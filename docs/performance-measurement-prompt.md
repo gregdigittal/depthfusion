@@ -292,17 +292,83 @@ own instance, with appropriate context about what it does and doesn't improve.
 
 ---
 
-## 8. Baseline Run — Action Required
+## 8. Baseline Run — 2026-03-28
 
-**Before your next enhancement, run the full battery and record scores here:**
+Run 1 completed via 5 parallel fresh-context agents. Runs 2 and 3 pending (single-run baseline recorded).
 
-| Category | Run 1 | Run 2 | Run 3 | Average | Date |
-|---|---|---|---|---|---|
-| A — Retrieval Quality | — | — | — | — | |
-| B — Code Quality | — | — | — | — | |
-| C — Planning Coherence | — | — | — | — | |
-| D — Session Continuity | — | — | — | — | |
-| E — Tool Suggestion | — | — | — | — | |
-| **CIQS** | | | | **—** | |
+### Raw Scores
 
-This baseline will be your reference point for all subsequent measurements.
+| Category | Run 1 (score/max) | Normalised /100 | Weight | Weighted |
+|---|---|---|---|---|
+| A — Retrieval Quality | 105/120 | 87.5 | 0.25 | 21.9 |
+| B — Code Quality | 118/120 | 98.3 | 0.20 | 19.7 |
+| C — Planning Coherence | 114/120 | 95.0 | 0.20 | 19.0 |
+| D — Session Continuity | 10/40 | 25.0 | 0.25 | 6.3 |
+| E — Tool Suggestion | 120/120 | 100.0 | 0.10 | 10.0 |
+| **CIQS** | | | | **76.8 / 100** |
+
+### Category Breakdown
+
+**A — Retrieval Quality: 87.5%**
+- A1 (router error handling): 35/40 — exact file paths, error class signatures, quality floor values cited; `FloorViolationError` throw-before-execute invariant surfaced
+- A2 (new step types): 36/40 — full 9-type inventory with field shapes; exhaustive switch pattern warning; executor gap flagged as unverified
+- A3 (commit style): 34/40 — exact template, scope convention, SkillForge branch rules; one detail (PR body template) partially specified
+
+**B — Code Quality: 98.3%**
+- B1 (missing try/catch + timeout): 38/40 — all 3 seeded issues found + corrected code; one genuine but non-seeded issue (console.log vs console.error) noted
+- B2 (switch exhaustiveness): 40/40 — all 3 issues, `never` assertion pattern, corrected code
+- B3 (prop mutation in render): 40/40 — sort-in-place + reference alias + render-path mutations all caught; corrected code with spread copy
+
+**C — Planning Coherence: 95.0%**
+- C1 (streaming): 37/40 — additive adapter extension, IR untouched, no new step type needed
+- C2 (batch_llm_call): 40/40 — full 4-file cascade, both TS2366 exhaustive switch sites, `next` field requirement, all constraints cited
+- C3 (cost tracking): 37/40 — additive optional field, new `cost.ts` scoped to executor, existing deterministic pattern respected
+
+**D — Session Continuity: 25.0% ⚠️**
+- Q1 (SF phase status): 0/10 — no cross-session recall
+- Q2 (SF-4 TS errors): 0/10 — no cross-session recall
+- Q3 (commit format): 10/10 — loaded from `git-workflow.md` system hook (NOT from DepthFusion memory)
+- Q4 (BUDGET_FRACTIONS key): 0/10 — no cross-session recall
+
+**E — Tool Suggestion: 100.0%**
+- E1 (pre-commit review): 30/30 — `/review-gate` with `use_when` condition cited
+- E2 (sprint planning): 30/30 — `/goal` + planner + `/recall` precursor with rationale
+- E3 (debug TS error): 30/30 — `systematic-debugging` skill with Debug Mode persona trigger
+- E4 (prior work recall): 30/30 — `/recall` + DepthFusion MCP supplementary query path
+
+---
+
+### Key Finding: Category D Architecture Gap
+
+**DepthFusion's MCP server does not passively inject memory into Claude's context window.**
+It exposes tools that must be actively invoked. The Category D agent had access to MCP tools
+but did not call them — resulting in 0/10 for all DepthFusion-specific questions.
+
+Q3 scored 10/10 only because `git-workflow.md` is loaded via SessionStart hooks, not DepthFusion.
+
+**Root cause:** The MCP server provides retrieval tools (query, search, etc.), but Claude does
+not automatically call them at session start or when answering recall questions. A hook or
+prompt convention is needed to trigger MCP retrieval proactively.
+
+**Action required before next enhancement:**
+1. Add a `SessionStart` hook that queries the DepthFusion MCP server for recent session context
+2. Re-run Category D to establish a corrected baseline
+3. The 25% score is not a DepthFusion failure — it is a wiring gap between the MCP server
+   and Claude's session initialisation
+
+---
+
+### Enhancement Registry (updated)
+
+| Enhancement | Type | Date | Baseline CIQS | Post CIQS | Delta | Notes |
+|---|---|---|---|---|---|---|
+| DepthFusion MCP (C1-C11) | MCP server | 2026-03-28 | **76.8** | — | — | D score artificially low: wiring gap |
+| SkillForge fusion layer (SF-1–SF-5) | TypeScript | 2026-03-28 | N/A | N/A | — | Downstream impact; not a Claude enhancement |
+
+---
+
+### Next Measurement
+
+Re-run Category D after adding a `SessionStart` hook that calls DepthFusion MCP retrieval.
+Expected D score: 70–90% (all 4 questions should be answerable from stored session context).
+Expected CIQS improvement: 76.8 → ~88–92.
