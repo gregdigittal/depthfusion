@@ -122,8 +122,110 @@ def _tool_status(config: Any) -> str:
 
 
 def _tool_recall(arguments: dict) -> str:
+    """Retrieve relevant context blocks across three sources:
+    1. ~/.claude/sessions/*.tmp  — goal session state files (cross-session memory)
+    2. ~/.claude/shared/discoveries/*.md — discovery files written by /goal and agents
+    3. ~/.claude/projects/-home-gregmorris/memory/*.md — persistent memory files
+
+    Returns top-k scored blocks suitable for injection as session context.
+    """
+    from pathlib import Path
+
     query = arguments.get("query", "")
-    return json.dumps({"query": query, "blocks": [], "message": "Recall not yet integrated"})
+    top_k = int(arguments.get("top_k", 5))
+
+    from depthfusion.core.types import SessionBlock
+    from depthfusion.session.scorer import SessionScorer
+
+    scorer = SessionScorer()
+    home = Path.home()
+    all_blocks: list[SessionBlock] = []
+
+    # Source 1: goal session state files
+    sessions_dir = home / ".claude" / "sessions"
+    if sessions_dir.exists():
+        for tmp_file in sorted(sessions_dir.glob("*.tmp"), key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
+            try:
+                content = tmp_file.read_text(encoding="utf-8", errors="replace")
+                if content.strip():
+                    all_blocks.append(SessionBlock(
+                        session_id=tmp_file.stem,
+                        block_index=0,
+                        content=content,
+                        tags=["session", tmp_file.stem],
+                    ))
+            except OSError:
+                pass
+
+    # Source 2: shared discoveries
+    discoveries_dir = home / ".claude" / "shared" / "discoveries"
+    if discoveries_dir.exists():
+        for md_file in sorted(discoveries_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
+            try:
+                content = md_file.read_text(encoding="utf-8", errors="replace")
+                if content.strip():
+                    # Extract topic tags from filename: YYYY-MM-DD-project-topic.md
+                    parts = md_file.stem.split("-")
+                    tags = ["discovery"] + [p for p in parts[3:] if p] if len(parts) > 3 else ["discovery"]
+                    all_blocks.append(SessionBlock(
+                        session_id=md_file.stem,
+                        block_index=0,
+                        content=content,
+                        tags=tags,
+                    ))
+            except OSError:
+                pass
+
+    # Source 3: persistent memory files
+    memory_dir = home / ".claude" / "projects" / "-home-gregmorris" / "memory"
+    if memory_dir.exists():
+        for md_file in sorted(memory_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)[:30]:
+            if md_file.name == "MEMORY.md":
+                continue  # index only — skip
+            try:
+                content = md_file.read_text(encoding="utf-8", errors="replace")
+                if content.strip():
+                    all_blocks.append(SessionBlock(
+                        session_id=md_file.stem,
+                        block_index=0,
+                        content=content,
+                        tags=["memory", md_file.stem],
+                    ))
+            except OSError:
+                pass
+
+    if not all_blocks:
+        return json.dumps({"query": query, "blocks": [], "message": "No session context available"})
+
+    # Score against query (or return recency-ordered if no query)
+    if query.strip():
+        scored = scorer.score_blocks(all_blocks, query)
+    else:
+        scored = [(b, 0.5) for b in all_blocks]  # recency order preserved
+
+    top = scored[:top_k]
+    blocks_out = []
+    for block, score in top:
+        # Truncate content to 500 chars for context injection efficiency
+        snippet = block.content[:500].strip()
+        if len(block.content) > 500:
+            snippet += "…"
+        blocks_out.append({
+            "chunk_id": block.session_id,
+            "source": "session" if block.session_id.startswith("202") and "-goal-" in block.session_id
+                      else "discovery" if block.session_id.startswith("202")
+                      else "memory",
+            "score": round(score, 4),
+            "tags": block.tags,
+            "snippet": snippet,
+        })
+
+    return json.dumps({
+        "query": query,
+        "blocks": blocks_out,
+        "total_sources_scanned": len(all_blocks),
+        "message": f"Retrieved {len(blocks_out)} relevant blocks",
+    }, indent=2)
 
 
 def _tool_tag_session(arguments: dict) -> str:
