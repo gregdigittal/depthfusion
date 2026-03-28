@@ -15,6 +15,10 @@ TOOLS: dict[str, str] = {
     "depthfusion_tag_session": "Tag a session file with metadata",
     "depthfusion_publish_context": "Publish a context item to the bus",
     "depthfusion_run_recursive": "Run recursive LLM on large content",
+    # v0.3.0 additions
+    "depthfusion_tier_status": "Return corpus size, active tier, and promotion estimate",
+    "depthfusion_auto_learn": "Trigger auto-learning extraction from recent session files",
+    "depthfusion_compress_session": "Compress a specific .tmp session file into a discovery file",
 }
 
 # Map tools to the feature flags that gate them
@@ -24,6 +28,9 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_tag_session": None,           # always enabled
     "depthfusion_publish_context": "router_enabled",
     "depthfusion_run_recursive": "rlm_enabled",
+    "depthfusion_tier_status": None,
+    "depthfusion_auto_learn": None,
+    "depthfusion_compress_session": None,
 }
 
 
@@ -103,6 +110,12 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_publish_context(arguments)
     elif tool_name == "depthfusion_run_recursive":
         return _tool_run_recursive(arguments, config)
+    elif tool_name == "depthfusion_tier_status":
+        return _tool_tier_status()
+    elif tool_name == "depthfusion_auto_learn":
+        return _tool_auto_learn(arguments)
+    elif tool_name == "depthfusion_compress_session":
+        return _tool_compress_session(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -237,6 +250,10 @@ def _tool_recall(arguments: dict) -> str:
             except OSError:
                 pass
 
+    # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
+    from depthfusion.retrieval.hybrid import RecallPipeline
+    pipeline = RecallPipeline.from_env()
+
     if not raw_blocks:
         return json.dumps({"query": query, "blocks": [], "message": "No session context available"})
 
@@ -285,31 +302,35 @@ def _tool_recall(arguments: dict) -> str:
     # Build lookup by chunk_id
     block_by_id = {b["chunk_id"]: b for b in raw_blocks}
 
-    # Deduplicate by file_stem: keep only the highest-scoring chunk per file
-    # Only include blocks with non-zero BM25 score when a query is present
+    # Build reranker input: deduplicate by file_stem, keep highest-scoring chunk per file
+    reranker_input = []
     seen_files: set[str] = set()
-    blocks_out = []
     for idx, final_score in weighted:
         if final_score <= 0.0:
-            break  # remainder all have zero score — stop
+            break
         b = raw_blocks[idx]
-        file_stem = b["file_stem"]
-        if file_stem in seen_files:
-            continue  # already have a higher-scoring chunk from this file
-        seen_files.add(file_stem)
-
+        if b["file_stem"] in seen_files:
+            continue
+        seen_files.add(b["file_stem"])
         snippet = b["content"][:snippet_len].strip()
         if len(b["content"]) > snippet_len:
             snippet += "…"
-
-        blocks_out.append({
+        reranker_input.append({
             "chunk_id": b["chunk_id"],
+            "file_stem": b["file_stem"],
             "source": b["source"],
             "score": round(final_score, 4),
             "snippet": snippet,
         })
-        if len(blocks_out) >= top_k:
-            break
+
+    # Apply reranker (no-op in local mode, haiku in vps-tier1+2)
+    blocks_out = pipeline.apply_reranker(reranker_input, query, top_k=top_k)
+    # Ensure output blocks have consistent fields
+    for b in blocks_out:
+        if "snippet" not in b:
+            b["snippet"] = b.get("content", "")[:snippet_len].strip()
+        b.pop("file_stem", None)
+        b.pop("content", None)
 
     return json.dumps({
         "query": query,
@@ -351,6 +372,66 @@ def _tool_run_recursive(arguments: dict, config: Any) -> str:
         return json.dumps({"error": str(exc), "result": None})
 
 
+def _tool_tier_status() -> str:
+    try:
+        from depthfusion.storage.tier_manager import TierManager
+        tm = TierManager()
+        cfg = tm.detect_tier()
+        return json.dumps({
+            "tier": cfg.tier.value,
+            "corpus_size": cfg.corpus_size,
+            "threshold": cfg.threshold,
+            "sessions_until_promotion": cfg.sessions_until_promotion,
+            "mode": cfg.mode,
+            "auto_promote": tm.auto_promote,
+        }, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+def _tool_auto_learn(arguments: dict) -> str:
+    """Trigger auto-learn extraction from recent .tmp session files."""
+    from pathlib import Path
+    max_files = int(arguments.get("max_files", 5))
+    sessions_dir = Path.home() / ".claude" / "sessions"
+    if not sessions_dir.exists():
+        return json.dumps({"compressed": 0, "message": "No sessions directory"})
+    try:
+        from depthfusion.capture.compressor import SessionCompressor
+        compressor = SessionCompressor()
+        recent = sorted(sessions_dir.glob("*.tmp"),
+                        key=lambda p: p.stat().st_mtime, reverse=True)[:max_files]
+        results = []
+        for tmp in recent:
+            out = compressor.compress(tmp)
+            if out:
+                results.append(str(out.name))
+        return json.dumps({
+            "compressed": len(results),
+            "files": results,
+            "message": f"Auto-learned from {len(results)} session files",
+        }, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "compressed": 0})
+
+
+def _tool_compress_session(arguments: dict) -> str:
+    """Compress a specific .tmp file into a discovery file."""
+    from pathlib import Path
+    session_path_str = arguments.get("session_path", "")
+    if not session_path_str:
+        return json.dumps({"error": "session_path argument required"})
+    try:
+        from depthfusion.capture.compressor import SessionCompressor
+        compressor = SessionCompressor()
+        out = compressor.compress(Path(session_path_str))
+        if out:
+            return json.dumps({"success": True, "output": str(out)})
+        return json.dumps({"success": False, "message": "Nothing to compress (empty or already done)"})
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
 def _process_request(request: dict, config: Any) -> dict:
     """Process a single JSON-RPC request and return the response."""
     method = request.get("method", "")
@@ -361,7 +442,7 @@ def _process_request(request: dict, config: Any) -> dict:
         result = {
             "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "depthfusion", "version": "0.1.0"},
+            "serverInfo": {"name": "depthfusion", "version": "0.3.0"},
         }
     elif method == "tools/list":
         result = _handle_tools_list(config)

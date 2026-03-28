@@ -5,14 +5,17 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, get_enabled_tools
 
 
-def test_tools_dict_has_five_entries():
-    assert len(TOOLS) == 5
+def test_tools_dict_has_eight_entries():
+    assert len(TOOLS) == 8
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
         "depthfusion_tag_session",
         "depthfusion_publish_context",
         "depthfusion_run_recursive",
+        "depthfusion_tier_status",
+        "depthfusion_auto_learn",
+        "depthfusion_compress_session",
     }
     assert set(TOOLS.keys()) == expected
 
@@ -21,21 +24,21 @@ def test_get_enabled_tools_all_flags_true():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 5
+    assert len(enabled) == 8
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
-    assert len(enabled) == 4
+    assert len(enabled) == 7
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    assert len(enabled) == 4
+    assert len(enabled) == 7
 
 
 def test_get_enabled_tools_both_disabled():
@@ -43,16 +46,19 @@ def test_get_enabled_tools_both_disabled():
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    assert len(enabled) == 3
+    assert len(enabled) == 6
 
 
 def test_core_tools_always_enabled():
-    """Status, recall, and tag are never gated by feature flags."""
+    """Status, recall, tag, and v0.3.0 tools are never gated by feature flags."""
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_status" in enabled
     assert "depthfusion_recall_relevant" in enabled
     assert "depthfusion_tag_session" in enabled
+    assert "depthfusion_tier_status" in enabled
+    assert "depthfusion_auto_learn" in enabled
+    assert "depthfusion_compress_session" in enabled
 
 
 def test_server_module_importable():
