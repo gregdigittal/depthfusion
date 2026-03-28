@@ -250,10 +250,6 @@ def _tool_recall(arguments: dict) -> str:
             except OSError:
                 pass
 
-    # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
-    from depthfusion.retrieval.hybrid import RecallPipeline
-    pipeline = RecallPipeline.from_env()
-
     if not raw_blocks:
         return json.dumps({"query": query, "blocks": [], "message": "No session context available"})
 
@@ -322,6 +318,10 @@ def _tool_recall(arguments: dict) -> str:
             "score": round(final_score, 4),
             "snippet": snippet,
         })
+
+    # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
+    from depthfusion.retrieval.hybrid import RecallPipeline
+    pipeline = RecallPipeline.from_env()
 
     # Apply reranker (no-op in local mode, haiku in vps-tier1+2)
     blocks_out = pipeline.apply_reranker(reranker_input, query, top_k=top_k)
@@ -392,7 +392,7 @@ def _tool_tier_status() -> str:
 def _tool_auto_learn(arguments: dict) -> str:
     """Trigger auto-learn extraction from recent .tmp session files."""
     from pathlib import Path
-    max_files = int(arguments.get("max_files", 5))
+    max_files = min(int(arguments.get("max_files", 5)), 50)
     sessions_dir = Path.home() / ".claude" / "sessions"
     if not sessions_dir.exists():
         return json.dumps({"compressed": 0, "message": "No sessions directory"})
