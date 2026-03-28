@@ -11,6 +11,14 @@ from enum import Enum
 
 from depthfusion.retrieval.reranker import HaikuReranker
 
+try:
+    from depthfusion.storage.tier_manager import TierManager, Tier as _StorageTier
+    _TIER_MANAGER_AVAILABLE = True
+except ImportError:
+    TierManager = None  # type: ignore[assignment,misc]
+    _StorageTier = None  # type: ignore[assignment]
+    _TIER_MANAGER_AVAILABLE = False
+
 
 class PipelineMode(Enum):
     LOCAL = "local"
@@ -35,11 +43,12 @@ class RecallPipeline:
         install_mode = os.environ.get("DEPTHFUSION_MODE", "local")
         if install_mode != "vps":
             return cls(mode=PipelineMode.LOCAL)
+        if not _TIER_MANAGER_AVAILABLE or TierManager is None:
+            return cls(mode=PipelineMode.VPS_TIER1)
         try:
-            from depthfusion.storage.tier_manager import TierManager, Tier
             tm = TierManager()
             cfg = tm.detect_tier()
-            if cfg.tier == Tier.VPS_TIER2:
+            if _StorageTier is not None and cfg.tier == _StorageTier.VPS_TIER2:
                 return cls(mode=PipelineMode.VPS_TIER2)
             return cls(mode=PipelineMode.VPS_TIER1)
         except Exception:
