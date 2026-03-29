@@ -91,3 +91,5 @@ def test_graph_tools_absent_when_flag_disabled():
     config.graph_enabled = False
     enabled = get_enabled_tools(config)
     assert "depthfusion_graph_traverse" not in enabled
+    assert "depthfusion_graph_status" not in enabled
+    assert "depthfusion_set_scope" not in enabled

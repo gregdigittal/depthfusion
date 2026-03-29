@@ -51,7 +51,7 @@ def get_enabled_tools(config: Any) -> list[str]:
     for tool_name, flag_attr in _TOOL_FLAGS.items():
         if flag_attr is None:
             enabled.append(tool_name)
-        elif getattr(config, flag_attr, True):
+        elif getattr(config, flag_attr, False):
             enabled.append(tool_name)
     return enabled
 
@@ -549,7 +549,7 @@ def _process_request(request: dict, config: Any) -> dict:
         result = {
             "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "depthfusion", "version": "0.3.0"},
+            "serverInfo": {"name": "depthfusion", "version": "0.4.0"},
         }
     elif method == "tools/list":
         result = _handle_tools_list(config)
