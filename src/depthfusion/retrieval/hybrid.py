@@ -79,10 +79,10 @@ class RecallPipeline:
             return query
         if graph_store is None:
             return query
+        from depthfusion.graph.traverser import expand_query  # ImportError is intentionally loud
         try:
             if graph_store.node_count() == 0:
                 return query
-            from depthfusion.graph.traverser import expand_query
             return expand_query(query, graph_store)
         except Exception:
             return query

@@ -9,6 +9,7 @@ Requires ANTHROPIC_API_KEY. Used in VPS mode by PostCompact hook.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -137,8 +138,6 @@ def summarize_and_extract_graph(
     Stores extracted entities and co-occurrence edges into graph_store.
     No-ops silently when DEPTHFUSION_GRAPH_ENABLED is not 'true' or graph_store is None.
     """
-    import os
-
     # Always run the summarizer (existing behaviour is unchanged)
     HaikuSummarizer().summarize_file(path)
 
