@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from enum import Enum
+from typing import Any
 
 from depthfusion.retrieval.reranker import HaikuReranker
 
@@ -61,6 +62,30 @@ class RecallPipeline:
         if self.mode == PipelineMode.LOCAL or self._reranker is None:
             return blocks[:top_k]
         return self._reranker.rerank(query, blocks, top_k=top_k)
+
+    def maybe_expand_query(
+        self,
+        query: str,
+        graph_store: "Any | None" = None,
+    ) -> str:
+        """Expand query with graph-linked terms when DEPTHFUSION_GRAPH_ENABLED=true.
+
+        Returns original query unchanged if:
+        - DEPTHFUSION_GRAPH_ENABLED is not 'true'
+        - graph_store is None
+        - graph has 0 nodes
+        """
+        if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() != "true":
+            return query
+        if graph_store is None:
+            return query
+        try:
+            if graph_store.node_count() == 0:
+                return query
+            from depthfusion.graph.traverser import expand_query
+            return expand_query(query, graph_store)
+        except Exception:
+            return query
 
     def rrf_fuse(
         self,

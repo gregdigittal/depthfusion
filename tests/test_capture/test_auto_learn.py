@@ -64,3 +64,36 @@ def test_heuristic_extractor_file_not_found():
     extractor = HeuristicExtractor()
     output = extractor.extract_from_file(Path("/nonexistent/file.tmp"))
     assert output is None
+
+
+def test_graph_extractor_populates_store(tmp_path, monkeypatch):
+    """Graph entities extracted from session file and stored when graph_enabled=True."""
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+    monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+
+    session_file = tmp_path / "session.tmp"
+    session_file.write_text("The TierManager class is central.\nrrf_fuse() merges results.", encoding="utf-8")
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(session_file, project="depthfusion", graph_store=store)
+
+    entities = store.all_entities()
+    names = [e.name for e in entities]
+    assert "TierManager" in names
+
+
+def test_graph_extraction_skipped_when_flag_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "false")
+    session_file = tmp_path / "session.tmp"
+    session_file.write_text("TierManager is central.", encoding="utf-8")
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(session_file, project="depthfusion", graph_store=store)
+
+    assert store.node_count() == 0

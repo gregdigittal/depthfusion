@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -124,3 +125,51 @@ Session content (truncated to 3000 chars):
         except Exception as exc:
             logger.warning("Haiku summarizer failed (%s), falling back to heuristic", exc)
             return HeuristicExtractor().extract_from_file(path)
+
+
+def summarize_and_extract_graph(
+    path: Path,
+    project: str,
+    graph_store: "Any | None",
+) -> None:
+    """Run HaikuSummarizer + graph entity extraction on a session file.
+
+    Stores extracted entities and co-occurrence edges into graph_store.
+    No-ops silently when DEPTHFUSION_GRAPH_ENABLED is not 'true' or graph_store is None.
+    """
+    import os
+
+    # Always run the summarizer (existing behaviour is unchanged)
+    HaikuSummarizer().summarize_file(path)
+
+    if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() != "true":
+        return
+    if graph_store is None:
+        return
+
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+
+    try:
+        from depthfusion.graph.extractor import (
+            RegexExtractor, HaikuExtractor, confidence_merge,
+        )
+        from depthfusion.graph.linker import CoOccurrenceLinker
+
+        regex_ext = RegexExtractor(project=project)
+        regex_entities = regex_ext.extract(content, source_file=str(path))
+        haiku_ext = HaikuExtractor(project=project)
+        haiku_entities = haiku_ext.extract(content, source_file=str(path))
+        entities = confidence_merge(regex_entities, haiku_entities)
+
+        linker = CoOccurrenceLinker()
+        edges = linker.link(entities)
+
+        for entity in entities:
+            graph_store.upsert_entity(entity)
+        for edge in edges:
+            graph_store.upsert_edge(edge)
+    except Exception as exc:
+        logger.debug("Graph entity extraction failed: %s", exc)
