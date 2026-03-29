@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -121,3 +122,143 @@ class JSONGraphStore:
 
     def edge_count(self) -> int:
         return len(self._data["edges"])
+
+
+class SQLiteGraphStore:
+    """SQLite-backed graph store. Supports proper traversal and edge filtering.
+
+    Schema:
+      entities(entity_id TEXT PK, name, type, project, source_files JSON,
+               confidence REAL, first_seen TEXT, metadata JSON)
+      edges(edge_id TEXT PK, source_id, target_id, relationship,
+            weight REAL, signals JSON, metadata JSON)
+    """
+
+    _CREATE_ENTITIES = """
+        CREATE TABLE IF NOT EXISTS entities (
+            entity_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            project TEXT NOT NULL,
+            source_files TEXT NOT NULL DEFAULT '[]',
+            confidence REAL NOT NULL DEFAULT 1.0,
+            first_seen TEXT NOT NULL DEFAULT '',
+            metadata TEXT NOT NULL DEFAULT '{}'
+        )
+    """
+    _CREATE_EDGES = """
+        CREATE TABLE IF NOT EXISTS edges (
+            edge_id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            relationship TEXT NOT NULL,
+            weight REAL NOT NULL DEFAULT 1.0,
+            signals TEXT NOT NULL DEFAULT '[]',
+            metadata TEXT NOT NULL DEFAULT '{}'
+        )
+    """
+
+    def __init__(self, path: Path | None = None):
+        self._path = path or (Path.home() / ".claude" / "depthfusion-graph.db")
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
+        self._conn.execute(self._CREATE_ENTITIES)
+        self._conn.execute(self._CREATE_EDGES)
+        self._conn.commit()
+
+    def upsert_entity(self, entity: Entity) -> None:
+        self._conn.execute(
+            """INSERT OR REPLACE INTO entities
+               (entity_id, name, type, project, source_files, confidence, first_seen, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entity.entity_id, entity.name, entity.type, entity.project,
+                json.dumps(entity.source_files), entity.confidence,
+                entity.first_seen, json.dumps(entity.metadata),
+            ),
+        )
+        self._conn.commit()
+
+    def get_entity(self, entity_id: str) -> Entity | None:
+        row = self._conn.execute(
+            "SELECT * FROM entities WHERE entity_id = ?", (entity_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return Entity(
+            entity_id=row[0], name=row[1], type=row[2], project=row[3],
+            source_files=json.loads(row[4]), confidence=row[5],
+            first_seen=row[6], metadata=json.loads(row[7]),
+        )
+
+    def upsert_edge(self, edge: Edge) -> None:
+        self._conn.execute(
+            """INSERT OR REPLACE INTO edges
+               (edge_id, source_id, target_id, relationship, weight, signals, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                edge.edge_id, edge.source_id, edge.target_id,
+                edge.relationship, edge.weight,
+                json.dumps(edge.signals), json.dumps(edge.metadata),
+            ),
+        )
+        self._conn.commit()
+
+    def get_edges(
+        self,
+        entity_id: str,
+        relationship_filter: list[str] | None = None,
+    ) -> list[Edge]:
+        params: list = [entity_id, entity_id]
+        if relationship_filter:
+            sql = (
+                "SELECT * FROM edges WHERE (source_id = ? OR target_id = ?)"
+                f" AND relationship IN ({','.join('?' * len(relationship_filter))})"
+            )
+            params.extend(relationship_filter)
+        else:
+            sql = "SELECT * FROM edges WHERE source_id = ? OR target_id = ?"
+
+        rows = self._conn.execute(sql, params).fetchall()
+        return [
+            Edge(
+                edge_id=r[0], source_id=r[1], target_id=r[2],
+                relationship=r[3], weight=r[4],
+                signals=json.loads(r[5]), metadata=json.loads(r[6]),
+            )
+            for r in rows
+        ]
+
+    def all_entities(self) -> list[Entity]:
+        rows = self._conn.execute("SELECT * FROM entities").fetchall()
+        return [
+            Entity(
+                entity_id=r[0], name=r[1], type=r[2], project=r[3],
+                source_files=json.loads(r[4]), confidence=r[5],
+                first_seen=r[6], metadata=json.loads(r[7]),
+            )
+            for r in rows
+        ]
+
+    def node_count(self) -> int:
+        return self._conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+
+    def edge_count(self) -> int:
+        return self._conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
+
+
+def get_store(
+    graph_json_path: Path | None = None,
+    graph_db_path: Path | None = None,
+    corpus_size: int = 0,
+) -> "JSONGraphStore | SQLiteGraphStore":
+    """Return the appropriate store backend based on DEPTHFUSION_MODE and corpus size.
+
+    Local mode → JSONGraphStore
+    VPS + corpus < 500 → SQLiteGraphStore
+    VPS + corpus >= 500 → SQLiteGraphStore (ChromaDB extension future work)
+    """
+    mode = os.environ.get("DEPTHFUSION_MODE", "local")
+    if mode != "vps":
+        return JSONGraphStore(path=graph_json_path)
+    return SQLiteGraphStore(path=graph_db_path)

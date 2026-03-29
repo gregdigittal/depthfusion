@@ -86,3 +86,76 @@ def test_edge_count(json_store, sample_entity, sample_entity_b, sample_edge):
     json_store.upsert_entity(sample_entity_b)
     json_store.upsert_edge(sample_edge)
     assert json_store.edge_count() == 1
+
+
+# ---- Task 6 additions ----
+
+import os
+from depthfusion.graph.store import SQLiteGraphStore, get_store
+
+
+@pytest.fixture
+def sqlite_store(tmp_path):
+    return SQLiteGraphStore(path=tmp_path / "graph.db")
+
+
+def test_sqlite_upsert_and_get_entity(sqlite_store, sample_entity):
+    sqlite_store.upsert_entity(sample_entity)
+    result = sqlite_store.get_entity(sample_entity.entity_id)
+    assert result is not None
+    assert result.name == "TierManager"
+
+
+def test_sqlite_get_missing_entity_returns_none(sqlite_store):
+    assert sqlite_store.get_entity("missing") is None
+
+
+def test_sqlite_upsert_edge_and_get(sqlite_store, sample_entity, sample_entity_b, sample_edge):
+    sqlite_store.upsert_entity(sample_entity)
+    sqlite_store.upsert_entity(sample_entity_b)
+    sqlite_store.upsert_edge(sample_edge)
+    edges = sqlite_store.get_edges(sample_entity.entity_id)
+    assert any(e.relationship == "CO_OCCURS" for e in edges)
+
+
+def test_sqlite_all_entities(sqlite_store, sample_entity, sample_entity_b):
+    sqlite_store.upsert_entity(sample_entity)
+    sqlite_store.upsert_entity(sample_entity_b)
+    assert len(sqlite_store.all_entities()) == 2
+
+
+def test_sqlite_node_and_edge_count(sqlite_store, sample_entity, sample_entity_b, sample_edge):
+    sqlite_store.upsert_entity(sample_entity)
+    sqlite_store.upsert_entity(sample_entity_b)
+    sqlite_store.upsert_edge(sample_edge)
+    assert sqlite_store.node_count() == 2
+    assert sqlite_store.edge_count() == 1
+
+
+def test_sqlite_relationship_filter(sqlite_store, sample_entity, sample_entity_b, sample_edge):
+    sqlite_store.upsert_entity(sample_entity)
+    sqlite_store.upsert_entity(sample_entity_b)
+    sqlite_store.upsert_edge(sample_edge)
+    edges = sqlite_store.get_edges(
+        sample_entity.entity_id, relationship_filter=["CO_OCCURS"]
+    )
+    assert len(edges) == 1
+    edges_empty = sqlite_store.get_edges(
+        sample_entity.entity_id, relationship_filter=["DEPENDS_ON"]
+    )
+    assert edges_empty == []
+
+
+def test_get_store_returns_json_in_local_mode(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+    store = get_store(graph_json_path=tmp_path / "g.json")
+    assert isinstance(store, JSONGraphStore)
+
+
+def test_get_store_returns_sqlite_in_vps_tier1(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps")
+    store = get_store(
+        graph_db_path=tmp_path / "g.db",
+        corpus_size=10,
+    )
+    assert isinstance(store, SQLiteGraphStore)
