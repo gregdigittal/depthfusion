@@ -5,8 +5,8 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, get_enabled_tools
 
 
-def test_tools_dict_has_eight_entries():
-    assert len(TOOLS) == 8
+def test_tools_dict_has_eleven_entries():
+    assert len(TOOLS) == 11
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -16,15 +16,18 @@ def test_tools_dict_has_eight_entries():
         "depthfusion_tier_status",
         "depthfusion_auto_learn",
         "depthfusion_compress_session",
+        "depthfusion_graph_traverse",
+        "depthfusion_graph_status",
+        "depthfusion_set_scope",
     }
     assert set(TOOLS.keys()) == expected
 
 
 def test_get_enabled_tools_all_flags_true():
-    config = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
+    config = DepthFusionConfig(rlm_enabled=True, router_enabled=True, graph_enabled=True)
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 8
+    assert len(enabled) == 11
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
@@ -65,3 +68,26 @@ def test_server_module_importable():
     """MCP server module must be importable without side effects."""
     import depthfusion.mcp.server  # noqa: F401
     assert True  # If we get here, import succeeded
+
+
+def test_graph_tools_registered_when_flag_enabled():
+    """Graph tools appear in enabled list when graph_enabled=True."""
+    from unittest.mock import MagicMock
+    config = MagicMock()
+    config.router_enabled = False
+    config.rlm_enabled = False
+    config.graph_enabled = True
+    enabled = get_enabled_tools(config)
+    assert "depthfusion_graph_traverse" in enabled
+    assert "depthfusion_graph_status" in enabled
+    assert "depthfusion_set_scope" in enabled
+
+
+def test_graph_tools_absent_when_flag_disabled():
+    from unittest.mock import MagicMock
+    config = MagicMock()
+    config.router_enabled = False
+    config.rlm_enabled = False
+    config.graph_enabled = False
+    enabled = get_enabled_tools(config)
+    assert "depthfusion_graph_traverse" not in enabled

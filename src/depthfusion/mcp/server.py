@@ -19,6 +19,10 @@ TOOLS: dict[str, str] = {
     "depthfusion_tier_status": "Return corpus size, active tier, and promotion estimate",
     "depthfusion_auto_learn": "Trigger auto-learning extraction from recent session files",
     "depthfusion_compress_session": "Compress a specific .tmp session file into a discovery file",
+    # v0.4.0 graph tools
+    "depthfusion_graph_traverse": "Traverse entity graph from a named entity",
+    "depthfusion_graph_status": "Report graph health: node count, edge count, coverage, tier",
+    "depthfusion_set_scope": "Set session graph scope (project | cross_project | global)",
 }
 
 # Map tools to the feature flags that gate them
@@ -31,6 +35,9 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_tier_status": None,
     "depthfusion_auto_learn": None,
     "depthfusion_compress_session": None,
+    "depthfusion_graph_traverse": "graph_enabled",
+    "depthfusion_graph_status": "graph_enabled",
+    "depthfusion_set_scope": "graph_enabled",
 }
 
 
@@ -116,6 +123,12 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_auto_learn(arguments)
     elif tool_name == "depthfusion_compress_session":
         return _tool_compress_session(arguments)
+    elif tool_name == "depthfusion_graph_traverse":
+        return _tool_graph_traverse(arguments)
+    elif tool_name == "depthfusion_graph_status":
+        return _tool_graph_status()
+    elif tool_name == "depthfusion_set_scope":
+        return _tool_set_scope(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -430,6 +443,100 @@ def _tool_compress_session(arguments: dict) -> str:
         return json.dumps({"success": False, "message": "Nothing to compress (empty or already done)"})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
+
+
+def _tool_graph_traverse(arguments: dict) -> str:
+    """Traverse entity graph from a named entity."""
+    import os
+    graph_enabled = os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true"
+    if not graph_enabled:
+        return json.dumps({"error": "DEPTHFUSION_GRAPH_ENABLED is not set"})
+
+    from depthfusion.graph.store import get_store
+    from depthfusion.graph.traverser import traverse
+
+    entity_name = arguments.get("entity_name", "")
+    depth = min(int(arguments.get("depth", 1)), 3)
+    relationship_filter = arguments.get("relationship_filter") or None
+
+    store = get_store()
+    all_entities = store.all_entities()
+    match = next(
+        (e for e in all_entities if e.name.lower() == entity_name.lower()), None
+    )
+    if not match:
+        return json.dumps({
+            "error": f"Entity not found: {entity_name}",
+            "available": [e.name for e in all_entities[:20]],
+        })
+
+    result = traverse(match.entity_id, store, depth=depth, relationship_filter=relationship_filter)
+    if not result:
+        return json.dumps({"error": "Traversal failed"})
+
+    return json.dumps({
+        "origin": {
+            "name": result.origin_entity.name,
+            "type": result.origin_entity.type,
+            "confidence": result.origin_entity.confidence,
+        },
+        "connected": [
+            {
+                "name": e.name, "type": e.type, "relationship": edge.relationship,
+                "weight": edge.weight, "signals": edge.signals,
+            }
+            for e, edge in result.connected
+        ],
+        "depth": result.depth,
+    }, indent=2)
+
+
+def _tool_graph_status() -> str:
+    """Report graph health and coverage."""
+    import os
+    graph_enabled = os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true"
+    if not graph_enabled:
+        return json.dumps({
+            "graph_enabled": False,
+            "message": "Set DEPTHFUSION_GRAPH_ENABLED=true to activate",
+        })
+
+    from depthfusion.graph.store import get_store
+    store = get_store()
+    entities = store.all_entities()
+    type_breakdown: dict[str, int] = {}
+    for e in entities:
+        type_breakdown[e.type] = type_breakdown.get(e.type, 0) + 1
+
+    return json.dumps({
+        "graph_enabled": True,
+        "node_count": store.node_count(),
+        "edge_count": store.edge_count(),
+        "entities_by_type": type_breakdown,
+        "tier": os.environ.get("DEPTHFUSION_MODE", "local"),
+    }, indent=2)
+
+
+def _tool_set_scope(arguments: dict) -> str:
+    """Programmatically set session graph scope."""
+    from datetime import datetime, timezone
+    from depthfusion.graph.scope import write_scope
+    from depthfusion.graph.types import GraphScope
+
+    mode = arguments.get("mode", "project")
+    projects = arguments.get("projects") or []
+
+    if mode not in ("project", "cross_project", "global"):
+        return json.dumps({"error": f"Invalid mode: {mode}. Use project|cross_project|global"})
+
+    scope = GraphScope(
+        mode=mode,
+        active_projects=projects,
+        session_id="mcp_set",
+        set_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+    )
+    write_scope(scope)
+    return json.dumps({"ok": True, "mode": mode, "active_projects": projects})
 
 
 def _process_request(request: dict, config: Any) -> dict:
