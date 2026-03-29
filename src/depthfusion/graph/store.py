@@ -117,7 +117,8 @@ class JSONGraphStore:
         return [
             _dict_to_edge(d)
             for d in self._data["edges"].values()
-            if d["source_id"] == entity_id or d["target_id"] == entity_id
+            if (d["source_id"] == entity_id or d["target_id"] == entity_id)
+            and (relationship_filter is None or d["relationship"] in relationship_filter)
         ]
 
     def all_entities(self) -> list[Entity]:
