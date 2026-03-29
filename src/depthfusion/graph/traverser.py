@@ -2,6 +2,7 @@
 """Graph traversal, query expansion, and score boosting."""
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,8 @@ _CONFIDENCE_THRESHOLD = 0.70
 _MAX_BOOST = 0.30
 # Boost per unit of edge weight
 _BOOST_PER_WEIGHT_UNIT = 0.10
+
+logger = logging.getLogger(__name__)
 
 
 def traverse(
@@ -128,7 +131,7 @@ def boost_scores(
         content_lower = block.get("content", "").lower()
         boost = 0.0
         for name_lower, weight in linked.items():
-            if name_lower in content_lower:
+            if re.search(r"\b" + re.escape(name_lower) + r"\b", content_lower):
                 boost += weight * _BOOST_PER_WEIGHT_UNIT
         boost = min(boost, _MAX_BOOST)
         boosted.append({**block, "score": block["score"] + boost})

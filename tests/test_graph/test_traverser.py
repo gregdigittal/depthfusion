@@ -97,7 +97,7 @@ def test_boost_scores_is_additive(populated_store, sample_entity):
     blocks = [{"chunk_id": "x", "content": "RecallPipeline", "score": 0.70}]
     boosted = boost_scores(blocks, top_result_entity_id=sample_entity.entity_id,
                            store=populated_store)
-    assert boosted[0]["score"] >= 0.70
+    assert boosted[0]["score"] > 0.70
 
 
 def test_boost_scores_no_entity_returns_unchanged(tmp_path):
@@ -136,3 +136,17 @@ def test_traverse_depth2_walks_two_hops(tmp_path):
     connected_ids = {e.entity_id for e, _ in result.connected}
     assert b.entity_id in connected_ids
     assert c.entity_id in connected_ids
+
+
+def test_expand_query_skips_low_confidence_entity(tmp_path):
+    """Entities with confidence below threshold are excluded from expansion."""
+    store = JSONGraphStore(path=tmp_path / "g.json")
+    low_conf = Entity(
+        entity_id=make_entity_id("LowConf", "class", "p"),
+        name="LowConf", type="class", project="p",
+        source_files=[], confidence=0.65,
+        first_seen="2026-03-28T00:00:00", metadata={},
+    )
+    store.upsert_entity(low_conf)
+    expanded = expand_query("LowConf processing", store)
+    assert expanded == "LowConf processing"
