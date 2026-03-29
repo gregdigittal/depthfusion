@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from itertools import combinations
 from typing import Any
 
@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 _VALID_RELATIONSHIPS = frozenset({
     "CO_OCCURS", "CAUSES", "FIXES", "DEPENDS_ON",
     "REPLACES", "CONFLICTS_WITH", "CO_WORKED_ON",
+})
+
+# Haiku may only produce semantic relationship types.
+# CO_OCCURS and CO_WORKED_ON are structural signals owned by
+# CoOccurrenceLinker and TemporalLinker — never Haiku-inferred.
+_HAIKU_VALID_RELATIONSHIPS = frozenset({
+    "CAUSES", "FIXES", "DEPENDS_ON", "REPLACES", "CONFLICTS_WITH",
 })
 
 _HAIKU_PROMPT = """\
@@ -34,10 +41,6 @@ Context: {context}"""
 def make_edge_id(source_id: str, target_id: str, relationship: str) -> str:
     raw = f"{source_id}{target_id}{relationship}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()[:12]
-
-
-def _now_iso() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 class CoOccurrenceLinker:
@@ -135,7 +138,7 @@ class HaikuLinker:
             logger.debug("HaikuLinker failed: %s", exc)
             return None
 
-        if rel not in _VALID_RELATIONSHIPS:
+        if rel not in _HAIKU_VALID_RELATIONSHIPS:
             return None
 
         return Edge(
