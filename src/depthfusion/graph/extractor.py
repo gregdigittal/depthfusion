@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -106,7 +107,6 @@ class HaikuExtractor:
         self._client: Any = None
         try:
             import anthropic
-            import os
             if os.environ.get("ANTHROPIC_API_KEY"):
                 self._client = anthropic.Anthropic()
         except ImportError:
