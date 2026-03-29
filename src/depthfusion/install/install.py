@@ -17,6 +17,7 @@ _VPS_ENV_LINES = [
     "DEPTHFUSION_MODE=vps",
     "DEPTHFUSION_TIER_AUTOPROMOTE=true",
     "DEPTHFUSION_RERANKER_ENABLED=true",
+    "DEPTHFUSION_GRAPH_ENABLED=false",  # v0.4.0 Knowledge Graph (opt-in)
 ]
 
 
