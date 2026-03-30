@@ -43,7 +43,7 @@ def install_local(dry_run: bool = False) -> None:
 def install_vps(dry_run: bool = False, tier_threshold: int = 500) -> None:
     _print_step(f"Configuring DepthFusion for VPS mode (tier threshold: {tier_threshold})", dry_run)
     _print_step("  - BM25 retrieval: enabled", dry_run)
-    _print_step("  - Haiku reranker (Tier 1): enabled (requires ANTHROPIC_API_KEY)", dry_run)
+    _print_step("  - Haiku reranker (Tier 1): opt-in (set DEPTHFUSION_HAIKU_ENABLED=true + DEPTHFUSION_API_KEY)", dry_run)
     _print_step(f"  - ChromaDB vector store (Tier 2): enabled at {tier_threshold}+ sessions", dry_run)
     _print_step("  - PreCompact + PostCompact auto-capture hooks: enabled", dry_run)
     if not dry_run:
@@ -51,9 +51,10 @@ def install_vps(dry_run: bool = False, tier_threshold: int = 500) -> None:
         env_lines.append(f"DEPTHFUSION_TIER_THRESHOLD={tier_threshold}")
         _write_env_config(env_lines)
         _register_hooks()
-        _check_anthropic_key()
+        _check_depthfusion_api_key()
     _print_step("VPS install complete.", dry_run)
-    _print_step("Ensure ANTHROPIC_API_KEY is set for haiku reranker.", dry_run)
+    _print_step("To enable Haiku summarization: set DEPTHFUSION_HAIKU_ENABLED=true and DEPTHFUSION_API_KEY=sk-ant-...", dry_run)
+    _print_step("WARNING: Do NOT set ANTHROPIC_API_KEY in your environment — Claude Code uses it for billing auth.", dry_run)
 
 
 def _write_env_config(lines: list[str]) -> None:
@@ -93,10 +94,16 @@ def _register_hooks() -> None:
         json.dump(settings, f, indent=2)
 
 
-def _check_anthropic_key() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("  Warning: ANTHROPIC_API_KEY not set. Haiku reranker will be disabled.")
-        print("  Set it with: export ANTHROPIC_API_KEY=sk-...")
+def _check_depthfusion_api_key() -> None:
+    if os.environ.get("DEPTHFUSION_API_KEY"):
+        print("  DEPTHFUSION_API_KEY found. Haiku features available when DEPTHFUSION_HAIKU_ENABLED=true.")
+    elif os.environ.get("ANTHROPIC_API_KEY"):
+        print("  Warning: ANTHROPIC_API_KEY is set but will NOT be used by default.")
+        print("  To avoid unintended Claude Code billing, use DEPTHFUSION_API_KEY instead.")
+        print("  See README for details.")
+    else:
+        print("  Haiku summarization disabled (no API key). Heuristic extraction will be used.")
+        print("  To enable: set DEPTHFUSION_HAIKU_ENABLED=true and DEPTHFUSION_API_KEY=sk-ant-...")
 
 
 def main() -> None:

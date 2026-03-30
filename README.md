@@ -73,13 +73,25 @@ export DEPTHFUSION_MODE=local
 
 ### VPS mode (haiku reranker + ChromaDB Tier 2)
 
+> ⚠️ **Billing warning:** Do NOT set `ANTHROPIC_API_KEY` in `~/.claude/settings.json` or your shell
+> environment. Claude Code reads this variable as its own auth credential and will switch your entire
+> billing from your Pro/Max subscription to pay-per-token API billing for **all** Claude Code usage —
+> not just DepthFusion. Use `DEPTHFUSION_API_KEY` instead (see below).
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[vps-tier2]"
-export ANTHROPIC_API_KEY=sk-...
 export DEPTHFUSION_MODE=vps
 python -m depthfusion.install.install --mode vps
 claude mcp add depthfusion --scope user -- $(pwd)/.venv/bin/python -m depthfusion.mcp.server
+```
+
+To enable Haiku summarization (optional — heuristic extraction works without it):
+
+```bash
+# In ~/.claude/depthfusion.env (NOT in settings.json env block):
+DEPTHFUSION_HAIKU_ENABLED=true
+DEPTHFUSION_API_KEY=sk-ant-your-key-here
 ```
 
 **Tier promotion:** When your corpus crosses 500 sessions (configurable via `DEPTHFUSION_TIER_THRESHOLD`), run the migration script to activate ChromaDB vector retrieval:
@@ -118,6 +130,8 @@ python -m depthfusion.install.migrate --dry-run  # preview without writing
 | `DEPTHFUSION_RLM_ENABLED` | rlm recursive reasoning | `true` |
 | `DEPTHFUSION_ROUTER_ENABLED` | Context bus pub/sub | `true` |
 | `DEPTHFUSION_METRICS_ENABLED` | JSONL metrics collection | `true` |
+| `DEPTHFUSION_HAIKU_ENABLED` | Haiku API calls for summarization/extraction (opt-in) | `false` |
+| `DEPTHFUSION_API_KEY` | API key for Haiku features — use instead of `ANTHROPIC_API_KEY` | — |
 
 ---
 

@@ -4,7 +4,13 @@ HeuristicExtractor: regex-based extraction of key decisions from .tmp files.
 No API calls — safe for local mode.
 
 HaikuSummarizer: calls Claude haiku to produce a structured discovery summary.
-Requires ANTHROPIC_API_KEY. Used in VPS mode by PostCompact hook.
+Opt-in: requires DEPTHFUSION_HAIKU_ENABLED=true and DEPTHFUSION_API_KEY (or the
+legacy ANTHROPIC_API_KEY fallback). Used in VPS mode by PostCompact hook.
+
+⚠️  Do NOT set ANTHROPIC_API_KEY in ~/.claude/settings.json or your shell
+environment — Claude Code reads it as auth and will switch your billing from
+your Pro/Max subscription to pay-per-token API billing for ALL usage. Use
+DEPTHFUSION_API_KEY instead.
 """
 from __future__ import annotations
 
@@ -87,11 +93,14 @@ Session content (truncated to 3000 chars):
     def __init__(self, model: str = "claude-haiku-4-5-20251001"):
         self._model = model
         self._client = None
+        haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+        if not haiku_enabled:
+            return
         try:
             import anthropic
-            import os
-            if os.environ.get("ANTHROPIC_API_KEY"):
-                self._client = anthropic.Anthropic()
+            api_key = os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+            if api_key:
+                self._client = anthropic.Anthropic(api_key=api_key)
         except ImportError:
             pass
 

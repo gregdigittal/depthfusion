@@ -97,7 +97,8 @@ class RegexExtractor:
 class HaikuExtractor:
     """Haiku-based extraction for concepts, decisions, error_patterns.
 
-    Returns empty list when ANTHROPIC_API_KEY is unset or SDK unavailable.
+    Returns empty list when DEPTHFUSION_HAIKU_ENABLED is not set or SDK unavailable.
+    Reads DEPTHFUSION_API_KEY (preferred) or ANTHROPIC_API_KEY (legacy fallback).
     Confidence range: 0.70–0.95 (lower than regex to allow precedence).
     """
 
@@ -105,10 +106,14 @@ class HaikuExtractor:
         self._project = project
         self._model = model
         self._client: Any = None
+        haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+        if not haiku_enabled:
+            return
         try:
             import anthropic
-            if os.environ.get("ANTHROPIC_API_KEY"):
-                self._client = anthropic.Anthropic()
+            api_key = os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+            if api_key:
+                self._client = anthropic.Anthropic(api_key=api_key)
         except ImportError:
             pass
 

@@ -49,6 +49,7 @@ class DepthFusionConfig:
     rlm_enabled: bool = True
     router_enabled: bool = True
     graph_enabled: bool = False       # v0.4.0 Knowledge Graph (opt-in)
+    haiku_enabled: bool = False       # v0.5.0 Haiku API calls (opt-in, requires DEPTHFUSION_API_KEY)
 
     # Session behaviour
     session_selective: bool = True   # False → load_all() fallback
@@ -75,6 +76,7 @@ class DepthFusionConfig:
             rlm_enabled=_env_bool("DEPTHFUSION_RLM_ENABLED", True),
             router_enabled=_env_bool("DEPTHFUSION_ROUTER_ENABLED", True),
             graph_enabled=_env_bool("DEPTHFUSION_GRAPH_ENABLED", False),
+            haiku_enabled=_env_bool("DEPTHFUSION_HAIKU_ENABLED", False),
             session_selective=_env_bool("DEPTHFUSION_SESSION_SELECTIVE", True),
             session_top_k=_env_int("DEPTHFUSION_SESSION_TOP_K", 5),
             tagger_llm=_env_bool("DEPTHFUSION_TAGGER_LLM", False),
