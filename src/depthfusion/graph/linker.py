@@ -108,7 +108,7 @@ class HaikuLinker:
         self._client: Any = None
         try:
             import anthropic
-            if os.environ.get("ANTHROPIC_API_KEY"):
+            if (os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
                 self._client = anthropic.Anthropic()
         except ImportError:
             pass

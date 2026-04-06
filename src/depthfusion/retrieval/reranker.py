@@ -36,8 +36,8 @@ class HaikuReranker:
     def __init__(self, model: str = "claude-haiku-4-5-20251001"):
         self._model = model
         self._client = None
-        if _ANTHROPIC_IMPORTABLE and os.environ.get("ANTHROPIC_API_KEY"):
-            self._client = anthropic.Anthropic()
+        if _ANTHROPIC_IMPORTABLE and (os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
+            self._client = anthropic.Anthropic(api_key=os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"))
 
     def is_available(self) -> bool:
         """Return True if the reranker can make API calls."""

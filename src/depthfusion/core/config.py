@@ -7,6 +7,26 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+
+def _load_env_file() -> None:
+    env_path = Path.home() / ".claude" / "depthfusion.env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip()
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+
+_load_env_file()
+
 
 _TRUTHY = {"true", "1", "yes"}
 _FALSY = {"false", "0", "no"}
