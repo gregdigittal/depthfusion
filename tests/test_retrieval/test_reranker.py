@@ -31,7 +31,7 @@ def test_reranker_returns_top_k(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     mock_msg = MagicMock()
     mock_msg.content = [MagicMock(text="[0, 2, 1]")]
-    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic:
+    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic,          patch("depthfusion.retrieval.reranker._ANTHROPIC_IMPORTABLE", True):
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_msg
         mock_anthropic.Anthropic.return_value = mock_client
@@ -46,7 +46,7 @@ def test_reranker_fallback_on_bad_json(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     mock_msg = MagicMock()
     mock_msg.content = [MagicMock(text="I cannot determine relevance")]
-    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic:
+    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic,          patch("depthfusion.retrieval.reranker._ANTHROPIC_IMPORTABLE", True):
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_msg
         mock_anthropic.Anthropic.return_value = mock_client
@@ -59,7 +59,7 @@ def test_reranker_fallback_on_bad_json(monkeypatch):
 
 def test_reranker_handles_api_exception(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic:
+    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic,          patch("depthfusion.retrieval.reranker._ANTHROPIC_IMPORTABLE", True):
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = Exception("API error")
         mock_anthropic.Anthropic.return_value = mock_client
