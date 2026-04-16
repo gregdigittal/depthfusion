@@ -93,6 +93,30 @@ def test_c4_green_when_no_clara(tmp_path: Path):
     assert result["status"] == GREEN
 
 
+def test_c4_green_when_clara_only_in_node_modules(tmp_path: Path):
+    """C4 must not false-positive on npm packages containing 'clara' in node_modules."""
+    scanner = _make_scanner(tmp_path)
+    # Simulate a node_modules package whose filename contains "clara"
+    node_mods = scanner.claude_dir / "node_modules" / "postcss-selector-parser" / "dist" / "selectors"
+    node_mods.mkdir(parents=True)
+    (node_mods / "clara-helper.js").write_text("// not a CLaRa integration file")
+    checker = CompatibilityChecker(scanner=scanner)
+    result = checker.check_c4_clara_state()
+    assert result["status"] == GREEN, (
+        f"Expected GREEN but got {result['status']}: {result['detail']}"
+    )
+
+
+def test_c4_yellow_when_clara_outside_excluded_dirs(tmp_path: Path):
+    """C4 must detect CLaRa indicators that are NOT inside excluded directories."""
+    scanner = _make_scanner(tmp_path)
+    # Create a genuine CLaRa file at the top level of ~/.claude
+    (scanner.claude_dir / "clara-state.json").write_text("{}")
+    checker = CompatibilityChecker(scanner=scanner)
+    result = checker.check_c4_clara_state()
+    assert result["status"] == YELLOW
+
+
 def test_c5_green_when_no_depthfusion_hooks(tmp_path: Path):
     scanner = _make_scanner(tmp_path)
     checker = CompatibilityChecker(scanner=scanner)

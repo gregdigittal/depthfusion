@@ -372,3 +372,37 @@ prompt convention is needed to trigger MCP retrieval proactively.
 Re-run Category D after adding a `SessionStart` hook that calls DepthFusion MCP retrieval.
 Expected D score: 70–90% (all 4 questions should be answerable from stored session context).
 Expected CIQS improvement: 76.8 → ~88–92.
+
+---
+
+### Category F — Knowledge Graph Performance (tests graph traversal + query expansion)
+
+**What it measures:** Whether the graph subsystem correctly identifies entity relationships and whether query expansion improves retrieval precision.
+
+**Benchmark 1: Traversal latency**
+```bash
+# Target: <100ms for depth≤3
+time .venv/bin/python -c "
+from depthfusion.graph.store import get_store
+from depthfusion.graph.traverser import traverse
+store = get_store()
+entities = store.all_entities()
+if entities:
+    result = traverse(entities[0].entity_id, store, depth=3)
+    print(f'Traversed {len(result.connected)} connections in depth 3')
+"
+```
+
+**Benchmark 2: Entity extraction throughput**
+Target: <500ms per file for RegexExtractor, <2s per file for HaikuExtractor.
+
+**Benchmark 3: Query expansion precision**
+Compare top-5 BM25 results with and without graph query expansion on 3 test queries.
+Expansion should improve precision (more relevant results in top-5) without degrading recall.
+
+**Scoring rubric (0-10):**
+| Dimension | 0 | 5 | 10 |
+|---|---|---|---|
+| Traversal completeness | Returns no connections | Some connections, missing obvious links | All expected links found |
+| Expansion precision | Expansion adds noise terms | Neutral — same results with/without | Expansion surfaces missed relevant results |
+| Latency | >500ms | 100-500ms | <100ms |

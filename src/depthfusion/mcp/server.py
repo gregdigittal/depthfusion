@@ -198,6 +198,45 @@ _SOURCE_WEIGHTS = {
 }
 
 
+def _trim_to_sentence(text: str, max_len: int) -> str:
+    """Trim *text* to at most *max_len* characters, preferring a sentence boundary.
+
+    Rules (applied in order):
+    1. If ``len(text) <= max_len`` return text unchanged.
+    2. Truncate to ``max_len`` characters.
+    3. Search backwards for the last sentence-ending character (``.``, ``!``,
+       ``?``, or ``\\n``) in the truncated slice.
+    4. If found **and** the break point is at least 60 % of ``max_len``
+       characters from the start (to avoid returning an overly-short result),
+       trim there (inclusive of the sentence-ending character).
+    5. Otherwise, trim at the last space (word boundary).
+    6. Append ``…`` to indicate truncation.
+    """
+    if len(text) <= max_len:
+        return text
+
+    truncated = text[:max_len]
+
+    # Step 3 – look for last sentence boundary
+    min_pos = int(max_len * 0.6)
+    last_sentence = -1
+    for char in (".", "!", "?", "\n"):
+        pos = truncated.rfind(char)
+        if pos >= min_pos and pos > last_sentence:
+            last_sentence = pos
+
+    if last_sentence != -1:
+        return truncated[: last_sentence + 1] + "…"
+
+    # Step 5 – fall back to last word boundary
+    last_space = truncated.rfind(" ")
+    if last_space > 0:
+        return truncated[:last_space] + "…"
+
+    # No boundary found – hard cut
+    return truncated + "…"
+
+
 def _tool_recall(arguments: dict) -> str:
     """Retrieve relevant context blocks across three sources using BM25 + RRF.
 
@@ -274,9 +313,7 @@ def _tool_recall(arguments: dict) -> str:
         top = raw_blocks[:top_k]
         blocks_out = []
         for b in top:
-            snippet = b["content"][:snippet_len].strip()
-            if len(b["content"]) > snippet_len:
-                snippet += "…"
+            snippet = _trim_to_sentence(b["content"].strip(), snippet_len)
             blocks_out.append({
                 "chunk_id": b["chunk_id"],
                 "source": b["source"],
@@ -308,9 +345,6 @@ def _tool_recall(arguments: dict) -> str:
 
     weighted.sort(key=lambda x: -x[1])
 
-    # Build lookup by chunk_id
-    block_by_id = {b["chunk_id"]: b for b in raw_blocks}
-
     # Build reranker input: deduplicate by file_stem, keep highest-scoring chunk per file
     reranker_input = []
     seen_files: set[str] = set()
@@ -321,9 +355,7 @@ def _tool_recall(arguments: dict) -> str:
         if b["file_stem"] in seen_files:
             continue
         seen_files.add(b["file_stem"])
-        snippet = b["content"][:snippet_len].strip()
-        if len(b["content"]) > snippet_len:
-            snippet += "…"
+        snippet = _trim_to_sentence(b["content"].strip(), snippet_len)
         reranker_input.append({
             "chunk_id": b["chunk_id"],
             "file_stem": b["file_stem"],
@@ -341,7 +373,7 @@ def _tool_recall(arguments: dict) -> str:
     # Ensure output blocks have consistent fields
     for b in blocks_out:
         if "snippet" not in b:
-            b["snippet"] = b.get("content", "")[:snippet_len].strip()
+            b["snippet"] = _trim_to_sentence(b.get("content", "").strip(), snippet_len)
         b.pop("file_stem", None)
         b.pop("content", None)
 

@@ -142,12 +142,21 @@ class CompatibilityChecker:
         # CLaRa would manifest as specific files in ~/.claude
         claude_dir = self.scanner.claude_dir
         clara_indicators = ["clara", "CLARA", "clara-state"]
+        # Directories that produce false positives (npm packages, Python caches, build artifacts)
+        _EXCLUDED_DIRS = {"node_modules", "__pycache__", ".venv", "venv", ".git", "dist"}
+
         for indicator in clara_indicators:
-            if list(claude_dir.rglob(f"*{indicator}*")):
+            matches = list(claude_dir.rglob(f"*{indicator}*"))
+            # Filter out matches inside excluded directories
+            real_matches = [
+                m for m in matches
+                if not any(excluded in m.parts for excluded in _EXCLUDED_DIRS)
+            ]
+            if real_matches:
                 return _check_result(
                     YELLOW,
                     "C4: CLaRa presence detected — manual integration review needed",
-                    f"Found indicator: {indicator}",
+                    f"Found indicator: {indicator} in {real_matches[0]}",
                 )
         return _check_result(GREEN, "C4: CLaRa not detected — no integration complexity", "")
 

@@ -1,8 +1,7 @@
 # tests/test_retrieval/test_reranker.py
-import pytest
 from unittest.mock import MagicMock, patch
-from depthfusion.retrieval.reranker import HaikuReranker
 
+from depthfusion.retrieval.reranker import HaikuReranker
 
 SAMPLE_BLOCKS = [
     {"chunk_id": "vps-instance", "source": "memory", "score": 5.0,
@@ -16,12 +15,14 @@ SAMPLE_BLOCKS = [
 
 def test_reranker_is_disabled_when_no_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
     r = HaikuReranker()
     assert not r.is_available()
 
 
 def test_reranker_passthrough_when_unavailable(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
     r = HaikuReranker()
     result = r.rerank("VPS server IP", SAMPLE_BLOCKS, top_k=3)
     assert result == SAMPLE_BLOCKS  # unchanged passthrough
@@ -72,6 +73,7 @@ def test_reranker_handles_api_exception(monkeypatch):
 
 def test_reranker_empty_blocks(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
     r = HaikuReranker()
     result = r.rerank("anything", [], top_k=3)
     assert result == []

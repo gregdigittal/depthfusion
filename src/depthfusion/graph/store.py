@@ -7,14 +7,39 @@ import sqlite3
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from depthfusion.graph.types import Entity, Edge
+from depthfusion.graph.types import Edge, Entity
 
 _DEFAULT_JSON_PATH = Path.home() / ".claude" / "depthfusion-graph.json"
+
+_DEFAULT_MIN_CONFIDENCE = 0.7
+
+
+def _min_confidence() -> float:
+    """Return the minimum confidence threshold for graph writes.
+
+    Reads from DEPTHFUSION_GRAPH_MIN_CONFIDENCE env var; falls back to
+    _DEFAULT_MIN_CONFIDENCE (0.7) if unset or invalid.
+    """
+    val = os.environ.get("DEPTHFUSION_GRAPH_MIN_CONFIDENCE", "")
+    if val:
+        try:
+            return float(val)
+        except ValueError:
+            pass
+    return _DEFAULT_MIN_CONFIDENCE
 
 
 @runtime_checkable
 class GraphBackend(Protocol):
-    def upsert_entity(self, entity: Entity) -> None: ...
+    def upsert_entity(self, entity: Entity) -> None:
+        """Store or update an entity.
+
+        Entities whose confidence is below the configured minimum threshold
+        (default 0.7, overridden via DEPTHFUSION_GRAPH_MIN_CONFIDENCE) are
+        silently skipped and not written to the store.
+        """
+        ...
+
     def get_entity(self, entity_id: str) -> Entity | None: ...
     def upsert_edge(self, edge: Edge) -> None: ...
     def get_edges(
@@ -98,6 +123,8 @@ class JSONGraphStore:
         )
 
     def upsert_entity(self, entity: Entity) -> None:
+        if entity.confidence < _min_confidence():
+            return  # silently skip low-confidence entities
         self._data["entities"][entity.entity_id] = _entity_to_dict(entity)
         self._save()
 
@@ -174,6 +201,8 @@ class SQLiteGraphStore:
         self._conn.commit()
 
     def upsert_entity(self, entity: Entity) -> None:
+        if entity.confidence < _min_confidence():
+            return  # silently skip low-confidence entities
         self._conn.execute(
             """INSERT OR REPLACE INTO entities
                (entity_id, name, type, project, source_files, confidence, first_seen, metadata)
