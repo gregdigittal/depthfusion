@@ -24,11 +24,15 @@ Backlog: T-119
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
 from depthfusion.backends.base import LLMBackend
+from depthfusion.backends.haiku import HaikuBackend
 from depthfusion.backends.null import NullBackend
+
+logger = logging.getLogger(__name__)
 
 # Per-capability env-var override names. Values override the mode default.
 _CAPABILITY_ENV_VARS = {
@@ -110,7 +114,17 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
         return NullBackend()
 
     if name == "haiku":
-        # T-116 will implement HaikuBackend. Scaffold: fall through to null.
+        # T-116 HaikuBackend. If construction succeeds but the backend
+        # reports unhealthy (no DEPTHFUSION_API_KEY, no SDK), fall through
+        # to NullBackend rather than returning an unusable backend.
+        backend = HaikuBackend()
+        if backend.healthy():
+            return backend
+        logger.info(
+            "HaikuBackend requested for capability %r but not healthy "
+            "(no DEPTHFUSION_API_KEY or anthropic SDK); falling back to NullBackend.",
+            capability,
+        )
         return NullBackend()
 
     if name == "gemma":

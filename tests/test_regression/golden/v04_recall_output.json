@@ -1,0 +1,25 @@
+{
+  "query": "backend provider architecture",
+  "blocks": [
+    {
+      "chunk_id": "architecture#1",
+      "source": "memory",
+      "score": 3.0252,
+      "snippet": "## Backend provider interface\nThe backend provider abstracts LLM backends behind a protocol. Pluggable implementations for Haiku, Gemma, and Null."
+    },
+    {
+      "chunk_id": "2026-04-10-backend-design#1",
+      "source": "discovery",
+      "score": 2.8162,
+      "snippet": "## Context\nDesigning the backend provider interface for v0.5. Provider pattern with typed protocol."
+    },
+    {
+      "chunk_id": "project-alpha#1",
+      "source": "memory",
+      "score": 1.5795,
+      "snippet": "## Status\nActive. Widget deadline 2026-05-01. Team-lead owns architecture decisions."
+    }
+  ],
+  "total_sources_scanned": 14,
+  "message": "Retrieved 3 relevant blocks (BM25+RRF)"
+}

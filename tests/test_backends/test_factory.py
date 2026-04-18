@@ -38,13 +38,18 @@ def test_missing_mode_defaults_to_local(monkeypatch):
 
 def test_vps_alias_maps_to_vps_cpu(monkeypatch):
     """Legacy `DEPTHFUSION_MODE=vps` is a v0.5 alias for vps-cpu.
-    Scaffolding: haiku→null fallthrough, so we only check it stays healthy.
+
+    Without a DEPTHFUSION_API_KEY in scope, the vps-cpu haiku route
+    falls back to NullBackend. The test asserts the alias works AND
+    that the factory's healthy() safety net is active.
     """
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     for cap in ["reranker", "extractor"]:
         monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
     backend = get_backend("reranker")
-    # vps→vps-cpu→haiku→null (scaffolding fallthrough)
+    # vps → vps-cpu → haiku (requested) → no key → NullBackend (healthy fallback)
     assert isinstance(backend, NullBackend)
     assert backend.healthy()
 
@@ -130,3 +135,73 @@ def test_unknown_mode_falls_through_to_null(monkeypatch):
     monkeypatch.delenv("DEPTHFUSION_RERANKER_BACKEND", raising=False)
     backend = get_backend("reranker")
     assert isinstance(backend, NullBackend)
+
+
+# ── Haiku dispatch (T-116 live) ──────────────────────────────────────────
+
+
+def test_haiku_override_returns_haiku_when_key_set(monkeypatch):
+    """Explicit haiku override + API key → returns a healthy HaikuBackend."""
+    from depthfusion.backends.haiku import HaikuBackend
+    monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+    monkeypatch.setenv("DEPTHFUSION_RERANKER_BACKEND", "haiku")
+    monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-test")
+    backend = get_backend("reranker")
+    assert isinstance(backend, HaikuBackend)
+    assert backend.healthy()
+
+
+def test_haiku_override_falls_back_to_null_without_key(monkeypatch):
+    """Explicit haiku override + no API key → falls through to NullBackend
+    rather than returning an unhealthy HaikuBackend. This is the safe-by-
+    default contract: callers never see an `.healthy() is False` backend
+    from the factory.
+    """
+    monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+    monkeypatch.setenv("DEPTHFUSION_RERANKER_BACKEND", "haiku")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    backend = get_backend("reranker")
+    assert isinstance(backend, NullBackend)
+
+
+def test_vps_cpu_defaults_to_haiku_when_key_set(monkeypatch):
+    """vps-cpu default for most capabilities is haiku; with a key, the
+    factory returns HaikuBackend.
+    """
+    from depthfusion.backends.haiku import HaikuBackend
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
+    monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-test")
+    for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor"]:
+        monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
+        backend = get_backend(cap)
+        assert isinstance(backend, HaikuBackend), (
+            f"vps-cpu/{cap} with DEPTHFUSION_API_KEY did not route to Haiku "
+            f"(got {type(backend).__name__})"
+        )
+
+
+def test_vps_cpu_falls_back_to_null_without_key(monkeypatch):
+    """Without DEPTHFUSION_API_KEY, vps-cpu routes degrade cleanly to null."""
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for cap in ["reranker", "extractor"]:
+        monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
+        backend = get_backend(cap)
+        assert isinstance(backend, NullBackend)
+
+
+def test_factory_never_returns_unhealthy_backend(monkeypatch):
+    """Load-bearing contract: callers can trust `backend.healthy()` is True
+    without having to check it themselves. Factory handles the fallback.
+    """
+    # Set up a state where haiku is selected but can't construct
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor", "embedding"]:
+        monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
+        backend = get_backend(cap)
+        assert backend.healthy() is True, (
+            f"Factory returned unhealthy backend for {cap}: {type(backend).__name__}"
+        )
