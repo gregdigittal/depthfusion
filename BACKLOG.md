@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-04-15
+> Last updated: 2026-04-18 (v0.5 epics E-18..E-22 added per `docs/plans/v0.5/` planning deliverable)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -599,6 +599,244 @@
 
 **Tasks:**
 - [x] T-114: Enforce confidence threshold at `graph/store.py` write path
+
+---
+
+## E-18: v0.5 Backend Foundation [backlog]
+
+> Introduce a pluggable LLM backend protocol and the three-mode installer so every downstream v0.5 feature can route to Haiku, Gemma, or Null without touching call-sites.
+
+### S-41: As a developer, I want a typed LLM backend protocol so that every Haiku call-site can be rewired to alternative providers without logic changes `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `backends/base.py`, `factory.py`, `haiku.py`, `null.py` exist with type hints on every public function
+- [ ] AC-2: All 4 LLM call-sites use `get_backend(...)`; no direct `anthropic.Anthropic(...)` call remains in `src/depthfusion/` (grep-verified — fixes C2)
+- [ ] AC-3: With no new flags set, `_tool_recall` output on a fixed corpus is byte-identical to v0.4.x (captured via `tests/test_regression/test_v04_output_identity.py`)
+- [ ] AC-4: A 429 rate-limit from Haiku surfaces as `RateLimitError` and triggers the fallback chain
+- [ ] AC-5: All 439 pre-existing tests pass
+- [ ] AC-6: ≥ 25 new tests in `tests/test_backends/` covering protocol contract, factory dispatch, fallback chain, and C2 fix
+- [ ] AC-7: CIQS benchmark run shows no category regression > 2 points vs v0.4.x baseline
+- [ ] AC-8: Fallback chain is **quality-ranked** (per DR-018 §4 ratification → I-18); cost/latency optimisation applies only within a quality tier
+
+**Tasks:**
+- [ ] T-115: Implement `backends/base.py` Protocol (complete/embed/rerank/extract_structured/healthy)
+- [ ] T-116: Implement `backends/haiku.py` HaikuBackend with typed 429/529/timeout errors and explicit `api_key=` (C2 fix)
+- [ ] T-117: Implement `backends/null.py` NullBackend
+- [ ] T-118: Implement `backends/local_embedding.py` sentence-transformers wrapper
+- [ ] T-119: Implement `backends/factory.py` with per-capability / per-mode dispatch table + env-var overrides
+- [ ] T-120: Migrate 4 call-sites (reranker.py, extractor.py, linker.py, auto_learn.py HaikuSummarizer) to `get_backend(...)`
+- [ ] T-121: Author regression test `tests/test_regression/test_v04_output_identity.py`
+- [ ] T-122: Author `tests/test_backends/` suite (contract, factory, fallback, C2)
+- [ ] T-123: Wire `DEPTHFUSION_BACKEND_FALLBACK_LOG` JSONL emission
+
+### S-42: As an operator, I want a three-mode installer so that I can provision `local`, `vps-cpu`, or `vps-gpu` environments with the right dependencies and smoke tests `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `--mode=vps-gpu` refuses cleanly on a no-GPU host with remediation text pointing to the rollout runbook
+- [ ] AC-2: On a GPU host, `--mode=vps-gpu` writes `~/.claude/depthfusion.env` with correct per-capability backend flags
+- [ ] AC-3: `--mode=vps` works as alias for `vps-cpu` with deprecation warning
+- [ ] AC-4: Smoke test passes on all three modes (vps-gpu CI-skipped unless `DEPTHFUSION_CI_HAS_GPU=true`)
+- [ ] AC-5: pyproject extras `[local]` / `[vps-cpu]` / `[vps-gpu]` install with no conflict warnings
+- [ ] AC-6: `--mode=local` produces byte-identical `depthfusion.env` to v0.4.x
+
+**Tasks:**
+- [ ] T-124: Extend `install/install.py` argparse to `{local,vps-cpu,vps-gpu}` with `vps` alias
+- [ ] T-125: Implement `install/gpu_probe.py` (nvidia-smi parsing, CUDA capability, VRAM)
+- [ ] T-126: Add `[local]` / `[vps-cpu]` / `[vps-gpu]` extras to `pyproject.toml`
+- [ ] T-127: Post-install smoke test (synthetic 5-file corpus, actual recall query)
+- [ ] T-128: Regression test for `--mode=local` byte-identical env output
+
+---
+
+## E-19: v0.5 GPU-Enabled LLM Routing [backlog]
+
+> Add the Gemma vLLM backend plus local embeddings so `vps-gpu` installations exploit on-box inference for reranking, extraction, summarisation, linking, and semantic retrieval.
+
+### S-43: As a vps-gpu operator, I want a local embedding backend so that hybrid retrieval fuses BM25 with semantic similarity at p95 ≤ 1500ms `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Byte-identical output when `DEPTHFUSION_EMBEDDING_BACKEND` unset
+- [ ] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu
+- [ ] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus
+- [ ] AC-4: ≥ 10 new tests
+
+**Tasks:**
+- [ ] T-129: Implement `backends/local_embedding.py` (sentence-transformers, default `all-MiniLM-L6-v2`)
+- [ ] T-130: Wire embedding step into `retrieval/hybrid.py` RRF fusion alongside BM25/ChromaDB
+- [ ] T-131: Author `tests/test_backends/test_local_embedding.py` + `tests/test_retrieval/test_hybrid_with_embeddings.py`
+
+### S-44: As a vps-gpu operator, I want a Gemma backend for all LLM capabilities so that reranking, extraction, summarisation, and linking run on-box with Haiku fallback `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode
+- [ ] AC-2: p95 latency per capability recorded in the Phase 4 runbook
+- [ ] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout (integration test with fault-injected mock server)
+- [ ] AC-4: Fallback to Null triggers when Haiku also unavailable (integration test)
+- [ ] AC-5: ≥ 15 new tests
+
+**Tasks:**
+- [ ] T-132: Implement `backends/gemma.py` (vLLM HTTP client, timeout, concurrency caps)
+- [ ] T-133: Register Gemma in `backends/factory.py`
+- [ ] T-134: Author `scripts/vllm-serve-gemma.sh` systemd-friendly launcher
+- [ ] T-135: Author `tests/test_backends/test_gemma.py` with mock vLLM server + fault injection
+
+---
+
+## E-20: v0.5 Capture Mechanisms [backlog]
+
+> Expand DepthFusion's write path with LLM-based decision extraction, negative-signal capture, a git post-commit hook, an active confirmation tool, and embedding-based dedup — closing the Category D data gap at source.
+
+### S-45: As a finishing session, I want an LLM-based decision extractor so that key decisions land in `~/.claude/shared/discoveries/` with precision ≥ 0.80 (CM-1) `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Precision on labelled eval set of 50 historical sessions ≥ 0.80 (baseline heuristic ~0.60)
+- [ ] AC-2: Each decision written to `{date}-{project}-decisions.md` with frontmatter (`project:`, `session_id:`, `confidence:`)
+- [ ] AC-3: Idempotent: running twice on same session produces no duplicates
+- [ ] AC-4: ≥ 8 new tests
+
+**Tasks:**
+- [ ] T-136: Implement `capture/decision_extractor.py` against backend interface
+- [ ] T-137: Wire extractor into `capture/auto_learn.py::summarize_and_extract_graph()`
+- [ ] T-138: Author `hooks/depthfusion-stop.sh` Stop hook
+- [ ] T-139: Author `tests/test_capture/test_decision_extractor.py` with labelled eval set
+
+### S-46: As a project maintainer, I want an opt-in git post-commit hook so that commits produce discovery files tagged with the current project (CM-3) `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Hook writes `{date}-{project}-commit-{sha7}.md` with commit message + diff summary
+- [ ] AC-2: Idempotent with existing post-commit hooks (appends, detects existing DepthFusion block)
+- [ ] AC-3: Completes in < 500ms on commits touching ≤ 50 files
+- [ ] AC-4: ≥ 5 new tests
+
+**Tasks:**
+- [ ] T-140: Implement `hooks/git_post_commit.py`
+- [ ] T-141: Author `scripts/install-git-hook.sh` opt-in installer (detects/appends)
+- [ ] T-142: Extend `analyzer/installer.py` to document the git-hook opt-in step
+- [ ] T-143: Author `tests/test_hooks/test_git_post_commit.py`
+
+### S-47: As a session, I want an active confirmation MCP tool so that borderline-confidence discoveries (0.50–0.75) can be saved, discarded, or edited (CM-5) `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Tool returns structured result (save / discard / edit)
+- [ ] AC-2: Non-blocking (async) response
+- [ ] AC-3: ≥ 4 new tests
+
+**Tasks:**
+- [ ] T-144: Register `depthfusion_confirm_discovery` in `mcp/server.py`
+- [ ] T-145: Author `tests/test_mcp/test_confirm_discovery.py`
+
+### S-48: As a session, I want a negative-signal extractor so that "X did not work because Y" entries are tagged separately for future downweighting (CM-6) `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Extracted negatives written with `type: negative` frontmatter
+- [ ] AC-2: False-negative rate ≤ 10% on labelled set
+- [ ] AC-3: ≥ 6 new tests
+
+**Tasks:**
+- [ ] T-146: Implement `capture/negative_extractor.py`
+- [ ] T-147: Wire into `capture/auto_learn.py::summarize_and_extract_graph()`
+- [ ] T-148: Author `tests/test_capture/test_negative_extractor.py`
+
+### S-49: As a session, I want embedding-based discovery dedup so that semantic duplicates are superseded rather than accumulated (CM-2) `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: When two discoveries have cos-sim ≥ 0.92, newer supersedes older (older renamed with `.superseded` suffix)
+- [ ] AC-2: False-dedup rate ≤ 5% on 30 labelled near-duplicate pairs
+- [ ] AC-3: ≥ 6 new tests
+
+**Tasks:**
+- [ ] T-149: Implement `capture/dedup.py`
+- [ ] T-150: Call dedup from `capture/auto_learn.py` before write
+- [ ] T-151: Author `tests/test_capture/test_dedup.py`
+
+---
+
+## E-21: v0.5 Retrieval Quality Enhancements [backlog]
+
+> Raise retrieval CIQS through temporal-graph edges, selective fusion gates, and project-scoped filtering on discoveries.
+
+### S-50: As a recall query, I want `PRECEDED_BY` cross-session graph edges so that "what did we do recently" questions traverse temporal context (CM-4) `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: New edge type documented in `graph/types.py` (8 edges total, up from 7)
+- [ ] AC-2: `traverse()` can filter by edge kind
+- [ ] AC-3: CIQS Category D delta ≥ +2 points on "recent work" questions
+- [ ] AC-4: ≥ 8 new tests
+
+**Tasks:**
+- [ ] T-152: Add `PRECEDED_BY` to `graph/types.py` EdgeKind literal
+- [ ] T-153: Implement `TemporalSessionLinker` in `graph/linker.py` (48h window, vocabulary overlap)
+- [ ] T-154: Extend `graph/traverser.py` for edge-kind filtering and time-bucketed traversal
+- [ ] T-155: Author `tests/test_graph/test_temporal_session_linker.py`
+
+### S-51: As a retrieval pipeline, I want selective fusion gates so that AttnRes α-blended source weighting beats flat weighting on Category A (TS-1 Mamba port) `P2` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: CIQS Category A delta ≥ +2 points on vps-cpu; ≥ +3 points on vps-gpu
+- [ ] AC-2: Gate log emitted per query (D-3 invariant compliance)
+- [ ] AC-3: Parity with TS reference implementation on 20 test cases
+- [ ] AC-4: ≥ 12 new tests
+
+**Tasks:**
+- [ ] T-156: Implement `fusion/gates.py` (port of TS B/C/Δ gate logic)
+- [ ] T-157: Integrate gates into `retrieval/hybrid.py::RecallPipeline` with gate-log emission
+- [ ] T-158: Extend `metrics/collector.py` to accept gate log entries
+- [ ] T-159: Author `tests/test_fusion/test_gates.py` (unit + TS parity cases)
+
+### S-52: As a project user, I want recall filtered to the current project by default so that discoveries from other projects don't pollute results `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Default recall in project A does not return discoveries tagged `project: B`
+- [ ] AC-2: `cross_project=true` returns everything (v0.4.x behaviour preserved)
+- [ ] AC-3: Discoveries without frontmatter treated as `cross_project` (backward-compat)
+- [ ] AC-4: ≥ 5 new tests
+
+**Tasks:**
+- [ ] T-160: Parse frontmatter at load time in `retrieval/hybrid.py`; apply project filter
+- [ ] T-161: Add `cross_project: bool = false` parameter to `depthfusion_recall_relevant` MCP tool
+- [ ] T-162: Author `tests/test_retrieval/test_project_filter.py`
+
+---
+
+## E-22: v0.5 Observability & Hygiene [backlog]
+
+> Extend metrics JSONL schema to cover backends, capture mechanisms, and per-capability latency; add RLM task-budget support and a discovery-pruning MCP tool.
+
+### S-53: As a maintainer, I want the metrics collector extended so that per-query JSONL records include backend routing, fallback chains, per-capability latency, and capture-mechanism fields `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Every recall query writes a JSONL record with the new fields (`backend_used`, `backend_fallback_chain`, `latency_ms_per_capability`, `capture_mechanism`, `capture_write_rate`, `event_subtype`, `config_version_id`)
+- [ ] AC-2: Aggregator produces per-backend latency + error-rate summary
+- [ ] AC-3: ≥ 4 new tests
+
+**Tasks:**
+- [ ] T-163: Extend `metrics/collector.py` with new schema fields (includes `event_subtype` with `sla_expiry_deny` value per DR-018 I-19; and `config_version_id` per amended I-11)
+- [ ] T-164: Extend `metrics/aggregator.py` with per-backend summaries
+- [ ] T-165: Author `tests/test_metrics/test_collector_v05.py`
+
+### S-54: As an RLM user, I want Opus 4.7 task-budget headers so that `DEPTHFUSION_RLM_COST_CEILING` is enforced API-side instead of post-hoc (OP-2) `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `RLMClient` passes the task-budget header when SDK supports it
+- [ ] AC-2: Falls back to post-hoc estimation with a warning when SDK lacks support
+- [ ] AC-3: ≥ 4 new tests
+
+**Tasks:**
+- [ ] T-166: Translate cost ceiling to token budget in `recursive/client.py`
+- [ ] T-167: Reconcile budgets in `router/cost_estimator.py`
+- [ ] T-168: Author `tests/test_recursive/test_task_budget.py` with mock Anthropic API
+
+### S-55: As a maintainer, I want a `depthfusion_prune_discoveries` MCP tool so that stale/unreferenced discovery files can be archived safely `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Tool returns prune-candidate list with reasons; does NOT delete without `confirm=true`
+- [ ] AC-2: Confirmed prune moves (not deletes) to `~/.claude/shared/discoveries/.archive/`
+- [ ] AC-3: ≥ 3 new tests
+
+**Tasks:**
+- [ ] T-169: Implement `capture/pruner.py` (age + min-recall-score heuristics)
+- [ ] T-170: Register `depthfusion_prune_discoveries` in `mcp/server.py`
+- [ ] T-171: Author `tests/test_mcp/test_prune_discoveries.py`
 
 ---
 
