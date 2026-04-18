@@ -1,9 +1,23 @@
 # tests/test_graph/test_extractor.py
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from depthfusion.graph.extractor import RegexExtractor, HaikuExtractor, confidence_merge, make_entity_id
+import pytest  # noqa: F401 — used indirectly via fixtures
+
+from depthfusion.graph.extractor import (
+    HaikuExtractor,
+    RegexExtractor,
+    confidence_merge,
+    make_entity_id,
+)
 from depthfusion.graph.types import Entity
+
+
+def _mock_backend_with_response(text: str):
+    """Build a mock LLMBackend whose `complete()` returns `text`."""
+    mock = MagicMock()
+    mock.healthy.return_value = True
+    mock.complete.return_value = text
+    return mock
 
 
 SAMPLE_TEXT = """
@@ -84,47 +98,68 @@ def test_make_entity_id_differs_by_project():
 
 
 def test_haiku_extractor_returns_entities_when_available():
-    extractor = HaikuExtractor(project="depthfusion")
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='[{"name": "BM25 scoring", "type": "concept"}]')]
-    mock_client.messages.create.return_value = mock_response
-    extractor._client = mock_client
+    backend = _mock_backend_with_response('[{"name": "BM25 scoring", "type": "concept"}]')
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
 
     entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
     assert any(e.name == "BM25 scoring" for e in entities)
 
 
 def test_haiku_extractor_confidence_in_range():
-    extractor = HaikuExtractor(project="depthfusion")
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='[{"name": "BM25 scoring", "type": "concept"}]')]
-    mock_client.messages.create.return_value = mock_response
-    extractor._client = mock_client
+    backend = _mock_backend_with_response('[{"name": "BM25 scoring", "type": "concept"}]')
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
 
     entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
     for e in entities:
         assert 0.70 <= e.confidence <= 0.95
 
 
-def test_haiku_extractor_returns_empty_when_unavailable():
+def test_haiku_extractor_returns_empty_when_unavailable(monkeypatch):
+    """No backend injected, HAIKU_ENABLED explicitly off → no backend
+    resolved, is_available() False → empty result. Explicit env cleanup
+    makes this test order-independent (other tests may have set the flag).
+    """
+    monkeypatch.setenv("DEPTHFUSION_HAIKU_ENABLED", "false")
     extractor = HaikuExtractor(project="depthfusion")
-    extractor._client = None
+    # _backend was never constructed because HAIKU_ENABLED is false
+    assert extractor._backend is None
     entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
     assert entities == []
 
 
 def test_haiku_extractor_handles_malformed_json():
-    extractor = HaikuExtractor(project="depthfusion")
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="not json")]
-    mock_client.messages.create.return_value = mock_response
-    extractor._client = mock_client
+    backend = _mock_backend_with_response("not json")
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
     # Should not raise
     entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
     assert entities == []
+
+
+def test_haiku_extractor_handles_empty_response():
+    """Backend returns empty string (e.g. NullBackend) → no entities."""
+    backend = _mock_backend_with_response("")
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
+    assert extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md") == []
+
+
+def test_haiku_extractor_skips_entities_with_empty_name():
+    """Defensive: malformed items with blank names get dropped."""
+    backend = _mock_backend_with_response(
+        '[{"name": "", "type": "concept"}, {"name": "Real", "type": "concept"}]'
+    )
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
+    entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
+    names = [e.name for e in entities]
+    assert names == ["Real"]
+
+
+def test_haiku_extractor_caps_at_10_entities():
+    """Defensive: even if the model returns 20 items, only 10 are kept."""
+    items = ",".join(f'{{"name": "E{i}", "type": "concept"}}' for i in range(20))
+    backend = _mock_backend_with_response(f"[{items}]")
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
+    entities = extractor.extract(SAMPLE_TEXT, source_file="memory/arch.md")
+    assert len(entities) == 10
 
 
 def test_confidence_merge_deduplicates():

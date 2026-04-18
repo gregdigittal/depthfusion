@@ -97,44 +97,55 @@ class RegexExtractor:
 class HaikuExtractor:
     """Haiku-based extraction for concepts, decisions, error_patterns.
 
-    Returns empty list when DEPTHFUSION_HAIKU_ENABLED is not set or SDK unavailable.
-    Reads DEPTHFUSION_API_KEY (preferred) or ANTHROPIC_API_KEY (legacy fallback).
-    Confidence range: 0.70–0.95 (lower than regex to allow precedence).
+    v0.5.0 T-120: uses the provider-agnostic backend interface via the
+    factory (`get_backend("extractor")`). Remains gated on
+    `DEPTHFUSION_HAIKU_ENABLED` so local installs don't call the backend
+    even when a key is present — this preserves v0.4.x opt-in semantics.
+
+    Returns empty list when the backend is unavailable (no API key /
+    no SDK / HAIKU_ENABLED=false). Confidence range: 0.70–0.95 (lower
+    than regex to allow precedence).
     """
 
-    def __init__(self, project: str, model: str = "claude-haiku-4-5-20251001"):
+    def __init__(
+        self,
+        project: str,
+        model: str = "claude-haiku-4-5-20251001",
+        backend: Any = None,
+    ) -> None:
         self._project = project
+        # `model` retained for compatibility; the backend owns model selection.
         self._model = model
-        self._client: Any = None
-        haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+        self._backend: Any = None
+
+        # v0.4.x opt-in gate — do NOT call the backend unless explicitly enabled.
+        haiku_flag = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower()
+        haiku_enabled = haiku_flag in ("true", "1", "yes")
+        if backend is not None:
+            # Test injection — bypass the env-var gate
+            self._backend = backend
+            return
         if not haiku_enabled:
             return
-        try:
-            import anthropic
-            api_key = os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-            if api_key:
-                self._client = anthropic.Anthropic(api_key=api_key)
-        except ImportError:
-            pass
+
+        from depthfusion.backends.factory import get_backend
+        self._backend = get_backend("extractor")
 
     def is_available(self) -> bool:
-        return self._client is not None
+        return self._backend is not None and self._backend.healthy()
 
     def extract(self, content: str, source_file: str) -> list[Entity]:
-        if not self._client:
+        if not self.is_available():
             return []
         try:
-            msg = self._client.messages.create(
-                model=self._model,
+            raw = self._backend.complete(
+                _HAIKU_PROMPT.format(content=content[:2000]),
                 max_tokens=512,
-                messages=[{
-                    "role": "user",
-                    "content": _HAIKU_PROMPT.format(content=content[:2000]),
-                }],
             )
-            raw = msg.content[0].text.strip()
+            if not raw:
+                return []
             items: list[dict] = json.loads(raw)
-        except (json.JSONDecodeError, Exception) as exc:
+        except Exception as exc:  # noqa: BLE001 — graceful-degradation contract
             logger.debug("HaikuExtractor failed: %s", exc)
             return []
 

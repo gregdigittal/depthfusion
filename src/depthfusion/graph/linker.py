@@ -5,12 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 from datetime import datetime
 from itertools import combinations
 from typing import Any
 
-from depthfusion.graph.types import Entity, Edge
+from depthfusion.graph.types import Edge, Entity
 
 logger = logging.getLogger(__name__)
 
@@ -101,40 +100,54 @@ class TemporalLinker:
 
 
 class HaikuLinker:
-    """Use Claude Haiku to infer semantic relationship type between two entities."""
+    """Use Claude Haiku to infer semantic relationship type between two entities.
 
-    def __init__(self, model: str = "claude-haiku-4-5-20251001"):
+    v0.5.0 T-120: migrated to the provider-agnostic backend interface.
+    Also closes the Phase 1 §1.2 C2 latent bug — the previous implementation
+    called `anthropic.Anthropic()` with NO `api_key=` argument, falling back
+    to the SDK's `ANTHROPIC_API_KEY` default lookup (a billing-isolation
+    hazard). The new factory-resolved HaikuBackend always uses explicit
+    `api_key=DEPTHFUSION_API_KEY`.
+    """
+
+    def __init__(
+        self,
+        model: str = "claude-haiku-4-5-20251001",
+        backend: Any = None,
+    ) -> None:
         self._model = model
-        self._client: Any = None
-        try:
-            import anthropic
-            if (os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
-                self._client = anthropic.Anthropic()
-        except ImportError:
-            pass
+        if backend is not None:
+            self._backend = backend
+            return
+        # The v0.4.x HaikuLinker was available whenever any API key was set
+        # (no DEPTHFUSION_HAIKU_ENABLED gate — unlike HaikuSummarizer/Extractor).
+        # Preserve that: resolve via factory, which returns NullBackend when
+        # no key is present.
+        from depthfusion.backends.factory import get_backend
+        self._backend = get_backend("linker")
+
+    def is_available(self) -> bool:
+        return self._backend.healthy() and self._backend.name != "null"
 
     def infer_relationship(
         self, entity_a: Entity, entity_b: Entity, context: str
     ) -> Edge | None:
-        if not self._client:
+        if not self.is_available():
             return None
         try:
-            msg = self._client.messages.create(
-                model=self._model,
+            raw = self._backend.complete(
+                _HAIKU_PROMPT.format(
+                    name_a=entity_a.name, type_a=entity_a.type,
+                    name_b=entity_b.name, type_b=entity_b.type,
+                    context=context[:500],
+                ),
                 max_tokens=64,
-                messages=[{
-                    "role": "user",
-                    "content": _HAIKU_PROMPT.format(
-                        name_a=entity_a.name, type_a=entity_a.type,
-                        name_b=entity_b.name, type_b=entity_b.type,
-                        context=context[:500],
-                    ),
-                }],
             )
-            raw = msg.content[0].text.strip()
+            if not raw:
+                return None
             data: dict = json.loads(raw)
             rel = data.get("relationship", "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — graceful-degradation contract
             logger.debug("HaikuLinker failed: %s", exc)
             return None
 

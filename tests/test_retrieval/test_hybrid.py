@@ -1,7 +1,9 @@
 # tests/test_retrieval/test_hybrid.py
-import pytest
 from unittest.mock import MagicMock, patch
-from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+
+import pytest
+
+from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
 
 
 def _make_blocks(n: int) -> list[dict]:
@@ -47,16 +49,21 @@ def test_pipeline_rrf_handles_empty_bm25_list():
 
 
 def test_pipeline_apply_reranker_tier1_calls_reranker(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    with patch("depthfusion.retrieval.reranker.anthropic") as mock_anthropic:
-        mock_client = MagicMock()
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="[0, 1, 2]")]
-        mock_client.messages.create.return_value = mock_msg
-        mock_anthropic.Anthropic.return_value = mock_client
-        p = RecallPipeline(mode=PipelineMode.VPS_TIER1)
-        blocks = _make_blocks(5)
-        result = p.apply_reranker(blocks, "query", top_k=3)
+    """Post T-120 migration: the reranker is the backend interface, not the
+    anthropic SDK directly. Inject a mock backend via HaikuReranker and
+    attach to the pipeline.
+    """
+    from depthfusion.retrieval.reranker import HaikuReranker
+
+    mock_backend = MagicMock()
+    mock_backend.healthy.return_value = True
+    mock_backend.rerank.return_value = [(0, 1.0), (1, 0.95), (2, 0.90)]
+    reranker = HaikuReranker(backend=mock_backend)
+
+    p = RecallPipeline(mode=PipelineMode.VPS_TIER1)
+    p._reranker = reranker  # inject the mock-backed reranker
+    blocks = _make_blocks(5)
+    result = p.apply_reranker(blocks, "query", top_k=3)
     assert len(result) == 3
 
 
@@ -86,10 +93,10 @@ def test_expand_query_called_when_graph_enabled(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
 
-    from depthfusion.graph.store import JSONGraphStore
-    from depthfusion.graph.types import Entity, Edge
     from depthfusion.graph.extractor import make_entity_id
     from depthfusion.graph.linker import make_edge_id
+    from depthfusion.graph.store import JSONGraphStore
+    from depthfusion.graph.types import Edge, Entity
 
     store_path = tmp_path / "g.json"
     store = JSONGraphStore(path=store_path)
@@ -109,7 +116,7 @@ def test_expand_query_called_when_graph_enabled(tmp_path, monkeypatch):
         relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"], metadata={},
     ))
 
-    from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+    from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     expanded = pipeline.maybe_expand_query("TierManager storage", graph_store=store)
     assert "RecallPipeline" in expanded
@@ -117,7 +124,7 @@ def test_expand_query_called_when_graph_enabled(tmp_path, monkeypatch):
 
 def test_expand_query_skipped_when_graph_disabled(monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "false")
-    from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+    from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     result = pipeline.maybe_expand_query("TierManager storage", graph_store=None)
     assert result == "TierManager storage"
@@ -125,7 +132,7 @@ def test_expand_query_skipped_when_graph_disabled(monkeypatch):
 
 def test_expand_query_no_op_when_store_is_none(monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
-    from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+    from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     result = pipeline.maybe_expand_query("any query", graph_store=None)
     assert result == "any query"

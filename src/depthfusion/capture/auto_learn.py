@@ -75,10 +75,13 @@ class HeuristicExtractor:
 
 
 class HaikuSummarizer:
-    """Summarize a .tmp session file into a structured discovery using Claude haiku.
+    """Summarize a .tmp session file into a structured discovery.
 
-    Requires anthropic SDK and ANTHROPIC_API_KEY. Gracefully degrades to
-    HeuristicExtractor when unavailable.
+    v0.5.0 T-120: migrated to the provider-agnostic backend interface. The
+    summariser is still gated on `DEPTHFUSION_HAIKU_ENABLED` (preserving
+    v0.4.x opt-in semantics) — when disabled, the backend is never resolved
+    and `is_available()` returns False, so callers fall back to
+    HeuristicExtractor.
     """
 
     _PROMPT = """\
@@ -90,22 +93,29 @@ filler. Format as a concise markdown document with ## sections.
 Session content (truncated to 3000 chars):
 {content}"""
 
-    def __init__(self, model: str = "claude-haiku-4-5-20251001"):
+    def __init__(
+        self,
+        model: str = "claude-haiku-4-5-20251001",
+        backend: Any = None,
+    ) -> None:
         self._model = model
-        self._client = None
-        haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower() in ("true", "1", "yes")
-        if not haiku_enabled:
+        self._backend: Any = None
+
+        if backend is not None:
+            # Test injection — bypass the env-var gate
+            self._backend = backend
             return
-        try:
-            import anthropic
-            api_key = os.environ.get("DEPTHFUSION_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-            if api_key:
-                self._client = anthropic.Anthropic(api_key=api_key)
-        except ImportError:
-            pass
+
+        # v0.4.x opt-in gate preserved
+        haiku_flag = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").strip().lower()
+        if haiku_flag not in ("true", "1", "yes"):
+            return
+
+        from depthfusion.backends.factory import get_backend
+        self._backend = get_backend("summariser")
 
     def is_available(self) -> bool:
-        return self._client is not None
+        return self._backend is not None and self._backend.healthy()
 
     def summarize_file(self, path: Path) -> str | None:
         """Summarize a session file. Falls back to heuristic if haiku unavailable."""
@@ -120,19 +130,15 @@ Session content (truncated to 3000 chars):
             return HeuristicExtractor().extract_from_file(path)
 
         try:
-            msg = self._client.messages.create(
-                model=self._model,
+            summary = self._backend.complete(
+                self._PROMPT.format(content=content[:3000]),
                 max_tokens=1024,
-                messages=[{
-                    "role": "user",
-                    "content": self._PROMPT.format(content=content[:3000]),
-                }],
             )
-            summary = msg.content[0].text.strip()
+            summary = (summary or "").strip()
             if not summary:
                 return None
             return f"# Session Summary: {path.stem}\n\n{summary}"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — graceful-degradation contract
             logger.warning("Haiku summarizer failed (%s), falling back to heuristic", exc)
             return HeuristicExtractor().extract_from_file(path)
 
@@ -162,7 +168,9 @@ def summarize_and_extract_graph(
 
     try:
         from depthfusion.graph.extractor import (
-            RegexExtractor, HaikuExtractor, confidence_merge,
+            HaikuExtractor,
+            RegexExtractor,
+            confidence_merge,
         )
         from depthfusion.graph.linker import CoOccurrenceLinker
 

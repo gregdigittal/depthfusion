@@ -1,8 +1,10 @@
 # tests/test_graph/test_linker.py
-import pytest
 from unittest.mock import MagicMock
-from depthfusion.graph.linker import CoOccurrenceLinker, TemporalLinker, HaikuLinker, make_edge_id
-from depthfusion.graph.types import Entity, Edge
+
+import pytest
+
+from depthfusion.graph.linker import CoOccurrenceLinker, HaikuLinker, TemporalLinker, make_edge_id
+from depthfusion.graph.types import Edge, Entity
 
 
 @pytest.fixture
@@ -90,14 +92,20 @@ def test_temporal_linker_signal_label(entity_a, entity_b):
     assert all("temporal" in e.signals for e in edges)
 
 
-def test_haiku_linker_returns_typed_edge():
-    linker = HaikuLinker()
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"relationship": "DEPENDS_ON"}')]
-    mock_client.messages.create.return_value = mock_response
-    linker._client = mock_client
+def _mock_linker_backend(response_text: str, healthy: bool = True):
+    """Build a mock LLMBackend whose `complete()` returns the given text.
 
+    Sets `.name` to something other than "null" so HaikuLinker's
+    is_available() check (which excludes NullBackend via name) passes.
+    """
+    mock = MagicMock()
+    mock.healthy.return_value = healthy
+    mock.name = "haiku"
+    mock.complete.return_value = response_text
+    return mock
+
+
+def _make_entity_pair():
     from depthfusion.graph.extractor import make_entity_id
     from depthfusion.graph.types import Entity
     a = Entity(entity_id=make_entity_id("A", "class", "p"), name="A", type="class",
@@ -106,6 +114,13 @@ def test_haiku_linker_returns_typed_edge():
     b = Entity(entity_id=make_entity_id("B", "class", "p"), name="B", type="class",
                project="p", source_files=[], confidence=1.0,
                first_seen="2026-03-28T00:00:00", metadata={})
+    return a, b
+
+
+def test_haiku_linker_returns_typed_edge():
+    backend = _mock_linker_backend('{"relationship": "DEPENDS_ON"}')
+    linker = HaikuLinker(backend=backend)
+    a, b = _make_entity_pair()
 
     edge = linker.infer_relationship(a, b, context="A depends on B for storage")
     assert edge is not None
@@ -114,38 +129,45 @@ def test_haiku_linker_returns_typed_edge():
 
 
 def test_haiku_linker_returns_none_when_unavailable():
-    linker = HaikuLinker()
-    linker._client = None
-    from depthfusion.graph.extractor import make_entity_id
-    from depthfusion.graph.types import Entity
-    a = Entity(entity_id=make_entity_id("A", "class", "p"), name="A", type="class",
-               project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
-    b = Entity(entity_id=make_entity_id("B", "class", "p"), name="B", type="class",
-               project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
-    result = linker.infer_relationship(a, b, context="x")
-    assert result is None
+    """Unhealthy backend → None (no edge inferred)."""
+    backend = _mock_linker_backend("", healthy=False)
+    linker = HaikuLinker(backend=backend)
+    a, b = _make_entity_pair()
+    assert linker.infer_relationship(a, b, context="x") is None
+
+
+def test_haiku_linker_returns_none_with_null_backend():
+    """Factory-resolved NullBackend (no key present) → is_available False → None.
+    This also covers the C2 fix: no bare anthropic.Anthropic() call ever occurs
+    because the factory routes through the backend interface.
+    """
+    from depthfusion.backends.null import NullBackend
+    linker = HaikuLinker(backend=NullBackend())
+    a, b = _make_entity_pair()
+    assert linker.infer_relationship(a, b, context="x") is None
 
 
 def test_haiku_linker_handles_invalid_relationship():
-    linker = HaikuLinker()
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"relationship": "INVENTED_TYPE"}')]
-    mock_client.messages.create.return_value = mock_response
-    linker._client = mock_client
+    backend = _mock_linker_backend('{"relationship": "INVENTED_TYPE"}')
+    linker = HaikuLinker(backend=backend)
+    a, b = _make_entity_pair()
 
-    from depthfusion.graph.extractor import make_entity_id
-    a = Entity(entity_id=make_entity_id("A", "class", "p"), name="A", type="class",
-               project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
-    b = Entity(entity_id=make_entity_id("B", "class", "p"), name="B", type="class",
-               project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
-    result = linker.infer_relationship(a, b, context="x")
-    # Invalid relationship type → None
-    assert result is None
+    # Invalid relationship type → None (dropped by _HAIKU_VALID_RELATIONSHIPS filter)
+    assert linker.infer_relationship(a, b, context="x") is None
+
+
+def test_haiku_linker_handles_malformed_json():
+    backend = _mock_linker_backend("not json at all")
+    linker = HaikuLinker(backend=backend)
+    a, b = _make_entity_pair()
+    assert linker.infer_relationship(a, b, context="x") is None
+
+
+def test_haiku_linker_handles_empty_response():
+    backend = _mock_linker_backend("")
+    linker = HaikuLinker(backend=backend)
+    a, b = _make_entity_pair()
+    assert linker.infer_relationship(a, b, context="x") is None
 
 
 def test_weight_accumulation_across_signals(entity_a, entity_b):
