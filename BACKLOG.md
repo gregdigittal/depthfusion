@@ -609,24 +609,24 @@
 ### S-41: As a developer, I want a typed LLM backend protocol so that every Haiku call-site can be rewired to alternative providers without logic changes `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `backends/base.py`, `factory.py`, `haiku.py`, `null.py` exist with type hints on every public function
-- [ ] AC-2: All 4 LLM call-sites use `get_backend(...)`; no direct `anthropic.Anthropic(...)` call remains in `src/depthfusion/` (grep-verified — fixes C2)
-- [ ] AC-3: With no new flags set, `_tool_recall` output on a fixed corpus is byte-identical to v0.4.x (captured via `tests/test_regression/test_v04_output_identity.py`)
-- [ ] AC-4: A 429 rate-limit from Haiku surfaces as `RateLimitError` and triggers the fallback chain
-- [ ] AC-5: All 439 pre-existing tests pass
-- [ ] AC-6: ≥ 25 new tests in `tests/test_backends/` covering protocol contract, factory dispatch, fallback chain, and C2 fix
+- [x] AC-1: `backends/base.py`, `factory.py`, `haiku.py`, `null.py` exist with type hints on every public function
+- [x] AC-2: All 4 LLM call-sites use `get_backend(...)`; no direct `anthropic.Anthropic(...)` call remains in `src/depthfusion/` (grep-verified — fixes C2)
+- [x] AC-3: With no new flags set, `_tool_recall` output on a fixed corpus is byte-identical to v0.4.x (captured via `tests/test_regression/test_v04_output_identity.py`)
+- [x] AC-4: A 429 rate-limit from Haiku surfaces as `RateLimitError` and triggers the fallback chain
+- [x] AC-5: All 439 pre-existing tests pass
+- [x] AC-6: ≥ 25 new tests in `tests/test_backends/` covering protocol contract, factory dispatch, fallback chain, and C2 fix
 - [ ] AC-7: CIQS benchmark run shows no category regression > 2 points vs v0.4.x baseline
 - [ ] AC-8: Fallback chain is **quality-ranked** (per DR-018 §4 ratification → I-18); cost/latency optimisation applies only within a quality tier
 
 **Tasks:**
-- [ ] T-115: Implement `backends/base.py` Protocol (complete/embed/rerank/extract_structured/healthy)
-- [ ] T-116: Implement `backends/haiku.py` HaikuBackend with typed 429/529/timeout errors and explicit `api_key=` (C2 fix)
-- [ ] T-117: Implement `backends/null.py` NullBackend
+- [x] T-115: Implement `backends/base.py` Protocol (complete/embed/rerank/extract_structured/healthy)
+- [x] T-116: Implement `backends/haiku.py` HaikuBackend with typed 429/529/timeout errors and explicit `api_key=` (C2 fix)
+- [x] T-117: Implement `backends/null.py` NullBackend
 - [ ] T-118: Implement `backends/local_embedding.py` sentence-transformers wrapper
-- [ ] T-119: Implement `backends/factory.py` with per-capability / per-mode dispatch table + env-var overrides
-- [ ] T-120: Migrate 4 call-sites (reranker.py, extractor.py, linker.py, auto_learn.py HaikuSummarizer) to `get_backend(...)`
-- [ ] T-121: Author regression test `tests/test_regression/test_v04_output_identity.py`
-- [ ] T-122: Author `tests/test_backends/` suite (contract, factory, fallback, C2)
+- [x] T-119: Implement `backends/factory.py` with per-capability / per-mode dispatch table + env-var overrides
+- [x] T-120: Migrate 4 call-sites (reranker.py, extractor.py, linker.py, auto_learn.py HaikuSummarizer) to `get_backend(...)`
+- [x] T-121: Author regression test `tests/test_regression/test_v04_output_identity.py`
+- [x] T-122: Author `tests/test_backends/` suite (contract, factory, fallback, C2)
 - [ ] T-123: Wire `DEPTHFUSION_BACKEND_FALLBACK_LOG` JSONL emission
 
 ### S-42: As an operator, I want a three-mode installer so that I can provision `local`, `vps-cpu`, or `vps-gpu` environments with the right dependencies and smoke tests `P0` `M`
@@ -668,17 +668,17 @@
 ### S-44: As a vps-gpu operator, I want a Gemma backend for all LLM capabilities so that reranking, extraction, summarisation, and linking run on-box with Haiku fallback `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode
-- [ ] AC-2: p95 latency per capability recorded in the Phase 4 runbook
-- [ ] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout (integration test with fault-injected mock server)
-- [ ] AC-4: Fallback to Null triggers when Haiku also unavailable (integration test)
-- [ ] AC-5: ≥ 15 new tests
+- [x] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode (verified in `test_vps_gpu_mode_routes_all_llm_caps_to_gemma`; embedding routes to local-stub → null until T-118)
+- [ ] AC-2: p95 latency per capability recorded in the Phase 4 runbook (requires live GEX44 benchmark)
+- [ ] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout (integration test with fault-injected mock server) — typed-error translation verified at unit level (`test_complete_translates_503_to_overload`, `..._529_to_overload`, `..._urllib_timeout_to_backend_timeout`); chain-level Haiku fallback requires the chain wiring deferred to a future TG
+- [ ] AC-4: Fallback to Null triggers when Haiku also unavailable (integration test) — same chain dependency
+- [x] AC-5: ≥ 15 new tests (37 landed in `test_gemma.py` + 3 factory tests for Gemma dispatch)
 
 **Tasks:**
-- [ ] T-132: Implement `backends/gemma.py` (vLLM HTTP client, timeout, concurrency caps)
-- [ ] T-133: Register Gemma in `backends/factory.py`
-- [ ] T-134: Author `scripts/vllm-serve-gemma.sh` systemd-friendly launcher
-- [ ] T-135: Author `tests/test_backends/test_gemma.py` with mock vLLM server + fault injection
+- [x] T-132: Implement `backends/gemma.py` (vLLM HTTP client via stdlib `urllib.request`, timeout, concurrency-cap config, typed-error translation for 429/503/529/timeout)
+- [x] T-133: Register Gemma in `backends/factory.py` (with healthy-check-then-fallback safety net)
+- [x] T-134: Author `scripts/vllm-serve-gemma.sh` systemd-friendly launcher + `scripts/vllm-gemma.service` unit file
+- [x] T-135: Author `tests/test_backends/test_gemma.py` with mock vLLM server + fault injection (37 tests)
 
 ---
 

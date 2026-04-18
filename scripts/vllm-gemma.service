@@ -1,0 +1,57 @@
+# vllm-gemma.service — systemd unit for DepthFusion vps-gpu Gemma server.
+#
+# Install:
+#   sudo cp scripts/vllm-gemma.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now vllm-gemma
+#
+# Inspect:
+#   systemctl status vllm-gemma
+#   journalctl -u vllm-gemma -f
+#
+# Assumes the depthfusion repo lives at /home/gregmorris/projects/depthfusion/
+# and the `vps-gpu` dependency extra has been installed into a venv under
+# /home/gregmorris/projects/depthfusion/.venv/. Adjust WorkingDirectory,
+# ExecStart, and Environment paths for other deployments.
+
+[Unit]
+Description=DepthFusion vLLM Gemma server (vps-gpu backend)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=gregmorris
+Group=gregmorris
+WorkingDirectory=/home/gregmorris/projects/depthfusion
+
+# vLLM must be on PATH from the venv. The shell script checks this up-front
+# and exits 127 with a clear error if vllm is missing.
+Environment="PATH=/home/gregmorris/projects/depthfusion/.venv/bin:/usr/bin:/bin"
+# Default model — override here, in /etc/default/vllm-gemma, or via drop-in.
+Environment="DEPTHFUSION_GEMMA_MODEL=google/gemma-3-12b-it-AWQ"
+Environment="DEPTHFUSION_GEMMA_PORT=8000"
+Environment="DEPTHFUSION_GEMMA_HOST=127.0.0.1"
+Environment="DEPTHFUSION_GEMMA_GPU_MEMORY=0.90"
+Environment="DEPTHFUSION_GEMMA_MAX_MODEL_LEN=8192"
+
+ExecStart=/home/gregmorris/projects/depthfusion/scripts/vllm-serve-gemma.sh
+
+Restart=on-failure
+RestartSec=5
+
+# vLLM can take ~60s to load Gemma 3 12B into VRAM on the GEX44; give it
+# headroom before systemd treats slow startup as a failure.
+TimeoutStartSec=300
+
+# Resource limits — the GEX44 has 64 GB RAM + 20 GB VRAM; vLLM is mostly
+# GPU-bound but also holds tokenizer / request-queue state in host RAM.
+MemoryMax=48G
+LimitNOFILE=65536
+
+# Log to journald only — redirect stdout/stderr into the journal.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

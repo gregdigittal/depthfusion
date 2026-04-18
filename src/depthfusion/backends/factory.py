@@ -29,6 +29,7 @@ import os
 from typing import Optional
 
 from depthfusion.backends.base import LLMBackend
+from depthfusion.backends.gemma import GemmaBackend
 from depthfusion.backends.haiku import HaikuBackend
 from depthfusion.backends.null import NullBackend
 
@@ -117,9 +118,9 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
         # T-116 HaikuBackend. If construction succeeds but the backend
         # reports unhealthy (no DEPTHFUSION_API_KEY, no SDK), fall through
         # to NullBackend rather than returning an unusable backend.
-        backend = HaikuBackend()
-        if backend.healthy():
-            return backend
+        haiku: LLMBackend = HaikuBackend()
+        if haiku.healthy():
+            return haiku
         logger.info(
             "HaikuBackend requested for capability %r but not healthy "
             "(no DEPTHFUSION_API_KEY or anthropic SDK); falling back to NullBackend.",
@@ -128,7 +129,17 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
         return NullBackend()
 
     if name == "gemma":
-        # T-132 will implement GemmaBackend. Scaffold: fall through to null.
+        # T-132 GemmaBackend. Healthy whenever URL + model are configured
+        # (construction-time check; no network probe). Falls back to
+        # NullBackend only in the extreme case of empty config.
+        gemma: LLMBackend = GemmaBackend()
+        if gemma.healthy():
+            return gemma
+        logger.info(
+            "GemmaBackend requested for capability %r but not healthy "
+            "(missing URL or model config); falling back to NullBackend.",
+            capability,
+        )
         return NullBackend()
 
     if name == "local":

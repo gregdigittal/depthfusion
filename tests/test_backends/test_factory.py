@@ -205,3 +205,57 @@ def test_factory_never_returns_unhealthy_backend(monkeypatch):
         assert backend.healthy() is True, (
             f"Factory returned unhealthy backend for {cap}: {type(backend).__name__}"
         )
+
+
+# ── Gemma dispatch (T-133) ──────────────────────────────────────────────
+
+
+def test_gemma_override_returns_gemma():
+    """Explicit gemma override → GemmaBackend. No GEX44 required for
+    construction since healthy() is config-only.
+    """
+    import os
+
+    from depthfusion.backends.gemma import GemmaBackend
+    # Use monkeypatch-equivalent via direct env control in a fresh context
+    # Note: GemmaBackend defaults are valid even without env vars set
+    os.environ["DEPTHFUSION_RERANKER_BACKEND"] = "gemma"
+    try:
+        backend = get_backend("reranker")
+        assert isinstance(backend, GemmaBackend)
+        assert backend.healthy()
+    finally:
+        del os.environ["DEPTHFUSION_RERANKER_BACKEND"]
+
+
+def test_vps_gpu_mode_routes_all_llm_caps_to_gemma(monkeypatch):
+    """vps-gpu default: reranker/extractor/linker/summariser/decision_extractor
+    all resolve to GemmaBackend (embedding routes to local_embedding, which
+    falls back to NullBackend until T-118 lands).
+    """
+    from depthfusion.backends.gemma import GemmaBackend
+    from depthfusion.backends.null import NullBackend
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+    for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor"]:
+        monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
+        backend = get_backend(cap)
+        assert isinstance(backend, GemmaBackend), (
+            f"vps-gpu/{cap} did not route to GemmaBackend "
+            f"(got {type(backend).__name__})"
+        )
+    # embedding still routes to local-backend stub (→ NullBackend until T-118)
+    monkeypatch.delenv("DEPTHFUSION_EMBEDDING_BACKEND", raising=False)
+    embedding_backend = get_backend("embedding")
+    assert isinstance(embedding_backend, NullBackend)
+
+
+def test_gemma_factory_uses_custom_url_from_env(monkeypatch):
+    """The factory instantiates GemmaBackend with default __init__ args,
+    which then reads DEPTHFUSION_GEMMA_URL from env. Verifies the
+    pipeline from env → factory → GemmaBackend is intact.
+    """
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+    monkeypatch.setenv("DEPTHFUSION_GEMMA_URL", "http://gex44.test:8000/v1")
+    monkeypatch.delenv("DEPTHFUSION_RERANKER_BACKEND", raising=False)
+    backend = get_backend("reranker")
+    assert backend._url == "http://gex44.test:8000/v1"
