@@ -69,7 +69,8 @@ class DepthFusionConfig:
     rlm_enabled: bool = True
     router_enabled: bool = True
     graph_enabled: bool = False       # v0.4.0 Knowledge Graph (opt-in)
-    haiku_enabled: bool = False       # v0.5.0 Haiku API calls (opt-in, requires DEPTHFUSION_API_KEY)
+    # v0.5.0 Haiku API calls (opt-in, requires DEPTHFUSION_API_KEY)
+    haiku_enabled: bool = False
 
     # Session behaviour
     session_selective: bool = True   # False → load_all() fallback
@@ -86,6 +87,18 @@ class DepthFusionConfig:
     # Context bus
     bus_backend: str = "file"        # "memory" | "file" | "supabase"
     bus_file_dir: str = "~/.claude/context-bus"
+
+    # v0.5.0 backend provider interface
+    # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
+    reranker_backend: str = ""           # null | haiku | gemma
+    extractor_backend: str = ""          # null | haiku | gemma
+    linker_backend: str = ""             # null | haiku | gemma
+    summariser_backend: str = ""         # null | haiku | gemma
+    embedding_backend: str = ""          # null | local
+    decision_extractor_backend: str = "" # null | haiku | gemma
+    gemma_url: str = "http://127.0.0.1:8000/v1"
+    gemma_model: str = "google/gemma-3-12b-it-AWQ"
+    backend_fallback_log: bool = True    # emit JSONL record to metrics/ on fallback
 
     @classmethod
     def from_env(cls) -> "DepthFusionConfig":
@@ -107,4 +120,13 @@ class DepthFusionConfig:
             bus_file_dir=os.environ.get(
                 "DEPTHFUSION_BUS_FILE_DIR", "~/.claude/context-bus"
             ),
+            reranker_backend=os.environ.get("DEPTHFUSION_RERANKER_BACKEND", ""),
+            extractor_backend=os.environ.get("DEPTHFUSION_EXTRACTOR_BACKEND", ""),
+            linker_backend=os.environ.get("DEPTHFUSION_LINKER_BACKEND", ""),
+            summariser_backend=os.environ.get("DEPTHFUSION_SUMMARISER_BACKEND", ""),
+            embedding_backend=os.environ.get("DEPTHFUSION_EMBEDDING_BACKEND", ""),
+            decision_extractor_backend=os.environ.get("DEPTHFUSION_DECISION_EXTRACTOR_BACKEND", ""),
+            gemma_url=os.environ.get("DEPTHFUSION_GEMMA_URL", "http://127.0.0.1:8000/v1"),
+            gemma_model=os.environ.get("DEPTHFUSION_GEMMA_MODEL", "google/gemma-3-12b-it-AWQ"),
+            backend_fallback_log=_env_bool("DEPTHFUSION_BACKEND_FALLBACK_LOG", True),
         )
