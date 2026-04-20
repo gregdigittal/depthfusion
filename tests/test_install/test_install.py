@@ -1,42 +1,76 @@
 # tests/test_install/test_install.py
+"""Installer CLI + per-mode install path tests — T-124 / T-127 / T-128 / S-42.
+
+Covers:
+  * argparse: all four mode tokens (local / vps-cpu / vps-gpu / vps-alias)
+  * Deprecation warning on --mode=vps
+  * Byte-identity of the local mode env file vs v0.4.x (AC-6)
+  * GPU probe refusal path (AC-1)
+  * Vps-gpu env file contents when GPU check is bypassed (AC-2)
+"""
+from __future__ import annotations
+
 import subprocess
 import sys
+from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 
-def test_install_help():
+from depthfusion.install import install as install_mod
+from depthfusion.install.gpu_probe import GPUInfo
+
+# ---------------------------------------------------------------------------
+# CLI smoke (subprocess) — checks argparse doesn't regress
+# ---------------------------------------------------------------------------
+
+def test_install_help_lists_all_modes():
     result = subprocess.run(
         [sys.executable, "-m", "depthfusion.install.install", "--help"],
-        capture_output=True, text=True
+        capture_output=True, text=True,
     )
     assert result.returncode == 0
     assert "--mode" in result.stdout
+    for mode in ("local", "vps-cpu", "vps-gpu"):
+        assert mode in result.stdout
 
 
 def test_install_local_dry_run():
     result = subprocess.run(
         [sys.executable, "-m", "depthfusion.install.install",
          "--mode", "local", "--dry-run"],
-        capture_output=True, text=True
+        capture_output=True, text=True,
     )
     assert result.returncode == 0
-    assert "dry-run" in result.stdout.lower() or "local" in result.stdout.lower()
+    assert "local" in result.stdout.lower() or "dry-run" in result.stdout.lower()
 
 
-def test_install_vps_dry_run():
+def test_install_vps_cpu_dry_run():
     result = subprocess.run(
         [sys.executable, "-m", "depthfusion.install.install",
-         "--mode", "vps", "--dry-run"],
-        capture_output=True, text=True
+         "--mode", "vps-cpu", "--dry-run"],
+        capture_output=True, text=True,
     )
     assert result.returncode == 0
-    assert "vps" in result.stdout.lower() or "dry-run" in result.stdout.lower()
+    assert "vps-cpu" in result.stdout.lower() or "dry-run" in result.stdout.lower()
+
+
+def test_install_vps_gpu_dry_run_with_skip_check():
+    """vps-gpu with --skip-gpu-check bypasses nvidia-smi probe."""
+    result = subprocess.run(
+        [sys.executable, "-m", "depthfusion.install.install",
+         "--mode", "vps-gpu", "--dry-run", "--skip-gpu-check"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert "vps-gpu" in result.stdout.lower() or "dry-run" in result.stdout.lower()
 
 
 def test_install_rejects_invalid_mode():
     result = subprocess.run(
         [sys.executable, "-m", "depthfusion.install.install",
          "--mode", "cloud"],
-        capture_output=True, text=True
+        capture_output=True, text=True,
     )
     assert result.returncode != 0
 
@@ -44,7 +78,205 @@ def test_install_rejects_invalid_mode():
 def test_migrate_help():
     result = subprocess.run(
         [sys.executable, "-m", "depthfusion.install.migrate", "--help"],
-        capture_output=True, text=True
+        capture_output=True, text=True,
     )
     assert result.returncode == 0
     assert "--dry-run" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# --mode=vps deprecation alias (AC-3)
+# ---------------------------------------------------------------------------
+
+def test_vps_alias_prints_deprecation_and_runs_vps_cpu(capsys):
+    """--mode=vps should warn AND execute the vps-cpu install path."""
+    with patch.object(install_mod, "install_vps_cpu") as mock_cpu:
+        rc = install_mod.main(["--mode", "vps", "--dry-run"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "DEPRECATION" in captured.err
+    assert "vps-cpu" in captured.err
+    mock_cpu.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# T-128: byte-identity of local-mode env file (AC-6)
+# ---------------------------------------------------------------------------
+
+# The exact byte content expected on disk. Changing this is a v0.4.x
+# compatibility break — the test fails on purpose to force a release note.
+_V04_LOCAL_ENV = (
+    "DEPTHFUSION_MODE=local\n"
+    "DEPTHFUSION_TIER_AUTOPROMOTE=false\n"
+    "DEPTHFUSION_GRAPH_ENABLED=true\n"
+)
+
+
+def test_install_local_env_file_is_byte_identical_to_v04(tmp_path, monkeypatch):
+    """Regression: `install_local()` must produce the exact same env file
+    bytes as v0.4.x. Changing this breaks external operator scripts that
+    hash or diff the file.
+    """
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    # Path.home() reads HOME on POSIX
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    install_mod.install_local(dry_run=False)
+
+    env_file = fake_home / ".claude" / "depthfusion.env"
+    assert env_file.exists()
+    assert env_file.read_bytes() == _V04_LOCAL_ENV.encode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# vps-gpu AC-1: refuses on no-GPU host
+# ---------------------------------------------------------------------------
+
+def test_install_vps_gpu_refuses_when_no_gpu(capsys, tmp_path, monkeypatch):
+    """--mode=vps-gpu with no GPU must exit 2 and print remediation."""
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    no_gpu = GPUInfo(
+        has_gpu=False, gpu_name="", vram_gb=0.0, device_count=0,
+        reason="nvidia-smi not found on PATH",
+    )
+    with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
+        rc = install_mod.install_vps_gpu(dry_run=False)
+
+    assert rc == 2
+    captured = capsys.readouterr()
+    assert "requires an NVIDIA GPU" in captured.out
+    assert "Remediation" in captured.out
+    assert "vps-cpu" in captured.out  # points at the fallback mode
+    # Env file must NOT be written on refusal
+    assert not (fake_home / ".claude" / "depthfusion.env").exists()
+
+
+# ---------------------------------------------------------------------------
+# vps-gpu AC-2: writes correct env on a GPU host
+# ---------------------------------------------------------------------------
+
+def test_install_vps_gpu_writes_correct_env_when_gpu_present(tmp_path, monkeypatch):
+    """On a GPU host, --mode=vps-gpu writes env with per-capability backend flags."""
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    good_gpu = GPUInfo(
+        has_gpu=True, gpu_name="RTX 4090", vram_gb=24.0, device_count=1,
+        reason="detected 1 GPU(s); primary: RTX 4090 (24.0 GB VRAM)",
+    )
+    with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
+        rc = install_mod.install_vps_gpu(dry_run=False, tier_threshold=500)
+
+    assert rc == 0
+    env_file = fake_home / ".claude" / "depthfusion.env"
+    assert env_file.exists()
+    contents = env_file.read_text()
+    assert "DEPTHFUSION_MODE=vps-gpu" in contents
+    assert "DEPTHFUSION_EMBEDDING_BACKEND=local" in contents
+    assert "DEPTHFUSION_GRAPH_ENABLED=true" in contents
+    assert "DEPTHFUSION_TIER_THRESHOLD=500" in contents
+
+
+def test_install_vps_gpu_skip_check_does_not_call_probe(tmp_path, monkeypatch):
+    """--skip-gpu-check bypasses nvidia-smi — useful for CI with no GPU."""
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    with patch("depthfusion.install.install.detect_gpu") as mock_probe:
+        rc = install_mod.install_vps_gpu(
+            dry_run=False, tier_threshold=500, skip_gpu_check=True,
+        )
+
+    assert rc == 0
+    mock_probe.assert_not_called()
+    assert (fake_home / ".claude" / "depthfusion.env").exists()
+
+
+# ---------------------------------------------------------------------------
+# pyproject extras (AC-5) — structural check, no install
+# ---------------------------------------------------------------------------
+
+def test_pyproject_declares_three_mode_extras():
+    """pyproject.toml must have [local], [vps-cpu], [vps-gpu] extras."""
+    pyproj_text = (Path(__file__).parent.parent.parent / "pyproject.toml").read_text()
+    for extra in ("local = ", "vps-cpu = ", "vps-gpu = "):
+        assert extra in pyproj_text, (
+            f"Missing extras entry '{extra}' in pyproject.toml"
+        )
+
+
+@pytest.mark.parametrize("mode,expected_mode_line", [
+    ("local", "DEPTHFUSION_MODE=local"),
+    ("vps-cpu", "DEPTHFUSION_MODE=vps-cpu"),
+])
+def test_each_mode_writes_correct_mode_line(mode, expected_mode_line, tmp_path, monkeypatch):
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    if mode == "local":
+        install_mod.install_local(dry_run=False)
+    else:
+        install_mod.install_vps_cpu(dry_run=False)
+
+    env_file = fake_home / ".claude" / "depthfusion.env"
+    assert expected_mode_line in env_file.read_text()
+
+
+# ---------------------------------------------------------------------------
+# Review-gate regressions: --skip-gpu-check warning + hook-registration path
+# ---------------------------------------------------------------------------
+
+def test_skip_gpu_check_warns_when_mode_is_local(capsys):
+    """Passing --skip-gpu-check to --mode=local must surface a warning so
+    operators notice a stale CI flag rather than silent acceptance.
+    """
+    rc = install_mod.main(["--mode", "local", "--dry-run", "--skip-gpu-check"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "--skip-gpu-check has no effect" in captured.err
+    assert "--mode=vps-gpu" in captured.err
+
+
+def test_skip_gpu_check_no_warning_when_mode_is_vps_gpu(capsys):
+    """The warning must NOT fire for the legitimate vps-gpu use case."""
+    rc = install_mod.main([
+        "--mode", "vps-gpu", "--dry-run", "--skip-gpu-check",
+    ])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "has no effect" not in captured.err
+
+
+def test_register_hooks_uses_runtime_resolved_home(tmp_path, monkeypatch):
+    """Regression: _register_hooks() must resolve ~/.claude/settings.json
+    at call time, not at module import. Previously these were module-level
+    constants that froze the real home directory path at import — making
+    tests silently skip hook registration.
+    """
+    fake_home = tmp_path / "home"
+    claude_dir = fake_home / ".claude"
+    hooks_dir = claude_dir / "hooks"
+    hooks_dir.mkdir(parents=True)
+    # Minimal settings file with no existing hooks
+    settings_file = claude_dir / "settings.json"
+    settings_file.write_text('{"hooks": {}}', encoding="utf-8")
+    # Create the hook script so it passes the existence check
+    (hooks_dir / "depthfusion-pre-compact.sh").write_text("#!/bin/bash\n")
+    (hooks_dir / "depthfusion-post-compact.sh").write_text("#!/bin/bash\n")
+
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+    install_mod.install_local(dry_run=False)
+
+    # If the constants were still module-level, this would be unchanged.
+    data = settings_file.read_text()
+    assert "depthfusion-pre-compact.sh" in data
+    assert "depthfusion-post-compact.sh" in data
