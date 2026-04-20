@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+# `types-PyYAML` is listed in `[dev]` extras; the ignore is kept for
+# environments (minimal deploys, CI smoke) that haven't installed it.
+# If `warn_unused_ignores` is ever enabled in mypy config, drop the
+# comment here and in session/tagger.py.
+import yaml  # type: ignore[import-untyped]
 
 from depthfusion.core.types import SessionBlock
 from depthfusion.session.scorer import SessionScorer

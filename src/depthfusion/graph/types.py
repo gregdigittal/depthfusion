@@ -10,10 +10,15 @@ if TYPE_CHECKING:
 
 @dataclass
 class Entity:
-    """A named entity extracted from memory files."""
+    """A named entity extracted from memory files.
+
+    `type` is one of:
+      class | function | file | concept | project | decision | error_pattern | session
+    (`session` was added in v0.5 / S-50 for session-level PRECEDED_BY edges.)
+    """
     entity_id: str           # sha256(name + type + project)[:12]
     name: str                # e.g. "BM25", "TierManager", "PostCompact hook"
-    type: str                # "class"|"function"|"file"|"concept"|"project"|"decision"|"error_pattern"
+    type: str
     project: str             # e.g. "depthfusion"
     source_files: list[str]  # memory/discovery files containing this entity
     confidence: float        # 1.0 = regex; 0.70–0.95 = haiku

@@ -871,29 +871,29 @@
 ### S-58: As an auditor, I want `config_version_id` populated on every gate-log record so that gate decisions can be reproduced against the config snapshot active at invocation (I-8 compliance) `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: A `config_version_id` is computed deterministically from the active `GateConfig` (e.g. sha256 of the `(alpha, b_threshold, c_threshold, delta_threshold)` tuple truncated to 12 hex chars) and attached to every `record_gate_log()` entry
-- [ ] AC-2: When `GateConfig` changes mid-session (env var reload), the next gate-log entry carries the NEW `config_version_id` — downstream tooling can diff the two to explain behaviour changes
-- [ ] AC-3: The `TODO(I-8)` marker in `retrieval/hybrid.py::apply_fusion_gates` is removed
-- [ ] AC-4: ≥ 4 new tests (deterministic ID generation, ID changes on config change, ID stable across calls with unchanged config, ID appears on disk entry)
+- [x] AC-1: `GateConfig.version_id()` — sha256 of `(alpha, b_threshold, c_threshold, delta_threshold)` truncated to 12 hex chars; attached to every `record_gate_log()` entry via `RecallPipeline.apply_fusion_gates`
+- [x] AC-2: When `GateConfig` changes mid-session (env var reload), the next gate-log entry carries the NEW `config_version_id` — verified in `test_config_version_id_changes_when_env_var_changes`
+- [x] AC-3: `TODO(I-8)` marker in `retrieval/hybrid.py::apply_fusion_gates` removed; docstring explicitly names I-8 compliance and the DR-018 §4 ratification as the contract
+- [x] AC-4: ≥ 4 new tests (13 tests in `test_gate_config_version.py`: determinism, sensitivity, clamp normalisation, signed-zero regression, end-to-end on-disk)
 
 **Tasks:**
-- [ ] T-178: Add `GateConfig.version_id()` method that hashes the frozen field tuple
-- [ ] T-179: Thread the computed ID from `apply_fusion_gates` through `record_gate_log(..., config_version_id=...)`
-- [ ] T-180: Author `tests/test_fusion/test_gate_config_version.py`
+- [x] T-178: `GateConfig.version_id()` — `.10f`-precision format string, defense-in-depth `_normalise_float` collapses signed-zero to guard against IEEE 754 edge cases
+- [x] T-179: `apply_fusion_gates` computes `cfg.version_id()` and threads into `record_gate_log(..., config_version_id=...)`; TODO marker replaced with reference to the ratified contract
+- [x] T-180: `tests/test_fusion/test_gate_config_version.py` — 13 tests
 
 ### S-59: As a maintainer, I want pre-existing mypy + ruff errors retired so that the default `ruff check` and `mypy src/depthfusion` commands are clean `P3` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `mypy src/depthfusion` reports 0 errors (currently 6 pre-existing: 3 in `storage/vector_store.py` index errors, 1 in `retrieval/hybrid.py` `_StorageTier` reassignment, 1 in `session/loader.py` missing yaml stubs, 1 remaining after yaml-stubs install)
-- [ ] AC-2: `ruff check src/ tests/` reports 0 errors (currently 5 pre-existing: E402/E501 in `mcp/server.py`, E501 in `graph/types.py:16`)
-- [ ] AC-3: The CI / pre-commit hooks guard against re-introduction (already in place for ruff; need to add mypy gate)
+- [x] AC-1: `mypy src/depthfusion` reports 0 errors — `Success: no issues found in 72 source files`
+- [x] AC-2: `ruff check src/ tests/` reports 0 errors — `All checks passed!`
+- [ ] AC-3: CI / pre-commit hooks guard against re-introduction (follow-up — current commit + push workflows run ruff but not mypy in the gate)
 
 **Tasks:**
-- [ ] T-181: Add `types-PyYAML` to `[dev]` extras and fix `session/loader.py` import
-- [ ] T-182: Fix `storage/vector_store.py` `list | None` indexing (add `if ... is None: return` guards)
-- [ ] T-183: Narrow the `_StorageTier` / `TierManager` conditional import in `retrieval/hybrid.py` to avoid `type: ignore[misc]`
-- [ ] T-184: Split the long E501 lines in `mcp/server.py` and `graph/types.py:16` across multiple lines
-- [ ] T-185: Move the module-level BM25 imports in `mcp/server.py` to the top (fixes E402) or add an `# noqa: E402` with a link to the refactor that made them late-bound
+- [x] T-181: Added `types-PyYAML>=6.0.0` to `[dev]` extras; `# type: ignore[import-untyped]` on `import yaml` in `session/loader.py` + `session/tagger.py` with explanatory comment for minimal-deploy environments where the stubs aren't installed
+- [x] T-182: `storage/vector_store.py` — narrowed Chroma's `list | None` return types via `results.get(...) or []` + early-return on empty nested list; per-row `distances[0][i] if distances and distances[0] else 0.0` guards
+- [x] T-183: `retrieval/hybrid.py` — private `_TierManager` / `_StorageTier` bindings inside `try/except`, public `TierManager = _TierManager` re-alias preserves back-compat with tests that patch `depthfusion.retrieval.hybrid.TierManager`
+- [x] T-184: Split E501 long lines — extracted `chunk_id` local in `mcp/server.py:423`, reformatted `return json.dumps({...})` to multi-line, moved the long `type:` enumeration comment in `graph/types.py:16` into the dataclass docstring
+- [x] T-185: Moved `from depthfusion.retrieval.bm25 import ...` to module-top in `mcp/server.py`; deleted the mid-file duplicate import block
 
 ---
 

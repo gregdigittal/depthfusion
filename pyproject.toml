@@ -43,6 +43,7 @@ dev = [
     "pytest-cov>=5.0",
     "mypy>=1.0",
     "ruff>=0.4",
+    "types-PyYAML>=6.0.0",  # mypy stubs for yaml (S-59 T-181)
 ]
 
 [tool.setuptools.packages.find]

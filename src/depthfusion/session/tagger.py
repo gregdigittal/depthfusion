@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # see loader.py for rationale
 
 # Known project name patterns (order matters — more specific first)
 _PROJECT_PATTERNS: list[tuple[str, str]] = [

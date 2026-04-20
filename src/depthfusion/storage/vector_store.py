@@ -50,13 +50,24 @@ class ChromaDBStore:
         if n == 0:
             return []
         results = self._collection.query(query_texts=[query_text], n_results=n)
+        # The Chroma return types for distances/documents/metadatas are
+        # `list[...] | None` — narrow once so mypy + runtime both treat
+        # the subscripted access below as safe.
+        ids = results.get("ids") or []
+        distances = results.get("distances") or []
+        documents = results.get("documents") or []
+        metadatas = results.get("metadatas") or []
+        if not ids or not ids[0]:
+            return []
         output = []
-        for i, doc_id in enumerate(results["ids"][0]):
-            dist = results["distances"][0][i] if results.get("distances") else 0.0
+        for i, doc_id in enumerate(ids[0]):
+            dist = distances[0][i] if distances and distances[0] else 0.0
+            content = documents[0][i] if documents and documents[0] else ""
+            metadata = metadatas[0][i] if metadatas and metadatas[0] else {}
             output.append({
                 "chunk_id": doc_id,
-                "content": results["documents"][0][i],
-                "metadata": results["metadatas"][0][i],
+                "content": content,
+                "metadata": metadata,
                 "score": max(0.0, 1.0 - dist),  # cosine distance → similarity
             })
         return output

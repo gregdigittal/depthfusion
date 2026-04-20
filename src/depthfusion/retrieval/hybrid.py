@@ -51,12 +51,20 @@ _FRONTMATTER_PROJECT_KEY_RE = re.compile(
 
 try:
     from depthfusion.storage.tier_manager import Tier as _StorageTier
-    from depthfusion.storage.tier_manager import TierManager
+    from depthfusion.storage.tier_manager import TierManager as _TierManager
     _TIER_MANAGER_AVAILABLE = True
 except ImportError:
-    TierManager = None  # type: ignore[assignment,misc]
-    _StorageTier = None  # type: ignore[assignment]
+    # Sentinel bindings when the storage extras aren't installed. Using
+    # distinct *private* names (_TierManager / _StorageTier) and assigning
+    # None to them avoids the "Cannot assign to a type" mypy error that
+    # occurs when the import-aliased name shadows a type symbol.
+    _TierManager = None  # type: ignore[misc,assignment]
+    _StorageTier = None  # type: ignore[misc,assignment]
     _TIER_MANAGER_AVAILABLE = False
+
+# Public module-level name preserved for back-compat with existing callers
+# and test monkeypatches that reference `depthfusion.retrieval.hybrid.TierManager`.
+TierManager = _TierManager
 
 
 class PipelineMode(Enum):
@@ -159,8 +167,12 @@ class RecallPipeline:
 
         try:
             from depthfusion.fusion.gates import GateConfig, SelectiveFusionGates
-            gates = SelectiveFusionGates(config=GateConfig.from_env())
+            cfg = GateConfig.from_env()
+            gates = SelectiveFusionGates(config=cfg)
             survivors, log = gates.apply(blocks, query_embedding=query_embedding)
+            # Deterministic snapshot ID of the config used for this decision
+            # (S-58 / I-8 compliance; closes the TODO marker from S-51).
+            config_version_id = cfg.version_id()
         except Exception as exc:  # noqa: BLE001 — fail-open contract
             logger.debug("apply_fusion_gates: degraded to pass-through (%s)", exc)
             return blocks
@@ -171,11 +183,11 @@ class RecallPipeline:
 
         # Emit gate log (D-3 invariant). Swallow any metrics failure so
         # observability never degrades retrieval.
-        # TODO(I-8): wire config_version_id once v0.6 adds the immutable
-        # config-snapshot machinery. Until then, gate-log records carry
-        # config_version_id="" — the audit trail is complete except for
-        # the snapshot pointer (see docs/plans/v0.5/03-skillforge-integration.md
-        # §3.3.5 action 2 for the ratified contract).
+        # I-8 compliance (S-58): `config_version_id` is a deterministic
+        # hash of the active GateConfig — auditors can reproduce any gate
+        # decision against the exact config that produced it. Per DR-018
+        # §4 ratification and docs/plans/v0.5/03-skillforge-integration.md
+        # §3.3.5, this field is mandatory on every gate-log record.
         try:
             import hashlib
 
@@ -185,6 +197,7 @@ class RecallPipeline:
                 log,
                 query_hash=query_hash,
                 mode=mode_label or self.mode.value,
+                config_version_id=config_version_id,
                 fallback_triggered=fallback_triggered,
             )
         except Exception as exc:  # noqa: BLE001

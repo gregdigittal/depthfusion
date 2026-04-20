@@ -7,6 +7,9 @@ import re
 import sys
 from typing import Any
 
+from depthfusion.retrieval.bm25 import BM25 as _BM25
+from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
+
 logger = logging.getLogger(__name__)
 
 TOOLS: dict[str, str] = {
@@ -159,14 +162,8 @@ def _tool_status(config: Any) -> str:
 
 
 ## ---------------------------------------------------------------------------
-## BM25 implementation (extracted to retrieval/bm25.py)
-## ---------------------------------------------------------------------------
-
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-
-## ---------------------------------------------------------------------------
 ## Block extraction: chunk files on H2 headers for finer-grained retrieval
+## (BM25 is imported at module-top to avoid ruff E402; see L11-12.)
 ## ---------------------------------------------------------------------------
 
 def _split_into_blocks(content: str, source_label: str, file_stem: str) -> list[dict]:
@@ -420,8 +417,13 @@ def _tool_recall(arguments: dict) -> str:
     for idx, raw_score in bm25_ranked:
         source = raw_blocks[idx]["source"]
         weight = _SOURCE_WEIGHTS.get(source, 1.0)
-        # recency_rank gives a small tie-breaking boost (0–1% of score) without overriding content signal
-        recency_rank = recency_list.index(raw_blocks[idx]["chunk_id"]) if raw_blocks[idx]["chunk_id"] in recency_list else len(recency_list)
+        # recency_rank gives a small tie-breaking boost (0–1% of score) without
+        # overriding content signal
+        chunk_id = raw_blocks[idx]["chunk_id"]
+        recency_rank = (
+            recency_list.index(chunk_id) if chunk_id in recency_list
+            else len(recency_list)
+        )
         recency_boost = 1.0 / (1 + recency_rank * 0.01)  # max 1%, fades quickly
         weighted.append((idx, raw_score * weight * recency_boost))
 
@@ -554,7 +556,10 @@ def _tool_compress_session(arguments: dict) -> str:
         out = compressor.compress(Path(session_path_str))
         if out:
             return json.dumps({"success": True, "output": str(out)})
-        return json.dumps({"success": False, "message": "Nothing to compress (empty or already done)"})
+        return json.dumps({
+            "success": False,
+            "message": "Nothing to compress (empty or already done)",
+        })
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 

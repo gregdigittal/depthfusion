@@ -37,6 +37,7 @@ Backlog: T-156 (S-51)
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import os
@@ -102,6 +103,59 @@ class GateConfig:
             ),
         )
 
+    def version_id(self) -> str:
+        """Deterministic 12-char hex ID of this config snapshot (I-8 compliance).
+
+        Stable under:
+          - Field order (tuple ordering is fixed).
+          - Value equality after post-init clamping (two configs with pre-
+            clamp alpha=-1 and alpha=0 produce the same id since both
+            clamp to 0.0).
+          - Process / host / interpreter — hashlib.sha256 is deterministic
+            across all of them; format string pins the float precision.
+
+        Changes when:
+          - Any field changes value (even small: 0.30 vs 0.30001 → different).
+          - Defaults change in a future release (the tuple shape is the hash
+            input, so adding a field breaks the ID across versions —
+            intentional; a v0.6 `GateConfig` should have a v0.6-distinct id).
+
+        Used by `record_gate_log(config_version_id=...)` to let auditors
+        reproduce a gate decision against the exact config that produced
+        it (per DR-018 §4 ratification of I-8). See
+        docs/plans/v0.5/03-skillforge-integration.md §3.3.5 for the
+        contract.
+
+        Edge-case handling:
+        - `-0.0` vs `0.0`: Python's `max(0.0, min(1.0, -0.0))` in __post_init__
+          already normalises to `+0.0` (first-arg-wins on IEEE 754 tie), so
+          callers passing `alpha=-0.0` get the same ID as `alpha=0.0`. We
+          still call `_normalise_float` below as defense-in-depth against
+          future interpreter changes and as documentation of intent.
+        - `NaN`: `math.isfinite` guards in __post_init__ replace NaN with
+          0.0 only for delta_threshold; NaN in alpha/b/c will format as
+          "nan" — deterministic across calls but two separately-produced
+          NaN configs will hash-equal even though NaN != NaN. Accepted:
+          NaN configs are operator error, and reproducing the operator
+          error deterministically is still audit-useful.
+        """
+        def _normalise_float(v: float) -> float:
+            # Collapse -0.0 → 0.0 so that signed zero can never produce two
+            # distinct IDs for configs that compare equal (0.0 == -0.0 is True).
+            return 0.0 if v == 0.0 else v
+
+        # Format each float with a fixed precision so "0.3" and "0.30000000"
+        # hash identically — avoid repr() since its output is not stable
+        # across Python minor versions for some float values.
+        fields = (
+            f"alpha={_normalise_float(self.alpha):.10f}",
+            f"b_threshold={_normalise_float(self.b_threshold):.10f}",
+            f"c_threshold={_normalise_float(self.c_threshold):.10f}",
+            f"delta_threshold={_normalise_float(self.delta_threshold):.10f}",
+        )
+        raw = "|".join(fields).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()[:12]
+
 
 @dataclass(frozen=True)
 class GateDecision:
@@ -140,7 +194,12 @@ class GateLog:
     passed_c: int
     passed_delta: int
     decisions: list[GateDecision] = field(default_factory=list)
-    config_version_id: str = ""  # set by caller (metrics layer) for I-8 compliance
+    # Set by the caller (typically `RecallPipeline.apply_fusion_gates`) from
+    # `GateConfig.version_id()`. I-8 compliance — auditors reproduce gate
+    # decisions by looking up this snapshot ID. Default empty string is the
+    # "snapshot pointer not wired" sentinel for callers that invoke the gates
+    # directly without going through the retrieval pipeline.
+    config_version_id: str = ""
 
 
 # ---------------------------------------------------------------------------
