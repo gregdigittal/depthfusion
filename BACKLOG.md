@@ -622,7 +622,7 @@
 - [x] T-115: Implement `backends/base.py` Protocol (complete/embed/rerank/extract_structured/healthy)
 - [x] T-116: Implement `backends/haiku.py` HaikuBackend with typed 429/529/timeout errors and explicit `api_key=` (C2 fix)
 - [x] T-117: Implement `backends/null.py` NullBackend
-- [ ] T-118: Implement `backends/local_embedding.py` sentence-transformers wrapper
+- [x] T-118: Implement `backends/local_embedding.py` sentence-transformers wrapper (22 tests landed in test_local_embedding.py; factory wired with healthy-check fallback + 2 new factory tests)
 - [x] T-119: Implement `backends/factory.py` with per-capability / per-mode dispatch table + env-var overrides
 - [x] T-120: Migrate 4 call-sites (reranker.py, extractor.py, linker.py, auto_learn.py HaikuSummarizer) to `get_backend(...)`
 - [x] T-121: Author regression test `tests/test_regression/test_v04_output_identity.py`
@@ -655,20 +655,20 @@
 ### S-43: As a vps-gpu operator, I want a local embedding backend so that hybrid retrieval fuses BM25 with semantic similarity at p95 ≤ 1500ms `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Byte-identical output when `DEPTHFUSION_EMBEDDING_BACKEND` unset
-- [ ] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu
-- [ ] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus
-- [ ] AC-4: ≥ 10 new tests
+- [x] AC-1: Byte-identical output when `DEPTHFUSION_EMBEDDING_BACKEND` unset (factory returns NullBackend on local mode; verified by existing `test_local_mode_returns_null_for_every_capability` + `test_v04_output_identity.py` regression)
+- [ ] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu (requires live vps-gpu benchmark)
+- [ ] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus (requires live vps-gpu benchmark)
+- [x] AC-4: ≥ 10 new tests (22 in test_local_embedding.py + 17 in test_hybrid_with_embeddings.py + 2 factory tests = 41)
 
 **Tasks:**
-- [ ] T-129: Implement `backends/local_embedding.py` (sentence-transformers, default `all-MiniLM-L6-v2`)
-- [ ] T-130: Wire embedding step into `retrieval/hybrid.py` RRF fusion alongside BM25/ChromaDB
-- [ ] T-131: Author `tests/test_backends/test_local_embedding.py` + `tests/test_retrieval/test_hybrid_with_embeddings.py`
+- [x] T-129: Implement `backends/local_embedding.py` (sentence-transformers, default `all-MiniLM-L6-v2`) — same file as T-118 (ticked once, shared across S-41/S-43)
+- [x] T-130: Wire embedding step into `retrieval/hybrid.py` RRF fusion alongside BM25/ChromaDB (added `apply_vector_search()` + `_cosine_similarity` helper; fuses with existing `rrf_fuse`)
+- [x] T-131: Author `tests/test_backends/test_local_embedding.py` + `tests/test_retrieval/test_hybrid_with_embeddings.py` (39 tests across both files)
 
 ### S-44: As a vps-gpu operator, I want a Gemma backend for all LLM capabilities so that reranking, extraction, summarisation, and linking run on-box with Haiku fallback `P1` `L`
 
 **Acceptance criteria:**
-- [x] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode (verified in `test_vps_gpu_mode_routes_all_llm_caps_to_gemma`; embedding routes to local-stub → null until T-118)
+- [x] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode (verified in `test_vps_gpu_mode_routes_all_llm_caps_to_gemma`; embedding routes to LocalEmbeddingBackend when sentence-transformers available, else NullBackend fallback)
 - [ ] AC-2: p95 latency per capability recorded in the Phase 4 runbook (requires live GEX44 benchmark)
 - [ ] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout (integration test with fault-injected mock server) — typed-error translation verified at unit level (`test_complete_translates_503_to_overload`, `..._529_to_overload`, `..._urllib_timeout_to_backend_timeout`); chain-level Haiku fallback requires the chain wiring deferred to a future TG
 - [ ] AC-4: Fallback to Null triggers when Haiku also unavailable (integration test) — same chain dependency
@@ -740,14 +740,14 @@
 ### S-49: As a session, I want embedding-based discovery dedup so that semantic duplicates are superseded rather than accumulated (CM-2) `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: When two discoveries have cos-sim ≥ 0.92, newer supersedes older (older renamed with `.superseded` suffix)
-- [ ] AC-2: False-dedup rate ≤ 5% on 30 labelled near-duplicate pairs
-- [ ] AC-3: ≥ 6 new tests
+- [x] AC-1: When two discoveries have cos-sim ≥ 0.92, newer supersedes older (older renamed with `.superseded` suffix) — verified in `test_supersedes_near_duplicate_in_same_project`
+- [ ] AC-2: False-dedup rate ≤ 5% on 30 labelled near-duplicate pairs (requires labelled eval set)
+- [x] AC-3: ≥ 6 new tests (26 tests in test_dedup.py: extract_project, load_corpus, find_duplicates, supersede, dedup_against_corpus integration)
 
 **Tasks:**
-- [ ] T-149: Implement `capture/dedup.py`
-- [ ] T-150: Call dedup from `capture/auto_learn.py` before write
-- [ ] T-151: Author `tests/test_capture/test_dedup.py`
+- [x] T-149: Implement `capture/dedup.py` (project-scoped, threshold env-overridable, graceful degradation when embedding backend unavailable)
+- [x] T-150: Call dedup from `capture/auto_learn.py` after each extractor write (Phase 2b, gated on `DEPTHFUSION_DEDUP_ENABLED`)
+- [x] T-151: Author `tests/test_capture/test_dedup.py`
 
 ---
 

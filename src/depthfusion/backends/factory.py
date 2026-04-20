@@ -160,7 +160,24 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
         return NullBackend()
 
     if name == "local":
-        # T-118 will implement LocalEmbeddingBackend. Scaffold: fall through.
+        # T-118/T-129 LocalEmbeddingBackend (sentence-transformers).
+        # Healthy when the `sentence_transformers` package is importable.
+        # Same pattern as haiku/gemma: if unhealthy, fall through to Null
+        # and emit a fallback event so operators can see the degradation.
+        from depthfusion.backends.local_embedding import LocalEmbeddingBackend
+        local: LLMBackend = LocalEmbeddingBackend()
+        if local.healthy():
+            return local
+        logger.info(
+            "LocalEmbeddingBackend requested for capability %r but not healthy "
+            "(sentence_transformers not installed); falling back to NullBackend.",
+            capability,
+        )
+        _emit_fallback_event(
+            requested=name,
+            capability=capability,
+            reason="unhealthy: sentence_transformers package not importable",
+        )
         return NullBackend()
 
     known = {"null", "haiku", "gemma", "local"}

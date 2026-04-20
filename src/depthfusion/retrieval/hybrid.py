@@ -3,14 +3,23 @@
 PipelineMode.LOCAL:       BM25 only, no API calls
 PipelineMode.VPS_TIER1:   BM25 top-10 -> HaikuReranker -> top-k
 PipelineMode.VPS_TIER2:   ChromaDB top-20 + BM25 top-10 -> RRF fusion -> HaikuReranker -> top-k
+
+v0.5.0 T-130: `apply_vector_search()` computes cosine similarity using the
+embedding backend from `get_backend("embedding")` (LocalEmbeddingBackend
+on vps-gpu, NullBackend elsewhere). Its output is a ranked block list
+suitable for RRF fusion with BM25 results via the existing `rrf_fuse()`.
 """
 from __future__ import annotations
 
+import logging
+import math
 import os
 from enum import Enum
 from typing import Any
 
 from depthfusion.retrieval.reranker import HaikuReranker
+
+logger = logging.getLogger(__name__)
 
 try:
     from depthfusion.storage.tier_manager import Tier as _StorageTier
@@ -88,6 +97,65 @@ class RecallPipeline:
         except Exception:
             return query
 
+    def apply_vector_search(
+        self,
+        query: str,
+        blocks: list[dict],
+        *,
+        top_k: int = 10,
+        backend: Any = None,
+    ) -> list[dict]:
+        """Rank `blocks` by cosine similarity between `query` and `block['snippet']`.
+
+        T-130: uses `get_backend("embedding")` (LocalEmbeddingBackend on
+        vps-gpu mode, NullBackend elsewhere). When the backend returns
+        `None` (no sentence-transformers, load failure, or NullBackend),
+        this method returns an empty list — callers fuse with BM25 via
+        `rrf_fuse()`, where an empty vector list is a no-op.
+
+        Contract:
+          - Requires each block to have a 'snippet' key (string content).
+          - Returns a NEW list of blocks sorted by descending cos-sim.
+          - Each returned block has a 'vector_score' key added.
+          - Top-k is applied AFTER sorting.
+          - Never raises — embedding failures return []; the pipeline
+            degrades gracefully to BM25-only.
+        """
+        if not blocks:
+            return []
+
+        if backend is None:
+            try:
+                from depthfusion.backends.factory import get_backend
+                backend = get_backend("embedding")
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("apply_vector_search: backend resolution failed: %s", exc)
+                return []
+
+        # Embed query + all block snippets in a single batched call.
+        snippets = [str(b.get("snippet", "")) for b in blocks]
+        texts = [query] + snippets
+        try:
+            embeddings = backend.embed(texts)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("apply_vector_search: embed() raised: %s", exc)
+            return []
+
+        if embeddings is None or len(embeddings) != len(texts):
+            return []
+
+        query_vec = embeddings[0]
+        block_vecs = embeddings[1:]
+
+        scored: list[tuple[float, dict]] = []
+        for block, vec in zip(blocks, block_vecs, strict=False):
+            score = _cosine_similarity(query_vec, vec)
+            enriched = {**block, "vector_score": score}
+            scored.append((score, enriched))
+
+        scored.sort(key=lambda t: -t[0])
+        return [b for _, b in scored[:top_k]]
+
     def rrf_fuse(
         self,
         bm25_results: list[dict],
@@ -119,3 +187,22 @@ class RecallPipeline:
 
         ranked = sorted(scores.items(), key=lambda x: -x[1])
         return [all_blocks[cid] for cid, _ in ranked]
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity in [-1.0, 1.0]; returns 0.0 for zero-vectors or
+    length-mismatched inputs (rather than raising — the retrieval path
+    must never hard-fail on degenerate embeddings).
+    """
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = 0.0
+    na = 0.0
+    nb = 0.0
+    for x, y in zip(a, b, strict=False):
+        dot += x * y
+        na += x * x
+        nb += y * y
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (math.sqrt(na) * math.sqrt(nb))

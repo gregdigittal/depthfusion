@@ -230,10 +230,13 @@ def test_gemma_override_returns_gemma():
 
 def test_vps_gpu_mode_routes_all_llm_caps_to_gemma(monkeypatch):
     """vps-gpu default: reranker/extractor/linker/summariser/decision_extractor
-    all resolve to GemmaBackend (embedding routes to local_embedding, which
-    falls back to NullBackend until T-118 lands).
+    all resolve to GemmaBackend. Embedding routes to LocalEmbeddingBackend
+    when sentence_transformers is installed; when the package is not
+    available (as in most CI), the factory's healthy-check safety net
+    falls back to NullBackend. Either outcome is contract-compliant.
     """
     from depthfusion.backends.gemma import GemmaBackend
+    from depthfusion.backends.local_embedding import LocalEmbeddingBackend
     from depthfusion.backends.null import NullBackend
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
     for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor"]:
@@ -243,10 +246,45 @@ def test_vps_gpu_mode_routes_all_llm_caps_to_gemma(monkeypatch):
             f"vps-gpu/{cap} did not route to GemmaBackend "
             f"(got {type(backend).__name__})"
         )
-    # embedding still routes to local-backend stub (→ NullBackend until T-118)
+    # embedding routes to LocalEmbeddingBackend (if healthy) or NullBackend (fallback)
     monkeypatch.delenv("DEPTHFUSION_EMBEDDING_BACKEND", raising=False)
     embedding_backend = get_backend("embedding")
-    assert isinstance(embedding_backend, NullBackend)
+    assert isinstance(embedding_backend, (LocalEmbeddingBackend, NullBackend))
+
+
+def test_local_embedding_backend_when_sentence_transformers_available(monkeypatch):
+    """When sentence_transformers is importable, factory returns
+    LocalEmbeddingBackend — not the NullBackend fallback.
+    """
+    import sys
+    from unittest.mock import MagicMock
+
+    from depthfusion.backends.local_embedding import LocalEmbeddingBackend
+
+    # Stub both sys.modules and find_spec so the healthy() check passes
+    monkeypatch.setitem(sys.modules, "sentence_transformers", MagicMock())
+    monkeypatch.setattr(
+        "depthfusion.backends.local_embedding.importlib.util.find_spec",
+        lambda name, *a, **kw: object() if name == "sentence_transformers" else None,
+    )
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+    monkeypatch.delenv("DEPTHFUSION_EMBEDDING_BACKEND", raising=False)
+    backend = get_backend("embedding")
+    assert isinstance(backend, LocalEmbeddingBackend)
+    assert backend.name == "local_embedding"
+
+
+def test_local_embedding_falls_back_to_null_when_package_missing(monkeypatch):
+    """Healthy-check fails → factory emits fallback event and returns NullBackend."""
+    from depthfusion.backends.null import NullBackend
+    monkeypatch.setattr(
+        "depthfusion.backends.local_embedding.importlib.util.find_spec",
+        lambda name, *a, **kw: None,
+    )
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+    monkeypatch.delenv("DEPTHFUSION_EMBEDDING_BACKEND", raising=False)
+    backend = get_backend("embedding")
+    assert isinstance(backend, NullBackend)
 
 
 def test_gemma_factory_uses_custom_url_from_env(monkeypatch):

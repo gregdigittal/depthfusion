@@ -162,23 +162,52 @@ def summarize_and_extract_graph(
 
     # Phase 2: LLM decision extractor + negative extractor (v0.5 CM-1/CM-6)
     # Gated on DEPTHFUSION_DECISION_EXTRACTOR_ENABLED to avoid API calls in local mode.
-    if os.environ.get("DEPTHFUSION_DECISION_EXTRACTOR_ENABLED", "false").lower() in ("true", "1", "yes"):
+    # After each write, run embedding-based dedup (T-150, CM-2) so semantic
+    # duplicates from past sessions are superseded rather than accumulated.
+    written_paths: list[Any] = []
+    _extractor_flag = os.environ.get("DEPTHFUSION_DECISION_EXTRACTOR_ENABLED", "false").lower()
+    if _extractor_flag in ("true", "1", "yes"):
+        # Single shared read so both extractors see the same content and
+        # neither depends on the other's success. If the read itself fails,
+        # skip extractor phase entirely.
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
-            session_id = path.stem
+        except OSError as exc:
+            logger.debug("Extractor phase: could not read %s: %s", path.name, exc)
+            content = ""
+        session_id = path.stem
 
-            from depthfusion.capture.decision_extractor import extract_and_write as _write_decisions
-            _write_decisions(content=content, project=project, session_id=session_id)
-        except Exception as exc:
-            logger.debug("Decision extractor failed for %s: %s", path.name, exc)
+        if content:
+            try:
+                from depthfusion.capture.decision_extractor import (
+                    extract_and_write as _write_decisions,
+                )
+                out = _write_decisions(content=content, project=project, session_id=session_id)
+                if out is not None:
+                    written_paths.append(out)
+            except Exception as exc:
+                logger.debug("Decision extractor failed for %s: %s", path.name, exc)
 
-        try:
-            from depthfusion.capture.negative_extractor import (
-                extract_and_write as _write_negatives,
-            )
-            _write_negatives(content=content, project=project, session_id=session_id)  # type: ignore[possibly-undefined]
-        except Exception as exc:
-            logger.debug("Negative extractor failed for %s: %s", path.name, exc)
+            try:
+                from depthfusion.capture.negative_extractor import (
+                    extract_and_write as _write_negatives,
+                )
+                out = _write_negatives(content=content, project=project, session_id=session_id)
+                if out is not None:
+                    written_paths.append(out)
+            except Exception as exc:
+                logger.debug("Negative extractor failed for %s: %s", path.name, exc)
+
+        # Phase 2b: dedup the newly-written files against the recent corpus.
+        # Opt-in: DEPTHFUSION_DEDUP_ENABLED (default true — safe no-op when
+        # the embedding backend is NullBackend / sentence-transformers missing).
+        if os.environ.get("DEPTHFUSION_DEDUP_ENABLED", "true").lower() in ("true", "1", "yes"):
+            try:
+                from depthfusion.capture.dedup import dedup_against_corpus
+                for written in written_paths:
+                    dedup_against_corpus(written)
+            except Exception as exc:
+                logger.debug("Discovery dedup failed: %s", exc)
 
     if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() != "true":
         return
