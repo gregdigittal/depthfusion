@@ -772,16 +772,16 @@
 ### S-51: As a retrieval pipeline, I want selective fusion gates so that AttnRes α-blended source weighting beats flat weighting on Category A (TS-1 Mamba port) `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: CIQS Category A delta ≥ +2 points on vps-cpu; ≥ +3 points on vps-gpu
-- [ ] AC-2: Gate log emitted per query (D-3 invariant compliance)
-- [ ] AC-3: Parity with TS reference implementation on 20 test cases
-- [ ] AC-4: ≥ 12 new tests
+- [ ] AC-1: CIQS Category A delta ≥ +2 points on vps-cpu; ≥ +3 points on vps-gpu (benchmark-blocked — requires live CIQS eval on both environments)
+- [x] AC-2: Gate log emitted per query (D-3 invariant compliance) — `MetricsCollector.record_gate_log()` writes to `YYYY-MM-DD-gates.jsonl` every apply() call; verified in `test_gate_log_written_to_disk` + `test_fallback_triggered_field_in_gate_log_entry`
+- [x] AC-3: Parity with TS reference implementation on 20 test cases (parametrised `_PARITY_CASES` matrix — 20 deterministic cases encoding the Python-vs-TS contract)
+- [x] AC-4: ≥ 12 new tests (57 tests in `test_gates.py`: 6 GateConfig + 4 cosine + 5 percentile + 10 behaviour + 4 pipeline integration + 20 parity + 5 review-gate regressions + 3 invariants)
 
 **Tasks:**
-- [ ] T-156: Implement `fusion/gates.py` (port of TS B/C/Δ gate logic)
-- [ ] T-157: Integrate gates into `retrieval/hybrid.py::RecallPipeline` with gate-log emission
-- [ ] T-158: Extend `metrics/collector.py` to accept gate log entries
-- [ ] T-159: Author `tests/test_fusion/test_gates.py` (unit + TS parity cases)
+- [x] T-156: Implement `fusion/gates.py` — `GateConfig`/`GateDecision`/`GateLog` frozen dataclasses + `SelectiveFusionGates` class; B gate (query similarity), C gate (topical coherence), Δ gate (α-blended fused-score threshold); base_scores normalised to percentile [0,1] before the blend so α semantics hold regardless of raw BM25 magnitude
+- [x] T-157: Integrate gates into `retrieval/hybrid.py::RecallPipeline` — `apply_fusion_gates()` method; gated on `DEPTHFUSION_FUSION_GATES_ENABLED=true`; fail-open on error AND on empty survivors; emits D-3-compliant gate log via MetricsCollector with `fallback_triggered` flag
+- [x] T-158: Extend `metrics/collector.py` — `record_gate_log()` writes to separate `YYYY-MM-DD-gates.jsonl` stream with `fcntl.flock` guarding against concurrent-writer interleaving (gate entries exceed 4 KiB PIPE_BUF); numpy-safe `_json_default` coerces numpy scalars to Python floats (not strings) so downstream log parsers receive native types
+- [x] T-159: Author `tests/test_fusion/test_gates.py` (57 tests; 20-case TS parity matrix)
 
 ### S-52: As a project user, I want recall filtered to the current project by default so that discoveries from other projects don't pollute results `P2` `S`
 

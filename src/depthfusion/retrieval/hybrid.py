@@ -13,6 +13,12 @@ v0.5.0 T-160: project-scoped recall filter.
 `extract_frontmatter_project()` parses `project:` YAML frontmatter from a
 block's content. `filter_blocks_by_project()` keeps only blocks whose
 project matches the current project (or have no frontmatter, for back-compat).
+
+v0.5.0 T-157: selective fusion gates (Mamba B/C/Δ port, S-51).
+`apply_fusion_gates()` runs the three-stage gate after BM25 + RRF fusion
+and before reranking. Gated on `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+(default false — preserves v0.4.x byte-identity). Emits a D-3-compliant
+gate log per query via MetricsCollector.
 """
 from __future__ import annotations
 
@@ -118,6 +124,81 @@ class RecallPipeline:
             return expand_query(query, graph_store)
         except Exception:
             return query
+
+    def apply_fusion_gates(
+        self,
+        blocks: list[dict],
+        *,
+        query: str = "",
+        query_embedding: list[float] | None = None,
+        mode_label: str = "",
+    ) -> list[dict]:
+        """Run the selective fusion gates (Mamba B/C/Δ) over `blocks`.
+
+        T-157 / S-51: gated on `DEPTHFUSION_FUSION_GATES_ENABLED=true`.
+        When disabled (default), returns `blocks` unchanged without
+        running gates — preserves v0.4.x byte-identity of the recall path.
+
+        Emits a D-3-compliant gate log via MetricsCollector whether or not
+        any block is rejected — observability first, optimization second.
+
+        Contract:
+          - Fail-open on any internal error: return the original `blocks`
+            so gate bugs never degrade recall quality below baseline.
+          - `query_embedding` is optional; absent → B/C gates fall back to
+            BM25-percentile and score-proximity heuristics respectively.
+          - The returned list is sorted by `gate_fused_score` desc when
+            gates run; by original order when gates are disabled.
+        """
+        if os.environ.get("DEPTHFUSION_FUSION_GATES_ENABLED", "false").lower() not in (
+            "true", "1", "yes",
+        ):
+            return blocks
+        if not blocks:
+            return blocks
+
+        try:
+            from depthfusion.fusion.gates import GateConfig, SelectiveFusionGates
+            gates = SelectiveFusionGates(config=GateConfig.from_env())
+            survivors, log = gates.apply(blocks, query_embedding=query_embedding)
+        except Exception as exc:  # noqa: BLE001 — fail-open contract
+            logger.debug("apply_fusion_gates: degraded to pass-through (%s)", exc)
+            return blocks
+
+        # Defensive fallback flag: set now so the gate log reflects whether
+        # the retrieval layer overrode the gate verdict (see below).
+        fallback_triggered = not survivors
+
+        # Emit gate log (D-3 invariant). Swallow any metrics failure so
+        # observability never degrades retrieval.
+        # TODO(I-8): wire config_version_id once v0.6 adds the immutable
+        # config-snapshot machinery. Until then, gate-log records carry
+        # config_version_id="" — the audit trail is complete except for
+        # the snapshot pointer (see docs/plans/v0.5/03-skillforge-integration.md
+        # §3.3.5 action 2 for the ratified contract).
+        try:
+            import hashlib
+
+            from depthfusion.metrics.collector import MetricsCollector
+            query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:12] if query else ""
+            MetricsCollector().record_gate_log(
+                log,
+                query_hash=query_hash,
+                mode=mode_label or self.mode.value,
+                fallback_triggered=fallback_triggered,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("apply_fusion_gates: gate-log emission failed (%s)", exc)
+
+        # Defensive: if gates filtered everything, fall back to the original
+        # pool rather than returning nothing (recall correctness > gate signal).
+        if not survivors:
+            logger.info(
+                "Fusion gates rejected all %d candidates — falling back to original pool",
+                len(blocks),
+            )
+            return blocks
+        return survivors
 
     def apply_vector_search(
         self,
