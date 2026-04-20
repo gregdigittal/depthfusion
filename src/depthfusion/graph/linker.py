@@ -1,10 +1,19 @@
 # src/depthfusion/graph/linker.py
-"""Edge creation signals: co-occurrence, haiku-inferred, temporal proximity."""
+"""Edge creation signals: co-occurrence, haiku-inferred, temporal proximity.
+
+Edge kinds produced by this module:
+  * CO_OCCURS       — CoOccurrenceLinker (entity-level, same block)
+  * CO_WORKED_ON    — TemporalLinker (entity-level, across sessions)
+  * PRECEDED_BY     — TemporalSessionLinker (session-level, v0.5 S-50 / CM-4)
+  * CAUSES/FIXES/DEPENDS_ON/REPLACES/CONFLICTS_WITH — HaikuLinker (semantic)
+"""
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
+import re
+from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
 from typing import Any
@@ -16,6 +25,7 @@ logger = logging.getLogger(__name__)
 _VALID_RELATIONSHIPS = frozenset({
     "CO_OCCURS", "CAUSES", "FIXES", "DEPENDS_ON",
     "REPLACES", "CONFLICTS_WITH", "CO_WORKED_ON",
+    "PRECEDED_BY",  # v0.5 S-50 / CM-4 — session-level temporal edge
 })
 
 # Haiku may only produce semantic relationship types.
@@ -96,6 +106,162 @@ class TemporalLinker:
                         signals=["temporal"],
                         metadata={"delta_hours": delta_hours},
                     ))
+        return edges
+
+
+# ---------------------------------------------------------------------------
+# v0.5 S-50 / CM-4 — session-level temporal linker
+# ---------------------------------------------------------------------------
+
+# Minimal alphanumeric tokenizer for vocabulary-overlap comparison.
+# Same shape as retrieval/bm25.tokenize() but without the stopword removal —
+# vocabulary overlap is more discriminating when stopwords are filtered by
+# the caller (or left in, depending on use case).
+# Minimum match length is 3 (enforced by the `{2,}` quantifier on chars
+# after the leading letter) so the caller doesn't need a post-filter.
+_SESSION_TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]{2,}")
+
+
+@dataclass
+class SessionRecord:
+    """A session's identity, timestamp, and vocabulary.
+
+    `session_id` is any stable identifier the caller uses (e.g. file stem of
+    the `.tmp` session state file). `timestamp` is ISO-8601. `vocabulary` is
+    a set of tokens — typically extracted once with `tokenize_session_content()`
+    and reused across pairwise comparisons to avoid O(n²) retokenization.
+    """
+    session_id: str
+    timestamp: str                         # ISO-8601
+    vocabulary: set[str]
+    project: str = "unknown"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def tokenize_session_content(content: str) -> set[str]:
+    """Produce a token set suitable for vocabulary-overlap comparison.
+
+    Lowercased alphanumeric tokens of length ≥ 3 (filters most stopwords
+    and noise). Idempotent — safe to call on already-tokenized content.
+    """
+    if not content:
+        return set()
+    # The regex guarantees length >= 3, so no post-filter is needed.
+    return {t.lower() for t in _SESSION_TOKEN_RE.findall(content)}
+
+
+def _vocabulary_overlap(a: set[str], b: set[str]) -> int:
+    """Return |a ∩ b| — the cardinality of the shared token set."""
+    if not a or not b:
+        return 0
+    # Intersect the smaller set against the larger for a minor perf win
+    # on very uneven sessions.
+    if len(a) > len(b):
+        a, b = b, a
+    return sum(1 for tok in a if tok in b)
+
+
+class TemporalSessionLinker:
+    """Create PRECEDED_BY edges between sessions close in time AND topic.
+
+    Directionality: `session_B PRECEDED_BY session_A` — i.e. A came BEFORE B.
+    The edge is emitted with B as source and A as target, so
+    `traverse(B.entity_id, relationship_filter=["PRECEDED_BY"])` walks
+    backward through time (natural for "what did we do recently").
+
+    Dual gate:
+      1. Time window: |t_B - t_A| ≤ `window_hours` (default 48h)
+      2. Vocabulary overlap: |vocab_A ∩ vocab_B| ≥ `min_overlap` (default 5
+         shared alphanumeric tokens — tunable for corpus size)
+
+    If either gate fails the linker returns None. Callers pass already-
+    tokenized SessionRecord instances; the linker does not read files.
+
+    The edge metadata records `delta_hours` and `overlap` for downstream
+    use — e.g. the traverser's `time_window_hours` filter reads
+    `delta_hours`, and UI layers can show the overlap as provenance.
+    """
+
+    def __init__(
+        self,
+        window_hours: float = 48.0,
+        min_overlap: int = 5,
+    ) -> None:
+        self._window_hours = float(window_hours)
+        self._min_overlap = int(min_overlap)
+
+    def link(
+        self,
+        session_a: SessionRecord,
+        session_b: SessionRecord,
+    ) -> Edge | None:
+        """Return a PRECEDED_BY edge if both gates pass, else None.
+
+        Order-independent: the linker figures out which session came first
+        from the timestamps, so callers don't need to pre-sort.
+        """
+        if session_a.session_id == session_b.session_id:
+            return None  # a session never precedes itself
+
+        try:
+            ts_a = datetime.fromisoformat(session_a.timestamp)
+            ts_b = datetime.fromisoformat(session_b.timestamp)
+        except ValueError:
+            return None
+
+        delta = ts_b - ts_a
+        delta_hours = abs(delta.total_seconds()) / 3600.0
+        if delta_hours > self._window_hours:
+            return None
+
+        overlap = _vocabulary_overlap(session_a.vocabulary, session_b.vocabulary)
+        if overlap < self._min_overlap:
+            return None
+
+        # Normalise direction: later PRECEDED_BY earlier.
+        # When timestamps are identical (realistic: batch imports, sub-second
+        # creation), tie-break on session_id so link(a,b) and link(b,a)
+        # produce the same edge_id — otherwise the store accumulates two
+        # edges for a single pair of sessions on re-upsert.
+        if ts_a < ts_b or (
+            ts_a == ts_b and session_a.session_id <= session_b.session_id
+        ):
+            earlier, later = session_a, session_b
+        else:
+            earlier, later = session_b, session_a
+
+        return Edge(
+            edge_id=make_edge_id(later.session_id, earlier.session_id, "PRECEDED_BY"),
+            source_id=later.session_id,
+            target_id=earlier.session_id,
+            relationship="PRECEDED_BY",
+            weight=1.0,
+            signals=["temporal", "vocabulary_overlap"],
+            metadata={
+                "delta_hours": round(delta_hours, 3),
+                "overlap": overlap,
+                "earlier_session": earlier.session_id,
+                "later_session": later.session_id,
+            },
+        )
+
+    def link_all(self, sessions: list[SessionRecord]) -> list[Edge]:
+        """Emit PRECEDED_BY edges for every qualifying pair in `sessions`.
+
+        O(n²) in the number of sessions; callers are expected to window
+        the input (e.g. last 30 sessions) before passing. Returns a flat
+        list with duplicates deduplicated by `edge_id`.
+        """
+        seen_edges: set[str] = set()
+        edges: list[Edge] = []
+        for a, b in combinations(sessions, 2):
+            edge = self.link(a, b)
+            if edge is None:
+                continue
+            if edge.edge_id in seen_edges:
+                continue
+            seen_edges.add(edge.edge_id)
+            edges.append(edge)
         return edges
 
 

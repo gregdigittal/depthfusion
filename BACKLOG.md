@@ -758,16 +758,16 @@
 ### S-50: As a recall query, I want `PRECEDED_BY` cross-session graph edges so that "what did we do recently" questions traverse temporal context (CM-4) `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: New edge type documented in `graph/types.py` (8 edges total, up from 7)
-- [ ] AC-2: `traverse()` can filter by edge kind
-- [ ] AC-3: CIQS Category D delta ≥ +2 points on "recent work" questions
-- [ ] AC-4: ≥ 8 new tests
+- [x] AC-1: New edge type documented in `graph/types.py` (8 edges total, up from 7) — `PRECEDED_BY` added to `_VALID_RELATIONSHIPS`; Edge docstring enumerates all 8 kinds
+- [x] AC-2: `traverse()` can filter by edge kind — `relationship_filter` already existed; this story adds `time_window_hours` filter for time-bucketed traversal with back-compat for non-temporal edges
+- [ ] AC-3: CIQS Category D delta ≥ +2 points on "recent work" questions (benchmark-blocked; requires live corpus + eval set)
+- [x] AC-4: ≥ 8 new tests (27 tests in `test_temporal_session_linker.py`)
 
 **Tasks:**
-- [ ] T-152: Add `PRECEDED_BY` to `graph/types.py` EdgeKind literal
-- [ ] T-153: Implement `TemporalSessionLinker` in `graph/linker.py` (48h window, vocabulary overlap)
-- [ ] T-154: Extend `graph/traverser.py` for edge-kind filtering and time-bucketed traversal
-- [ ] T-155: Author `tests/test_graph/test_temporal_session_linker.py`
+- [x] T-152: Add `PRECEDED_BY` to `graph/types.py` EdgeKind literal (via `_VALID_RELATIONSHIPS` in linker.py — type.py uses string field; docstring expanded to list all 8 kinds)
+- [x] T-153: Implement `TemporalSessionLinker` in `graph/linker.py` (48h window, vocabulary overlap) — dual-gate with `min_overlap` default 5; `SessionRecord` dataclass; `tokenize_session_content()` helper; direction normalisation with tie-break on session_id for equal timestamps
+- [x] T-154: Extend `graph/traverser.py` for edge-kind filtering and time-bucketed traversal — added `time_window_hours` param; filters on `metadata["delta_hours"]`; non-temporal edges (CO_OCCURS, Haiku-inferred) bypass the filter for back-compat
+- [x] T-155: Author `tests/test_graph/test_temporal_session_linker.py` (27 tests across tokenize + overlap + linker + link_all + traverser integration + review-gate regression)
 
 ### S-51: As a retrieval pipeline, I want selective fusion gates so that AttnRes α-blended source weighting beats flat weighting on Category A (TS-1 Mamba port) `P2` `L`
 

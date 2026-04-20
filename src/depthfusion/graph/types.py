@@ -23,11 +23,24 @@ class Entity:
 
 @dataclass
 class Edge:
-    """A directed relationship between two entities."""
+    """A directed relationship between two entities.
+
+    Relationship values (one of):
+      * CO_OCCURS       — two entities mentioned in the same block (structural)
+      * CAUSES          — A is a cause of B (semantic; Haiku-inferred)
+      * FIXES           — A fixes B (semantic; Haiku-inferred)
+      * DEPENDS_ON      — A depends on B (semantic; Haiku-inferred)
+      * REPLACES        — A replaces B (semantic; Haiku-inferred)
+      * CONFLICTS_WITH  — A conflicts with B (semantic; Haiku-inferred)
+      * CO_WORKED_ON    — two ENTITIES appeared across sessions in a time window (TemporalLinker)
+      * PRECEDED_BY     — B PRECEDED_BY A: session A came before session B in
+                          wall-clock time, and shared vocabulary suggests
+                          continuity. Directed, session-level. v0.5 CM-4 / S-50.
+    """
     edge_id: str
     source_id: str
     target_id: str
-    relationship: str        # "CO_OCCURS"|"CAUSES"|"FIXES"|"DEPENDS_ON"|"REPLACES"|"CONFLICTS_WITH"|"CO_WORKED_ON"
+    relationship: str
     weight: float            # 1–3: count of signals that agree
     signals: list[str]       # ["co_occurrence", "haiku", "temporal"]
     metadata: dict[str, Any] = field(default_factory=dict)

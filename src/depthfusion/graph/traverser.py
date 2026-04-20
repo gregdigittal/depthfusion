@@ -26,11 +26,25 @@ def traverse(
     store: "JSONGraphStore | SQLiteGraphStore",
     depth: int = 1,
     relationship_filter: list[str] | None = None,
+    time_window_hours: float | None = None,
 ) -> TraversalResult | None:
     """Walk the graph from entity_id up to `depth` hops.
 
     Returns TraversalResult with all reachable (entity, edge) pairs,
     or None if the origin entity is not found.
+
+    Args:
+        entity_id: origin entity for the traversal.
+        store: graph backend (JSON or SQLite).
+        depth: maximum hops (default 1).
+        relationship_filter: if provided, only edges whose `relationship`
+            is in this list are traversed. Passed through to
+            `store.get_edges()` for push-down filtering where supported.
+        time_window_hours: v0.5 S-50 — if provided, only traverse edges
+            whose `metadata["delta_hours"]` is at most this value. Edges
+            without `delta_hours` in metadata are INCLUDED (back-compat:
+            non-temporal edges like CO_OCCURS or Haiku-inferred semantic
+            edges don't carry a time delta and should not be filtered out).
     """
     origin = store.get_entity(entity_id)
     if origin is None:
@@ -45,6 +59,13 @@ def traverse(
         for fid in frontier:
             edges = store.get_edges(fid, relationship_filter=relationship_filter)
             for edge in edges:
+                # v0.5 T-154: time-bucketed traversal. Skip temporal edges
+                # that exceed the window; keep non-temporal edges (which
+                # have no delta_hours in metadata) regardless.
+                if time_window_hours is not None:
+                    delta = edge.metadata.get("delta_hours")
+                    if delta is not None and float(delta) > time_window_hours:
+                        continue
                 neighbor_id = (
                     edge.target_id if edge.source_id == fid else edge.source_id
                 )
