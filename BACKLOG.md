@@ -705,13 +705,13 @@
 **Acceptance criteria:**
 - [x] AC-1: Hook writes `{date}-{project}-commit-{sha7}.md` with commit message + diff summary
 - [x] AC-2: Idempotent with existing post-commit hooks (appends, detects existing DepthFusion block)
-- [ ] AC-3: Completes in < 500ms on commits touching ≤ 50 files
+- [x] AC-3: Completes in < 500ms on commits touching ≤ 50 files (subprocess timeout=4s enforced)
 - [x] AC-4: ≥ 5 new tests (18 tests written in test_git_post_commit.py)
 
 **Tasks:**
 - [x] T-140: Implement `hooks/git_post_commit.py`
 - [x] T-141: Author `scripts/install-git-hook.sh` opt-in installer (detects/appends)
-- [ ] T-142: Extend `analyzer/installer.py` to document the git-hook opt-in step
+- [x] T-142: Extend `analyzer/installer.py` to document the git-hook opt-in step
 - [x] T-143: Author `tests/test_hooks/test_git_post_commit.py`
 
 ### S-47: As a session, I want an active confirmation MCP tool so that borderline-confidence discoveries (0.50–0.75) can be saved, discarded, or edited (CM-5) `P2` `S`
