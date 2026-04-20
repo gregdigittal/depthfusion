@@ -786,15 +786,15 @@
 ### S-52: As a project user, I want recall filtered to the current project by default so that discoveries from other projects don't pollute results `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Default recall in project A does not return discoveries tagged `project: B`
-- [ ] AC-2: `cross_project=true` returns everything (v0.4.x behaviour preserved)
-- [ ] AC-3: Discoveries without frontmatter treated as `cross_project` (backward-compat)
-- [ ] AC-4: ≥ 5 new tests
+- [x] AC-1: Default recall in project A does not return discoveries tagged `project: B` (verified in `test_default_filters_to_explicit_project` + unit-level `test_default_filters_out_other_projects`)
+- [x] AC-2: `cross_project=true` returns everything (v0.4.x behaviour preserved) — verified in `test_cross_project_true_returns_blocks_from_all_projects` with defense-in-depth patching of `detect_project`
+- [x] AC-3: Discoveries without frontmatter treated as `cross_project` (backward-compat) — verified in `test_no_frontmatter_always_included` + `test_legacy_memory_files_returned_regardless_of_project`
+- [x] AC-4: ≥ 5 new tests (24 tests in `test_project_filter.py`)
 
 **Tasks:**
-- [ ] T-160: Parse frontmatter at load time in `retrieval/hybrid.py`; apply project filter
-- [ ] T-161: Add `cross_project: bool = false` parameter to `depthfusion_recall_relevant` MCP tool
-- [ ] T-162: Author `tests/test_retrieval/test_project_filter.py`
+- [x] T-160: Parse frontmatter at load time in `retrieval/hybrid.py`; apply project filter (pure functions: `extract_frontmatter_project` + `filter_blocks_by_project`; frontmatter regex bounded to opening `---...---` block to ignore body prose)
+- [x] T-161: Add `cross_project: bool = false` + `project: str` parameters to `depthfusion_recall_relevant` MCP tool; slug sanitisation prevents path traversal; handles `detect_project()` "unknown" fallback by treating it as "no project context"
+- [x] T-162: Author `tests/test_retrieval/test_project_filter.py` (24 tests across unit + integration + 5 review-gate regression tests)
 
 ---
 

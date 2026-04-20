@@ -8,18 +8,40 @@ v0.5.0 T-130: `apply_vector_search()` computes cosine similarity using the
 embedding backend from `get_backend("embedding")` (LocalEmbeddingBackend
 on vps-gpu, NullBackend elsewhere). Its output is a ranked block list
 suitable for RRF fusion with BM25 results via the existing `rrf_fuse()`.
+
+v0.5.0 T-160: project-scoped recall filter.
+`extract_frontmatter_project()` parses `project:` YAML frontmatter from a
+block's content. `filter_blocks_by_project()` keeps only blocks whose
+project matches the current project (or have no frontmatter, for back-compat).
 """
 from __future__ import annotations
 
 import logging
 import math
 import os
+import re
 from enum import Enum
 from typing import Any
 
 from depthfusion.retrieval.reranker import HaikuReranker
 
 logger = logging.getLogger(__name__)
+
+# Frontmatter pattern — same shape as capture/dedup.py uses for discovery files.
+# Duplicated deliberately: retrieval/hybrid.py is on the recall hot path and
+# capture/dedup.py runs under the git post-commit hook; keeping them decoupled
+# means importing one never transitively loads the other's heavy deps.
+#
+# Bounded to the opening `---\n...\n---` block so that prose in the body
+# (e.g. a code snippet that happens to contain `project: other`) cannot
+# override the real frontmatter tag. Uses non-greedy `.*?` with DOTALL so
+# the closing `---` is matched on its own line.
+_FRONTMATTER_PROJECT_RE = re.compile(
+    r"\A---\s*\n(?P<fm>.*?)\n---\s*\n", re.DOTALL,
+)
+_FRONTMATTER_PROJECT_KEY_RE = re.compile(
+    r"^project:\s*(\S+)\s*$", re.MULTILINE,
+)
 
 try:
     from depthfusion.storage.tier_manager import Tier as _StorageTier
@@ -206,3 +228,74 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     if na == 0.0 or nb == 0.0:
         return 0.0
     return dot / (math.sqrt(na) * math.sqrt(nb))
+
+
+# ---------------------------------------------------------------------------
+# T-160 — Project-scoped recall filter
+# ---------------------------------------------------------------------------
+
+def extract_frontmatter_project(content: str) -> str | None:
+    """Parse `project:` from YAML frontmatter; return the slug or None.
+
+    Accepts discoveries that were written by any DepthFusion capture path
+    (decision_extractor, negative_extractor, git_post_commit). The
+    frontmatter block format is:
+        ---
+        project: <slug>
+        ...
+        ---
+
+    Files without a `project:` key return None — callers treat None as
+    "unknown project" and apply backward-compat rules (include in results
+    regardless of filter, per S-52 AC-3).
+    """
+    if not content:
+        return None
+    # Restrict to the opening frontmatter block; prose in the body is ignored.
+    fm_match = _FRONTMATTER_PROJECT_RE.match(content)
+    if not fm_match:
+        return None
+    key_match = _FRONTMATTER_PROJECT_KEY_RE.search(fm_match.group("fm"))
+    return key_match.group(1).strip() if key_match else None
+
+
+def filter_blocks_by_project(
+    blocks: list[dict],
+    *,
+    current_project: str | None,
+    cross_project: bool = False,
+) -> list[dict]:
+    """Filter out blocks whose project tag names a different project.
+
+    Project resolution order for each block:
+      1. `block["project"]` — an explicit project key (preferred; set at
+         file-load time by the caller, so it survives section-splitting
+         that would strip the file-level frontmatter from later blocks)
+      2. `extract_frontmatter_project(block["content"])` — parses any
+         frontmatter that did survive inside the block's own content
+
+    Rules (S-52 AC-1 / AC-2 / AC-3):
+      * `cross_project=True`           → return `blocks` unchanged (v0.4.x behaviour)
+      * `current_project` is None       → return `blocks` unchanged (no project
+        context to filter against — e.g. recall outside any git repo)
+      * Block has no project at all     → INCLUDED (back-compat for
+        pre-v0.5 discoveries and user-written memory files)
+      * Block project matches           → INCLUDED
+      * Block project differs           → EXCLUDED
+    """
+    if cross_project or current_project is None:
+        return blocks
+
+    filtered: list[dict] = []
+    for block in blocks:
+        # Preferred: project tag attached at file-load time.
+        project = block.get("project") or None
+        # Fallback: try to parse frontmatter from the block's own content
+        # (works for block 0 of a section-split file; later blocks have
+        # already lost the frontmatter, which is why (1) above is preferred).
+        if project is None:
+            content = block.get("content", "")
+            project = extract_frontmatter_project(content) if content else None
+        if project is None or project == current_project:
+            filtered.append(block)
+    return filtered

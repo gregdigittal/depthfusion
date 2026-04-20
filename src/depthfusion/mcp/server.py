@@ -11,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 TOOLS: dict[str, str] = {
     "depthfusion_status": "Return current DepthFusion component status",
-    "depthfusion_recall_relevant": "Retrieve most relevant session blocks for a query",
+    "depthfusion_recall_relevant": (
+        "Retrieve most relevant session blocks for a query. "
+        "Args: query (str), top_k (int, default 5), snippet_len (int, default 1500), "
+        "cross_project (bool, default False — when True, searches all projects), "
+        "project (str, optional — override auto-detected project slug)."
+    ),
     "depthfusion_tag_session": "Tag a session file with metadata",
     "depthfusion_publish_context": "Publish a context item to the bus",
     "depthfusion_run_recursive": "Run recursive LLM on large content",
@@ -242,6 +247,26 @@ def _trim_to_sentence(text: str, max_len: int) -> str:
     return truncated + "…"
 
 
+# S-52 / T-161: slug sanitisation for externally-supplied `project` args.
+# MCP clients can pass `project="..."` to _tool_recall and _tool_confirm_discovery.
+# Without sanitisation, a malicious slug like "../other" could traverse outside
+# ~/.claude/shared/discoveries/ when used as a filename component (as
+# write_decisions does). Same allowlist as git_post_commit.detect_project().
+_SLUG_ALLOW_RE = re.compile(r"[^a-z0-9-]")
+
+
+def _sanitise_project_slug(slug: str) -> str:
+    """Lowercase, allow only [a-z0-9-], collapse other chars to '-', cap at 40.
+
+    Returns empty string for inputs that sanitise to nothing (pure separators,
+    empty, whitespace-only) so callers can treat it as "no project provided".
+    """
+    if not slug:
+        return ""
+    cleaned = _SLUG_ALLOW_RE.sub("-", slug.strip().lower())[:40].strip("-")
+    return cleaned
+
+
 def _tool_recall(arguments: dict) -> str:
     """Retrieve relevant context blocks across three sources using BM25 + RRF.
 
@@ -263,21 +288,46 @@ def _tool_recall(arguments: dict) -> str:
     query = arguments.get("query", "")
     top_k = int(arguments.get("top_k", 5))
     snippet_len = int(arguments.get("snippet_len", 1500))
+    # T-161 / S-52: project scoping. When cross_project=False (the default),
+    # results are filtered to the current project (auto-detected via git
+    # remote or DEPTHFUSION_PROJECT env var). cross_project=True restores
+    # the v0.4.x behaviour of returning discoveries from every project.
+    cross_project = bool(arguments.get("cross_project", False))
+    # Optional explicit project override — useful for tests and for MCP
+    # clients that know their project context better than git does.
+    # Sanitise against path-traversal: a malicious client could pass
+    # `project="../../etc"`, which _tool_confirm_discovery would otherwise
+    # propagate to write_decisions() as a filename component.
+    _raw_explicit = str(arguments.get("project", "")).strip()
+    explicit_project = _sanitise_project_slug(_raw_explicit) or None
 
     home = Path.home()
     raw_blocks: list[dict] = []  # list of {chunk_id, file_stem, source, content, title}
+
+    # T-160: parse `project:` frontmatter once per file and attach it to each
+    # block we derive from that file. This survives the ## section split in
+    # _split_into_blocks — the frontmatter lives only in block 0 otherwise.
+    from depthfusion.retrieval.hybrid import extract_frontmatter_project
+
+    def _load_file(md_file: "Path", source_label: str) -> None:
+        try:
+            content = md_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return
+        if not content.strip():
+            return
+        file_project = extract_frontmatter_project(content)
+        for block in _split_into_blocks(content, source_label, md_file.stem):
+            if file_project is not None:
+                block["project"] = file_project
+            raw_blocks.append(block)
 
     # Source 1: goal session state files (.tmp)
     sessions_dir = home / ".claude" / "sessions"
     if sessions_dir.exists():
         for tmp_file in sorted(sessions_dir.glob("*.tmp"),
                                key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
-            try:
-                content = tmp_file.read_text(encoding="utf-8", errors="replace")
-                if content.strip():
-                    raw_blocks.extend(_split_into_blocks(content, "session", tmp_file.stem))
-            except OSError:
-                pass
+            _load_file(tmp_file, "session")
 
     # Source 2: shared discoveries
     discoveries_dir = home / ".claude" / "shared" / "discoveries"
@@ -286,12 +336,7 @@ def _tool_recall(arguments: dict) -> str:
                               key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
             if md_file.name == "README.md":
                 continue
-            try:
-                content = md_file.read_text(encoding="utf-8", errors="replace")
-                if content.strip():
-                    raw_blocks.extend(_split_into_blocks(content, "discovery", md_file.stem))
-            except OSError:
-                pass
+            _load_file(md_file, "discovery")
 
     # Source 3: persistent memory files
     memory_dir = home / ".claude" / "projects" / "-home-gregmorris" / "memory"
@@ -300,15 +345,47 @@ def _tool_recall(arguments: dict) -> str:
                               key=lambda p: p.stat().st_mtime, reverse=True)[:30]:
             if md_file.name == "MEMORY.md":
                 continue
-            try:
-                content = md_file.read_text(encoding="utf-8", errors="replace")
-                if content.strip():
-                    raw_blocks.extend(_split_into_blocks(content, "memory", md_file.stem))
-            except OSError:
-                pass
+            _load_file(md_file, "memory")
 
     if not raw_blocks:
         return json.dumps({"query": query, "blocks": [], "message": "No session context available"})
+
+    # S-52 T-161: apply project-scoped filter before scoring so BM25 IDF
+    # weights are computed against the filtered corpus, not the full
+    # cross-project corpus.
+    if not cross_project:
+        current_project = explicit_project
+        if current_project is None:
+            try:
+                from depthfusion.hooks.git_post_commit import detect_project
+                detected = detect_project()
+            except Exception:
+                detected = ""
+            # detect_project() never returns None or empty — it falls back
+            # to the sanitised cwd-directory name, or the literal "unknown"
+            # when that also fails. Treat "unknown" as "no project context"
+            # rather than filtering against a literal slug that no real
+            # discovery file would ever have — otherwise recall in a bare
+            # MCP client with no git remote would silently return zero blocks.
+            if detected and detected != "unknown":
+                current_project = detected
+            else:
+                current_project = None
+        if current_project:
+            from depthfusion.retrieval.hybrid import filter_blocks_by_project
+            before_count = len(raw_blocks)
+            raw_blocks = filter_blocks_by_project(
+                raw_blocks, current_project=current_project, cross_project=False,
+            )
+            if not raw_blocks:
+                return json.dumps({
+                    "query": query, "blocks": [],
+                    "message": (
+                        f"No context found for project {current_project!r} "
+                        f"(filtered {before_count} blocks). Pass "
+                        "cross_project=true to search all projects."
+                    ),
+                })
 
     # Recency ordering: insertion order reflects mtime desc (used as a small tie-breaker)
     recency_list: list[str] = [b["chunk_id"] for b in raw_blocks]
@@ -577,11 +654,17 @@ def _tool_confirm_discovery(arguments: dict) -> str:
     if len(text) > 300:
         text = text[:300]
 
-    project = str(arguments.get("project", "")).strip()
+    # Sanitise any externally-supplied slug against path traversal before it
+    # reaches write_decisions() (which uses the slug as a filename component).
+    project = _sanitise_project_slug(str(arguments.get("project", "")))
     if not project:
-        # Auto-detect from git remote or cwd
-        from depthfusion.hooks.git_post_commit import detect_project
-        project = detect_project()
+        # Auto-detect from git remote or cwd; guard the import so a broken
+        # git_post_commit module can't take down the confirmation tool.
+        try:
+            from depthfusion.hooks.git_post_commit import detect_project
+            project = detect_project()
+        except Exception:
+            project = "unknown"
 
     category = str(arguments.get("category", "decision")).strip()
     if category not in ("decision", "fact", "pattern", "error_fix", "value"):
