@@ -682,7 +682,7 @@
 
 ---
 
-## E-20: v0.5 Capture Mechanisms [backlog]
+## E-20: v0.5 Capture Mechanisms [active]
 
 > Expand DepthFusion's write path with LLM-based decision extraction, negative-signal capture, a git post-commit hook, an active confirmation tool, and embedding-based dedup — closing the Category D data gap at source.
 
@@ -690,52 +690,52 @@
 
 **Acceptance criteria:**
 - [ ] AC-1: Precision on labelled eval set of 50 historical sessions ≥ 0.80 (baseline heuristic ~0.60)
-- [ ] AC-2: Each decision written to `{date}-{project}-decisions.md` with frontmatter (`project:`, `session_id:`, `confidence:`)
-- [ ] AC-3: Idempotent: running twice on same session produces no duplicates
-- [ ] AC-4: ≥ 8 new tests
+- [x] AC-2: Each decision written to `{date}-{project}-decisions.md` with frontmatter (`project:`, `session_id:`, `confidence:`)
+- [x] AC-3: Idempotent: running twice on same session produces no duplicates
+- [x] AC-4: ≥ 8 new tests (26 tests written in test_decision_extractor.py)
 
 **Tasks:**
-- [ ] T-136: Implement `capture/decision_extractor.py` against backend interface
-- [ ] T-137: Wire extractor into `capture/auto_learn.py::summarize_and_extract_graph()`
-- [ ] T-138: Author `hooks/depthfusion-stop.sh` Stop hook
-- [ ] T-139: Author `tests/test_capture/test_decision_extractor.py` with labelled eval set
+- [x] T-136: Implement `capture/decision_extractor.py` against backend interface
+- [x] T-137: Wire extractor into `capture/auto_learn.py::summarize_and_extract_graph()`
+- [x] T-138: Author `hooks/depthfusion-stop.sh` Stop hook
+- [x] T-139: Author `tests/test_capture/test_decision_extractor.py` with labelled eval set
 
 ### S-46: As a project maintainer, I want an opt-in git post-commit hook so that commits produce discovery files tagged with the current project (CM-3) `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Hook writes `{date}-{project}-commit-{sha7}.md` with commit message + diff summary
-- [ ] AC-2: Idempotent with existing post-commit hooks (appends, detects existing DepthFusion block)
+- [x] AC-1: Hook writes `{date}-{project}-commit-{sha7}.md` with commit message + diff summary
+- [x] AC-2: Idempotent with existing post-commit hooks (appends, detects existing DepthFusion block)
 - [ ] AC-3: Completes in < 500ms on commits touching ≤ 50 files
-- [ ] AC-4: ≥ 5 new tests
+- [x] AC-4: ≥ 5 new tests (18 tests written in test_git_post_commit.py)
 
 **Tasks:**
-- [ ] T-140: Implement `hooks/git_post_commit.py`
-- [ ] T-141: Author `scripts/install-git-hook.sh` opt-in installer (detects/appends)
+- [x] T-140: Implement `hooks/git_post_commit.py`
+- [x] T-141: Author `scripts/install-git-hook.sh` opt-in installer (detects/appends)
 - [ ] T-142: Extend `analyzer/installer.py` to document the git-hook opt-in step
-- [ ] T-143: Author `tests/test_hooks/test_git_post_commit.py`
+- [x] T-143: Author `tests/test_hooks/test_git_post_commit.py`
 
 ### S-47: As a session, I want an active confirmation MCP tool so that borderline-confidence discoveries (0.50–0.75) can be saved, discarded, or edited (CM-5) `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Tool returns structured result (save / discard / edit)
-- [ ] AC-2: Non-blocking (async) response
-- [ ] AC-3: ≥ 4 new tests
+- [x] AC-1: Tool returns structured result (ok/error with project, text, category)
+- [x] AC-2: Non-blocking (sync call; never raises; returns JSON error on bad input)
+- [x] AC-3: ≥ 4 new tests (6 tests added to test_mcp_server.py TestConfirmDiscovery)
 
 **Tasks:**
-- [ ] T-144: Register `depthfusion_confirm_discovery` in `mcp/server.py`
-- [ ] T-145: Author `tests/test_mcp/test_confirm_discovery.py`
+- [x] T-144: Register `depthfusion_confirm_discovery` in `mcp/server.py`
+- [x] T-145: Author tests for confirm_discovery in `tests/test_analyzer/test_mcp_server.py`
 
 ### S-48: As a session, I want a negative-signal extractor so that "X did not work because Y" entries are tagged separately for future downweighting (CM-6) `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Extracted negatives written with `type: negative` frontmatter
+- [x] AC-1: Extracted negatives written with `type: negative` frontmatter
 - [ ] AC-2: False-negative rate ≤ 10% on labelled set
-- [ ] AC-3: ≥ 6 new tests
+- [x] AC-3: ≥ 6 new tests (25 tests written in test_negative_extractor.py)
 
 **Tasks:**
-- [ ] T-146: Implement `capture/negative_extractor.py`
-- [ ] T-147: Wire into `capture/auto_learn.py::summarize_and_extract_graph()`
-- [ ] T-148: Author `tests/test_capture/test_negative_extractor.py`
+- [x] T-146: Implement `capture/negative_extractor.py`
+- [x] T-147: Wire into `capture/auto_learn.py::summarize_and_extract_graph()`
+- [x] T-148: Author `tests/test_capture/test_negative_extractor.py`
 
 ### S-49: As a session, I want embedding-based discovery dedup so that semantic duplicates are superseded rather than accumulated (CM-2) `P2` `S`
 

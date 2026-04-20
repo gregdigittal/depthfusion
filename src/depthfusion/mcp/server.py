@@ -23,6 +23,8 @@ TOOLS: dict[str, str] = {
     "depthfusion_graph_traverse": "Traverse entity graph from a named entity",
     "depthfusion_graph_status": "Report graph health: node count, edge count, coverage, tier",
     "depthfusion_set_scope": "Set session graph scope (project | cross_project | global)",
+    # v0.5.0 CM-5 active confirmation tool
+    "depthfusion_confirm_discovery": "Actively confirm a decision or fact for immediate capture",
 }
 
 # Map tools to the feature flags that gate them
@@ -38,6 +40,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_graph_traverse": "graph_enabled",
     "depthfusion_graph_status": "graph_enabled",
     "depthfusion_set_scope": "graph_enabled",
+    "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
 }
 
 
@@ -129,6 +132,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_graph_status()
     elif tool_name == "depthfusion_set_scope":
         return _tool_set_scope(arguments)
+    elif tool_name == "depthfusion_confirm_discovery":
+        return _tool_confirm_discovery(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -547,6 +552,79 @@ def _tool_graph_status() -> str:
         "entities_by_type": type_breakdown,
         "tier": os.environ.get("DEPTHFUSION_MODE", "local"),
     }, indent=2)
+
+
+def _tool_confirm_discovery(arguments: dict) -> str:
+    """CM-5: Actively confirm a decision or fact for immediate capture.
+
+    Writes a discovery file tagged `type: decisions` immediately — no LLM call
+    required. Claude can call this during a session to capture an architectural
+    decision, confirmed value, or established pattern the moment it is resolved.
+
+    Arguments:
+        text     (str, required): The decision or fact to capture (≤ 300 chars)
+        project  (str, optional): Project slug (auto-detected from cwd if absent)
+        category (str, optional): one of decision|fact|pattern|error_fix|value
+                                   (default: "decision")
+        confidence (float, optional): 0.0–1.0 (default: 0.95 — user confirmed)
+    """
+    text = str(arguments.get("text", "")).strip()
+    if not text:
+        return json.dumps({
+            "ok": False,
+            "error": "text argument is required",
+        })
+    if len(text) > 300:
+        text = text[:300]
+
+    project = str(arguments.get("project", "")).strip()
+    if not project:
+        # Auto-detect from git remote or cwd
+        from depthfusion.hooks.git_post_commit import detect_project
+        project = detect_project()
+
+    category = str(arguments.get("category", "decision")).strip()
+    if category not in ("decision", "fact", "pattern", "error_fix", "value"):
+        category = "decision"
+
+    confidence = float(arguments.get("confidence", 0.95))
+    confidence = max(0.0, min(1.0, confidence))
+
+
+    from depthfusion.capture.decision_extractor import DecisionEntry, write_decisions
+
+    entry = DecisionEntry(
+        text=text,
+        confidence=confidence,
+        category=category,
+        source_session="mcp_confirm",
+    )
+
+    try:
+        out = write_decisions(
+            [entry],
+            project=project,
+            session_id="mcp_confirm",
+        )
+        if out:
+            return json.dumps({
+                "ok": True,
+                "written": str(out),
+                "project": project,
+                "text": text,
+                "category": category,
+                "confidence": confidence,
+            }, indent=2)
+        # File already exists for today — still succeeds, just idempotent
+        return json.dumps({
+            "ok": True,
+            "written": None,
+            "note": "Discovery file for today already exists; entry not appended "
+                    "(use a new session or delete the file to re-capture)",
+            "project": project,
+        }, indent=2)
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": str(exc)})
 
 
 def _tool_set_scope(arguments: dict) -> str:

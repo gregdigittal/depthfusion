@@ -148,13 +148,37 @@ def summarize_and_extract_graph(
     project: str,
     graph_store: "Any | None",
 ) -> None:
-    """Run HaikuSummarizer + graph entity extraction on a session file.
+    """Run HaikuSummarizer + decision/negative extractors + graph entity extraction.
+
+    T-137/T-147: wire decision_extractor and negative_extractor into the
+    capture pipeline. Both run after the summarizer; errors are swallowed so
+    a failing extractor never blocks the session compressor.
 
     Stores extracted entities and co-occurrence edges into graph_store.
     No-ops silently when DEPTHFUSION_GRAPH_ENABLED is not 'true' or graph_store is None.
     """
-    # Always run the summarizer (existing behaviour is unchanged)
+    # Phase 1: run the summarizer (existing behaviour — unchanged)
     HaikuSummarizer().summarize_file(path)
+
+    # Phase 2: LLM decision extractor + negative extractor (v0.5 CM-1/CM-6)
+    # Gated on DEPTHFUSION_DECISION_EXTRACTOR_ENABLED to avoid API calls in local mode.
+    if os.environ.get("DEPTHFUSION_DECISION_EXTRACTOR_ENABLED", "false").lower() in ("true", "1", "yes"):
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+            session_id = path.stem
+
+            from depthfusion.capture.decision_extractor import extract_and_write as _write_decisions
+            _write_decisions(content=content, project=project, session_id=session_id)
+        except Exception as exc:
+            logger.debug("Decision extractor failed for %s: %s", path.name, exc)
+
+        try:
+            from depthfusion.capture.negative_extractor import (
+                extract_and_write as _write_negatives,
+            )
+            _write_negatives(content=content, project=project, session_id=session_id)  # type: ignore[possibly-undefined]
+        except Exception as exc:
+            logger.debug("Negative extractor failed for %s: %s", path.name, exc)
 
     if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() != "true":
         return
