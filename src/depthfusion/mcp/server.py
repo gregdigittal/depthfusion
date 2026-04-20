@@ -152,8 +152,8 @@ def _tool_status(config: Any) -> str:
 ## BM25 implementation (extracted to retrieval/bm25.py)
 ## ---------------------------------------------------------------------------
 
-from depthfusion.retrieval.bm25 import BM25 as _BM25, tokenize as _tokenize_bm25
-
+from depthfusion.retrieval.bm25 import BM25 as _BM25
+from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
 
 ## ---------------------------------------------------------------------------
 ## Block extraction: chunk files on H2 headers for finer-grained retrieval
@@ -552,6 +552,7 @@ def _tool_graph_status() -> str:
 def _tool_set_scope(arguments: dict) -> str:
     """Programmatically set session graph scope."""
     from datetime import datetime, timezone
+
     from depthfusion.graph.scope import write_scope
     from depthfusion.graph.types import GraphScope
 

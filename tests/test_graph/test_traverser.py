@@ -1,10 +1,11 @@
 # tests/test_graph/test_traverser.py
 import pytest
-from depthfusion.graph.traverser import traverse, expand_query, boost_scores
-from depthfusion.graph.store import JSONGraphStore
-from depthfusion.graph.types import Entity, Edge, TraversalResult
+
 from depthfusion.graph.extractor import make_entity_id
 from depthfusion.graph.linker import make_edge_id
+from depthfusion.graph.store import JSONGraphStore
+from depthfusion.graph.traverser import boost_scores, expand_query, traverse
+from depthfusion.graph.types import Edge, Entity, TraversalResult
 
 
 @pytest.fixture

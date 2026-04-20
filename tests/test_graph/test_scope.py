@@ -1,9 +1,7 @@
 """Tests for scope module."""
 import json
-import pytest
-from pathlib import Path
 
-from depthfusion.graph.scope import read_scope, write_scope, default_scope, _DEFAULT_SCOPE_PATH
+from depthfusion.graph.scope import default_scope, read_scope, write_scope
 from depthfusion.graph.types import GraphScope
 
 

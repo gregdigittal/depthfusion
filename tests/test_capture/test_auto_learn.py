@@ -1,7 +1,6 @@
-import pytest
 from pathlib import Path
-from depthfusion.capture.auto_learn import HeuristicExtractor, extract_key_decisions
 
+from depthfusion.capture.auto_learn import HeuristicExtractor, extract_key_decisions
 
 SAMPLE_SESSION = """\
 # Goal: implement user auth

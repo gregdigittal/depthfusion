@@ -1,5 +1,4 @@
 # tests/test_install/test_install.py
-import pytest
 import subprocess
 import sys
 

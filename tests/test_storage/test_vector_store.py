@@ -1,5 +1,6 @@
 # tests/test_storage/test_vector_store.py
 import pytest
+
 from depthfusion.storage.vector_store import ChromaDBStore, is_chromadb_available
 
 
@@ -30,6 +31,7 @@ def test_chromadb_store_unavailable_raises_import_error(monkeypatch):
     import sys
     monkeypatch.setitem(sys.modules, "chromadb", None)
     from importlib import reload
+
     import depthfusion.storage.vector_store as vs
     reload(vs)
     if not vs.is_chromadb_available():

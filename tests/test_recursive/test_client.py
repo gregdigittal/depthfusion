@@ -88,6 +88,7 @@ def test_estimate_cost_is_positive_for_nonempty_content():
 def test_check_rlm_available_handles_import_error():
     """When rlm import fails, _check_rlm_available() returns False (covers lines 22-24)."""
     import sys
+
     import depthfusion.recursive.client as client_mod
 
     original_available = client_mod._RLM_AVAILABLE
@@ -111,8 +112,8 @@ def test_run_succeeds_with_mocked_rlm():
 
     Covers lines 90-109 — the live rlm execution path.
     """
-    from unittest.mock import MagicMock
     import sys
+    from unittest.mock import MagicMock
 
     mock_rlm_pkg = MagicMock()
     mock_rlm_instance = MagicMock()
@@ -139,8 +140,8 @@ def test_run_exception_propagates_when_rlm_fails():
 
     Covers lines 111-114 — the except block that marks trajectory incomplete.
     """
-    from unittest.mock import MagicMock
     import sys
+    from unittest.mock import MagicMock
 
     mock_rlm_pkg = MagicMock()
     mock_rlm_pkg.RLM.side_effect = RuntimeError("rlm internal error")

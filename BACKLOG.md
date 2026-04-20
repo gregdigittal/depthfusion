@@ -602,7 +602,7 @@
 
 ---
 
-## E-18: v0.5 Backend Foundation [backlog]
+## E-18: v0.5 Backend Foundation [active]
 
 > Introduce a pluggable LLM backend protocol and the three-mode installer so every downstream v0.5 feature can route to Haiku, Gemma, or Null without touching call-sites.
 
@@ -615,7 +615,7 @@
 - [x] AC-4: A 429 rate-limit from Haiku surfaces as `RateLimitError` and triggers the fallback chain
 - [x] AC-5: All 439 pre-existing tests pass
 - [x] AC-6: ≥ 25 new tests in `tests/test_backends/` covering protocol contract, factory dispatch, fallback chain, and C2 fix
-- [ ] AC-7: CIQS benchmark run shows no category regression > 2 points vs v0.4.x baseline
+- [x] AC-7: CIQS benchmark run shows no category regression > 2 points vs v0.4.x baseline
 - [ ] AC-8: Fallback chain is **quality-ranked** (per DR-018 §4 ratification → I-18); cost/latency optimisation applies only within a quality tier
 
 **Tasks:**
@@ -627,7 +627,7 @@
 - [x] T-120: Migrate 4 call-sites (reranker.py, extractor.py, linker.py, auto_learn.py HaikuSummarizer) to `get_backend(...)`
 - [x] T-121: Author regression test `tests/test_regression/test_v04_output_identity.py`
 - [x] T-122: Author `tests/test_backends/` suite (contract, factory, fallback, C2)
-- [ ] T-123: Wire `DEPTHFUSION_BACKEND_FALLBACK_LOG` JSONL emission
+- [x] T-123: Wire `DEPTHFUSION_BACKEND_FALLBACK_LOG` JSONL emission
 
 ### S-42: As an operator, I want a three-mode installer so that I can provision `local`, `vps-cpu`, or `vps-gpu` environments with the right dependencies and smoke tests `P0` `M`
 

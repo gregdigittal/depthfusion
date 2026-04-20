@@ -19,8 +19,15 @@ backend, so callers can cascade on `RateLimitError` / `BackendOverloadError`
 single backend and the fallback is implicit (NullBackend when others
 haven't shipped yet).
 
+T-123 — Fallback observability:
+When a healthy-check fails and the factory falls back from a real backend
+(haiku, gemma) to NullBackend, a JSONL event is emitted to the metrics
+collector if `DEPTHFUSION_BACKEND_FALLBACK_LOG` is not explicitly disabled.
+This gives operators a durable audit trail for silent-degradation events
+that would otherwise appear only in Python logging output.
+
 Spec: docs/plans/v0.5/02-build-plan.md §2.2.2
-Backlog: T-119
+Backlog: T-119, T-123
 """
 from __future__ import annotations
 
@@ -126,6 +133,11 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
             "(no DEPTHFUSION_API_KEY or anthropic SDK); falling back to NullBackend.",
             capability,
         )
+        _emit_fallback_event(
+            requested=name,
+            capability=capability,
+            reason="unhealthy: no DEPTHFUSION_API_KEY or anthropic SDK unavailable",
+        )
         return NullBackend()
 
     if name == "gemma":
@@ -140,6 +152,11 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
             "(missing URL or model config); falling back to NullBackend.",
             capability,
         )
+        _emit_fallback_event(
+            requested=name,
+            capability=capability,
+            reason="unhealthy: DEPTHFUSION_GEMMA_URL or DEPTHFUSION_GEMMA_MODEL empty",
+        )
         return NullBackend()
 
     if name == "local":
@@ -151,6 +168,42 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
         f"Unknown backend: {name!r} for capability {capability!r}. "
         f"Known backends: {sorted(known)}"
     )
+
+
+def _emit_fallback_event(
+    requested: str,
+    capability: str,
+    reason: str,
+) -> None:
+    """Emit a JSONL fallback-event record to the metrics collector.
+
+    Gated on DEPTHFUSION_BACKEND_FALLBACK_LOG (default: enabled).
+    Errors are swallowed — observability must never degrade serving.
+
+    T-123 contract:
+      metric name : "backend.fallback"
+      value       : 1.0  (increment; aggregator sums over windows)
+      labels      : requested, capability, reason
+    """
+    raw = os.environ.get("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return
+
+    try:
+        from depthfusion.metrics.collector import MetricsCollector  # lazy import
+        MetricsCollector().record(
+            "backend.fallback",
+            1.0,
+            labels={
+                "requested": requested,
+                "actual": "null",
+                "capability": capability,
+                "reason": reason,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Observability must never break serving. Log at DEBUG only.
+        logger.debug("_emit_fallback_event: could not write metrics record: %s", exc)
 
 
 __all__ = ["get_backend"]

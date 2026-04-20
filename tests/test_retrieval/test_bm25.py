@@ -1,5 +1,4 @@
 # tests/test_retrieval/test_bm25.py
-import pytest
 from depthfusion.retrieval.bm25 import BM25, tokenize
 
 

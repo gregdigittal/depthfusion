@@ -6,7 +6,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-from depthfusion.graph.types import Entity, Edge, TraversalResult
+from depthfusion.graph.types import Edge, Entity, TraversalResult
 
 if TYPE_CHECKING:
     from depthfusion.graph.store import JSONGraphStore, SQLiteGraphStore

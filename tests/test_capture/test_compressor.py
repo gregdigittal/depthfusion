@@ -1,7 +1,6 @@
 # tests/test_capture/test_compressor.py
-import pytest
-from pathlib import Path
 from unittest.mock import patch
+
 from depthfusion.capture.compressor import SessionCompressor
 
 

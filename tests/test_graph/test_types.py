@@ -1,6 +1,5 @@
-import pytest
-from depthfusion.graph.types import Entity, Edge, GraphScope, TraversalResult
 from depthfusion.core.types import RetrievedChunk
+from depthfusion.graph.types import Edge, Entity, TraversalResult
 
 
 def test_entity_id_is_12_chars():

@@ -1,6 +1,7 @@
 """Shared fixtures for graph tests."""
 import pytest
-from depthfusion.graph.types import Entity, Edge
+
+from depthfusion.graph.types import Edge, Entity
 
 
 @pytest.fixture

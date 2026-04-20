@@ -13,7 +13,8 @@ from typing import Any
 from depthfusion.retrieval.reranker import HaikuReranker
 
 try:
-    from depthfusion.storage.tier_manager import TierManager, Tier as _StorageTier
+    from depthfusion.storage.tier_manager import Tier as _StorageTier
+    from depthfusion.storage.tier_manager import TierManager
     _TIER_MANAGER_AVAILABLE = True
 except ImportError:
     TierManager = None  # type: ignore[assignment,misc]

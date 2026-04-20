@@ -1,7 +1,7 @@
 # tests/test_storage/test_tier_manager.py
-import pytest
 from unittest.mock import patch
-from depthfusion.storage.tier_manager import TierManager, Tier
+
+from depthfusion.storage.tier_manager import Tier, TierManager
 
 
 def test_detect_tier_local_mode(monkeypatch):
