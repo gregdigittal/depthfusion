@@ -242,3 +242,137 @@ def summarize_and_extract_graph(
             graph_store.upsert_edge(edge)
     except Exception as exc:
         logger.debug("Graph entity extraction failed: %s", exc)
+
+    # Phase 4: session-level temporal edges (v0.5 S-50 / CM-4).
+    # After the entity-level graph is updated, link this session to other
+    # recent sessions via PRECEDED_BY edges when they're close in time AND
+    # share vocabulary. Opt-in via DEPTHFUSION_TEMPORAL_SESSION_LINKER_ENABLED
+    # so operators can disable if they don't want session-level graph bulk.
+    if os.environ.get(
+        "DEPTHFUSION_TEMPORAL_SESSION_LINKER_ENABLED", "true",
+    ).lower() in ("true", "1", "yes"):
+        try:
+            _link_session_temporally(path, project, graph_store)
+        except Exception as exc:
+            logger.debug("Temporal session linking failed for %s: %s", path.name, exc)
+
+
+def _link_session_temporally(
+    current_path: Path,
+    project: str,
+    graph_store: "Any",
+    *,
+    lookback_hours: float = 72.0,
+    max_sessions: int = 30,
+) -> None:
+    """Upsert session entities and PRECEDED_BY edges for recent sessions.
+
+    Called from `summarize_and_extract_graph` after entity-level graph
+    update. Scans `current_path.parent` for `.tmp` session files modified
+    within `lookback_hours`, builds SessionRecords, and runs
+    `TemporalSessionLinker.link_all()` over the combined set (current +
+    prior). Upserts one session Entity per SessionRecord and every
+    qualifying PRECEDED_BY Edge.
+
+    `lookback_hours` is wider than the linker's default 48h window so
+    boundary pairs aren't missed; the linker itself still applies its
+    internal window. `max_sessions` caps O(n²) pairwise comparison cost
+    on large session archives.
+    """
+    from datetime import datetime, timezone
+
+    from depthfusion.graph.extractor import make_entity_id
+    from depthfusion.graph.linker import (
+        SessionRecord,
+        TemporalSessionLinker,
+        tokenize_session_content,
+    )
+    from depthfusion.graph.types import Entity
+
+    sessions_dir = current_path.parent
+    if not sessions_dir.exists():
+        return
+
+    # Collect recent .tmp files within lookback window, most-recent first.
+    now = datetime.now(tz=timezone.utc).timestamp()
+    cutoff = now - (lookback_hours * 3600.0)
+    candidate_files: list[Path] = []
+    try:
+        for p in sessions_dir.glob("*.tmp"):
+            try:
+                if p.stat().st_mtime >= cutoff:
+                    candidate_files.append(p)
+            except OSError:
+                continue
+    except OSError:
+        return
+
+    # Ensure the current session is included even if its mtime somehow slipped.
+    if current_path.exists() and current_path not in candidate_files:
+        candidate_files.append(current_path)
+
+    # Cap to most-recent N to bound the pairwise work.
+    candidate_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    candidate_files = candidate_files[:max_sessions]
+    if len(candidate_files) < 2:
+        # Need at least two sessions to form any PRECEDED_BY edge.
+        return
+
+    # Build SessionRecords. Timestamp uses UTC file mtime for stability
+    # across timezones.
+    records: list[SessionRecord] = []
+    for p in candidate_files:
+        try:
+            body = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        mtime_iso = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
+        records.append(SessionRecord(
+            session_id=p.stem,
+            timestamp=mtime_iso,
+            vocabulary=tokenize_session_content(body),
+            project=project,
+        ))
+
+    if len(records) < 2:
+        return
+
+    # Link and persist.
+    linker = TemporalSessionLinker()
+    edges = linker.link_all(records)
+    if not edges:
+        return
+
+    # Session entities are upserted lazily — only the ones that actually
+    # participate in a PRECEDED_BY edge. This avoids bulking the graph
+    # with isolated session nodes that nothing references.
+    participating_ids: set[str] = set()
+    for e in edges:
+        participating_ids.add(e.source_id)
+        participating_ids.add(e.target_id)
+
+    for rec in records:
+        if rec.session_id not in participating_ids:
+            continue
+        entity_id = make_entity_id(rec.session_id, "session", rec.project)
+        graph_store.upsert_entity(Entity(
+            entity_id=entity_id,
+            name=rec.session_id,
+            type="session",
+            project=rec.project,
+            source_files=[rec.session_id],
+            confidence=1.0,
+            first_seen=rec.timestamp,
+            metadata={"vocabulary_size": len(rec.vocabulary)},
+        ))
+
+    # The linker's edge source_id / target_id are session_ids (stems), but
+    # the graph expects entity_ids. Re-map before upsert.
+    from depthfusion.graph.linker import make_edge_id
+    for edge in edges:
+        src_entity = make_entity_id(edge.source_id, "session", project)
+        tgt_entity = make_entity_id(edge.target_id, "session", project)
+        edge.source_id = src_entity
+        edge.target_id = tgt_entity
+        edge.edge_id = make_edge_id(src_entity, tgt_entity, edge.relationship)
+        graph_store.upsert_edge(edge)

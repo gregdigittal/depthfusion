@@ -840,7 +840,62 @@
 
 ---
 
-## Planning Concerns (non-epic notes)
+## E-23: v0.6 Cleanup & I-8 Wiring [backlog]
+
+> Remove v0.5-era deprecations, wire `config_version_id` for full I-8 compliance, and retire pre-existing mypy/ruff errors. No new features — this epic exists to keep the tech-debt surface from accumulating across v0.6 feature work.
+
+### S-56: As a maintainer, I want the deprecated `--mode=vps` installer alias removed so that the CLI surface doesn't carry indefinite compatibility shims `P2` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `python -m depthfusion.install.install --mode=vps` exits with a non-zero argparse error naming the valid choices `{local, vps-cpu, vps-gpu}` — no deprecation-warning pass-through path
+- [ ] AC-2: The v0.5-era deprecation test (`test_vps_alias_prints_deprecation_and_runs_vps_cpu`) is replaced with a "rejects vps" regression test
+- [ ] AC-3: CHANGELOG §Removed documents the break with an explicit migration note pointing at `--mode=vps-cpu`
+
+**Tasks:**
+- [ ] T-172: Remove `"vps"` from argparse choices in `install/install.py`; delete the `if mode == "vps"` deprecation branch in `main()`
+- [ ] T-173: Update `test_vps_alias_prints_deprecation_and_runs_vps_cpu` → `test_vps_alias_rejected_in_v06`
+- [ ] T-174: Add `[Removed]` entry to `CHANGELOG.md` under `## [v0.6.0]`
+
+### S-57: As a package installer, I want the legacy `vps-tier1`/`vps-tier2` pyproject extras removed so that users migrate cleanly to the three-mode extras `P3` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `pyproject.toml` `[project.optional-dependencies]` contains only `local`, `vps-cpu`, `vps-gpu`, `dev`, `rlm` — no `vps-tier1` / `vps-tier2` keys
+- [ ] AC-2: `pip install '.[vps-tier1]'` fails with a clear "no matching distribution" error message (standard pip behaviour on removed extras)
+- [ ] AC-3: Release notes + migration guide updated
+
+**Tasks:**
+- [ ] T-175: Delete `vps-tier1` / `vps-tier2` entries from `pyproject.toml`
+- [ ] T-176: Grep the repo for remaining references to `vps-tier1` / `vps-tier2`; update any install docs, runbooks, or agent skills that reference them
+- [ ] T-177: Add `[Removed]` entry to `CHANGELOG.md`
+
+### S-58: As an auditor, I want `config_version_id` populated on every gate-log record so that gate decisions can be reproduced against the config snapshot active at invocation (I-8 compliance) `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: A `config_version_id` is computed deterministically from the active `GateConfig` (e.g. sha256 of the `(alpha, b_threshold, c_threshold, delta_threshold)` tuple truncated to 12 hex chars) and attached to every `record_gate_log()` entry
+- [ ] AC-2: When `GateConfig` changes mid-session (env var reload), the next gate-log entry carries the NEW `config_version_id` — downstream tooling can diff the two to explain behaviour changes
+- [ ] AC-3: The `TODO(I-8)` marker in `retrieval/hybrid.py::apply_fusion_gates` is removed
+- [ ] AC-4: ≥ 4 new tests (deterministic ID generation, ID changes on config change, ID stable across calls with unchanged config, ID appears on disk entry)
+
+**Tasks:**
+- [ ] T-178: Add `GateConfig.version_id()` method that hashes the frozen field tuple
+- [ ] T-179: Thread the computed ID from `apply_fusion_gates` through `record_gate_log(..., config_version_id=...)`
+- [ ] T-180: Author `tests/test_fusion/test_gate_config_version.py`
+
+### S-59: As a maintainer, I want pre-existing mypy + ruff errors retired so that the default `ruff check` and `mypy src/depthfusion` commands are clean `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `mypy src/depthfusion` reports 0 errors (currently 6 pre-existing: 3 in `storage/vector_store.py` index errors, 1 in `retrieval/hybrid.py` `_StorageTier` reassignment, 1 in `session/loader.py` missing yaml stubs, 1 remaining after yaml-stubs install)
+- [ ] AC-2: `ruff check src/ tests/` reports 0 errors (currently 5 pre-existing: E402/E501 in `mcp/server.py`, E501 in `graph/types.py:16`)
+- [ ] AC-3: The CI / pre-commit hooks guard against re-introduction (already in place for ruff; need to add mypy gate)
+
+**Tasks:**
+- [ ] T-181: Add `types-PyYAML` to `[dev]` extras and fix `session/loader.py` import
+- [ ] T-182: Fix `storage/vector_store.py` `list | None` indexing (add `if ... is None: return` guards)
+- [ ] T-183: Narrow the `_StorageTier` / `TierManager` conditional import in `retrieval/hybrid.py` to avoid `type: ignore[misc]`
+- [ ] T-184: Split the long E501 lines in `mcp/server.py` and `graph/types.py:16` across multiple lines
+- [ ] T-185: Move the module-level BM25 imports in `mcp/server.py` to the top (fixes E402) or add an `# noqa: E402` with a link to the refactor that made them late-bound
+
+---
 
 - **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.

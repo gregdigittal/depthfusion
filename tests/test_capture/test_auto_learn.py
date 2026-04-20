@@ -96,3 +96,150 @@ def test_graph_extraction_skipped_when_flag_off(tmp_path, monkeypatch):
     summarize_and_extract_graph(session_file, project="depthfusion", graph_store=store)
 
     assert store.node_count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: TemporalSessionLinker wiring (S-50 follow-up)
+# ---------------------------------------------------------------------------
+
+def _make_session_file(sessions_dir, name: str, content: str, mtime_offset_s: float = 0):
+    """Create a .tmp session file with a specific mtime relative to now."""
+    import os
+    import time
+    path = sessions_dir / name
+    path.write_text(content, encoding="utf-8")
+    if mtime_offset_s != 0:
+        ts = time.time() + mtime_offset_s
+        os.utime(path, (ts, ts))
+    return path
+
+
+def test_temporal_session_linker_wires_preceded_by_edges(tmp_path, monkeypatch):
+    """Two sessions close in time + sharing vocabulary → PRECEDED_BY edge upserted."""
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+
+    # Shared vocabulary of >=5 tokens on both sessions ensures the linker's
+    # default min_overlap=5 gate passes.
+    shared = (
+        "authentication pipeline validator serializer handler context "
+        "middleware orchestrator "
+    )
+    _make_session_file(
+        sessions_dir, "alpha.tmp", shared + "alpha-unique-token",
+        mtime_offset_s=-3600 * 2,  # 2 hours ago
+    )
+    current = _make_session_file(
+        sessions_dir, "beta.tmp", shared + "beta-unique-token",
+        mtime_offset_s=0,  # now
+    )
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(current, project="testproj", graph_store=store)
+
+    # At least one PRECEDED_BY edge should have been created
+    session_entities = [e for e in store.all_entities() if e.type == "session"]
+    assert len(session_entities) >= 2
+
+    # Find the PRECEDED_BY edge — traverse from the newer session
+    from depthfusion.graph.extractor import make_entity_id
+    beta_id = make_entity_id("beta", "session", "testproj")
+    edges = store.get_edges(beta_id, relationship_filter=["PRECEDED_BY"])
+    assert len(edges) >= 1
+
+
+def test_temporal_linker_disabled_by_env_flag(tmp_path, monkeypatch):
+    """Setting DEPTHFUSION_TEMPORAL_SESSION_LINKER_ENABLED=false skips Phase 4."""
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+    monkeypatch.setenv("DEPTHFUSION_TEMPORAL_SESSION_LINKER_ENABLED", "false")
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    shared = "alpha beta gamma delta epsilon zeta "
+    _make_session_file(sessions_dir, "a.tmp", shared + "unique-a", mtime_offset_s=-3600)
+    current = _make_session_file(sessions_dir, "b.tmp", shared + "unique-b")
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(current, project="testproj", graph_store=store)
+
+    # Entity-level extraction may still run; but NO session-type entities
+    # should have been upserted since Phase 4 was disabled.
+    session_entities = [e for e in store.all_entities() if e.type == "session"]
+    assert session_entities == []
+
+
+def test_temporal_linker_noop_on_single_session(tmp_path, monkeypatch):
+    """With only one session file, no pair can form; Phase 4 is a clean no-op."""
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    current = _make_session_file(sessions_dir, "solo.tmp", "just some content here")
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(current, project="testproj", graph_store=store)
+
+    session_entities = [e for e in store.all_entities() if e.type == "session"]
+    assert session_entities == []  # no pairs → no edges → no session entities
+
+
+def test_temporal_linker_excludes_sessions_outside_lookback(tmp_path, monkeypatch):
+    """A session file older than 72h is not considered for linking."""
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    shared = "authentication pipeline validator serializer handler context "
+    # 100 hours ago — outside the default 72h lookback
+    _make_session_file(sessions_dir, "ancient.tmp", shared + "ancient", mtime_offset_s=-3600 * 100)
+    current = _make_session_file(sessions_dir, "current.tmp", shared + "current")
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(current, project="testproj", graph_store=store)
+
+    # Ancient session is outside lookback → never loaded → no pair formed
+    session_entities = [e for e in store.all_entities() if e.type == "session"]
+    assert session_entities == []
+
+
+def test_temporal_linker_isolated_sessions_not_upserted(tmp_path, monkeypatch):
+    """Sessions that don't participate in ANY edge aren't added to the graph —
+    avoids bulking with unreferenced session nodes.
+    """
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    # Two sessions with no vocabulary overlap → no edge qualifies.
+    _make_session_file(
+        sessions_dir, "cats.tmp",
+        "feline whiskers purring mice-catching grooming napping sunbeams",
+        mtime_offset_s=-3600,
+    )
+    current = _make_session_file(
+        sessions_dir, "rockets.tmp",
+        "thrust propellant nozzle trajectory orbit payload booster",
+    )
+
+    from depthfusion.graph.store import JSONGraphStore
+    store = JSONGraphStore(path=tmp_path / "g.json")
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    summarize_and_extract_graph(current, project="testproj", graph_store=store)
+
+    session_entities = [e for e in store.all_entities() if e.type == "session"]
+    assert session_entities == []
