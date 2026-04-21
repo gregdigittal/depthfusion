@@ -12,9 +12,73 @@ Conventions:
 
 ## [Unreleased]
 
-No changes pending beyond v0.6.0a1. Next release scope is data-dependent
-— see `docs/plans/v0.7/roadmap.md` for contingency paths based on
-post-migration field data.
+Accumulating post-v0.6.0a1. No release cut yet; items target v0.6.0 or
+v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
+
+### Added
+
+**Two-mode CIQS comparison (`scripts/ciqs_compare.py`):**
+- Unpaired-bootstrap delta CI between baseline and candidate CIQS runs
+  (e.g. vps-cpu pre-migration vs vps-gpu post-migration). Classifies each
+  category as `improved` / `regressed` / `parity` based on whether zero
+  falls in the delta CI — prevents claiming wins on sampling noise.
+- `--exit-nonzero-on-regression` flag for CI/automation gating.
+- 23 unit tests covering math, verdict classification, report formatting,
+  end-to-end CLI, and the review-gate `_reset_summ_for_testing()` hook.
+
+**Session-history prompt miner (`scripts/mine_session_prompts.py`):**
+- Extracts user-authored prompts from `~/.claude/projects/*/session-*.jsonl`
+  for eval-corpus expansion. Higher signal than LLM-synthesised prompts
+  because the corpus is already in-distribution for the user.
+- Filters: `type: user` + string content; drops wrappers
+  (`<command-message>`, `<system-reminder>`, etc.); length threshold;
+  exact-dup removal via normalised-hash.
+- Redacts common secret patterns (OpenAI/Anthropic, AWS, GitHub,
+  Slack) before the dedup hash so secrets-only-differing prompts collapse.
+- Smoke-tested on 1445 real session files producing 78 unique prompts.
+- 32 unit tests plus the review-gate regression for
+  `dropped_project_filter` stat counting.
+
+**Autonomous weekly regression monitor (`scripts/ciqs_weekly.py`):**
+- Reads the already-emitted `backend_summary()` / `capture_summary()`
+  JSONL streams; compares last 7 days to prior 7 days; flags latency
+  (> 20%), error-rate (> 5pp), capture-volume (> 30% drop), and
+  availability (< 95% with prior full coverage) regressions.
+- Does NOT auto-score quality — that requires labelled expected outputs.
+  Report ships with an explicit disclaimer so operators don't conflate
+  "no mechanical regression" with "no quality issue".
+- `scripts/ciqs-weekly.service` + `scripts/ciqs-weekly.timer` systemd
+  units for scheduled (Monday 06:00 local) execution with 10m jitter.
+- Exit 0 on no regressions, 1 on regressions (systemd marks unit failed),
+  2 on analysis error. Surfaces in `systemctl status` and journal.
+- 19 unit tests covering window aggregation, threshold semantics, the
+  "new backend not flagged" invariant, report formatting, CLI exit codes,
+  and the review-gate regression for `window_days` threading.
+
+### Fixed
+
+**Review-gate findings on the three new scripts (2 High, 2 Medium, 2 Low):**
+- `ciqs-weekly.service`: `%i` specifier expanded to empty string in
+  non-template unit (filename became `-YYYY-MM-DD.md` with leading dash).
+  Replaced with static `weekly-` prefix.
+- `ciqs_weekly.py`: `detect_regressions` and `format_report` hardcoded
+  `/ 7` divisor for availability math, breaking correctness when
+  `--window-days != 7`. Both now consume `window_days` from the
+  aggregated dict.
+- `ciqs_compare.py`: added `_reset_summ_for_testing()` so the lazy
+  module cache can be cleared in future tests that inject a fake
+  summariser (no current test does, but the trap is now defused).
+- `mine_session_prompts.py`: `dropped_project_filter` stat was
+  initialised but never incremented — now tracks filtered-out files.
+  Summary line added to stderr output.
+- `mine_session_prompts.py`: removed shadowed `sk-ant-…` redaction
+  pattern — the preceding `sk-…` branch matched first, making it
+  dead code.
+
+### Changed
+
+Nothing changed in library runtime behaviour. All additions are scripts
+(not importable from the package); no existing tests touched.
 
 ---
 

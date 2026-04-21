@@ -1,0 +1,31 @@
+[Unit]
+Description=DepthFusion weekly autonomous regression monitor
+Documentation=https://github.com/gregdigittal/depthfusion/blob/main/scripts/ciqs_weekly.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust User / WorkingDirectory / paths for your install:
+User=gregmorris
+WorkingDirectory=%h/projects/depthfusion
+# The script writes to %h/.local/share/depthfusion/weekly-reports/
+# and emits summary to stdout (captured by journalctl -u ciqs-weekly).
+# Non-zero exit = regressions detected; systemd marks the unit failed
+# which surfaces in `systemctl status` and user notifications.
+ExecStartPre=/bin/mkdir -p %h/.local/share/depthfusion/weekly-reports
+ExecStart=/usr/bin/env python3 %h/projects/depthfusion/scripts/ciqs_weekly.py \
+    --out %h/.local/share/depthfusion/weekly-reports/weekly-$(date +%%F).md \
+    --verbose
+
+# Capture output even when the command fails so we can read the report
+# from journalctl even in the alert-severity path.
+StandardOutput=journal
+StandardError=journal
+
+# Environment for the script — point at where DepthFusion is installed
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=%h/projects/depthfusion/src
+
+[Install]
+WantedBy=default.target

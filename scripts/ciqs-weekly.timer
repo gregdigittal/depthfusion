@@ -1,0 +1,18 @@
+[Unit]
+Description=Run DepthFusion weekly regression monitor every Monday morning
+Documentation=https://github.com/gregdigittal/depthfusion/blob/main/scripts/ciqs_weekly.py
+
+[Timer]
+# Fire every Monday at 06:00 local time. Persistent=true means a
+# missed run (laptop asleep, VPS rebooting) fires on next boot.
+OnCalendar=Mon *-*-* 06:00:00
+Persistent=true
+# Randomise a 10-minute delay so a fleet of hosts doesn't all run at
+# the same second — cheap insurance against thundering herds on any
+# shared downstream (the report is local-only today but this is good
+# hygiene for future aggregation).
+RandomizedDelaySec=10m
+Unit=ciqs-weekly.service
+
+[Install]
+WantedBy=timers.target
