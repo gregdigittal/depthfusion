@@ -12,7 +12,100 @@ Conventions:
 
 ## [Unreleased]
 
-No changes pending beyond v0.5.1.
+No changes pending beyond v0.5.2.
+
+---
+
+## [v0.5.2] — 2026-04-21
+
+**Theme:** observability depth, two dead-path wirings fixed, interactive
+install UX, and a web-UX design brief.
+
+Patch release landing three focused improvements on top of v0.5.1:
+per-capability latency measurement in the recall stream, a pair of
+pre-existing "method defined but never called" gaps closed (fusion
+gates + vector search), an interactive installer that auto-detects GPU
+and recommends the right mode, a `vps-gpu`-specific smoke test, and a
+comprehensive Claude-design brief for an animated web install UX.
+
+Test count: 991 → 1003 (+12 net new — crossed the 1000-test milestone).
+Quality: mypy 0 errors, ruff 0 errors — unchanged from v0.5.1's clean
+baseline.
+
+### Added
+
+**Per-capability latency in recall metrics (S-61 / E-24):**
+- `_tool_recall` threads a mutable `perf_ms: dict[str, float]` through
+  `_tool_recall_impl`. Phases time themselves with `time.monotonic()`
+  brackets; `perf_ms` gets an entry only when the phase actually ran.
+- `record_recall_query()`'s `latency_ms_per_capability` field now
+  populated from this dict. In v0.5.1 it shipped as an always-empty dict.
+
+**Interactive install mode auto-select (S-62 / E-25):**
+- `python -m depthfusion.install.install` with no `--mode` probes GPU
+  via `detect_gpu()`, prints a recommendation banner, and either prompts
+  (interactive shells) or auto-accepts (`--yes` flag or non-tty shells).
+- Recommendation logic: NVIDIA GPU detected → `vps-gpu`; no GPU but
+  `DEPTHFUSION_API_KEY` set → `vps-cpu`; otherwise → `local`.
+- Explicit `--mode=X` preserves v0.5.1 behaviour (no banner, no probe).
+
+**`vps-gpu`-specific smoke test (S-62 / T-197):**
+- `install/smoke.py::run_vps_gpu_smoke()` — three-probe check
+  (`nvidia-smi`, `sentence-transformers` import, `LocalEmbeddingBackend.embed()`
+  roundtrip). Runs after `install_vps_gpu` writes the env file. Failure
+  is a warning (not fatal) — install completes, operator can re-run
+  the smoke test after fixing the gap without redoing the install.
+
+**Claude design prompt for web install UX:**
+- `docs/design/install-ux-prompt.md` — 326-line design brief for an
+  animated landing page / onboarding wizard. Covers hero animation
+  ("LLM memory before vs after DepthFusion" with compaction event as
+  the dramatic moment), three mode selector cards with hardware-probe
+  recommendation, 4-step deployment walkthrough, tier-specific value
+  callouts with progressive disclosure, and a live metrics stream
+  widget. Self-contained — a designer using Claude's design mode can
+  paste it and produce a production UX.
+
+### Changed
+
+- `_tool_recall_impl` signature gains `perf_ms: dict | None = None`
+  keyword argument for callers that want per-capability timing.
+- `install.main()` — `--mode` no longer required; new `-y/--yes` flag
+  for non-interactive auto-accept.
+- `pyproject.toml` version `0.5.1` → `0.5.2`.
+
+### Fixed
+
+- **Fusion gates dead-path.** S-51 added `apply_fusion_gates` to
+  `RecallPipeline` but `_tool_recall_impl` never called it —
+  `DEPTHFUSION_FUSION_GATES_ENABLED=true` was a silent no-op in
+  production. v0.5.2 wires the call between BM25 scoring and
+  reranking.
+- **Vector search dead-path.** T-130 added `apply_vector_search` to
+  `RecallPipeline` but `_tool_recall_impl` never called it — the
+  GPU's embedding backend couldn't actually participate in recall.
+  v0.5.2 wires the call (gated on `DEPTHFUSION_VECTOR_SEARCH_ENABLED`)
+  with `rrf_fuse` against BM25 results. Graceful degradation when
+  backend returns None (NullBackend / missing sentence-transformers).
+
+### Deprecated
+
+No new deprecations. `--mode=vps` alias and `vps-tier1`/`vps-tier2`
+extras from v0.5.0 remain deprecated and are scheduled for v0.6.0
+removal per E-23.
+
+### Test metrics
+
+- **1003 passed, 1 skipped** (crossed 1000-test milestone).
+- **Ruff:** 0 errors on `src/` and `tests/`.
+- **Mypy:** 0 errors on `src/depthfusion` (74 source files).
+- Test count delta since v0.5.1: 991 → 1003 (+12 net new).
+
+### New environment variables (v0.5.2 additions)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DEPTHFUSION_VECTOR_SEARCH_ENABLED` | `false` | Opt-in to `apply_vector_search` in the recall path. When enabled, the query + block embeddings are fused with BM25 via RRF. Requires a real embedding backend (LocalEmbeddingBackend on vps-gpu, ChromaDB on vps-cpu Tier 2). |
 
 ---
 
