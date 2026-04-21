@@ -805,14 +805,18 @@
 ### S-53: As a maintainer, I want the metrics collector extended so that per-query JSONL records include backend routing, fallback chains, per-capability latency, and capture-mechanism fields `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Every recall query writes a JSONL record with the new fields (`backend_used`, `backend_fallback_chain`, `latency_ms_per_capability`, `capture_mechanism`, `capture_write_rate`, `event_subtype`, `config_version_id`)
-- [ ] AC-2: Aggregator produces per-backend latency + error-rate summary
-- [ ] AC-3: ≥ 4 new tests
+- [x] AC-1: Every recall query writes a JSONL record with the new fields — `record_recall_query()` writes to `YYYY-MM-DD-recall.jsonl` with `backend_used`, `backend_fallback_chain`, `latency_ms_per_capability`, `total_latency_ms`, `result_count`, `event_subtype`, `config_version_id`. Capture events use `record_capture_event()` to a separate `YYYY-MM-DD-capture.jsonl` stream; `capture_write_rate` is computed by the aggregator from write_success counts per mechanism.
+- [x] AC-2: Aggregator produces per-backend latency + error-rate summary — `backend_summary()` returns `{per_backend: {cap::backend: {count, measured_count, avg/p50/p95 latency, error_count, error_rate}}, per_capability_fallback, total_queries, total_errors, overall_error_rate}`. Companion `capture_summary()` returns per-mechanism write rates.
+- [x] AC-3: ≥ 4 new tests (26 tests in `test_collector_v05.py` — 2 constants + 5 record_recall_query + 3 record_capture_event + 5 backend_summary + 4 capture_summary + 4 percentile helper + 3 review-gate regressions)
 
 **Tasks:**
-- [ ] T-163: Extend `metrics/collector.py` with new schema fields (includes `event_subtype` with `sla_expiry_deny` value per DR-018 I-19; and `config_version_id` per amended I-11)
-- [ ] T-164: Extend `metrics/aggregator.py` with per-backend summaries
-- [ ] T-165: Author `tests/test_metrics/test_collector_v05.py`
+- [x] T-163: Extend `metrics/collector.py` — `record_recall_query()` + `record_capture_event()`; two module-level enums (`_VALID_EVENT_SUBTYPES` incl. `sla_expiry_deny` per DR-018 I-19, `_VALID_CAPTURE_MECHANISMS` for the 5 v0.5 CMs); `_append_jsonl()` private helper shared across streams; `_validate_event_subtype()` with DEBUG log on coercion (review fix HIGH-2)
+- [x] T-164: Extend `metrics/aggregator.py` — `backend_summary()` + `capture_summary()`; `_percentile()` nearest-rank helper; error attribution fixed so timeout-path queries with no measured latency still get a per-backend bucket (review fix MED-4)
+- [x] T-165: Author `tests/test_metrics/test_collector_v05.py` (26 tests)
+
+**Follow-up (L6/L7 from review, optional for v0.6):**
+- [ ] Simple `record()` stream not flock-guarded (pre-existing); migrate if multi-process interleaving is observed.
+- [ ] `_iter_jsonl` silently skips malformed lines; `skipped_lines` counter in summary would surface data-integrity gaps.
 
 ### S-54: As an RLM user, I want Opus 4.7 task-budget headers so that `DEPTHFUSION_RLM_COST_CEILING` is enforced API-side instead of post-hoc (OP-2) `P3` `S`
 
