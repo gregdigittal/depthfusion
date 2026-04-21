@@ -56,6 +56,39 @@ logger = logging.getLogger(__name__)
 _FALLBACK_ERRORS = (RateLimitError, BackendOverloadError, BackendTimeoutError)
 
 
+# Lazy-cached singleton so the emission hot path doesn't pay
+# `Path.home() / mkdir(exist_ok=True)` cost on every fallback event.
+# Under an overload wave every call emits — the cached instance turns
+# per-event cost from "stat syscall + object ctor" into a dict lookup.
+# Tests that need to redirect metrics dir (e.g. via monkeypatching HOME)
+# can call `_reset_metrics_collector()` to clear the cache.
+_cached_collector: Any = None
+
+
+def _reset_metrics_collector() -> None:
+    """Clear the cached MetricsCollector. Intended for test use only."""
+    global _cached_collector
+    _cached_collector = None
+
+
+def _get_collector() -> Any:
+    """Return the cached MetricsCollector or construct and cache one.
+
+    Returns `None` if the import itself fails — observability must
+    never break serving, so a missing metrics module is swallowed.
+    """
+    global _cached_collector
+    if _cached_collector is not None:
+        return _cached_collector
+    try:
+        from depthfusion.metrics.collector import MetricsCollector
+        _cached_collector = MetricsCollector()
+        return _cached_collector
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("_get_collector: could not construct MetricsCollector: %s", exc)
+        return None
+
+
 def _emit_runtime_fallback_event(
     from_backend: str,
     to_backend: str,
@@ -76,9 +109,11 @@ def _emit_runtime_fallback_event(
     raw = os.environ.get("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true").strip().lower()
     if raw in ("0", "false", "no", "off"):
         return
+    collector = _get_collector()
+    if collector is None:
+        return
     try:
-        from depthfusion.metrics.collector import MetricsCollector
-        MetricsCollector().record(
+        collector.record(
             "backend.runtime_fallback",
             1.0,
             labels={
@@ -128,46 +163,60 @@ class FallbackChain:
     ) -> Any:
         """Walk the chain until one backend returns without a typed error.
 
-        Unhealthy backends are skipped entirely (they don't count toward
-        exhaustion — if they later become healthy, they rejoin the chain
-        on the next call).
+        Unhealthy backends are skipped. The "to" field in the emitted
+        event is the NEXT-IN-CHAIN-BY-INDEX name, not a re-probed
+        healthy name — this avoids a race where health can flip between
+        the loop's health check and the event emission. Operators who
+        need the actually-serving backend should correlate with the
+        subsequent event (the "from" of the next fallback, or absence
+        thereof for success).
         """
         tried: list[str] = []
+        skipped_unhealthy: list[str] = []
+        n = len(self._backends)
         for i, backend in enumerate(self._backends):
             if not backend.healthy():
+                skipped_unhealthy.append(backend.name)
                 continue
             tried.append(backend.name)
             try:
                 return attempt(backend)
             except _FALLBACK_ERRORS as err:
-                next_name = self._next_healthy_name(i + 1)
+                # "to" = next name by index (not by health) — see
+                # docstring rationale. "exhausted" when this was the
+                # last link, regardless of subsequent health state.
+                to_name = self._backends[i + 1].name if i + 1 < n else "exhausted"
                 _emit_runtime_fallback_event(
                     from_backend=backend.name,
-                    to_backend=next_name,
+                    to_backend=to_name,
                     capability=capability,
                     error_type=type(err).__name__,
                 )
                 logger.info(
                     "FallbackChain[%s] %s raised %s; falling through to %s",
-                    capability, backend.name, type(err).__name__, next_name,
+                    capability, backend.name, type(err).__name__, to_name,
                 )
                 continue
             # Any non-fallback exception propagates — it's a backend bug.
 
+        # Exhausted. `chain` carries the full backend list (always) so
+        # operators see the structure even when nothing was tried (all
+        # unhealthy). The message distinguishes tried-and-errored from
+        # skipped-as-unhealthy for debugging clarity.
+        all_names = [b.name for b in self._backends]
+        detail_parts = []
+        if tried:
+            detail_parts.append(f"tried and errored: {tried!r}")
+        if skipped_unhealthy:
+            detail_parts.append(f"skipped as unhealthy: {skipped_unhealthy!r}")
+        detail = "; ".join(detail_parts) if detail_parts else "empty chain"
         raise BackendExhaustedError(
-            chain=tried,
+            chain=all_names,
             message=(
-                f"FallbackChain[{capability}] exhausted after trying {tried!r}; "
-                f"no healthy backend remained or all raised typed errors"
+                f"FallbackChain[{capability}] exhausted over {all_names!r} "
+                f"({detail})"
             ),
         )
-
-    def _next_healthy_name(self, start_idx: int) -> str:
-        """Name of the next healthy backend after `start_idx`, or 'exhausted'."""
-        for j in range(start_idx, len(self._backends)):
-            if self._backends[j].healthy():
-                return self._backends[j].name
-        return "exhausted"
 
     # --- LLMBackend protocol methods ---
 

@@ -167,7 +167,11 @@ class TestCompleteFallback:
         chain = FallbackChain([a, b])
         with pytest.raises(BackendExhaustedError) as excinfo:
             chain.complete("hi", max_tokens=10)
+        # H-2 fix: chain is the FULL backend list (always), so
+        # operators see the structure regardless of which backends
+        # were tried vs skipped. The message distinguishes the two.
         assert excinfo.value.chain == ["a", "b"]
+        assert "tried and errored" in str(excinfo.value)
 
     def test_unhealthy_backends_skipped(self):
         # An unhealthy backend is not counted as a fallback attempt;
@@ -179,14 +183,33 @@ class TestCompleteFallback:
         assert a.call_counts["complete"] == 0  # never called
         assert b.call_counts["complete"] == 1
 
-    def test_all_unhealthy_raises_exhausted_empty_chain(self):
+    def test_all_unhealthy_raises_exhausted_lists_full_chain(self):
+        # H-2 regression: under the old behaviour `chain` was `[]` when
+        # all backends were unhealthy, giving operators no information
+        # about which chain they configured. Now `chain` is always the
+        # full backend list and the message reports the skipped subset.
         a = _FakeBackend("a", healthy=False)
         b = _FakeBackend("b", healthy=False)
         chain = FallbackChain([a, b])
         with pytest.raises(BackendExhaustedError) as excinfo:
             chain.complete("hi", max_tokens=10)
-        # Nothing was actually tried — chain attribute is empty
-        assert excinfo.value.chain == []
+        assert excinfo.value.chain == ["a", "b"]
+        assert "skipped as unhealthy" in str(excinfo.value)
+        assert "tried and errored" not in str(excinfo.value)
+
+    def test_mixed_unhealthy_and_errored_in_message(self):
+        # New H-2 follow-through: exhaustion with some tried + some
+        # skipped shows both buckets explicitly.
+        a = _FakeBackend("a", healthy=False)
+        b = _FakeBackend("b", complete_result=RateLimitError("429"))
+        c = _FakeBackend("c", healthy=False)
+        chain = FallbackChain([a, b, c])
+        with pytest.raises(BackendExhaustedError) as excinfo:
+            chain.complete("hi", max_tokens=10)
+        msg = str(excinfo.value)
+        assert "tried and errored: ['b']" in msg
+        assert "skipped as unhealthy: ['a', 'c']" in msg
+        assert excinfo.value.chain == ["a", "b", "c"]
 
 
 # --------------------------------------------------------------------------
@@ -238,45 +261,99 @@ class TestExtractStructuredFallback:
 # Event emission
 # --------------------------------------------------------------------------
 
+class _RecordingCollector:
+    """Stand-in for MetricsCollector that captures .record() calls in memory."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        # Attributes the real collector exposes; harmless here
+        self.metrics_dir = __import__("pathlib").Path("/tmp/test-metrics")
+
+    def record(self, metric_name: str, value: float, labels: dict | None = None) -> None:
+        self.calls.append({
+            "metric": metric_name,
+            "value": value,
+            "labels": labels or {},
+        })
+
+
+@pytest.fixture
+def recording_collector(monkeypatch):
+    """Replace chain.py's cached MetricsCollector with a recorder.
+
+    Avoids the M-1 trap: the prior test skipped silently whenever the
+    real metrics dir didn't land under a monkeypatched HOME. Mocking
+    the class attribute directly is robust under any filesystem
+    configuration.
+    """
+    import depthfusion.backends.chain as chain_mod
+    chain_mod._reset_metrics_collector()
+    rec = _RecordingCollector()
+    monkeypatch.setattr(chain_mod, "_cached_collector", rec)
+    yield rec
+    chain_mod._reset_metrics_collector()
+
+
 class TestFallbackEventEmission:
-    def test_emits_on_transition(self, monkeypatch, tmp_path):
-        # Point metrics dir at a tmp location so we don't pollute global state
-        monkeypatch.setenv("HOME", str(tmp_path))
+    def test_emits_on_transition(self, monkeypatch, recording_collector):
         monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true")
-
         a = _FakeBackend("a", complete_result=RateLimitError("429"))
         b = _FakeBackend("b", complete_result="ok")
         chain = FallbackChain([a, b])
         chain.complete("hi", max_tokens=10)
 
-        # Locate today's metrics file
-        from depthfusion.metrics.collector import MetricsCollector
-        mc = MetricsCollector()
-        path = mc.metrics_dir / f"{__import__('datetime').date.today().isoformat()}.jsonl"
-        if not path.exists():
-            pytest.skip("metrics dir not under HOME (container-specific path)")
-        text = path.read_text()
-        assert "backend.runtime_fallback" in text
-        assert '"from": "a"' in text
-        assert '"to": "b"' in text
-        assert "RateLimitError" in text
+        assert len(recording_collector.calls) == 1
+        call = recording_collector.calls[0]
+        assert call["metric"] == "backend.runtime_fallback"
+        assert call["value"] == 1.0
+        assert call["labels"]["from"] == "a"
+        assert call["labels"]["to"] == "b"
+        assert call["labels"]["capability"] == "complete"
+        assert call["labels"]["error_type"] == "RateLimitError"
 
-    def test_disabled_via_env_var(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HOME", str(tmp_path))
+    def test_disabled_via_env_var(self, monkeypatch, recording_collector):
         monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "false")
-
         a = _FakeBackend("a", complete_result=RateLimitError("429"))
         b = _FakeBackend("b", complete_result="ok")
         chain = FallbackChain([a, b])
         chain.complete("hi", max_tokens=10)
+        assert recording_collector.calls == []
 
-        # No metrics file should exist (or it should not contain our event)
-        from depthfusion.metrics.collector import MetricsCollector
-        mc = MetricsCollector()
-        path = mc.metrics_dir / f"{__import__('datetime').date.today().isoformat()}.jsonl"
-        if path.exists():
-            text = path.read_text()
-            assert "backend.runtime_fallback" not in text
+    def test_last_link_error_labels_to_as_exhausted(
+        self, monkeypatch, recording_collector,
+    ):
+        # M-2 regression: the "to" field should read "exhausted" when
+        # the erroring backend was the last in the chain, regardless
+        # of subsequent health probes.
+        monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true")
+        a = _FakeBackend("a", complete_result=RateLimitError("a"))
+        b = _FakeBackend("b", complete_result=BackendTimeoutError("b"))
+        chain = FallbackChain([a, b])
+        with pytest.raises(BackendExhaustedError):
+            chain.complete("hi", max_tokens=10)
+
+        # Two events: a->b, then b->exhausted
+        assert len(recording_collector.calls) == 2
+        assert recording_collector.calls[0]["labels"]["to"] == "b"
+        assert recording_collector.calls[1]["labels"]["from"] == "b"
+        assert recording_collector.calls[1]["labels"]["to"] == "exhausted"
+
+    def test_to_field_uses_next_index_not_next_healthy(
+        self, monkeypatch, recording_collector,
+    ):
+        # H-1 regression: even if the next-in-chain backend is unhealthy
+        # (so the loop will skip it), the event still labels it as "to"
+        # because it's the name by index — this removes the
+        # health-probe race from the observability contract.
+        monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true")
+        a = _FakeBackend("a", complete_result=RateLimitError("429"))
+        b = _FakeBackend("b", healthy=False)  # next-in-chain but skipped
+        c = _FakeBackend("c", complete_result="from-c")
+        chain = FallbackChain([a, b, c])
+        assert chain.complete("hi", max_tokens=10) == "from-c"
+        # The a->? event should name b (next-by-index), not c (next-healthy)
+        assert len(recording_collector.calls) == 1
+        assert recording_collector.calls[0]["labels"]["to"] == "b"
 
 
 # --------------------------------------------------------------------------
