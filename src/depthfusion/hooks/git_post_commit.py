@@ -137,6 +137,15 @@ def write_commit_discovery(
 
     if output_path.exists():
         logger.debug("Commit discovery %s already exists, skipping", filename)
+        # S-60 / T-189: emit skip event so the stream reflects every
+        # invocation — operators can see "commit hook fired, no new
+        # discovery written" vs silent behaviour.
+        _emit_capture_event(
+            capture_mechanism="git_post_commit",
+            project=project, session_id=sha7,
+            write_success=False, entries_written=0,
+            file_path=str(output_path),
+        )
         return None
 
     message = commit.get("message", "").strip()
@@ -166,7 +175,30 @@ def write_commit_discovery(
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
     logger.info("Wrote commit discovery %s", output_path.name)
+    _emit_capture_event(
+        capture_mechanism="git_post_commit",
+        project=project, session_id=sha7,
+        write_success=True, entries_written=1,
+        file_path=str(output_path),
+    )
     return output_path
+
+
+def _emit_capture_event(**kwargs) -> None:
+    """Thin wrapper around `depthfusion.capture._metrics.emit_capture_event`
+    with an extra layer of exception-swallowing.
+
+    Git post-commit hooks MUST return 0 — a metrics failure here would
+    bubble into `run_hook` which could block the developer's git commit.
+    The shared helper already swallows, but this wrapper guards the
+    import path itself so even a broken metrics module can't crash the
+    git-commit flow.
+    """
+    try:
+        from depthfusion.capture._metrics import emit_capture_event
+        emit_capture_event(**kwargs)
+    except Exception:  # noqa: BLE001 — git hook must never block commit
+        pass
 
 
 def run_hook(cwd: Path | None = None, output_dir: Path | None = None) -> int:

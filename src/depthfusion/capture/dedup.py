@@ -247,6 +247,28 @@ def dedup_against_corpus(
         threshold=threshold,
     )
 
+    # S-60 / T-188: emit a capture event per supersede attempt. Use
+    # `extract_project` on the new file so the project slug in the
+    # metrics record matches the file's frontmatter (not the project
+    # of the older superseded file, which might differ in edge cases).
+    from depthfusion.capture._metrics import emit_capture_event
+    new_project = extract_project(new_content) or "unknown"
+
+    # Review-fix IMP-2: when dedup runs but finds no duplicates, still
+    # emit an event so the metrics stream distinguishes "ran, found
+    # nothing" (the common case) from "never ran". Without this, a dedup
+    # pass against a clean corpus would leave no audit trail.
+    if not dupes:
+        emit_capture_event(
+            capture_mechanism="dedup",
+            project=new_project,
+            session_id=new_path.stem,
+            write_success=True,      # dedup completed successfully
+            entries_written=0,       # but zero files superseded
+            file_path=str(new_path),
+        )
+        return []
+
     superseded: list[Path] = []
     for old_path, sim in dupes:
         logger.info(
@@ -254,7 +276,16 @@ def dedup_against_corpus(
             new_path.name, old_path.name, sim,
         )
         result = supersede(old_path)
-        if result is not None:
+        success = result is not None
+        emit_capture_event(
+            capture_mechanism="dedup",
+            project=new_project,
+            session_id=new_path.stem,
+            write_success=success,
+            entries_written=1 if success else 0,
+            file_path=str(result) if result else str(old_path),
+        )
+        if success:
             superseded.append(old_path)
     return superseded
 

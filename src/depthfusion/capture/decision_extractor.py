@@ -23,6 +23,20 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+def _default_discoveries_dir() -> Path:
+    """Resolve `~/.claude/shared/discoveries/` at call time.
+
+    Using a function (not a module-level constant) lets tests redirect
+    `Path.home()` via monkeypatch after the module is imported — a
+    module-level constant would freeze the real home directory at
+    import time and ignore the patch. Same pattern as `capture/pruner.py`
+    and `install/install.py`.
+    """
+    return Path.home() / ".claude" / "shared" / "discoveries"
+
+
+# Deprecated module-level constant — retained for any external caller
+# that still imports it. New code should use `_default_discoveries_dir()`.
 _DISCOVERIES_DIR = Path.home() / ".claude" / "shared" / "discoveries"
 
 _DECISION_SCHEMA = {
@@ -189,6 +203,7 @@ def write_decisions(
     session_id: str,
     output_dir: Path | None = None,
     min_confidence: float = 0.0,
+    capture_mechanism: str = "decision_extractor",
 ) -> Path | None:
     """Write a list of DecisionEntry objects to a discovery file.
 
@@ -201,6 +216,11 @@ def write_decisions(
         session_id: session identifier for frontmatter
         output_dir: directory to write to (default: ~/.claude/shared/discoveries/)
         min_confidence: skip entries with confidence < min_confidence
+        capture_mechanism: S-60 — name emitted in the metrics stream.
+            Defaults to "decision_extractor" for direct calls; callers
+            that wrap this function (e.g. `_tool_confirm_discovery`)
+            override with their own mechanism name so the metrics bucket
+            reflects the HIGHER-LEVEL intent, not the internal writer.
 
     Returns:
         Path to the written file, or None if nothing to write or already exists.
@@ -209,7 +229,7 @@ def write_decisions(
     if not filtered:
         return None
 
-    out_dir = output_dir or _DISCOVERIES_DIR
+    out_dir = output_dir or _default_discoveries_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     today = date.today().isoformat()
@@ -218,9 +238,18 @@ def write_decisions(
     filename = f"{today}-{slug}-decisions.md"
     output_path = out_dir / filename
 
-    # Idempotent: don't overwrite
+    # Idempotent: don't overwrite. Emit a capture event with
+    # `event_subtype="ok"` + `write_success=False` so the skip shows up
+    # in the metrics stream as a legitimate outcome (not an error).
     if output_path.exists():
         logger.debug("write_decisions: %s already exists, skipping", filename)
+        from depthfusion.capture._metrics import emit_capture_event
+        emit_capture_event(
+            capture_mechanism=capture_mechanism,
+            project=project, session_id=session_id,
+            write_success=False, entries_written=0,
+            file_path=str(output_path),
+        )
         return None
 
     lines = [
@@ -244,6 +273,15 @@ def write_decisions(
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("Wrote %d decisions to %s", len(filtered), output_path.name)
+
+    # S-60 / T-187: emit capture event on successful write.
+    from depthfusion.capture._metrics import emit_capture_event
+    emit_capture_event(
+        capture_mechanism=capture_mechanism,
+        project=project, session_id=session_id,
+        write_success=True, entries_written=len(filtered),
+        file_path=str(output_path),
+    )
     return output_path
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sys
 from typing import Any
@@ -18,7 +19,10 @@ TOOLS: dict[str, str] = {
         "Retrieve most relevant session blocks for a query. "
         "Args: query (str), top_k (int, default 5), snippet_len (int, default 1500), "
         "cross_project (bool, default False — when True, searches all projects), "
-        "project (str, optional — override auto-detected project slug)."
+        "project (str, optional — override auto-detected project slug). "
+        "Response: {query, blocks: [...], message, total_sources_scanned}. "
+        "On internal error, response may also include `error: str` with the "
+        "exception message; `blocks` is always present (empty list on error)."
     ),
     "depthfusion_tag_session": "Tag a session file with metadata",
     "depthfusion_publish_context": "Publish a context item to the bus",
@@ -279,18 +283,91 @@ def _sanitise_project_slug(slug: str) -> str:
 def _tool_recall(arguments: dict) -> str:
     """Retrieve relevant context blocks across three sources using BM25 + RRF.
 
+    v0.5.2 S-60 / T-186: thin wrapper around `_tool_recall_impl` that
+    measures total latency, counts returned blocks, and emits a
+    `record_recall_query` JSONL event on every call. Metrics emission
+    failures are swallowed so observability can never break recall.
+    """
+    import hashlib
+    import time
+
+    t0 = time.monotonic()
+    event_subtype = "ok"
+    response_json = ""
+    try:
+        response_json = _tool_recall_impl(arguments)
+    except Exception as exc:
+        event_subtype = "error"
+        response_json = json.dumps(
+            {"error": str(exc), "query": str(arguments.get("query", "")), "blocks": []}
+        )
+
+    # Best-effort metrics emission — never raises into the caller.
+    try:
+        result_count = 0
+        try:
+            parsed = json.loads(response_json) if response_json else {}
+            result_count = len(parsed.get("blocks", []) or [])
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        from depthfusion.metrics.collector import MetricsCollector
+        query = str(arguments.get("query", ""))
+        query_hash = (
+            hashlib.sha256(query.encode("utf-8")).hexdigest()[:12] if query else ""
+        )
+        # Backend-routing snapshot — the factory is the authoritative
+        # source. We record the resolved name per capability at emit time
+        # so each query reflects the CURRENT routing, not a stale cache.
+        # Skip the 6× probe on the error path (the path is already
+        # degraded; adding probe overhead doesn't add observability value).
+        backend_used = _detect_current_backends() if event_subtype == "ok" else {}
+        total_latency_ms = (time.monotonic() - t0) * 1000.0
+
+        MetricsCollector().record_recall_query(
+            query_hash=query_hash,
+            mode=os.environ.get("DEPTHFUSION_MODE", "local"),
+            backend_used=backend_used,
+            total_latency_ms=round(total_latency_ms, 3),
+            result_count=result_count,
+            event_subtype=event_subtype,
+        )
+    except Exception as exc:  # noqa: BLE001 — observability must not raise
+        logger.debug("recall metrics emission failed: %s", exc)
+
+    return response_json
+
+
+def _detect_current_backends() -> dict[str, str]:
+    """Return {capability: backend_name} for all 6 LLM capabilities.
+
+    Resolves via `get_backend(...)` so the routing reflects the live env
+    (including any DEPTHFUSION_*_BACKEND overrides). Fails-closed to an
+    empty dict on any error — the record still emits, just without
+    routing detail for the failed probe.
+    """
+    result: dict[str, str] = {}
+    try:
+        from depthfusion.backends.factory import get_backend
+        for cap in ("reranker", "extractor", "linker", "summariser",
+                    "embedding", "decision_extractor"):
+            try:
+                result[cap] = get_backend(cap).name
+            except Exception:  # noqa: BLE001 — per-cap failure → skip
+                continue
+    except Exception:  # noqa: BLE001
+        pass
+    return result
+
+
+def _tool_recall_impl(arguments: dict) -> str:
+    """Core recall logic — extracted from `_tool_recall` for wrapping with
+    metrics emission (S-60 / T-186). Preserves the full v0.5.1 behaviour.
+
     Sources:
     1. ~/.claude/sessions/*.tmp  — goal session state files (cross-session memory)
     2. ~/.claude/shared/discoveries/*.md — discovery files written by /goal and agents
     3. ~/.claude/projects/-home-gregmorris/memory/*.md — persistent memory files
-
-    Improvements over v0.1.0:
-    - BM25 scoring (length-normalized, IDF-weighted) replaces keyword overlap
-    - RRF fusion of BM25 rank + recency rank for robust ordering
-    - Block chunking: files split on ## H2 headers for finer-grained retrieval
-    - Source-type weights: memory > discovery > session
-    - Extended snippet: 1500 chars (was 500)
-    - Source classification from actual directory, not fragile heuristic
     """
     from pathlib import Path
 
@@ -701,10 +778,15 @@ def _tool_confirm_discovery(arguments: dict) -> str:
     )
 
     try:
+        # S-60 / T-190: the metrics bucket for this path is
+        # "confirm_discovery" (the high-level MCP tool), not
+        # "decision_extractor" (the underlying writer). The override
+        # kwarg on write_decisions threads the mechanism name through.
         out = write_decisions(
             [entry],
             project=project,
             session_id="mcp_confirm",
+            capture_mechanism="confirm_discovery",
         )
         if out:
             return json.dumps({

@@ -207,6 +207,15 @@ def write_negatives(
     Idempotent: if the output file already exists, does not overwrite.
 
     Returns path on success, None if nothing to write or already exists.
+
+    Note on metrics (S-60): this function hard-codes
+    `capture_mechanism="negative_extractor"` in its emit calls. There is
+    no override parameter (unlike `decision_extractor.write_decisions`)
+    because no higher-level tool currently wraps this function the way
+    `_tool_confirm_discovery` wraps `write_decisions`. If a future MCP
+    tool wants to re-bucket negative-extractor events under its own
+    mechanism name, add a `capture_mechanism` parameter following the
+    decision_extractor pattern.
     """
     if not entries:
         return None
@@ -221,6 +230,13 @@ def write_negatives(
 
     if output_path.exists():
         logger.debug("write_negatives: %s already exists, skipping", filename)
+        from depthfusion.capture._metrics import emit_capture_event
+        emit_capture_event(
+            capture_mechanism="negative_extractor",
+            project=project, session_id=session_id,
+            write_success=False, entries_written=0,
+            file_path=str(output_path),
+        )
         return None
 
     lines = [
@@ -246,6 +262,15 @@ def write_negatives(
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("Wrote %d negative signals to %s", len(entries), output_path.name)
+
+    # S-60 / T-187: emit capture event on successful write.
+    from depthfusion.capture._metrics import emit_capture_event
+    emit_capture_event(
+        capture_mechanism="negative_extractor",
+        project=project, session_id=session_id,
+        write_success=True, entries_written=len(entries),
+        file_path=str(output_path),
+    )
     return output_path
 
 

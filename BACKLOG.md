@@ -800,6 +800,8 @@
 
 ## E-22: v0.5 Observability & Hygiene [done]
 
+> Re-opened 2026-04-21 for S-60 integration, re-closed same day.
+
 > Extend metrics JSONL schema to cover backends, capture mechanisms, and per-capability latency; add RLM task-budget support and a discovery-pruning MCP tool.
 
 ### S-53: As a maintainer, I want the metrics collector extended so that per-query JSONL records include backend routing, fallback chains, per-capability latency, and capture-mechanism fields `P2` `S`
@@ -847,6 +849,26 @@
 **Follow-up noted:**
 - [ ] `superseded_min_age_hours` grace-period parameter (v0.6) — adds an age floor to the superseded heuristic so false-positive dedup runs have a safety window before archival.
 - [ ] `min-recall-score` heuristic — requires `record_recall_query` extension to capture chunk_ids of returned blocks per query (separate epic).
+
+### S-60: As an operator, I want production code paths to emit the structured recall/capture streams added in S-53 so that `backend_summary()` and `capture_summary()` actually return data `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `_tool_recall` emits a `recall_query` JSONL record per invocation with `backend_used`, `total_latency_ms`, `result_count`, and `event_subtype` (`ok` on success, `error` on exception). Wrapper extracted via `_tool_recall_impl` to keep emission separate from business logic; error path skips the 6× backend probe for efficiency.
+- [x] AC-2: Each capture mechanism emits a `capture` JSONL record per write attempt: `decision_extractor` (success + skip), `negative_extractor` (success + skip), `dedup` (success + skip AND when no duplicates found — review fix IMP-2), `git_post_commit` (success + skip), `confirm_discovery` (re-buckets decision_extractor via `capture_mechanism` kwarg override to avoid double-counting).
+- [x] AC-3: Metrics emission never raises into the hot path — shared `capture/_metrics.py::emit_capture_event` helper + local `_emit_capture_event` wrapper in `git_post_commit.py` (defense in depth so a metrics failure can never block a git commit). Verified by `test_broken_metrics_collector_doesnt_break_*` tests.
+- [x] AC-4: ≥ 5 integration tests (13 tests in `test_integration.py` — one per call site + 2 review-gate regressions + 2 safety-net checks)
+
+**Tasks:**
+- [x] T-186: Wire `record_recall_query` into `_tool_recall` via wrapper around extracted `_tool_recall_impl`; measures `total_latency_ms` via `time.monotonic`, counts blocks from JSON response, detects error path via outer try/except; `_detect_current_backends()` helper probes factory routing (skipped on error path per review fix)
+- [x] T-187: Wire `record_capture_event` into `decision_extractor.write_decisions` + `negative_extractor.write_negatives` (via shared `_metrics.py` helper); decision_extractor gains `capture_mechanism` kwarg override for caller re-bucketing
+- [x] T-188: Wire `record_capture_event` into `dedup.dedup_against_corpus` — one event per supersede AND a dedicated event when dedup completes with no duplicates (so metrics stream distinguishes "ran, found nothing" from "never ran")
+- [x] T-189: Wire `record_capture_event` into `hooks/git_post_commit.write_commit_discovery` via a local `_emit_capture_event` wrapper with extra try/except layer (git hooks must never block a commit)
+- [x] T-190: Wire `record_capture_event` into `_tool_confirm_discovery` via the `capture_mechanism="confirm_discovery"` override on `write_decisions` (single event per call, re-bucketed to the higher-level tool label)
+- [x] T-191: Integration tests in `tests/test_metrics/test_integration.py` (13 tests)
+
+**Scope note:** `latency_ms_per_capability` field on `record_recall_query` ships with an empty dict in S-60 — per-capability latency measurement requires wrapping individual backend calls (reranker, embedding) with timing decorators, deferred to a v0.6 follow-up.
+
+**Follow-up noted (v0.6):** `_DISCOVERIES_DIR` module-level constants in `negative_extractor.py` + `git_post_commit.py` should be converted to `_default_discoveries_dir()` runtime helpers for consistency with `decision_extractor.py` / `pruner.py` / `install.py`. Same freeze-at-import pattern that bit us in S-42 and again here.
 
 ---
 
