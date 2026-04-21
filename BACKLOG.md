@@ -604,6 +604,25 @@
 **Tasks:**
 - [x] T-114: Enforce confidence threshold at `graph/store.py` write path
 
+### S-67: As a new user, I want the installer to register the MCP server automatically so that DepthFusion tools are usable in Claude Code without a separate `claude mcp add` step `P2` `S`
+
+> Surfaced 2026-04-21 while answering "do I need to enable per session?" — the installer writes env config and registers compaction hooks, but **does not** register the DepthFusion MCP server with Claude Code. The current `vps-cpu-quickstart.md` and `vps-gpu-quickstart.md` have a dedicated "Register the MCP server" step (§3/§4 respectively) as a workaround. This story folds that step back into the installer.
+
+**Acceptance criteria:**
+- [ ] AC-1: `install.install` detects the `claude` CLI via `shutil.which("claude")`
+- [ ] AC-2: When `claude` CLI is present AND the MCP server is not already registered (detected by parsing `claude mcp list` output OR reading settings.json's `mcpServers` key), the installer invokes `claude mcp add depthfusion --scope user -- <sys.executable> -m depthfusion.mcp.server`
+- [ ] AC-3: Idempotent — re-running the installer on an already-configured host does NOT duplicate the entry and does NOT error
+- [ ] AC-4: When `claude` CLI is absent, the installer prints the exact manual `claude mcp add …` command to stdout with a brief explanation — never silently skips
+- [ ] AC-5: Failure of the `claude mcp add` subprocess (non-zero exit) is reported to the user but does NOT abort the install — the env-file write + hook registration must have already completed
+- [ ] AC-6: ≥ 5 new tests in `tests/test_install/test_mcp_registration.py`: CLI present + not registered (invokes); CLI present + already registered (skips); CLI absent (prints manual command); invocation failure (reports but install continues); `--dry-run` respected
+- [ ] AC-7: Quickstart guides updated — remove the standalone "Register the MCP server" sections from both; re-number to close the gap
+
+**Tasks:**
+- [ ] T-208: Add `_register_mcp_server()` helper in `src/depthfusion/install/install.py` with `shutil.which` detection and idempotency probe
+- [ ] T-209: Wire helper into `install_local`, `install_vps_cpu`, `install_vps_gpu` (called after `_register_hooks`)
+- [ ] T-210: Author `tests/test_install/test_mcp_registration.py` covering all AC-6 scenarios (subprocess mocked for the actual CLI invocation)
+- [ ] T-211: Remove standalone MCP-registration sections from `docs/install/vps-cpu-quickstart.md` and `docs/install/vps-gpu-quickstart.md`; re-number; remove the "Why isn't this automatic?" aside (no longer needed)
+
 ---
 
 ## E-18: v0.5 Backend Foundation [done]

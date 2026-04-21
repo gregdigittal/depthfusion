@@ -100,7 +100,36 @@ If any route to `null`, check that `DEPTHFUSION_API_KEY` is in
 
 ---
 
-## 3. Install the research tools
+## 3. Register the MCP server with Claude Code
+
+**Important — this step is easy to miss.** The previous step set up
+hooks and env config, but did NOT register DepthFusion's MCP tools
+(recall, confirm-discovery, prune) with Claude Code. Without this,
+Claude Code sessions won't have access to the tools even though the
+library is installed.
+
+```bash
+# Register DepthFusion as an MCP server at user scope.
+# --scope user writes to ~/.config/claude/... — available in every
+# Claude Code session on this host, not tied to any single project.
+claude mcp add depthfusion --scope user -- python3 -m depthfusion.mcp.server
+```
+
+**Verify:**
+
+```bash
+claude mcp list
+# DepthFusion should appear. If not, check the command ran without error.
+```
+
+> **Why isn't this automatic?** The installer doesn't invoke
+> `claude mcp add` today — tracked as a v0.7 polish item (see
+> `BACKLOG.md` E-17 S-67). Once that lands, step 3 will be folded
+> into step 2.
+
+---
+
+## 4. Install the research tools
 
 ```bash
 bash ~/projects/depthfusion/scripts/install-research-tools.sh
@@ -131,7 +160,7 @@ head -1 ~/.local/share/depthfusion/corpus/corpus-*.jsonl | python3 -m json.tool
 
 ---
 
-## 4. Smoke test the full pipeline
+## 5. Smoke test the full pipeline
 
 ```bash
 # End-to-end recall query via the MCP server's tool interface
@@ -151,7 +180,7 @@ that's fine, indexing populates as you use Claude Code.
 
 ---
 
-## 5. Trigger the weekly monitor manually (optional sanity check)
+## 6. Trigger the weekly monitor manually (optional sanity check)
 
 ```bash
 # Fire once without waiting for Monday
