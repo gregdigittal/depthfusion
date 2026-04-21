@@ -10,13 +10,154 @@ Conventions:
 
 ---
 
-## [Unreleased] — targeting v0.6.0-alpha (GPU rollout)
+## [Unreleased]
 
-**Theme:** pre-migration preparation for the GPU VPS cutover. Ships
-operational docs and the missing fallback-chain infrastructure (S-44
-AC-3/AC-4) without touching runtime defaults. Safe to deploy to vps-cpu
-operators; a follow-up v0.6.0 stable will flip the chain on by default
-for vps-gpu mode.
+No changes pending beyond v0.6.0a1. Next release scope is data-dependent
+— see `docs/plans/v0.7/roadmap.md` for contingency paths based on
+post-migration field data.
+
+---
+
+## [v0.6.0a1] — 2026-04-21
+
+**Theme:** benchmark infrastructure, pre-migration preparation, and
+backlog hygiene. No runtime-behaviour changes — the library behaves
+identically to v0.5.2 unless operators explicitly opt in to the new
+opt-in features (FallbackChain direct construction, dogfood telemetry
+collection, CIQS harness runs).
+
+Why alpha: the FallbackChain class (S-44 AC-3/AC-4) is implemented,
+tested, and ready, but not yet wired into the factory's default
+dispatch. v0.6.0 stable will flip the chain on by default for
+vps-gpu mode, gated initially on `DEPTHFUSION_FALLBACK_CHAIN_ENABLED`
+and then default-on. Alpha signals "new public classes are stable to
+depend on; integration into defaults is forthcoming."
+
+### Added
+
+**`FallbackChain` backend wrapper (S-44 AC-3, AC-4 / E-19):**
+- `src/depthfusion/backends/chain.py` — ordered `LLMBackend` wrapper
+  that catches the three typed fallback errors (`RateLimitError`,
+  `BackendOverloadError`, `BackendTimeoutError`) from the primary
+  and transparently falls through to the next healthy link.
+- Emits `backend.runtime_fallback` events per transition (distinct
+  metric name from the factory's construction-time `backend.fallback`).
+  Both gated on the same `DEPTHFUSION_BACKEND_FALLBACK_LOG` env var.
+- Canonical cascade once wired: `FallbackChain([Gemma, Haiku, Null])`.
+- Cached MetricsCollector instance on the emission hot path — no
+  repeated stat syscalls under overload waves.
+- 27 tests (`test_chain.py`) covering construction, health semantics,
+  each typed-error variant, non-fallback exception propagation,
+  unhealthy-skip, exhaustion with full chain names, 3-link cascade,
+  event emission on/off, and H-1 health-race regression.
+
+**CIQS benchmark harness (S-63 / E-26):**
+- `scripts/ciqs_harness.py` — two-subcommand runner (`run`, `score`)
+  driving the 5-category battery. Category A (retrieval-only) is
+  fully auto-executed via `depthfusion.mcp.server._tool_recall`;
+  B/C/D/E emit a scoring template for operator/judge-model filling.
+- `scripts/ciqs_summarise.py` — bootstrap CI aggregation over N
+  scored runs. Linear-interpolated percentile + 5000-resample
+  bootstrap at seed=1729 for determinism.
+- `docs/benchmarks/prompts/ciqs-battery.yaml` — machine-readable
+  5-category battery (17 topics total, per-dimension rubrics with
+  0/5/10 anchors, composite weights declared).
+- `docs/benchmarks/README.md` — three-stage flow methodology.
+- 33 unit tests covering percentile, bootstrap CI, normalisation,
+  category grouping, report formatting, and template parsing.
+
+**Capture-mechanism eval sets (S-64 / E-26):**
+- `docs/eval-sets/README.md` + three per-set READMEs — schemas,
+  labelling protocol, inter-rater-agreement guidance, edge cases.
+- 6 seed JSON fixtures across three sets (decision-extraction,
+  dedup, negative) pinning each schema.
+- `scripts/eval_decision.py`, `scripts/eval_dedup.py`,
+  `scripts/eval_negative.py` — heuristic-extractor + BOW-cosine
+  precision/recall reporters. Self-contained (no embedding backend
+  dependency). Target thresholds report PASS/FAIL against S-45
+  AC-1, S-48 AC-2, S-49 AC-2.
+
+**Dogfood telemetry runbook (S-65 T-204 / E-26):**
+- `docs/runbooks/dogfood-telemetry.md` — protocol for validating
+  the v0.5.1/v0.5.2 observability layer by running on real work
+  for ≥ 1 week. Covers prereqs, daily usage, end-of-week
+  aggregation incantations (jq + `MetricsAggregator`), field-level
+  analysis checklists, triage rubric, report template.
+
+**GPU VPS migration runbook (E-19 ops support):**
+- `docs/runbooks/gpu-vps-migration.md` — end-to-end handover:
+  snapshot + rollback tarball, SCP to new host, `[vps-gpu]`
+  install, vLLM systemd service, installer auto-probe + smoke
+  test, data restore, 5-step validation, per-probe
+  troubleshooting, rollback procedure, first-week tasks.
+
+**Darkroom Amber design prototype (docs/design):**
+- `docs/design/prototype/design_handoff_depthfusion_landing/` —
+  self-contained HTML + README from a Claude design handoff
+  implementing the install UX brief at
+  `docs/design/install-ux-prompt.md`. Sodium-safelight palette,
+  Fraunces typography, accessibility-first (`prefers-reduced-motion`
+  honoured at both CSS and JS layers).
+
+### Changed
+
+**Backlog reconciliation (docs-only, one-pass):**
+- E-14 (CIQS Data-Gap Closure) `[active]` → `[done]` — code-complete
+  since v0.5 absorbed v0.3.1 fixes; S-30 benchmark ACs migrated to E-26.
+- E-15 (Performance Measurement Framework) `[active]` → `[done]`
+  — authoring complete; T-93 (harness automation) delivered as S-63.
+- E-19 (v0.5 GPU-Enabled LLM Routing) `[backlog]` → `[done]` — both
+  S-43 and S-44 code-complete with 41 + 61 tests; live-GPU benchmarks
+  migrated to E-26 as S-66.
+- E-20 (v0.5 Capture Mechanisms) `[active]` → `[done]` — all five
+  mechanisms code-complete; benchmark-blocked precision/recall ACs
+  migrated to E-26.
+- E-21 (v0.5 Retrieval Quality Enhancements) `[backlog]` → `[done]`
+  — S-50/S-51/S-52 all landed across v0.5 release arc.
+- New E-26 (Benchmark Harness & Evaluation Data) — consolidates all
+  benchmark-blocked ACs into one measurement workstream with stories
+  S-63 (harness), S-64 (gold sets), S-65 (dogfood), S-66 (GPU baseline).
+- S-25 T-73 ("sentence-boundary trimming not yet implemented") flipped
+  `[x]` — `_trim_to_sentence()` has been in `mcp/server.py:224` since
+  v0.3.1; status was stale.
+
+### Fixed
+
+**Review-gate fixes on v0.6.0a1 scripts (three Highs + three Mediums):**
+- `scripts/ciqs_harness.py` `cmd_score` output-path derivation: naïve
+  `str.replace("-raw.jsonl", ...)` was a no-op on non-matching paths,
+  silently overwriting the input file. Extracted `_derive_scored_path()`
+  that validates the `-raw` suffix and raises `ValueError` otherwise.
+- `_SECTION_HEADER` regex loosened from `[A-E]` to `[A-Z]` — future
+  F+ categories will not be silently skipped.
+- Docstring on `parse_scoring_template` corrected to match code:
+  non-integer scores are silently skipped (regex filter), only
+  out-of-range raises.
+- `ciqs_summarise.py` report table header now uses the actual
+  confidence level instead of hardcoded "95% CI".
+- Eval scripts: `from collections import Counter` moved to module
+  top; `sys.exit(2)` from library functions replaced with
+  `raise ImportError` handled by `main()`.
+- `FallbackChain` `_next_healthy_name` race eliminated (H-1); event
+  "to" field now uses next-by-index instead of re-probed health.
+- `BackendExhaustedError.chain` now always carries the full backend
+  list (was `[]` when all unhealthy); message distinguishes tried
+  vs skipped.
+- Fallback-event emission tests no longer silently skip when metrics
+  dir doesn't resolve under `$HOME` — mock the collector directly.
+
+### Not yet shipped (targets for v0.6.0 stable)
+
+- **Factory wiring of FallbackChain** — currently opt-in via direct
+  construction. v0.6.0 stable will switch `get_backend` on vps-gpu
+  mode to return `FallbackChain([Gemma, Haiku, Null])` for LLM
+  capabilities, gated initially on `DEPTHFUSION_FALLBACK_CHAIN_ENABLED`.
+- **Live-GPU benchmarks** (S-66) — gated on executing the migration.
+- **Post-migration dogfood report** (S-65 T-205 first pass).
+- **3-run CIQS baseline** for local + vps-cpu (S-63 T-201) — calendar-
+  blocked on operator time.
+- **Full gold-set curation** (S-64 T-202 remainder): 50 decision sessions,
+  30 dedup pairs, 40 negatives — labelling labour.
 
 ### Added
 
