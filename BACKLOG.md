@@ -1015,8 +1015,8 @@
 - [ ] AC-3: Findings triaged into v0.5.3 polish backlog (new stories under a fresh epic if warranted)
 
 **Tasks:**
-- [ ] T-204: Author the runbook
-- [ ] T-205: Execute the first pass on this repo; commit the report
+- [x] T-204: Author the runbook — `docs/runbooks/dogfood-telemetry.md` (252 lines; mental model + prereqs + daily protocol + aggregation incantations + analysis checklists for all four streams + triage workflow + report template + known limits)
+- [ ] T-205: Execute the first pass on this repo; commit the report — **calendar-blocked ≥ 7 days**
 
 ---
 
