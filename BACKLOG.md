@@ -1,12 +1,14 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-04-18 (v0.5 epics E-18..E-22 added per `docs/plans/v0.5/` planning deliverable)
+> Last updated: 2026-04-21 (E-14/E-15/E-20/E-21 reconciled to `[done]`; E-26 benchmark-harness epic opened)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
 > **Note on backsolving:** This backlog was reverse-engineered from commit history, module layout, and canonical planning docs (`docs/Account_synch/depthfusion-build-plan.md`, `docs/honest-assessment-2026-03-28.md`, `docs/skillforge-integration-plan.md`) on 2026-04-15. Completed items (`[x]`) map to shipped commits and present modules. Pending items (`[ ]`) map to documented gaps in the build plan or assessment docs.
 >
-> **Current release trajectory:** v0.3.0 shipped (baseline). v0.4.0 knowledge graph shipped. v0.3.1 scoring/data-gap fixes were implemented inline in `mcp/server.py` during a 2026-03-28 `/goal` run (confirmed via discovery file + code review 2026-04-16). Remaining: minor quality items, docs, and release tag.
+> **Current release trajectory:** v0.3.0 (baseline) → v0.4.0 (knowledge graph) → v0.5.0 (three-mode backend protocol + installer) → v0.5.1 (observability + quality baseline) → v0.5.2 (observability depth + interactive install UX) — all shipped and tagged. v0.3.1 data-gap fixes were absorbed into v0.5 (v0.3.1 was never cut as its own tag). Next planned releases: **v0.5.3** (project-filter polish + dogfooded telemetry), **v0.6.0-alpha** (GPU routing: S-43 local embeddings + S-44 on-box Gemma) — latter gated on GPU VPS migration.
+>
+> **Benchmark separation (2026-04-21):** ACs requiring labelled eval sets or multi-run CIQS measurements have been lifted out of feature epics and consolidated under **E-26: Benchmark Harness & Evaluation Data**. Feature epics E-14/E-15/E-20/E-21 are considered code-complete; their remaining unchecked ACs are referenced from E-26 and will be ticked as the harness runs land.
 
 ---
 
@@ -369,9 +371,9 @@
 
 ---
 
-## E-14: CIQS Data-Gap Closure (v0.3.1) [active]
+## E-14: CIQS Data-Gap Closure (v0.3.1) [done]
 
-> Six surgical fixes targeting the honest-assessment bottlenecks. **Implemented inline in `mcp/server.py` during a 2026-03-28 `/goal` run** (confirmed via `~/.claude/shared/discoveries/2026-03-28-depthfusion-recall-optimization.md` + code review 2026-04-16). Remaining: sentence-boundary trimming, CIQS benchmark runs, and release tag. Target: CIQS 76.8 → 88–90, Category D 25% → 55-65%.
+> Six surgical fixes targeting the honest-assessment bottlenecks. **Implemented inline in `mcp/server.py` during a 2026-03-28 `/goal` run** (confirmed via `~/.claude/shared/discoveries/2026-03-28-depthfusion-recall-optimization.md` + code review 2026-04-16). All six stories (S-24..S-29) code-complete. S-30 (3-run statistical confidence) moved to **E-26: Benchmark Harness**. Original v0.3.1 tag was superseded — fixes shipped as part of the v0.5.x line. Target: CIQS 76.8 → 88–90, Category D 25% → 55-65% (to be measured via E-26 harness).
 
 ### S-24: As BM25 scoring, I want document-length normalization so that one 19KB file stops dominating all queries `P0` `S`
 
@@ -393,7 +395,7 @@
 
 **Tasks:**
 - [x] T-72: Extend snippet extraction in `mcp/server.py` (default 1500, was 500)
-- [x] T-73: Sentence-boundary trimming (quality improvement, not yet implemented)
+- [x] T-73: Sentence-boundary trimming — `_trim_to_sentence()` at `mcp/server.py:224` (seeks `.!?\n` after 60% of `max_len`); called from the three recall return paths (lines 503, 550, 611)
 
 ### S-26: As the retrieval pipeline, I want RRF fusion wired so that scoring exploits multiple signals `P0` `S`
 
@@ -459,19 +461,21 @@
 - [ ] T-89: Execute 3-run post-fix baseline
 - [ ] T-90: Commit results under `docs/benchmarks/`
 
-### v0.3.1 Definition of Done
+### v0.3.1 Definition of Done (reconciled 2026-04-21)
 
 - [x] All 6 fixes (S-24…S-29) implemented (inline in mcp/server.py, verified 2026-04-16)
-- [x] 412+ tests GREEN (1 env-dependent failure — see E-17)
-- [ ] Sentence-boundary snippet trimming (S-25 AC-2)
-- [ ] `mypy src/` + `ruff check src/ tests/` clean
-- [ ] C1-C11: all GREEN (C4 YELLOW pending — see E-17)
-- [ ] CIQS 3-run post-fix ≥ 88 overall (S-30)
-- [ ] Git tag `v0.3.1`
+- [x] 412+ tests GREEN
+- [x] Sentence-boundary snippet trimming (S-25 AC-2) — `_trim_to_sentence()` at `mcp/server.py:224`
+- [x] `mypy src/depthfusion` + `ruff check src/ tests/` clean (S-59 closed 2026-04-20)
+- [x] C1-C11: all GREEN (S-37 closed; C4 false-positive whitelisted)
+- [ ] CIQS 3-run post-fix ≥ 88 overall (S-30) — **moved to E-26: Benchmark Harness**
+- [x] ~~Git tag `v0.3.1`~~ — **superseded by v0.5.0/v0.5.1/v0.5.2 tag line**; v0.3.1 never cut as its own release
 
 ---
 
-## E-15: Performance Measurement Framework [active]
+## E-15: Performance Measurement Framework [done]
+
+> Documentation, rubrics, and benchmark-battery design. Authoring work is complete; the remaining T-93 (automated CIQS run harness) is a distinct implementation concern and moves to **E-26: Benchmark Harness** as its S-63 deliverable.
 
 > Reproducible CIQS benchmark protocol so enhancement deltas are measurable.
 
@@ -486,7 +490,7 @@
 **Tasks:**
 - [x] T-91: Author measurement prompt doc
 - [x] T-92: Add graph-subsystem benchmark cases to the battery
-- [ ] T-93: Automate CIQS run harness (script that drives prompts through Claude Code and logs scores)
+- [ ] T-93: Automate CIQS run harness (script that drives prompts through Claude Code and logs scores) — **delivery moved to E-26 S-63 (2026-04-21)**
 
 ---
 
@@ -682,7 +686,9 @@
 
 ---
 
-## E-20: v0.5 Capture Mechanisms [active]
+## E-20: v0.5 Capture Mechanisms [done]
+
+> All five capture mechanisms (S-45..S-49) code-complete: LLM decision extractor (CM-1), git post-commit hook (CM-3), active-confirmation MCP tool (CM-5), negative-signal extractor (CM-6), embedding-based dedup (CM-2). Benchmark-blocked ACs (S-45 AC-1 precision ≥ 0.80, S-48 AC-2 false-neg ≤ 10%, S-49 AC-2 false-dedup ≤ 5%) reference **E-26: Benchmark Harness** as their evaluation home — they remain unchecked here pending labelled eval sets (S-64).
 
 > Expand DepthFusion's write path with LLM-based decision extraction, negative-signal capture, a git post-commit hook, an active confirmation tool, and embedding-based dedup — closing the Category D data gap at source.
 
@@ -751,7 +757,9 @@
 
 ---
 
-## E-21: v0.5 Retrieval Quality Enhancements [backlog]
+## E-21: v0.5 Retrieval Quality Enhancements [done]
+
+> S-50 (PRECEDED_BY temporal graph edges), S-51 (selective fusion gates / AttnRes α-blending, TS-1 Mamba port), S-52 (project-scoped recall default) — all code-complete. Wired into production via S-60 (stream emission) + S-61 (latency tables) during v0.5.1/v0.5.2. CIQS Category A / Category D delta ACs (S-50 AC-3, S-51 AC-1) reference **E-26: Benchmark Harness** — they remain unchecked pending the harness runs (S-65).
 
 > Raise retrieval CIQS through temporal-graph edges, selective fusion gates, and project-scoped filtering on discoveries.
 
@@ -967,6 +975,48 @@
 - [x] T-183: `retrieval/hybrid.py` — private `_TierManager` / `_StorageTier` bindings inside `try/except`, public `TierManager = _TierManager` re-alias preserves back-compat with tests that patch `depthfusion.retrieval.hybrid.TierManager`
 - [x] T-184: Split E501 long lines — extracted `chunk_id` local in `mcp/server.py:423`, reformatted `return json.dumps({...})` to multi-line, moved the long `type:` enumeration comment in `graph/types.py:16` into the dataclass docstring
 - [x] T-185: Moved `from depthfusion.retrieval.bm25 import ...` to module-top in `mcp/server.py`; deleted the mid-file duplicate import block
+
+---
+
+## E-26: Benchmark Harness & Evaluation Data [backlog]
+
+> Consolidates all benchmark-blocked acceptance criteria from feature epics (E-14, E-20, E-21) into a single deliverable workstream. The feature code ships independently; this epic produces the measurement apparatus that lets us assert *how well* it works. Until this epic is active, feature epics carry forward with their benchmark-blocked ACs unchecked — that is a deliberate, documented carve-out, not drift.
+
+### S-63: As a release, I want an automated CIQS run harness so that pre/post-change deltas can be measured reproducibly without manual per-prompt execution `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}.jsonl`
+- [ ] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI; writes `docs/benchmarks/{YYYY-MM-DD}-{mode}-summary.md`
+- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55)
+- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu)
+
+**Tasks:**
+- [ ] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner, env-var selectable backend, JSONL output
+- [ ] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`); markdown report template
+- [ ] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era)
+
+### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: 50-session decision-extraction gold set under `docs/eval-sets/decision-extraction/` — each session has human-labelled "decisions worth capturing" + expected discovery files
+- [ ] AC-2: 30-pair near-duplicate dedup gold set under `docs/eval-sets/dedup/` — pairs labelled as true-dup / false-dup
+- [ ] AC-3: 40-example negative-signal gold set under `docs/eval-sets/negative/` — sentences labelled as genuine negative vs false-positive
+- [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%)
+
+**Tasks:**
+- [ ] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`)
+- [ ] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow)
+
+### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Runbook in `docs/runbooks/dogfood-telemetry.md` prescribes: enable instrumentation, use DepthFusion for ≥ 1 week of real work, collect JSONL streams, run aggregators, inspect outputs
+- [ ] AC-2: First dogfood pass committed as `docs/runbooks/dogfood-reports/{YYYY-MM-DD}-week1.md` with concrete findings (fields with empty values, fields that lied, missing fields we wish existed)
+- [ ] AC-3: Findings triaged into v0.5.3 polish backlog (new stories under a fresh epic if warranted)
+
+**Tasks:**
+- [ ] T-204: Author the runbook
+- [ ] T-205: Execute the first pass on this repo; commit the report
 
 ---
 
