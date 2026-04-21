@@ -80,6 +80,35 @@ v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
 Nothing changed in library runtime behaviour. All additions are scripts
 (not importable from the package); no existing tests touched.
 
+### Added (install tooling)
+
+**Bundled installer for research tools (`scripts/install-research-tools.sh`):**
+- Mode-agnostic shell installer for the research-tools bundle (session-
+  history miner + weekly regression monitor). Detects prerequisites
+  (`python3`, `depthfusion` importable, `systemctl --user` available);
+  installs systemd user units idempotently via `cmp -s` compare-then-
+  copy; runs initial mining pass; prints next-scheduled-run time.
+- Graceful fallback to cron guidance when `systemctl --user` isn't
+  usable (headless VPSes without user lingering enabled).
+- Supports `--dry-run` for preview and `--skip-miner` for timer-only
+  reinstalls. 7 smoke tests covering syntax, flags, dry-run side-effect
+  absence, idempotency check presence, and systemd fallback logic.
+
+**Quickstart guides for two install paths:**
+- `docs/install/README.md` — decision overview: which path to pick,
+  when to run both (parallel-comparison plan)
+- `docs/install/vps-cpu-quickstart.md` — complete CPU-only install
+  path (~10 min)
+- `docs/install/vps-gpu-quickstart.md` — complete GPU install path
+  (~4 hrs including vLLM + Gemma download). Cross-references the
+  GPU migration runbook for data-migration scenarios.
+
+The two quickstart guides share the same research-tools installer
+invocation — what differs is the `pip install` extras (`[vps-cpu]`
+vs `[vps-gpu]`), the `--mode` flag for `depthfusion.install.install`,
+and the GPU path's vLLM systemd service setup (root-level, distinct
+from the user-level weekly timer).
+
 ---
 
 ## [v0.6.0a1] — 2026-04-21
