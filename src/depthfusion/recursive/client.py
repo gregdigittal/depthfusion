@@ -1,12 +1,27 @@
-"""RLMClient — wrapper around the rlm package with cost tracking and ceiling enforcement."""
+"""RLMClient — wrapper around the rlm package with cost tracking and ceiling enforcement.
+
+v0.5.1 T-166 / S-54: opt-in Opus 4.7 task-budget enforcement. When the
+Anthropic SDK supports the task-budget beta, the RLM passes a token
+budget (translated from the USD cost ceiling) to the API so the
+enforcement happens server-side rather than post-hoc. When the SDK
+lacks support, falls back to the pre-v0.5 post-hoc estimation path
+with a DEBUG log — behaviour is byte-identical to v0.4.x for operators
+who haven't upgraded the SDK.
+
+Per build plan §TG-13 kill-criterion, this is shipped as a "best effort
+wrapper without CIQS claim" — the feature guards against budget
+overshoots when the beta is stable, and is a no-op on older SDKs.
+"""
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.recursive.strategies import recommend_strategy
 from depthfusion.recursive.trajectory import RecursiveTrajectory
+from depthfusion.router.cost_estimator import CostEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +48,39 @@ def _estimate_cost(content: str) -> float:
     """Rough cost estimate based on content length."""
     approx_tokens = len(content.split())
     return approx_tokens * _COST_PER_TOKEN
+
+
+def _task_budget_beta_available() -> bool:
+    """Probe whether the Anthropic SDK supports the task-budgets beta.
+
+    Two gates, both must pass:
+      1. `DEPTHFUSION_RLM_TASK_BUDGET_ENABLED` env var is truthy — lets
+         operators opt out even if the SDK reports support.
+      2. The SDK exposes a `task_budget` attribute (or any of the
+         documented future entry points). Currently the beta is not in
+         any shipped SDK release, so this gate returns False by default.
+         When Anthropic ships the beta, adjust the attribute probe to
+         match the shipped surface without requiring callers to change.
+
+    Returns False silently on any import or attribute-probe failure —
+    the fallback path must never raise.
+    """
+    raw = os.environ.get("DEPTHFUSION_RLM_TASK_BUDGET_ENABLED", "").strip().lower()
+    if raw not in ("true", "1", "yes"):
+        return False
+    try:
+        import anthropic
+        # Probe: the beta is expected to surface as either a module-level
+        # `task_budget` attribute or a feature enum on `anthropic.types`.
+        # Neither is present in the 0.x SDKs shipped at v0.5.1 tag time.
+        if hasattr(anthropic, "task_budget"):
+            return True
+        types_mod = getattr(anthropic, "types", None)
+        if types_mod is not None and hasattr(types_mod, "TaskBudget"):
+            return True
+    except Exception as exc:  # noqa: BLE001 — probe must never raise
+        logger.debug("task-budget probe failed: %s", exc)
+    return False
 
 
 class RLMClient:
@@ -90,11 +138,46 @@ class RLMClient:
         try:
             import rlm as rlm_pkg
 
-            rlm_instance = rlm_pkg.RLM(
-                backend="anthropic",
-                max_budget=effective_ceiling,
-                max_timeout=float(self.config.rlm_timeout_seconds),
-            )
+            # S-54: when the task-budget beta is available, translate the
+            # USD ceiling to a token budget and pass it to the RLM. When
+            # rlm supports a `task_budget_tokens` kwarg (it doesn't yet),
+            # this goes through directly; otherwise `rlm_kwargs` is an
+            # empty dict and behaviour is identical to pre-v0.5.
+            rlm_kwargs: dict = {
+                "backend": "anthropic",
+                "max_budget": effective_ceiling,
+                "max_timeout": float(self.config.rlm_timeout_seconds),
+            }
+            if _task_budget_beta_available():
+                estimator = CostEstimator()
+                token_budget = estimator.budget_tokens_for_ceiling(
+                    effective_ceiling, model="opus",
+                )
+                # Probe the rlm signature — not all rlm versions accept
+                # a `task_budget_tokens` kwarg. inspect.signature fails
+                # closed: if we can't confirm support, skip the kwarg.
+                try:
+                    import inspect
+                    rlm_sig = inspect.signature(rlm_pkg.RLM.__init__)
+                    if "task_budget_tokens" in rlm_sig.parameters:
+                        rlm_kwargs["task_budget_tokens"] = token_budget
+                        logger.info(
+                            "RLM task-budget enabled: %d tokens (ceiling $%.4f, opus)",
+                            token_budget, effective_ceiling,
+                        )
+                    else:
+                        logger.debug(
+                            "task-budget beta available but rlm package does not "
+                            "accept task_budget_tokens kwarg; post-hoc estimation only",
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("rlm signature probe failed: %s", exc)
+            else:
+                logger.debug(
+                    "task-budget beta not available; using post-hoc cost estimation",
+                )
+
+            rlm_instance = rlm_pkg.RLM(**rlm_kwargs)
             prompt = f"Query: {query}\n\nContent:\n{content}"
             completion = rlm_instance.completion(prompt)
             result_text = str(completion)

@@ -798,7 +798,7 @@
 
 ---
 
-## E-22: v0.5 Observability & Hygiene [backlog]
+## E-22: v0.5 Observability & Hygiene [done]
 
 > Extend metrics JSONL schema to cover backends, capture mechanisms, and per-capability latency; add RLM task-budget support and a discovery-pruning MCP tool.
 
@@ -821,14 +821,16 @@
 ### S-54: As an RLM user, I want Opus 4.7 task-budget headers so that `DEPTHFUSION_RLM_COST_CEILING` is enforced API-side instead of post-hoc (OP-2) `P3` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `RLMClient` passes the task-budget header when SDK supports it
-- [ ] AC-2: Falls back to post-hoc estimation with a warning when SDK lacks support
-- [ ] AC-3: ≥ 4 new tests
+- [x] AC-1: `RLMClient` passes the task-budget header when SDK supports it — `_task_budget_beta_available()` dual-gates on `DEPTHFUSION_RLM_TASK_BUDGET_ENABLED=true` AND anthropic SDK surface presence; `inspect.signature` probe confirms rlm accepts the `task_budget_tokens` kwarg before passing it; verified in `test_passes_task_budget_when_supported`.
+- [x] AC-2: Falls back to post-hoc estimation with a warning when SDK lacks support — DEBUG log explains the skip path; pre-flight `_estimate_cost` ceiling check still fires before any RLM construction; verified in `test_skips_kwarg_when_rlm_does_not_accept` + `test_no_kwarg_when_env_var_off`.
+- [x] AC-3: ≥ 4 new tests (19 tests in `test_task_budget.py`: 7 budget translation, 5 probe gate, 4 RLM integration, 2 sanity safety nets, 1 documented-overshoot regression)
 
 **Tasks:**
-- [ ] T-166: Translate cost ceiling to token budget in `recursive/client.py`
-- [ ] T-167: Reconcile budgets in `router/cost_estimator.py`
-- [ ] T-168: Author `tests/test_recursive/test_task_budget.py` with mock Anthropic API
+- [x] T-166: Translate cost ceiling to token budget in `recursive/client.py` — `_task_budget_beta_available()` probe + `inspect.signature` probe on rlm.RLM.__init__; kwarg conditionally added to rlm_kwargs dict
+- [x] T-167: Reconcile budgets in `router/cost_estimator.py` — `budget_tokens_for_ceiling(ceiling_usd, model)` translates USD to integer tokens via input pricing; docstring explicitly documents the output-heavy overshoot hazard (up to 5× for opus)
+- [x] T-168: Author `tests/test_recursive/test_task_budget.py` (19 tests with mock Anthropic module + mock rlm package)
+
+**Kill-criterion honored:** shipped as "best-effort wrapper without CIQS claim" per build plan §TG-13. Activation requires explicit env var opt-in AND a future SDK release; default behaviour is byte-identical to v0.4.x.
 
 ### S-55: As a maintainer, I want a `depthfusion_prune_discoveries` MCP tool so that stale/unreferenced discovery files can be archived safely `P3` `S`
 
