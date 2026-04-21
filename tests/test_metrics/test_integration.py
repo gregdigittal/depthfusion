@@ -381,6 +381,140 @@ class TestReviewGateRegressions:
         assert events[0]["project"] == "p1"
 
 
+class TestLatencyPerCapability:
+    """S-61: `latency_ms_per_capability` must be populated for phases
+    that actually run (reranker, fusion_gates), absent for phases that
+    didn't execute.
+    """
+
+    def test_local_mode_no_phase_latencies(self, tmp_path, monkeypatch):
+        """LOCAL mode: reranker is a pass-through slice, gates disabled →
+        neither capability appears in the latency dict.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text(
+            "# Sample\n\nauthentication token refresh flow\n",
+            encoding="utf-8",
+        )
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "authentication token", "top_k": 5})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        assert len(events) == 1
+        lat = events[0]["latency_ms_per_capability"]
+        assert "reranker" not in lat
+        assert "fusion_gates" not in lat
+
+    def test_fusion_gates_phase_timed_when_enabled(self, tmp_path, monkeypatch):
+        """When DEPTHFUSION_FUSION_GATES_ENABLED=true AND the input pool
+        is non-empty, the gates phase runs and its wall-clock time is
+        recorded under `fusion_gates` in the latency dict.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "true")
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text(
+            "# Redis\n\nauthentication token refresh cached in redis\n",
+            encoding="utf-8",
+        )
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "authentication token", "top_k": 5})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        lat = events[0]["latency_ms_per_capability"]
+        assert "fusion_gates" in lat
+        assert isinstance(lat["fusion_gates"], (int, float))
+        assert lat["fusion_gates"] >= 0.0
+        # In local mode the reranker is still a slice — no reranker key
+        assert "reranker" not in lat
+
+    def test_reranker_phase_timed_in_non_local_mode(self, tmp_path, monkeypatch):
+        """In VPS_TIER1+ modes where the reranker invokes a backend,
+        the phase time lands under `reranker` in the latency dict.
+
+        We achieve VPS_TIER1 without a live API key by forcing the
+        pipeline mode via monkeypatch — the HaikuReranker in LOCAL
+        mode is `None` and `apply_reranker` short-circuits to a slice;
+        in VPS_TIER1 it calls `HaikuReranker.rerank` which (with no
+        API key) gracefully degrades but still enters the timed block.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text(
+            "# Sample\n\nquery authentication token\n", encoding="utf-8",
+        )
+
+        # Force VPS_TIER1 pipeline mode by monkey-patching `from_env`
+        from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
+
+        original_from_env = RecallPipeline.from_env
+
+        @classmethod
+        def force_tier1(cls):
+            pipeline = original_from_env.__func__(cls)
+            pipeline.mode = PipelineMode.VPS_TIER1
+            return pipeline
+
+        monkeypatch.setattr(RecallPipeline, "from_env", force_tier1)
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "authentication token", "top_k": 5})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        lat = events[0]["latency_ms_per_capability"]
+        assert "reranker" in lat
+        assert isinstance(lat["reranker"], (int, float))
+        assert lat["reranker"] >= 0.0
+
+    def test_empty_pool_skips_fusion_gates_timing(self, tmp_path, monkeypatch):
+        """When the query pool is empty (no raw_blocks at all), the
+        fusion_gates phase is skipped — recall returns early before
+        reaching the pipeline. No capability entries emitted.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "true")
+        # No discovery / session / memory dirs → empty corpus
+        (tmp_path / ".claude").mkdir(parents=True)
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "anything"})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        lat = events[0]["latency_ms_per_capability"]
+        assert lat == {}  # empty — no phases ran
+
+    def test_latency_values_are_numeric_not_strings(self, tmp_path, monkeypatch):
+        """Review-gate belt-and-braces: the timing values round-trip as
+        JSON numbers, not stringified via json's `default=str` fallback.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "true")
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text(
+            "# X\n\nanything here as content\n", encoding="utf-8",
+        )
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "anything"})
+
+        gate_file = next(_metrics_dir(tmp_path).glob("*-recall.jsonl"))
+        raw = gate_file.read_text()
+        # The value must be a JSON number, not a quoted string
+        import re
+        assert re.search(r'"fusion_gates":\s*[\d.]+', raw), raw
+
+
 class TestObservabilityIsBestEffort:
     def test_broken_metrics_collector_doesnt_break_recall(
         self, tmp_path, monkeypatch,

@@ -285,8 +285,13 @@ def _tool_recall(arguments: dict) -> str:
 
     v0.5.2 S-60 / T-186: thin wrapper around `_tool_recall_impl` that
     measures total latency, counts returned blocks, and emits a
-    `record_recall_query` JSONL event on every call. Metrics emission
-    failures are swallowed so observability can never break recall.
+    `record_recall_query` JSONL event on every call.
+    v0.5.2 S-61 / T-193: threads a mutable `perf_ms` dict through the
+    impl so per-capability phase latencies ride out to the metrics
+    record. Phases that didn't run are absent from the dict (not
+    zero) — absence is the signal for "this capability wasn't invoked".
+    Metrics emission failures are swallowed so observability can never
+    break recall.
     """
     import hashlib
     import time
@@ -294,8 +299,9 @@ def _tool_recall(arguments: dict) -> str:
     t0 = time.monotonic()
     event_subtype = "ok"
     response_json = ""
+    perf_ms: dict[str, float] = {}
     try:
-        response_json = _tool_recall_impl(arguments)
+        response_json = _tool_recall_impl(arguments, perf_ms=perf_ms)
     except Exception as exc:
         event_subtype = "error"
         response_json = json.dumps(
@@ -328,6 +334,7 @@ def _tool_recall(arguments: dict) -> str:
             query_hash=query_hash,
             mode=os.environ.get("DEPTHFUSION_MODE", "local"),
             backend_used=backend_used,
+            latency_ms_per_capability=perf_ms,
             total_latency_ms=round(total_latency_ms, 3),
             result_count=result_count,
             event_subtype=event_subtype,
@@ -360,7 +367,7 @@ def _detect_current_backends() -> dict[str, str]:
     return result
 
 
-def _tool_recall_impl(arguments: dict) -> str:
+def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     """Core recall logic — extracted from `_tool_recall` for wrapping with
     metrics emission (S-60 / T-186). Preserves the full v0.5.1 behaviour.
 
@@ -368,8 +375,20 @@ def _tool_recall_impl(arguments: dict) -> str:
     1. ~/.claude/sessions/*.tmp  — goal session state files (cross-session memory)
     2. ~/.claude/shared/discoveries/*.md — discovery files written by /goal and agents
     3. ~/.claude/projects/-home-gregmorris/memory/*.md — persistent memory files
+
+    v0.5.2 S-61: the caller may pass a mutable `perf_ms: dict[str, float]`
+    that this function populates with per-capability phase latencies.
+    Only phases that actually run write entries — absence means the
+    phase didn't execute for this query. Current phases tracked:
+      * `reranker` — `pipeline.apply_reranker` wall-clock time (in ms)
+      * `fusion_gates` — `pipeline.apply_fusion_gates` wall-clock time
+        (only when `DEPTHFUSION_FUSION_GATES_ENABLED=true`)
     """
+    import time
     from pathlib import Path
+
+    if perf_ms is None:
+        perf_ms = {}  # local scratch if caller didn't provide one
 
     query = arguments.get("query", "")
     top_k = int(arguments.get("top_k", 5))
@@ -541,8 +560,28 @@ def _tool_recall_impl(arguments: dict) -> str:
     from depthfusion.retrieval.hybrid import RecallPipeline
     pipeline = RecallPipeline.from_env()
 
-    # Apply reranker (no-op in local mode, haiku in vps-tier1+2)
+    # S-61: apply fusion gates BEFORE reranking when enabled. The
+    # gates (Mamba B/C/Δ) filter the candidate pool by query similarity
+    # + topical coherence + α-blended threshold; the reranker then
+    # orders what the gates admitted. Phase is timed only when gates
+    # actually run (env flag on + non-empty input); the `perf_ms` dict
+    # gets a `fusion_gates` entry only in that case.
+    if (
+        os.environ.get("DEPTHFUSION_FUSION_GATES_ENABLED", "false").lower()
+        in ("true", "1", "yes")
+        and reranker_input
+    ):
+        _t_gates = time.monotonic()
+        reranker_input = pipeline.apply_fusion_gates(reranker_input, query=query)
+        perf_ms["fusion_gates"] = round((time.monotonic() - _t_gates) * 1000.0, 3)
+
+    # Apply reranker (no-op in local mode, haiku in vps-tier1+2).
+    # Time this phase only in non-LOCAL modes where the reranker actually
+    # calls an LLM backend — in LOCAL mode `apply_reranker` is a list slice.
+    _t_rerank = time.monotonic()
     blocks_out = pipeline.apply_reranker(reranker_input, query, top_k=top_k)
+    if pipeline.mode.value != "local":
+        perf_ms["reranker"] = round((time.monotonic() - _t_rerank) * 1000.0, 3)
     # Ensure output blocks have consistent fields
     for b in blocks_out:
         if "snippet" not in b:

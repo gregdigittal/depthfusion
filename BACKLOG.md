@@ -872,6 +872,28 @@
 
 ---
 
+## E-24: v0.5.2 Observability Depth [done]
+
+> Fill the `latency_ms_per_capability` field on `record_recall_query` that shipped empty in v0.5.1/S-60. Focused on the two capabilities the recall path actually invokes — `reranker` and `fusion_gates` — rather than the full-refactor instrumentation that would be needed to cover all six LLM call-sites across the codebase.
+
+### S-61: As an operator, I want `latency_ms_per_capability` populated for the two capabilities the recall path invokes so that `backend_summary()` can produce meaningful latency tables `P2` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: When `_tool_recall` emits a `recall_query` event, `latency_ms_per_capability` contains entries for `reranker` and `fusion_gates` when those phases ran — verified in `test_fusion_gates_phase_timed_when_enabled` + `test_reranker_phase_timed_in_non_local_mode`
+- [x] AC-2: Phases that didn't run are absent from the dict — verified in `test_local_mode_no_phase_latencies` (neither key present) + `test_empty_pool_skips_fusion_gates_timing` (empty dict)
+- [x] AC-3: ≥ 3 new tests (5 tests in `TestLatencyPerCapability`)
+
+**Tasks:**
+- [x] T-192: Wire `apply_fusion_gates` into the recall path (previously the method existed on `RecallPipeline` but nothing called it from `_tool_recall_impl`); time both that phase and the existing `apply_reranker` call with `time.monotonic()` brackets. Phase entries emitted only when the phase ran.
+- [x] T-193: Thread a mutable `perf_ms: dict[str, float]` through `_tool_recall_impl` (new keyword arg); `_tool_recall` wrapper creates the dict, passes it into the impl, and hands it to `record_recall_query(latency_ms_per_capability=perf_ms)`
+- [x] T-194: 5 tests in `test_integration.py::TestLatencyPerCapability` covering local/non-local modes, gates on/off, empty-pool short-circuit, and JSON number serialisation
+
+**Bonus gap closed:** S-61 also wires `apply_fusion_gates` INTO the recall path — the method was added to `RecallPipeline` in S-51 but never called from `_tool_recall_impl`. Now gates actually run when `DEPTHFUSION_FUSION_GATES_ENABLED=true` sees a non-empty input pool, between BM25 scoring and reranking.
+
+**Scope note:** Full backend-level instrumentation (wrapping every `.complete()` / `.embed()` call-site across reranker.py, linker.py, gemma.py, etc.) remains a v0.6 refactor. S-61 times the TWO phases `_tool_recall_impl` actually runs, which are the two that matter for recall-latency observability. Capture-path capabilities (extractor, summariser, linker, decision_extractor) remain out of scope until the auto_learn hot path gets similar instrumentation.
+
+---
+
 ## E-23: v0.6 Cleanup & I-8 Wiring [backlog]
 
 > Remove v0.5-era deprecations, wire `config_version_id` for full I-8 compliance, and retire pre-existing mypy/ruff errors. No new features — this epic exists to keep the tech-debt surface from accumulating across v0.6 feature work.
