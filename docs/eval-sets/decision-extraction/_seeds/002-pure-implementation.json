@@ -1,0 +1,10 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "seed-002-pure-implementation",
+  "input_text": "Added the new /api/posts endpoint. Wired up the handler, the validator, and the storage call. Wrote 4 tests covering happy path, missing-field error, too-long-title error, and unauthorized. All green. Ran lint and mypy, both clean. Committed and pushed. PR open at #142.",
+  "expected": [],
+  "reviewer_notes": "Pure implementation session with no decisions. Demonstrates the 'expected no output' case.",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}

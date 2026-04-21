@@ -1,0 +1,10 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "BM25 length normalisation (k1=1.5, b=0.75) fixed the long-document dominance problem in retrieval/bm25.py.",
+  "b": "BM25 scoring in retrieval/bm25.py does not currently emit per-term debug weights. Adding a --verbose flag to the debug CLI would help when diagnosing future scoring anomalies.",
+  "reviewer_notes": "Both about bm25.py, but one describes a fix that landed, the other describes missing observability. Keeping both is correct — deduplicating them would erase useful context.",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}

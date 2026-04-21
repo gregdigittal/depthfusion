@@ -1,0 +1,20 @@
+{
+  "schema": "negative/v1",
+  "source_session": "seed-001-genuine-negative",
+  "input_text": "Tried using the Haiku reranker with top-N=100 inputs under load (8k concurrent sessions). Rate-limit errors after about 30 seconds — Anthropic's per-org-per-minute quota can't sustain that throughput. Dropped top-N to 20 and the errors stopped. Also tried a 5-second retry with exponential backoff but it just delayed the failure instead of avoiding it. Don't use top-N above ~20 for the Haiku reranker at our concurrency levels; pick a different model if you need larger N.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Haiku reranker with top-N=100 inputs at 8k concurrent sessions",
+      "why": "rate-limit errors due to Anthropic's per-org-per-minute quota"
+    },
+    {
+      "what": "5-second retry with exponential backoff as a workaround for the rate-limit",
+      "why": "merely delays failure instead of avoiding it"
+    }
+  ],
+  "reviewer_notes": "Two distinct negatives: the original problem and a rejected workaround. Both are concrete (specific numbers, specific mechanism).",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}

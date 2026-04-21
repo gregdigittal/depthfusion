@@ -1,0 +1,10 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "BM25 with default k1/b parameters causes one long document (the 19KB review-gate-patterns.md file) to dominate all query results regardless of topic. The fix is to enable length normalisation with k1=1.5 and b=0.75 in retrieval/bm25.py.",
+  "b": "Discovered that our BM25 implementation was giving disproportionate weight to long documents. A 19 KB review-gate-patterns file scored highest on every query because the default parameters don't normalise for document length. Applied k1=1.5, b=0.75 as a fix.",
+  "reviewer_notes": "Same observation, different phrasing. The second is clearly a restatement of the first with different word choice. A human reading both in succession would immediately mark them as duplicates.",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}

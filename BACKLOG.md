@@ -998,14 +998,14 @@
 ### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: 50-session decision-extraction gold set under `docs/eval-sets/decision-extraction/` — each session has human-labelled "decisions worth capturing" + expected discovery files
-- [ ] AC-2: 30-pair near-duplicate dedup gold set under `docs/eval-sets/dedup/` — pairs labelled as true-dup / false-dup
-- [ ] AC-3: 40-example negative-signal gold set under `docs/eval-sets/negative/` — sentences labelled as genuine negative vs false-positive
-- [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%)
+- [ ] AC-1: 50-session decision-extraction gold set under `docs/eval-sets/decision-extraction/` — each session has human-labelled "decisions worth capturing" + expected discovery files. **Scaffolding + 2 seed examples landed 2026-04-21; full curation (50 examples) calendar-blocked.**
+- [ ] AC-2: 30-pair near-duplicate dedup gold set under `docs/eval-sets/dedup/` — pairs labelled as true-dup / false-dup. **Scaffolding + 2 seed pairs landed 2026-04-21; full curation (30 pairs) calendar-blocked.**
+- [ ] AC-3: 40-example negative-signal gold set under `docs/eval-sets/negative/` — sentences labelled as genuine negative vs false-positive. **Scaffolding + 2 seed examples landed 2026-04-21; full curation (40 examples) calendar-blocked.**
+- [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%) — **execution blocked on AC-1/2/3 population**
 
 **Tasks:**
-- [ ] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`)
-- [ ] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow)
+- [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) is the remaining labour.
+- [x] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow) — 175-line methodology doc + per-set READMEs covering schema, edge cases, running the measurements
 
 ### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S`
 

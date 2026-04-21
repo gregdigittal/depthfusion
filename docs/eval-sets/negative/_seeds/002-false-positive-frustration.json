@@ -1,0 +1,11 @@
+{
+  "schema": "negative/v1",
+  "source_session": "seed-002-false-positive-frustration",
+  "input_text": "Debugging the session-loader bug took all afternoon. The tests kept passing locally but failing in CI — absolute nightmare. Finally tracked it down to a timezone mismatch between the test fixture and the CI runner clock. Added an explicit UTC conversion in the loader; all green now.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "The session describes a successfully resolved bug. 'Absolute nightmare' is frustration phrasing, not a concrete negative signal — the problem was fixed, so it belongs in positive signals (which we don't capture). No entry here.",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}

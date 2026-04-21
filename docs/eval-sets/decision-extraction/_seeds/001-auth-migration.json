@@ -1,0 +1,19 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "seed-001-auth-migration",
+  "input_text": "Spent the morning looking at the auth middleware. The class-based wrapper we inherited is breaking on async handlers because the constructor runs synchronously and the hooks can't await cleanly. Options: A) keep the class shape and add a separate async init step. B) migrate to function-based middleware with the composition pattern. B is more work upfront but the function style composes cleanly with existing async handlers. Decided: going with B. Will leave the class shim in place for one release so downstream callers can migrate incrementally. Also realised the JWT validator in auth/tokens.js wasn't checking the signing secret at module load — added a startup assertion. Don't think that counts as a decision, more a bug fix.",
+  "expected": [
+    {
+      "text": "Migrate auth middleware from class-based to function-based composition because the class constructor runs synchronously and hooks can't await cleanly",
+      "category": "architecture"
+    },
+    {
+      "text": "Leave the class shim in place for one release so downstream callers can migrate incrementally",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Excluded the JWT startup assertion — it's a bug fix, not a decision. The author explicitly said so.",
+  "labelled_by": "seed",
+  "labelled_at": "2026-04-21",
+  "synthetic": true
+}
