@@ -32,6 +32,19 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+def _default_discoveries_dir() -> Path:
+    """Resolve `~/.claude/shared/discoveries/` at call time.
+
+    Runtime-resolution pattern — see `capture/decision_extractor.py`,
+    `capture/negative_extractor.py`, and `capture/pruner.py` for the
+    same idiom. Prevents the freeze-at-import bug where tests can't
+    redirect `Path.home()` via monkeypatch because the module-level
+    constant was already computed at import time.
+    """
+    return Path.home() / ".claude" / "shared" / "discoveries"
+
+
+# Deprecated module-level constant — retained for external importers.
 _DISCOVERIES_DIR = Path.home() / ".claude" / "shared" / "discoveries"
 _MAX_DIFF_LINES = 80   # cap diff summary size
 _MAX_MESSAGE_CHARS = 1000
@@ -126,7 +139,7 @@ def write_commit_discovery(
     if not commit.get("sha7") or commit["sha7"] == "unknown":
         return None
 
-    out_dir = output_dir or _DISCOVERIES_DIR
+    out_dir = output_dir or _default_discoveries_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     today = date.today().isoformat()

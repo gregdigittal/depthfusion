@@ -12,7 +12,174 @@ Conventions:
 
 ## [Unreleased]
 
-No changes pending beyond v0.5.0.
+No changes pending beyond v0.5.1.
+
+---
+
+## [v0.5.1] — 2026-04-21
+
+**Theme:** observability surface + integration, RLM task-budget wrapper,
+discovery pruner, I-8 compliance wiring, and zero-error quality baseline.
+
+v0.5.1 is a significant feature addition over v0.5.0. Primary work: E-22
+(Observability & Hygiene) landed with all four stories — the structured
+metrics streams from S-53, the discovery pruner from S-55, the Opus 4.7
+task-budget wrapper from S-54, and the integration layer from S-60 that
+wires the streams into every capture mechanism and the recall tool. In
+addition, S-58 completed the I-8 `config_version_id` wiring left as a
+TODO in v0.5.0, and S-59 retired every pre-existing mypy and ruff error
+so the default lint + type check commands run clean for the first time
+in the v0.5 release window.
+
+Test count delta: 887 → 986 (+99 net new). Quality: mypy 0 errors,
+ruff 0 errors — unchanged from v0.5.0's post-S-59 baseline but
+preserved through all subsequent feature work.
+
+### Epic summary
+
+| Epic                        | Change in v0.5.1                      |
+|-----------------------------|----------------------------------------|
+| E-22 Observability & Hygiene| **CLOSED** — all 4 stories (S-53, S-54, S-55, S-60) landed |
+| E-23 v0.6 Cleanup           | S-58 (I-8 wiring) + S-59 (mypy/ruff) landed; S-56/S-57 stay for v0.6 proper |
+| E-19 GPU Routing            | Unchanged (still benchmark-blocked)    |
+| E-20 Capture Mechanisms     | Unchanged (still benchmark-blocked)    |
+| E-21 Retrieval Quality      | Unchanged (still benchmark-blocked)    |
+
+### Added
+
+**Structured metrics streams (S-53, T-163..T-165):**
+- `MetricsCollector.record_recall_query()` — writes per-query records to
+  `YYYY-MM-DD-recall.jsonl` with `backend_used`, `backend_fallback_chain`,
+  `latency_ms_per_capability` (empty in v0.5.1; filled in v0.6 per-cap
+  latency refactor), `total_latency_ms`, `result_count`, `event_subtype`,
+  `config_version_id`.
+- `MetricsCollector.record_capture_event()` — writes per-write records to
+  `YYYY-MM-DD-capture.jsonl` with `capture_mechanism`, `project`,
+  `session_id`, `write_success`, `entries_written`, `file_path`,
+  `event_subtype`, `config_version_id`. Unknown mechanisms flagged with
+  `capture_mechanism_known: false` but still preserved on disk (forensics).
+- `MetricsAggregator.backend_summary()` — per-`capability::backend_name`
+  rollup: `count`, `measured_count` (distinct from `count` when latency
+  samples are sparse), avg/p50/p95 latency, error_count, error_rate;
+  plus per-capability fallback-chain union and overall error rate.
+- `MetricsAggregator.capture_summary()` — per-mechanism write rate and
+  entries-written totals; unknown mechanisms surfaced separately.
+- Module-level `_VALID_EVENT_SUBTYPES` enum including `sla_expiry_deny`
+  per DR-018 I-19 ratification.
+- `_append_jsonl()` helper in the collector — all structured streams
+  acquire `fcntl.flock(LOCK_EX)` on a fresh OFD to serialise concurrent
+  writers (gate entries exceed 4 KiB PIPE_BUF so `O_APPEND` atomicity
+  alone is insufficient). Numpy-safe `_json_default` for serialisation.
+
+**Production emission wiring (S-60, T-186..T-191):**
+- `capture/_metrics.py` — NEW shared `emit_capture_event()` helper used
+  by every capture mechanism (extractors + dedup + git hook +
+  confirm_discovery).
+- `_tool_recall` refactored into a thin wrapper around
+  `_tool_recall_impl`; measures total latency via `time.monotonic`,
+  probes backend routing via new `_detect_current_backends()` helper
+  (skipped on error path for efficiency), emits `recall_query` per call.
+- `_tool_confirm_discovery` passes `capture_mechanism="confirm_discovery"`
+  to `write_decisions` so emits re-bucket under the higher-level tool
+  label — one event per logical operation, not double-counted.
+- `dedup.dedup_against_corpus` emits a dedicated event when it runs and
+  finds zero duplicates — the metrics stream distinguishes "dedup ran,
+  no dupes" from "dedup never ran".
+- Git post-commit hook uses a LOCAL `_emit_capture_event` wrapper with
+  its own try/except on top of the shared helper — defense in depth so
+  a metrics failure can NEVER block a developer's git commit.
+
+**Discovery pruner (S-55, T-169..T-171):**
+- `capture/pruner.py` — NEW. `PruneCandidate` frozen dataclass +
+  `identify_candidates()` + `prune_discoveries()`. Two heuristics: age
+  threshold (default 90d via `DEPTHFUSION_PRUNE_AGE_DAYS`) and
+  `.superseded` suffix from S-49 dedup.
+- `depthfusion_prune_discoveries` MCP tool (13th tool, always enabled).
+  Two-phase: `confirm=False` (default) returns candidates; `confirm=True`
+  moves files to `~/.claude/shared/discoveries/.archive/`. Never deletes.
+  Archive collisions get timestamp-suffix names.
+
+**RLM task-budget wrapper (S-54, T-166..T-168):**
+- `CostEstimator.budget_tokens_for_ceiling(ceiling_usd, model)` —
+  translates USD cost ceiling to token budget using model input pricing.
+  Docstring explicitly names the output-heavy overshoot hazard (up to
+  5× for opus) so operators see the caveat in their IDE.
+- `RLMClient.run()` probes the SDK surface for the Anthropic task-budgets
+  beta. Dual gate: `DEPTHFUSION_RLM_TASK_BUDGET_ENABLED=true` AND SDK
+  exposes `anthropic.task_budget` or `anthropic.types.TaskBudget`.
+  `inspect.signature(rlm.RLM.__init__)` confirms rlm accepts the
+  `task_budget_tokens` kwarg before passing it. Falls back to v0.4.x
+  post-hoc estimation when either gate fails.
+- Shipped as a "best-effort wrapper without CIQS claim" per build plan
+  §TG-13 kill-criterion — dormant until Anthropic SDK ships the beta.
+
+**I-8 compliance wiring (S-58, T-178..T-180):**
+- `GateConfig.version_id()` — deterministic 12-char hex hash of the
+  config tuple, attached to every gate-log record. Removes the
+  `TODO(I-8)` marker left in v0.5.0 `apply_fusion_gates`.
+- Auditors can now reproduce any historical gate decision by looking
+  up the `config_version_id` in the gate log against an archived
+  config snapshot.
+
+### Changed
+
+- `decision_extractor.write_decisions()` accepts a `capture_mechanism`
+  parameter (default `"decision_extractor"`) so wrappers can re-bucket
+  metrics under their own mechanism name.
+- `_DISCOVERIES_DIR` module-level constants in `decision_extractor`,
+  `negative_extractor`, and `git_post_commit` replaced with
+  `_default_discoveries_dir()` runtime helpers — fixes a freeze-at-
+  import bug where tests couldn't redirect via `monkeypatch.Path.home`.
+- `MCP tool count: 12 → 13` (new `depthfusion_prune_discoveries`).
+- `pyproject.toml` version `0.5.0` → `0.5.1`.
+
+### Fixed
+
+- **S-59 mypy/ruff cleanup.** Retired 6 pre-existing mypy errors and 5
+  pre-existing ruff errors. Both `mypy src/depthfusion` and
+  `ruff check src/ tests/` now exit clean for the first time in the v0.5
+  release window. Added `types-PyYAML>=6.0.0` to `[dev]` extras.
+- **Gate-log config_version_id defaults to empty string.** v0.5.0
+  shipped with a `TODO(I-8)` marker and empty `config_version_id` on
+  every record; v0.5.1 populates it from `GateConfig.version_id()`
+  deterministically.
+- **Dedup `no supersessions` observability gap.** v0.5.0 dedup emitted
+  nothing when it ran and found zero duplicates. v0.5.1 emits a
+  dedicated `write_success=True, entries_written=0` event so the
+  metrics stream distinguishes the common case from "dedup never ran."
+- **Review gate findings across 4 stories** — 22 issues total (0
+  Critical, 6 High/Important, 13 Medium, 3 Low) all caught and fixed
+  pre-commit. See individual commit messages for the breakdown.
+
+### Deprecated
+
+No new deprecations. `--mode=vps` alias and `vps-tier1`/`vps-tier2`
+extras from v0.5.0 remain deprecated and are scheduled for v0.6.0
+removal per E-23.
+
+### Security
+
+- Gate log + recall_query log + capture log streams all record
+  `query_hash` (sha256[:12]) only — raw query text is never written to
+  disk in any observability stream.
+- Prune tool never deletes files; always moves to `.archive/` with
+  timestamp-suffix collision handling.
+- Anthropic SDK probe for task-budget beta requires explicit env var
+  opt-in — a silent SDK upgrade cannot accidentally activate the wrapper.
+
+### Test metrics
+
+- **986 passed, 1 skipped** (sentence-transformers integration test).
+- **Ruff:** 0 errors on `src/` and `tests/`.
+- **Mypy:** 0 errors on `src/depthfusion` (74 source files).
+- Test count delta since v0.5.0: 887 → 986 (+99 net new).
+
+### New environment variables (v0.5.1 additions)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DEPTHFUSION_PRUNE_AGE_DAYS` | `90` | Age threshold for the discovery pruner (S-55). |
+| `DEPTHFUSION_RLM_TASK_BUDGET_ENABLED` | `false` | Opt-in to the Anthropic task-budgets beta wrapper (S-54). |
 
 ---
 

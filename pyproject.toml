@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "depthfusion"
-version = "0.5.0"
+version = "0.5.1"
 description = "Depth-aware memory fusion for Claude Code — pluggable LLM backends, three-mode installer, capture mechanisms, selective retrieval gates"
 requires-python = ">=3.10"
 dependencies = [
