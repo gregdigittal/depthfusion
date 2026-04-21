@@ -304,15 +304,21 @@ def _get_df_version() -> str:
 # Subcommand: score
 # --------------------------------------------------------------------------
 
+# Section header: accept any single letter + topic ID like X9; validation
+# of category membership happens at the caller level. Loosening the regex
+# avoids silent-skip when the battery grows past category E.
 _SCORE_LINE = re.compile(r"^-\s+(\w+):\s*`score:\s*(\d+)`", re.MULTILINE)
-_SECTION_HEADER = re.compile(r"^## (?P<cat>[A-E]) / (?P<topic>[A-E]\d+) -", re.MULTILINE)
+_SECTION_HEADER = re.compile(r"^## (?P<cat>[A-Z]) / (?P<topic>[A-Z]\d+) -", re.MULTILINE)
 
 
 def parse_scoring_template(text: str) -> dict[str, dict[str, int]]:
     """Parse a filled-in scoring template.
 
-    Returns {topic_id: {dim: score}}. Raises ValueError on malformed
-    input (missing scores, non-integer, out of 0-10 range).
+    Returns {topic_id: {dim: score}}. Raises ValueError only on
+    OUT-OF-RANGE integers (>10 or <0). Missing/unfilled scores and
+    non-digit values (e.g. `score: seven`) are silently skipped — they
+    simply don't match the regex. Callers that need to enforce
+    completeness (like cmd_score) check for missing topics separately.
     """
     sections: dict[str, str] = {}
     last_topic: str | None = None
@@ -343,10 +349,30 @@ def parse_scoring_template(text: str) -> dict[str, dict[str, int]]:
     return result
 
 
+def _derive_scored_path(raw_path: Path) -> Path:
+    """Given `{date}-{mode}-run{N}-raw.jsonl`, return `...-scored.jsonl`.
+
+    Rejects inputs that don't end in the expected suffix rather than
+    silently producing an output path identical to the input (which
+    would overwrite the raw file on the next `write`).
+    """
+    stem = raw_path.stem  # strips .jsonl
+    if not stem.endswith("-raw"):
+        raise ValueError(
+            f"expected raw file to end with '-raw.jsonl', got {raw_path.name!r}"
+        )
+    new_stem = stem[:-len("-raw")] + "-scored"
+    return raw_path.with_name(new_stem + raw_path.suffix)
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     raw_path = Path(args.raw)
     scoring_path = Path(args.scoring)
-    out_path = Path(str(raw_path).replace("-raw.jsonl", "-scored.jsonl"))
+    try:
+        out_path = _derive_scored_path(raw_path)
+    except ValueError as err:
+        print(f"ERROR: {err}", file=sys.stderr)
+        return 2
 
     if not raw_path.exists():
         print(f"ERROR: raw file not found: {raw_path}", file=sys.stderr)

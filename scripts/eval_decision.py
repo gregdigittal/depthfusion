@@ -22,6 +22,7 @@ import json
 import math
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,7 +48,6 @@ def bow_cosine(a: str, b: str) -> float:
     tb = tokenise(b)
     if not ta or not tb:
         return 0.0
-    from collections import Counter
     ca = Counter(ta)
     cb = Counter(tb)
     shared = set(ca) & set(cb)
@@ -144,11 +144,9 @@ def match_extracted_to_expected(
 # --------------------------------------------------------------------------
 
 def compute_metrics(files: list[Path], threshold: float) -> MatchResult:
-    try:
-        from depthfusion.capture.decision_extractor import HeuristicDecisionExtractor
-    except ImportError as err:
-        print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
-        sys.exit(2)
+    # Import deferred: lets tests exercise the pure-function path without
+    # requiring the full depthfusion package in the test env.
+    from depthfusion.capture.decision_extractor import HeuristicDecisionExtractor
 
     extractor = HeuristicDecisionExtractor()
     result = MatchResult()
@@ -231,7 +229,11 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 1
 
-    result = compute_metrics(files, args.threshold)
+    try:
+        result = compute_metrics(files, args.threshold)
+    except ImportError as err:
+        print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
+        return 2
     print(format_report(result, len(files), args.threshold))
     return 0
 

@@ -26,6 +26,7 @@ import json
 import math
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,7 +47,6 @@ def bow_cosine(a: str, b: str) -> float:
     tb = tokenise(b)
     if not ta or not tb:
         return 0.0
-    from collections import Counter
     ca = Counter(ta)
     cb = Counter(tb)
     shared = set(ca) & set(cb)

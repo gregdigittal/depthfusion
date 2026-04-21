@@ -20,6 +20,7 @@ import json
 import math
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,7 +41,6 @@ def bow_cosine(a: str, b: str) -> float:
     tb = tokenise(b)
     if not ta or not tb:
         return 0.0
-    from collections import Counter
     ca = Counter(ta)
     cb = Counter(tb)
     shared = set(ca) & set(cb)
@@ -95,11 +95,8 @@ def _best_match(extracted_what_list: list[str], target: str, threshold: float) -
 
 
 def compute_metrics(files: list[Path], threshold: float) -> NegativeResult:
-    try:
-        from depthfusion.capture.negative_extractor import HeuristicNegativeExtractor
-    except ImportError as err:
-        print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
-        sys.exit(2)
+    # Import deferred: same rationale as eval_decision.compute_metrics.
+    from depthfusion.capture.negative_extractor import HeuristicNegativeExtractor
 
     extractor = HeuristicNegativeExtractor()
     result = NegativeResult()
@@ -187,7 +184,11 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 1
 
-    result = compute_metrics(files, args.threshold)
+    try:
+        result = compute_metrics(files, args.threshold)
+    except ImportError as err:
+        print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
+        return 2
     print(format_report(result, len(files), args.threshold))
     return 0
 

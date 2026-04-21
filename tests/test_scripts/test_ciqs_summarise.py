@@ -1,8 +1,8 @@
-"""Unit tests for scripts/ciqs_summarise.py math.
+"""Unit tests for scripts/ciqs_summarise.py math and
+scripts/ciqs_harness.py template parsing.
 
-We import the module by file path because scripts/ is not on the
-package path. Tests cover: percentile, bootstrap_ci, normalise_topic_score,
-group_by_category, format_report.
+We import each module by file path because scripts/ is not on the
+package path.
 """
 from __future__ import annotations
 

@@ -156,7 +156,8 @@ def format_report(
     lines.append("")
     lines.append("## Per-category statistics")
     lines.append("")
-    lines.append("| Category | N | Mean | Stddev | 95% CI (bootstrap) |")
+    ci_pct = int(round(confidence * 100))
+    lines.append(f"| Category | N | Mean | Stddev | {ci_pct}% CI (bootstrap) |")
     lines.append("|----------|---|------|--------|--------------------|")
 
     overall_means: list[float] = []
