@@ -192,6 +192,26 @@ def install_vps_gpu(
         _write_env_config(env_lines)
         _register_hooks()
         _check_sentence_transformers_installed()
+        # S-62 / T-197: run the vps-gpu-specific smoke test immediately
+        # after env-write so driver/SDK/extras gaps surface at install
+        # time rather than first recall. Failure is a warning (not
+        # fatal) — the install still completes with the env file in
+        # place, giving the operator a chance to fix the gap without
+        # redoing the install.
+        _print_step("Running vps-gpu smoke test...", dry_run)
+        from depthfusion.install.smoke import run_vps_gpu_smoke
+        smoke_result = run_vps_gpu_smoke()
+        if smoke_result.ok:
+            _print_step(f"  ✓ {smoke_result.reason}", dry_run)
+        else:
+            _print_step(f"  ⚠ Smoke test failed: {smoke_result.reason}", dry_run)
+            _print_step(
+                "  Install file written, but the runtime stack isn't fully "
+                "functional yet. Fix the issue above and re-run the smoke "
+                "test with `python -c 'from depthfusion.install.smoke "
+                "import run_vps_gpu_smoke; print(run_vps_gpu_smoke())'`.",
+                dry_run,
+            )
     _print_step("VPS-GPU install complete.", dry_run)
     _print_step(
         "To serve Gemma locally: `bash scripts/vllm-serve-gemma.sh` "
@@ -280,20 +300,105 @@ def _check_sentence_transformers_installed() -> None:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+def _recommend_mode_from_gpu() -> tuple[str, str]:
+    """Return (recommended_mode, human_reason).
+
+    v0.5.2 S-62 / T-195: called from the interactive path when no
+    `--mode` arg is supplied. Probes the host, picks the mode that
+    matches the detected hardware, and returns both the recommendation
+    and a one-sentence explanation for the banner.
+    """
+    info = detect_gpu()
+    if info.has_gpu:
+        return "vps-gpu", (
+            f"NVIDIA GPU detected ({info.gpu_name}, {info.vram_gb} GB VRAM). "
+            "vps-gpu runs Gemma + local embeddings on-box for lowest latency."
+        )
+    # No GPU — the choice between local and vps-cpu depends on whether the
+    # user has a DEPTHFUSION_API_KEY configured. If they do, vps-cpu is
+    # worth recommending (enables Haiku reranker). If not, local is the
+    # zero-config baseline.
+    if os.environ.get("DEPTHFUSION_API_KEY"):
+        return "vps-cpu", (
+            "No GPU, but DEPTHFUSION_API_KEY is set — vps-cpu enables the "
+            "Haiku reranker via Anthropic's API."
+        )
+    return "local", (
+        "No GPU, no DEPTHFUSION_API_KEY — local mode runs BM25-only with "
+        "zero external dependencies. Upgrade to vps-cpu later by setting "
+        "the API key and re-running the installer."
+    )
+
+
+def _print_mode_banner(recommendation: str, reason: str) -> None:
+    """Print the mode-selection banner for interactive installs."""
+    print("")
+    print("╭─────────────────────────────────────────────────────────────╮")
+    print("│  DepthFusion installer — mode selection                     │")
+    print("╰─────────────────────────────────────────────────────────────╯")
+    print("")
+    print(f"  {reason}")
+    print("")
+    print("  Available modes:")
+    print("    [1] local    — BM25 only, no API calls, no GPU dependencies")
+    print("    [2] vps-cpu  — Haiku reranker + optional ChromaDB (Tier 2)")
+    print("    [3] vps-gpu  — Gemma on-box + local embeddings (needs GPU)")
+    print("")
+    marker = {"local": "1", "vps-cpu": "2", "vps-gpu": "3"}[recommendation]
+    print(f"  Recommended for this host: [{marker}] {recommendation}")
+    print("")
+
+
+def _read_mode_choice(recommendation: str) -> str:
+    """Read a mode choice from stdin; blank input accepts the recommendation.
+
+    Retries on invalid input up to 3 times, then falls back to the
+    recommendation. Never raises.
+    """
+    for _ in range(3):
+        try:
+            raw = input("  Choose [1/2/3] or press Enter to accept: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return recommendation
+        if not raw:
+            return recommendation
+        if raw in ("1", "local"):
+            return "local"
+        if raw in ("2", "vps-cpu", "vps"):
+            return "vps-cpu"
+        if raw in ("3", "vps-gpu"):
+            return "vps-gpu"
+        print(f"  '{raw}' isn't a valid choice — enter 1, 2, 3, or Enter.")
+    print(f"  Too many invalid choices; accepting recommendation: {recommendation}")
+    return recommendation
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="DepthFusion installer (three-mode: local / vps-cpu / vps-gpu)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     # Note: `vps` is accepted as a deprecated alias for `vps-cpu` below.
+    # `--mode` is NOT required — when absent, the installer runs an
+    # interactive probe + recommendation (v0.5.2 S-62).
     parser.add_argument(
         "--mode",
         choices=["local", "vps-cpu", "vps-gpu", "vps"],
-        required=True,
+        default=None,
         help=(
             "Install mode: 'local' (BM25 only), 'vps-cpu' (Haiku reranker), "
             "'vps-gpu' (Gemma on-box + local embeddings). "
-            "'vps' is a deprecated alias for 'vps-cpu'."
+            "'vps' is a deprecated alias for 'vps-cpu'. "
+            "When omitted, the installer auto-detects your hardware and "
+            "prompts you to confirm the recommended mode."
+        ),
+    )
+    parser.add_argument(
+        "-y", "--yes", action="store_true",
+        help=(
+            "Accept the auto-recommended mode without prompting. Useful in "
+            "non-interactive shells (CI, provisioning scripts) where stdin "
+            "is not a tty."
         ),
     )
     parser.add_argument(
@@ -313,7 +418,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # Resolve mode: explicit --mode wins; otherwise auto-detect and
+    # optionally prompt.
     mode = args.mode
+    if mode is None:
+        recommendation, reason = _recommend_mode_from_gpu()
+        _print_mode_banner(recommendation, reason)
+        if args.yes or not sys.stdin.isatty():
+            print(f"  [auto-accept] Using recommendation: {recommendation}")
+            print("")
+            mode = recommendation
+        else:
+            mode = _read_mode_choice(recommendation)
+            print("")
+            print(f"  → Proceeding with mode={mode}")
+            print("")
+
     if mode == "vps":
         print(
             "[DEPRECATION] --mode=vps is a deprecated alias for --mode=vps-cpu; "

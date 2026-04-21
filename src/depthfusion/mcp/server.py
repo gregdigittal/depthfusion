@@ -560,6 +560,29 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     from depthfusion.retrieval.hybrid import RecallPipeline
     pipeline = RecallPipeline.from_env()
 
+    # S-62 / T-196: apply vector search BEFORE fusion gates and reranking.
+    # `apply_vector_search` calls `get_backend("embedding")` — on vps-gpu
+    # this is `LocalEmbeddingBackend` (sentence-transformers); on other
+    # modes it's `NullBackend` which returns None → the method returns
+    # [] → `rrf_fuse` degrades gracefully to BM25-only. Gated on
+    # DEPTHFUSION_VECTOR_SEARCH_ENABLED so v0.5.x byte-identity is
+    # preserved when the flag is off (default).
+    if (
+        os.environ.get("DEPTHFUSION_VECTOR_SEARCH_ENABLED", "false").lower()
+        in ("true", "1", "yes")
+        and reranker_input
+    ):
+        _t_vec = time.monotonic()
+        vector_results = pipeline.apply_vector_search(
+            query, reranker_input, top_k=max(top_k * 2, 10),
+        )
+        if vector_results:
+            # RRF-fuse BM25 (reranker_input, already ranked) with the
+            # vector-search ordering. Output is the fused list — replace
+            # the reranker input so downstream phases see the fused pool.
+            reranker_input = pipeline.rrf_fuse(reranker_input, vector_results)
+        perf_ms["vector_search"] = round((time.monotonic() - _t_vec) * 1000.0, 3)
+
     # S-61: apply fusion gates BEFORE reranking when enabled. The
     # gates (Mamba B/C/Δ) filter the candidate pool by query similarity
     # + topical coherence + α-blended threshold; the reranker then

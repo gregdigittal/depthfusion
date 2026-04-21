@@ -894,7 +894,26 @@
 
 ---
 
-## E-23: v0.6 Cleanup & I-8 Wiring [backlog]
+---
+
+## E-25: Pre-GPU-Migration UX Bundle [done]
+
+> Three high-leverage items that improve the first-install experience on the new GPU-enabled VPS: interactive mode auto-selection, `apply_vector_search` wired into the recall path (uses the GPU's embedding backend from day 1), and a `vps-gpu`-specific smoke test. All three are shippable before the migration; all three produce immediate value the moment the new host comes up.
+
+### S-62: As a new-host operator, I want the installer to auto-detect my GPU and recommend the right mode so that provisioning doesn't require me to know `--mode=vps-gpu` vs `--mode=vps-cpu` by heart `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `python -m depthfusion.install.install` (no `--mode` arg) probes GPU via `detect_gpu()` and prints a recommendation banner with mode options and detected hardware
+- [x] AC-2: Interactive shell (stdin is a tty) prompts `[1/2/3 or Enter]`; non-interactive shell (CI, scripts) + `--yes` flag auto-picks the recommended mode
+- [x] AC-3: `apply_vector_search` is wired into `_tool_recall_impl` (gated on `DEPTHFUSION_VECTOR_SEARCH_ENABLED=true`), fuses with BM25 via `rrf_fuse`, times phase as `perf_ms["vector_search"]`
+- [x] AC-4: `vps-gpu`-specific smoke test (`run_vps_gpu_smoke()`) validates three probes (nvidia-smi + sentence-transformers + embed roundtrip); runs after `install_vps_gpu` writes the env file; failure is a warning, not fatal
+- [x] AC-5: ≥ 7 new tests across the three items (12 new tests: 5 for install UX, 4 for gpu smoke, 3 for vector_search wiring)
+
+**Tasks:**
+- [x] T-195: Interactive mode auto-select in `install/install.py::main()` — `_recommend_mode_from_gpu()` picks mode based on `detect_gpu()` + `DEPTHFUSION_API_KEY`; `_print_mode_banner()` shows options; `_read_mode_choice()` handles interactive input; `--yes` + non-tty auto-accept
+- [x] T-196: `_tool_recall_impl` wires `apply_vector_search` + `rrf_fuse` between BM25 scoring and fusion gates; phase timed into `perf_ms["vector_search"]`; gated on `DEPTHFUSION_VECTOR_SEARCH_ENABLED`
+- [x] T-197: `install/smoke.py::run_vps_gpu_smoke()` three-probe check; called from `install_vps_gpu` post-env-write with warning-not-fatal semantics
+- [x] T-198: 12 new tests across `test_install.py`, `test_smoke.py`, `test_metrics/test_integration.py`
 
 > Remove v0.5-era deprecations, wire `config_version_id` for full I-8 compliance, and retire pre-existing mypy/ruff errors. No new features — this epic exists to keep the tech-debt surface from accumulating across v0.6 feature work.
 

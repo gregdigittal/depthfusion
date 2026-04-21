@@ -163,4 +163,86 @@ def _run_with_dir(mode: str, corpus_dir: Path) -> SmokeResult:
     )
 
 
-__all__ = ["SmokeResult", "run_smoke_test"]
+# ---------------------------------------------------------------------------
+# v0.5.2 S-62 / T-197 — vps-gpu-specific smoke test
+# ---------------------------------------------------------------------------
+
+def run_vps_gpu_smoke() -> SmokeResult:
+    """Three-probe check for a fresh vps-gpu install.
+
+    Verifies the GPU path is functional end-to-end:
+      1. `nvidia-smi` is on PATH and reports ≥ 1 GPU
+      2. `sentence_transformers` is importable (from `[vps-gpu]` extras)
+      3. `LocalEmbeddingBackend.embed(["probe"])` returns a non-empty vector
+
+    Called from `install_vps_gpu` after the env file is written, so a
+    fresh install on a new GPU host surfaces driver/SDK/extras gaps
+    immediately rather than letting them show up at first recall.
+
+    Never raises — all failures return a `SmokeResult(ok=False, ...)`
+    with a `reason` string naming the probe that failed.
+    """
+    # Probe 1: GPU present?
+    try:
+        from depthfusion.install.gpu_probe import detect_gpu
+        gpu_info = detect_gpu()
+    except Exception as exc:  # noqa: BLE001
+        return SmokeResult(
+            ok=False, mode="vps-gpu", top_hit="", result_count=0,
+            reason=f"gpu_probe import failed: {exc}",
+        )
+    if not gpu_info.has_gpu:
+        return SmokeResult(
+            ok=False, mode="vps-gpu", top_hit="", result_count=0,
+            reason=f"GPU probe failed: {gpu_info.reason}",
+        )
+
+    # Probe 2: sentence-transformers importable?
+    try:
+        import importlib.util
+        if importlib.util.find_spec("sentence_transformers") is None:
+            return SmokeResult(
+                ok=False, mode="vps-gpu", top_hit="", result_count=0,
+                reason=(
+                    "sentence_transformers not importable — install the "
+                    "vps-gpu extras: `pip install -e '.[vps-gpu]'`"
+                ),
+            )
+    except Exception as exc:  # noqa: BLE001
+        return SmokeResult(
+            ok=False, mode="vps-gpu", top_hit="", result_count=0,
+            reason=f"sentence_transformers probe raised: {exc}",
+        )
+
+    # Probe 3: embedding backend functional?
+    try:
+        from depthfusion.backends.local_embedding import LocalEmbeddingBackend
+        backend = LocalEmbeddingBackend()
+        vectors = backend.embed(["depthfusion smoke test probe"])
+    except Exception as exc:  # noqa: BLE001
+        return SmokeResult(
+            ok=False, mode="vps-gpu", top_hit="", result_count=0,
+            reason=f"LocalEmbeddingBackend.embed() raised: {exc}",
+        )
+    if vectors is None or not vectors or not vectors[0]:
+        return SmokeResult(
+            ok=False, mode="vps-gpu", top_hit="", result_count=0,
+            reason=(
+                "LocalEmbeddingBackend.embed() returned empty — model load "
+                "may have failed. Check ~/.cache/huggingface for the model "
+                "files, or run with DEPTHFUSION_EMBEDDING_MODEL set to a "
+                "preloaded model."
+            ),
+        )
+
+    return SmokeResult(
+        ok=True, mode="vps-gpu", top_hit="gpu-smoke-ok",
+        result_count=len(vectors[0]),
+        reason=(
+            f"vps-gpu smoke passed: GPU={gpu_info.gpu_name}, "
+            f"embedding dim={len(vectors[0])}, vectors={len(vectors)}"
+        ),
+    )
+
+
+__all__ = ["SmokeResult", "run_smoke_test", "run_vps_gpu_smoke"]

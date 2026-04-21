@@ -81,3 +81,101 @@ class TestRunSmokeTest:
             result = run_smoke_test(mode="local", corpus_dir=empty)
         assert result.ok is False
         assert "no .md files" in result.reason or "zero" in result.reason.lower()
+
+
+# ---------------------------------------------------------------------------
+# S-62 / T-197: run_vps_gpu_smoke
+# ---------------------------------------------------------------------------
+
+class TestRunVpsGpuSmoke:
+    def test_no_gpu_returns_failure(self, monkeypatch):
+        """Probe 1 fails when nvidia-smi reports no GPU."""
+        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.smoke import run_vps_gpu_smoke
+        monkeypatch.setattr(
+            "depthfusion.install.gpu_probe.detect_gpu",
+            lambda: GPUInfo(False, "", 0.0, 0, "nvidia-smi not found"),
+        )
+        result = run_vps_gpu_smoke()
+        assert result.ok is False
+        assert "GPU probe failed" in result.reason
+
+    def test_no_sentence_transformers_returns_failure(self, monkeypatch):
+        """Probe 2 fails when the extras aren't installed."""
+        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.smoke import run_vps_gpu_smoke
+        monkeypatch.setattr(
+            "depthfusion.install.gpu_probe.detect_gpu",
+            lambda: GPUInfo(True, "RTX 4090", 24.0, 1, "ok"),
+        )
+        import importlib.util as _iu
+        original_find_spec = _iu.find_spec
+        monkeypatch.setattr(
+            _iu, "find_spec",
+            lambda name, *a, **kw: (
+                None if name == "sentence_transformers"
+                else original_find_spec(name, *a, **kw)
+            ),
+        )
+        result = run_vps_gpu_smoke()
+        assert result.ok is False
+        assert "sentence_transformers not importable" in result.reason
+
+    def test_embed_returns_empty_vector_returns_failure(self, monkeypatch):
+        """Probe 3 fails when embed() returns None (e.g., model load failed)."""
+        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.smoke import run_vps_gpu_smoke
+        monkeypatch.setattr(
+            "depthfusion.install.gpu_probe.detect_gpu",
+            lambda: GPUInfo(True, "RTX 4090", 24.0, 1, "ok"),
+        )
+        # Pretend sentence-transformers is importable
+        import importlib.util as _iu
+        monkeypatch.setattr(
+            _iu, "find_spec", lambda name, *a, **kw: object(),
+        )
+        # But the backend returns None
+        from depthfusion.backends.local_embedding import LocalEmbeddingBackend
+
+        class BrokenBackend:
+            def __init__(self):
+                pass
+
+            def embed(self, texts):
+                return None
+
+        monkeypatch.setattr(
+            LocalEmbeddingBackend, "__init__", lambda self: None,
+        )
+        monkeypatch.setattr(
+            LocalEmbeddingBackend, "embed", lambda self, texts: None,
+        )
+        result = run_vps_gpu_smoke()
+        assert result.ok is False
+        assert "returned empty" in result.reason
+
+    def test_all_probes_pass_returns_ok(self, monkeypatch):
+        """Happy path: GPU + extras + functional embed → ok=True."""
+        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.smoke import run_vps_gpu_smoke
+        monkeypatch.setattr(
+            "depthfusion.install.gpu_probe.detect_gpu",
+            lambda: GPUInfo(True, "RTX 4090", 24.0, 1, "ok"),
+        )
+        import importlib.util as _iu
+        monkeypatch.setattr(
+            _iu, "find_spec", lambda name, *a, **kw: object(),
+        )
+        from depthfusion.backends.local_embedding import LocalEmbeddingBackend
+        monkeypatch.setattr(
+            LocalEmbeddingBackend, "__init__", lambda self: None,
+        )
+        monkeypatch.setattr(
+            LocalEmbeddingBackend, "embed",
+            lambda self, texts: [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        )
+        result = run_vps_gpu_smoke()
+        assert result.ok is True
+        assert result.mode == "vps-gpu"
+        # result_count = embedding dimensionality (len of the first vector)
+        assert result.result_count == 5

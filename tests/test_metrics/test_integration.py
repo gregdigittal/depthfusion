@@ -515,6 +515,73 @@ class TestLatencyPerCapability:
         assert re.search(r'"fusion_gates":\s*[\d.]+', raw), raw
 
 
+class TestVectorSearchWiredIntoRecall:
+    """S-62 / T-196: `apply_vector_search` wired between BM25 and gates.
+    Gated on DEPTHFUSION_VECTOR_SEARCH_ENABLED for byte-identity on
+    clean v0.5.x deployments.
+    """
+
+    def test_vector_search_disabled_by_default(self, tmp_path, monkeypatch):
+        """Flag unset → `vector_search` key absent from latency dict."""
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.delenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", raising=False)
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text("# X\n\nredis caching layer\n", encoding="utf-8")
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "redis caching"})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        lat = events[0]["latency_ms_per_capability"]
+        assert "vector_search" not in lat
+
+    def test_vector_search_enabled_times_phase(self, tmp_path, monkeypatch):
+        """Flag on + non-empty pool → `vector_search` entry present and numeric."""
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", "true")
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text("# X\n\nredis caching layer\n", encoding="utf-8")
+
+        from depthfusion.mcp.server import _tool_recall
+        _tool_recall({"query": "redis caching"})
+
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        lat = events[0]["latency_ms_per_capability"]
+        assert "vector_search" in lat
+        assert isinstance(lat["vector_search"], (int, float))
+        assert lat["vector_search"] >= 0.0
+
+    def test_vector_search_degrades_gracefully_with_null_backend(
+        self, tmp_path, monkeypatch,
+    ):
+        """With the default NullBackend (no sentence-transformers), the
+        vector search phase still runs and times itself, but the RRF
+        fusion degrades to BM25-only (since NullBackend.embed returns None).
+        Recall still returns results.
+        """
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", "true")
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")  # → NullBackend for embedding
+        disc = tmp_path / ".claude" / "shared" / "discoveries"
+        disc.mkdir(parents=True)
+        (disc / "sample.md").write_text(
+            "# X\n\nauthentication token refresh flow\n", encoding="utf-8",
+        )
+
+        from depthfusion.mcp.server import _tool_recall
+        result_json = _tool_recall({"query": "authentication"})
+
+        import json as _json
+        result = _json.loads(result_json)
+        assert "blocks" in result
+        # Recall didn't break — some blocks returned
+        # (degradation is silent; observability shows phase ran via latency)
+        events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
+        assert events[0]["event_subtype"] == "ok"
+
+
 class TestObservabilityIsBestEffort:
     def test_broken_metrics_collector_doesnt_break_recall(
         self, tmp_path, monkeypatch,

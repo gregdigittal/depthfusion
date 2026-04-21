@@ -255,6 +255,96 @@ def test_skip_gpu_check_no_warning_when_mode_is_vps_gpu(capsys):
     assert "has no effect" not in captured.err
 
 
+# ---------------------------------------------------------------------------
+# S-62 / T-195: interactive mode auto-select
+# ---------------------------------------------------------------------------
+
+class TestInteractiveModeSelect:
+    def test_yes_flag_auto_accepts_recommendation(self, tmp_path, monkeypatch, capsys):
+        """`--yes` with no `--mode` probes the host and auto-picks the
+        recommended mode without prompting."""
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        # Force no-GPU recommendation
+        from depthfusion.install.gpu_probe import GPUInfo
+        with patch("depthfusion.install.install.detect_gpu",
+                   return_value=GPUInfo(False, "", 0.0, 0, "no gpu")):
+            monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+            rc = install_mod.main(["--yes", "--dry-run"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "mode selection" in captured.out.lower()
+        # No-GPU + no-API-key → recommendation is `local`
+        assert "[1] local" in captured.out
+        assert "[auto-accept]" in captured.out
+        assert "local" in captured.out.lower()
+
+    def test_no_tty_auto_accepts(self, tmp_path, monkeypatch, capsys):
+        """When stdin is not a tty (piped, CI), the installer auto-accepts
+        the recommendation without prompting — even without `--yes`.
+        """
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        from depthfusion.install.gpu_probe import GPUInfo
+        with patch("depthfusion.install.install.detect_gpu",
+                   return_value=GPUInfo(False, "", 0.0, 0, "no gpu")):
+            rc = install_mod.main(["--dry-run"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "[auto-accept]" in captured.out
+
+    def test_recommendation_for_gpu_host_is_vps_gpu(self, tmp_path, monkeypatch, capsys):
+        """With a detected GPU, the recommendation is vps-gpu."""
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        from depthfusion.install.gpu_probe import GPUInfo
+        good_gpu = GPUInfo(True, "RTX 4090", 24.0, 1, "ok")
+        with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
+            with patch("depthfusion.install.install.install_vps_gpu",
+                       return_value=0) as mock_install:
+                rc = install_mod.main(["--yes"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "NVIDIA GPU detected" in captured.out
+        assert "[3] vps-gpu" in captured.out
+        mock_install.assert_called_once()
+
+    def test_recommendation_for_cpu_with_api_key_is_vps_cpu(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """No GPU + DEPTHFUSION_API_KEY set → vps-cpu recommendation."""
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-test")
+        from depthfusion.install.gpu_probe import GPUInfo
+        with patch("depthfusion.install.install.detect_gpu",
+                   return_value=GPUInfo(False, "", 0.0, 0, "no gpu")):
+            rc = install_mod.main(["--yes", "--dry-run"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "DEPTHFUSION_API_KEY is set" in captured.out
+        assert "vps-cpu" in captured.out.lower()
+
+    def test_explicit_mode_skips_recommendation(self, tmp_path, monkeypatch, capsys):
+        """When `--mode` is explicitly provided, no probe/banner runs."""
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        with patch("depthfusion.install.install.detect_gpu") as mock_probe:
+            rc = install_mod.main(["--mode=local", "--dry-run"])
+        assert rc == 0
+        # Probe NOT called when --mode is explicit
+        mock_probe.assert_not_called()
+        captured = capsys.readouterr()
+        # Banner NOT shown
+        assert "mode selection" not in captured.out.lower()
+
+
 def test_register_hooks_uses_runtime_resolved_home(tmp_path, monkeypatch):
     """Regression: _register_hooks() must resolve ~/.claude/settings.json
     at call time, not at module import. Previously these were module-level
