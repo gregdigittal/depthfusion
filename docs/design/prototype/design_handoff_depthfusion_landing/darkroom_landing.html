@@ -1,0 +1,1306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DepthFusion — install (darkroom)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,200;9..144,300;9..144,400;9..144,500&family=JetBrains+Mono:wght@300;400;500&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   DIRECTION 02 — DARKROOM AMBER
+
+   Sodium safelight in a photographer's darkroom. Near-black paper,
+   warm amber glow radiating from behind things. Nothing is pure white.
+   Type is Fraunces — light, editorial, patient. Motion is slow: images
+   develop like prints rising from a tray of chemistry.
+
+   Colors are intentionally warm (reds/ambers/browns). No blue.
+   Edges are soft — shadows fall inward, borders are dotted or faded,
+   film sprocket holes mark sections.
+═══════════════════════════════════════════════════════════════════ */
+:root {
+  --night:      #09070a;        /* deepest */
+  --paper:      #120e0b;        /* panel bg */
+  --paper-2:    #1a140f;        /* raised */
+  --paper-3:    #251c14;        /* lifted */
+  --warm-rule:  #3a2a1e;
+  --amber:      #ff8e3a;        /* sodium safelight */
+  --amber-soft: #c2701f;
+  --ember:      #c2410c;        /* deeper flame */
+  --ember-glow: rgba(255,142,58,.22);
+  --cold:       #3e5b5e;        /* single cold for 'missing' */
+  --ivory:      #efe6d6;        /* warm white */
+  --ivory-2:    #c7b89a;
+  --ivory-3:    #8a7a5f;
+  --ivory-4:    #5a4e3e;
+  --serif:  'Fraunces', 'PP Editorial New', 'Times New Roman', serif;
+  --sans:   'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+  --mono:   'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; background: var(--night); color: var(--ivory);
+  font-family: var(--sans); font-size: 16px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; font-weight: 300;
+  letter-spacing: -0.005em;
+}
+/* a subtle grain over everything — simulated film grain */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+  background-image:
+    radial-gradient(circle at 50% 30%, rgba(255,142,58,.04), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .1 0 0 0 0 0 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+  opacity: .55;
+}
+::selection { background: var(--amber); color: var(--night); }
+a { color: var(--amber); text-decoration: none; }
+a:hover { color: var(--ivory); }
+code { font-family: var(--mono); font-size: .88em; color: var(--amber-soft); }
+
+.shell { max-width: 1220px; margin: 0 auto; padding: 0 44px; position: relative; }
+
+/* ─── nav ─── */
+.nav {
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 24px; align-items: center;
+  padding: 22px 0 20px;
+  border-bottom: 1px solid var(--warm-rule);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--ivory-3);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .mark {
+  width: 28px; height: 28px; position: relative;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--amber), var(--ember) 70%, #2a1006 100%);
+  box-shadow:
+    0 0 24px rgba(255,142,58,.55),
+    inset 0 0 6px rgba(0,0,0,.5),
+    inset -2px -3px 8px rgba(194,65,12,.4);
+  animation: breathe 6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 24px rgba(255,142,58,.55), inset 0 0 6px rgba(0,0,0,.5), inset -2px -3px 8px rgba(194,65,12,.4); }
+  50% { box-shadow: 0 0 36px rgba(255,142,58,.7), inset 0 0 8px rgba(0,0,0,.5), inset -2px -3px 8px rgba(194,65,12,.5); }
+}
+.brand .name { font-family: var(--serif); font-weight: 300; font-size: 20px; color: var(--ivory); letter-spacing: -0.02em; font-variation-settings: 'opsz' 72; }
+.brand .name em { font-style: italic; color: var(--amber); font-weight: 300; }
+.brand .ver { color: var(--ivory-4); margin-left: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; }
+.nav-items { display: flex; gap: 28px; }
+.nav-items a { color: var(--ivory-3); border-bottom: 1px solid transparent; padding-bottom: 1px; transition: all .4s ease; }
+.nav-items a:hover { color: var(--amber); border-bottom-color: var(--amber); }
+.nav-gh {
+  color: var(--ivory-3); padding: 7px 14px;
+  border: 1px solid var(--warm-rule); border-radius: 2px;
+  transition: all .4s ease;
+}
+.nav-gh:hover { color: var(--amber); border-color: var(--amber); background: var(--ember-glow); }
+.nav-escape { color: var(--amber); position: relative; padding-right: 18px; }
+.nav-escape::after { content: '→'; position: absolute; right: 0; top: 0; transition: right .4s ease; }
+.nav-escape:hover::after { right: -4px; }
+
+/* ─── section header ─── */
+.section { padding: 110px 0; border-bottom: 1px solid var(--warm-rule); position: relative; }
+/* film sprocket holes — left & right gutters */
+.section::before, .section::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 12px;
+  background-image: radial-gradient(circle at center, var(--night) 3px, transparent 4px);
+  background-size: 12px 32px; background-repeat: repeat-y;
+  opacity: .5; pointer-events: none;
+}
+.section::before { left: 16px; }
+.section::after { right: 16px; }
+
+.section-hd { margin-bottom: 60px; display: grid; grid-template-columns: 170px 1fr; gap: 40px; align-items: baseline; }
+.section-hd .slate {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--ivory-4); padding-top: 14px; border-top: 1px solid var(--warm-rule);
+}
+.section-hd .slate b { color: var(--amber); font-weight: 500; }
+.section-hd .slate .dots { display: inline-block; margin-left: 6px; letter-spacing: -.05em; color: var(--amber-soft); }
+.section-hd h2 {
+  font-family: var(--serif); font-weight: 200;
+  font-size: clamp(40px, 5vw, 56px); line-height: 1.02; letter-spacing: -0.02em; margin: 0;
+  text-wrap: balance; font-variation-settings: 'opsz' 96;
+}
+.section-hd h2 em { font-style: italic; color: var(--amber); font-weight: 300; }
+.section-hd .sub {
+  margin-top: 18px; font-size: 15px; line-height: 1.6; color: var(--ivory-2); max-width: 58ch; font-weight: 300;
+}
+
+/* ─── hero ─── */
+.hero {
+  position: relative; padding: 90px 0 80px; overflow: hidden;
+  border-bottom: 1px solid var(--warm-rule);
+}
+/* the safelight — a warm glow radiating from upper-right */
+.hero::before {
+  content: ''; position: absolute; top: -200px; right: -200px; width: 800px; height: 800px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,142,58,.18) 0%, rgba(194,65,12,.08) 35%, transparent 70%);
+  pointer-events: none; animation: pulse 8s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .7 } }
+
+.hero-inner { display: grid; grid-template-columns: 1.35fr 1fr; gap: 60px; align-items: center; position: relative; }
+
+.slate-top {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--amber-soft);
+  margin-bottom: 28px; display: flex; align-items: center; gap: 14px;
+}
+.slate-top .pip { width: 5px; height: 5px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.slate-top .sep { color: var(--ivory-4); }
+.hero h1 {
+  font-family: var(--serif); font-weight: 200; font-variation-settings: 'opsz' 144;
+  font-size: clamp(56px, 7vw, 96px); line-height: 0.94; letter-spacing: -0.035em;
+  margin: 0 0 28px;
+  text-wrap: balance;
+}
+.hero h1 em { font-style: italic; color: var(--amber); font-weight: 300; }
+.hero h1 .emerge { display: inline-block; animation: emerge 2.4s cubic-bezier(.4,0,.2,1) both; }
+.hero h1 .emerge:nth-child(2) { animation-delay: .6s; }
+.hero h1 .emerge:nth-child(3) { animation-delay: 1.2s; }
+@keyframes emerge {
+  from { opacity: 0; filter: blur(6px); color: #3a2a1e; }
+  to   { opacity: 1; filter: blur(0); color: var(--ivory); }
+}
+.hero .lede {
+  font-size: 18px; line-height: 1.65; color: var(--ivory-2); max-width: 52ch; font-weight: 300;
+  margin: 0 0 40px;
+  animation: emerge 2.4s cubic-bezier(.4,0,.2,1) 1.8s both;
+}
+.hero-cta { display: flex; gap: 14px; align-items: center; animation: emerge 2s cubic-bezier(.4,0,.2,1) 2.2s both; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 14px 22px; font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+  background: var(--amber); color: var(--night); border: none; cursor: pointer;
+  border-radius: 2px; font-weight: 500;
+  box-shadow: 0 0 30px rgba(255,142,58,.4), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: all .4s cubic-bezier(.4,0,.2,1);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 40px rgba(255,142,58,.6), inset 0 1px 0 rgba(255,255,255,.2); }
+.btn-primary .arr { transition: transform .4s; }
+.btn-primary:hover .arr { transform: translateX(4px); }
+.btn-link { color: var(--ivory-2); font-family: var(--mono); font-size: 12px; letter-spacing: .08em; padding: 14px 6px; border-bottom: 1px solid var(--warm-rule); }
+.btn-link:hover { color: var(--amber); border-bottom-color: var(--amber); }
+
+/* the developing-print in hero-right: a literal darkroom tray */
+.developer {
+  position: relative; aspect-ratio: 1/1; max-width: 420px; margin-left: auto;
+  animation: emerge 3s cubic-bezier(.4,0,.2,1) .4s both;
+}
+.tray {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 20%, var(--paper-3) 0%, var(--paper) 60%, var(--night) 100%);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 4px 20px rgba(0,0,0,.6),
+    inset 0 -2px 8px rgba(255,142,58,.04),
+    0 0 80px rgba(255,142,58,.15);
+  overflow: hidden;
+}
+/* liquid surface */
+.tray::after {
+  content: ''; position: absolute; inset: 6%;
+  background:
+    radial-gradient(ellipse at 40% 30%, rgba(255,142,58,.12), transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(194,65,12,.08), transparent 50%);
+  animation: ripple 9s ease-in-out infinite;
+}
+@keyframes ripple { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.03) } }
+
+/* the print emerging — an abstract graph-like image of a memory network */
+.print {
+  position: absolute; inset: 18%;
+  display: grid; place-items: center;
+  animation: develop 4s cubic-bezier(.4,0,.2,1) 1.2s both;
+}
+@keyframes develop {
+  0%   { opacity: 0; filter: blur(8px) brightness(.4) sepia(.8); }
+  60%  { opacity: .6; filter: blur(3px) brightness(.7) sepia(.4); }
+  100% { opacity: 1; filter: blur(0) brightness(1) sepia(.15); }
+}
+.print svg { width: 100%; height: 100%; overflow: visible; }
+.print svg circle.node { transform-origin: center; }
+.print svg .pulse { animation: nodeBreath 4s ease-in-out infinite; }
+.print svg .pulse:nth-child(2) { animation-delay: .5s; }
+.print svg .pulse:nth-child(3) { animation-delay: 1s; }
+.print svg .pulse:nth-child(4) { animation-delay: 1.5s; }
+.print svg .pulse:nth-child(5) { animation-delay: 2s; }
+@keyframes nodeBreath {
+  0%, 100% { opacity: .5; r: 3; }
+  50%      { opacity: 1; r: 5; }
+}
+.tray-label {
+  position: absolute; bottom: -28px; left: 4px;
+  font-family: var(--mono); font-size: 10px; color: var(--ivory-4); letter-spacing: .18em;
+}
+.tray-label b { color: var(--amber-soft); font-weight: 500; }
+
+/* ─── hero meta strip ─── */
+.meta {
+  margin-top: 80px; padding-top: 28px; border-top: 1px solid var(--warm-rule);
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px;
+  animation: emerge 2s cubic-bezier(.4,0,.2,1) 2.6s both;
+}
+.meta-cell { display: flex; flex-direction: column; gap: 6px; }
+.meta-cell .k { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--ivory-4); }
+.meta-cell .v { font-family: var(--serif); font-size: 22px; font-weight: 300; color: var(--ivory); font-variation-settings: 'opsz' 48; letter-spacing: -0.01em; }
+.meta-cell .v em { color: var(--amber); font-style: italic; }
+.meta-cell .sub { font-family: var(--mono); font-size: 11px; color: var(--ivory-3); }
+
+/* ─── part 1: comparison as photograph plates ─── */
+.plates {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px; position: relative;
+}
+.plate {
+  position: relative; background: var(--paper); border-radius: 6px; overflow: hidden;
+  padding: 28px;
+  box-shadow:
+    0 1px 0 rgba(255,142,58,.03),
+    0 20px 60px rgba(0,0,0,.5),
+    inset 0 0 1px rgba(255,142,58,.1);
+}
+.plate.lost { filter: saturate(.7); }
+.plate.kept {
+  box-shadow:
+    0 1px 0 rgba(255,142,58,.1),
+    0 20px 60px rgba(0,0,0,.5),
+    0 0 60px rgba(255,142,58,.08),
+    inset 0 0 1px rgba(255,142,58,.2);
+}
+.plate-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding-bottom: 18px; border-bottom: 1px solid var(--warm-rule);
+  margin-bottom: 0;
+}
+.plate-title { font-family: var(--serif); font-weight: 300; font-size: 24px; letter-spacing: -0.01em; color: var(--ivory); font-variation-settings: 'opsz' 48; }
+.plate-title em { color: var(--amber); font-style: italic; }
+.plate-title .stamp { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--ivory-4); margin-bottom: 4px; font-weight: 400; }
+.plate-count { font-family: var(--mono); font-size: 12px; color: var(--ivory-3); text-align: right; font-variant-numeric: tabular-nums; }
+.plate-count b { font-family: var(--serif); font-weight: 300; font-size: 28px; letter-spacing: -.02em; display: block; font-variation-settings: 'opsz' 72; }
+.plate.lost .plate-count b { color: var(--cold); }
+.plate.kept .plate-count b { color: var(--amber); }
+
+.stage {
+  position: relative; height: 340px; margin: 24px -8px -8px;
+}
+.svg-stage { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.annot {
+  position: absolute; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 13px;
+  color: var(--amber-soft); letter-spacing: -0.005em; line-height: 1.3; pointer-events: none;
+  max-width: 200px;
+}
+.annot::before { content: '↳ '; font-style: normal; color: var(--amber); }
+.annot.cold { color: var(--cold); }
+.annot.cold::before { color: var(--cold); content: '— '; }
+
+.plate-foot {
+  position: absolute; left: 28px; right: 28px; bottom: 20px;
+  padding-top: 14px; border-top: 1px dashed var(--warm-rule);
+  font-size: 13px; color: var(--ivory-3); font-style: italic; font-family: var(--serif); font-weight: 300;
+}
+
+/* scrub / timeline */
+.timeline {
+  grid-column: 1 / -1; margin-top: 28px;
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 22px; align-items: center;
+  padding: 18px 24px;
+  background: var(--paper); border-radius: 4px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .15em; color: var(--ivory-3);
+}
+.timeline button {
+  background: transparent; border: 1px solid var(--warm-rule); color: var(--ivory-2);
+  font-family: inherit; font-size: inherit; letter-spacing: inherit;
+  padding: 7px 14px; border-radius: 2px; cursor: pointer;
+  transition: all .3s;
+}
+.timeline button:hover { color: var(--amber); border-color: var(--amber); background: var(--ember-glow); }
+.track { position: relative; height: 2px; background: var(--warm-rule); cursor: pointer; }
+.fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--amber); box-shadow: 0 0 12px var(--amber); transition: width .1s linear; }
+.marker { position: absolute; top: -6px; width: 2px; height: 14px; background: var(--ember); transform: translateX(-1px); }
+.marker-label { position: absolute; top: -26px; transform: translateX(-50%); font-size: 9px; color: var(--ember); letter-spacing: .12em; white-space: nowrap; text-transform: uppercase; }
+.time { font-variant-numeric: tabular-nums; min-width: 110px; text-align: right; color: var(--ivory-2); }
+
+/* ─── part 2: install cards ─── */
+.probe {
+  padding: 18px 24px; background: var(--paper); border-radius: 4px;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center;
+  margin-bottom: 40px; font-family: var(--mono); font-size: 13px; color: var(--ivory-2);
+  border: 1px solid transparent;
+  background-image: linear-gradient(var(--paper), var(--paper)), linear-gradient(90deg, var(--amber), transparent 40%);
+  background-origin: border-box; background-clip: padding-box, border-box;
+}
+.probe-orb {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 16px var(--amber), 0 0 32px rgba(255,142,58,.3);
+  animation: orbBreath 2.4s ease-in-out infinite;
+}
+@keyframes orbBreath { 0%, 100% { opacity: 1 } 50% { opacity: .5 } }
+.probe-orb.dim { background: var(--ivory-4); box-shadow: none; animation: none; }
+.probe-orb.warn { background: #c07a28; box-shadow: 0 0 10px rgba(192,122,40,.3); }
+.probe-text { color: var(--ivory-3); }
+.probe-text .host { color: var(--ivory); }
+.probe-text .rec  { color: var(--amber); font-weight: 500; }
+.probe-toggle { display: flex; background: var(--paper-2); border-radius: 3px; padding: 2px; }
+.probe-toggle button {
+  border: none; background: transparent; color: var(--ivory-4);
+  font: inherit; padding: 6px 12px; cursor: pointer; border-radius: 2px; letter-spacing: .06em;
+  transition: all .3s;
+}
+.probe-toggle button.on { background: var(--amber); color: var(--night); }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.card {
+  position: relative; padding: 32px 30px; background: var(--paper);
+  border-radius: 6px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 22px; min-height: 620px;
+  transition: all .4s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 1px 0 rgba(255,142,58,.04), 0 4px 30px rgba(0,0,0,.3);
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 1px 0 rgba(255,142,58,.1), 0 20px 50px rgba(0,0,0,.5), 0 0 50px rgba(255,142,58,.08);
+}
+.card.selected {
+  box-shadow:
+    0 1px 0 rgba(255,142,58,.25),
+    0 20px 60px rgba(0,0,0,.5),
+    0 0 70px rgba(255,142,58,.22),
+    inset 0 0 0 1px rgba(255,142,58,.3);
+}
+.card.recommended::before {
+  content: 'Recommended · fits your host';
+  position: absolute; top: 14px; right: 14px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+  color: var(--amber); padding: 5px 10px; background: var(--ember-glow);
+  border: 1px solid rgba(255,142,58,.25); border-radius: 2px;
+}
+
+.card-slate {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--ivory-4); padding-bottom: 16px; border-bottom: 1px dashed var(--warm-rule);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.card-slate .tier { color: var(--amber-soft); }
+
+.card-head { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.card-name { font-family: var(--serif); font-weight: 200; font-size: 42px; letter-spacing: -0.025em; line-height: 1; margin: 0; font-variation-settings: 'opsz' 96; color: var(--ivory); }
+.card-name em { color: var(--amber); font-style: italic; font-weight: 300; }
+.card-tag { color: var(--ivory-2); font-size: 15px; line-height: 1.5; font-weight: 300; }
+
+.specs { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; font-size: 13px; font-family: var(--mono); }
+.specs li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: baseline; color: var(--ivory-2); }
+.specs li .m { color: var(--amber); font-size: 14px; }
+.specs li.no { color: var(--ivory-4); }
+.specs li.no .m { color: var(--ivory-4); }
+.specs li.warn { color: #d8934a; }
+.specs li.warn .m { color: #d8934a; }
+.specs code { color: var(--amber-soft); background: var(--paper-2); padding: 1px 6px; border-radius: 2px; }
+
+.demo {
+  border-radius: 4px; height: 88px; position: relative; padding: 10px 14px;
+  background:
+    radial-gradient(ellipse at 50% 100%, var(--ember-glow), transparent 70%),
+    var(--paper-2);
+  overflow: hidden;
+}
+.demo .lab { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--ivory-4); text-transform: uppercase; }
+.demo .track { position: absolute; left: 20px; right: 30px; top: 50%; height: 1px; background: var(--warm-rule); }
+.demo .llm {
+  position: absolute; top: 50%; right: 18px; transform: translateY(-50%);
+  width: 14px; height: 14px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--amber), var(--ember));
+  box-shadow: 0 0 14px rgba(255,142,58,.5);
+}
+.demo .tk { position: absolute; top: 50%; left: 24px; transform: translateY(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--amber); filter: blur(.3px); animation: drift 3.5s linear infinite; }
+.demo .tk.s2 { animation-delay: .9s; top: 40%; background: var(--amber-soft); }
+.demo .tk.s3 { animation-delay: 1.8s; top: 60%; }
+.demo .tk.s4 { animation-delay: 2.6s; top: 50%; background: var(--ember); }
+@keyframes drift {
+  0%   { transform: translate(0, -50%); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate(250px, -50%); opacity: 0; }
+}
+
+.cli { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+.cli-label { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--ivory-4); text-transform: uppercase; }
+.cli-block {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 14px; background: var(--night); border-radius: 3px;
+  font-family: var(--mono); font-size: 12px; overflow: hidden;
+  border: 1px solid var(--warm-rule);
+}
+.cli-block code { color: var(--amber); white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+.cli-block code::-webkit-scrollbar { display: none; }
+.cli-block code .p { color: var(--ivory-4); }
+.copy-btn {
+  background: transparent; border: 1px solid var(--warm-rule); color: var(--ivory-3);
+  font: inherit; font-size: 10px; letter-spacing: .14em; padding: 4px 10px; border-radius: 2px; cursor: pointer;
+  transition: all .3s;
+}
+.copy-btn:hover { color: var(--amber); border-color: var(--amber); }
+.copy-btn.copied { color: var(--night); background: var(--amber); border-color: var(--amber); }
+
+.warn-note {
+  display: flex; gap: 10px; padding: 12px 14px; font-size: 12px;
+  background: rgba(192,122,40,.06); border: 1px dashed rgba(216,147,74,.4); border-radius: 3px;
+  color: #d8934a; line-height: 1.5;
+}
+.warn-note code { color: #e5b07a; }
+
+/* ─── part 3: walkthrough — filmstrip ─── */
+.filmstrip {
+  position: relative;
+  background: linear-gradient(90deg, transparent 0, var(--paper) 40px, var(--paper) calc(100% - 40px), transparent 100%);
+  padding: 20px 40px;
+  border-radius: 4px;
+}
+/* sprocket holes on top + bottom */
+.filmstrip::before, .filmstrip::after {
+  content: ''; position: absolute; left: 40px; right: 40px; height: 14px;
+  background-image: radial-gradient(ellipse at center, var(--night) 6px 5px, transparent 7px);
+  background-size: 54px 14px; background-repeat: repeat-x;
+  pointer-events: none;
+}
+.filmstrip::before { top: 0; }
+.filmstrip::after { bottom: 0; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--warm-rule); margin: 14px 0; }
+.step {
+  background: var(--paper); padding: 32px 26px 36px; display: flex; flex-direction: column; gap: 18px;
+  position: relative;
+}
+.step-no {
+  font-family: var(--serif); font-weight: 200; font-size: 64px; letter-spacing: -0.03em;
+  color: var(--amber); line-height: 1; font-variation-settings: 'opsz' 144;
+}
+.step-no sup { font-family: var(--mono); font-size: 10px; color: var(--ivory-4); font-weight: 400; vertical-align: top; margin-left: 6px; letter-spacing: .1em; }
+.step h3 { font-family: var(--serif); font-weight: 300; font-size: 20px; margin: 0; color: var(--ivory); letter-spacing: -0.01em; font-variation-settings: 'opsz' 48; }
+.step-body { font-size: 14px; color: var(--ivory-2); line-height: 1.55; font-weight: 300; }
+.step-body code { background: var(--paper-2); padding: 1px 5px; border-radius: 2px; font-size: 11px; }
+.step-asset {
+  font-family: var(--mono); font-size: 11px; line-height: 1.75;
+  padding: 14px; background: var(--night); border-radius: 3px;
+  color: var(--ivory-2); white-space: pre; overflow-x: auto; scrollbar-width: none;
+  border: 1px solid var(--warm-rule);
+}
+.step-asset::-webkit-scrollbar { display: none; }
+.step-asset .k { color: var(--amber); }
+.step-asset .s { color: #d8934a; }
+.step-asset .v { color: var(--ivory); }
+.step-asset .c { color: var(--ivory-4); }
+
+/* ─── part 4: callouts — developing notes ─── */
+.callout-tier {
+  display: inline-flex; background: var(--paper); border-radius: 3px; padding: 2px;
+  margin-bottom: 32px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+}
+.callout-tier button {
+  border: none; background: transparent; color: var(--ivory-3); padding: 7px 14px;
+  font: inherit; cursor: pointer; border-radius: 2px; transition: all .3s;
+}
+.callout-tier button.on { background: var(--amber); color: var(--night); }
+
+.callouts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.callout {
+  padding: 30px 32px; background: var(--paper); border-radius: 6px;
+  cursor: pointer; position: relative;
+  display: flex; flex-direction: column; gap: 14px; min-height: 220px;
+  transition: all .6s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 2px 0 rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,142,58,.03);
+}
+.callout:hover {
+  box-shadow: 0 2px 0 rgba(0,0,0,.3), 0 20px 60px rgba(0,0,0,.5), 0 0 60px rgba(255,142,58,.1), inset 0 0 0 1px rgba(255,142,58,.18);
+}
+.callout .stamp {
+  position: absolute; top: 20px; right: 24px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--ivory-4);
+}
+.callout h4 {
+  font-family: var(--serif); font-weight: 200; font-size: 26px; letter-spacing: -0.015em;
+  line-height: 1.15; margin: 0; color: var(--ivory); max-width: 90%; font-variation-settings: 'opsz' 72;
+}
+.callout h4 em { font-style: italic; color: var(--amber); font-weight: 300; }
+.callout .hint { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--ivory-4); text-transform: uppercase; }
+.callout .reveal {
+  font-size: 14px; color: var(--ivory-2); line-height: 1.65; font-weight: 300;
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height .8s cubic-bezier(.4,0,.2,1), opacity .4s;
+}
+.callout:hover .reveal { max-height: 260px; opacity: 1; }
+.callout .reveal code { color: var(--amber-soft); background: var(--paper-2); padding: 1px 5px; border-radius: 2px; font-size: 12px; }
+.callout-link { color: var(--amber); font-family: var(--mono); font-size: 11px; letter-spacing: .08em; margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* ─── part 5: metrics — contact sheet ─── */
+.contact {
+  display: grid; grid-template-columns: 1.5fr 1fr;
+  background: var(--paper); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.sheet {
+  position: relative; background: var(--night);
+  border-right: 1px solid var(--warm-rule);
+}
+.sheet-head {
+  padding: 14px 22px; border-bottom: 1px solid var(--warm-rule);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 10px; color: var(--ivory-4); letter-spacing: .12em; text-transform: uppercase;
+}
+.sheet-head .path { color: var(--ivory-2); letter-spacing: 0; text-transform: none; font-size: 12px; }
+.sheet-head .live { color: var(--amber); display: flex; align-items: center; gap: 7px; }
+.sheet-head .live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: orbBreath 2.4s infinite; }
+.sheet-body {
+  padding: 18px 22px; height: 420px; overflow: hidden;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.75;
+}
+.entry {
+  margin-bottom: 14px; padding: 14px 16px; background: var(--paper);
+  border-left: 2px solid var(--amber); color: var(--ivory-2); border-radius: 0 3px 3px 0;
+  animation: appear 1s cubic-bezier(.4,0,.2,1);
+  box-shadow: -12px 0 24px -12px rgba(255,142,58,.1);
+}
+@keyframes appear {
+  from { opacity: 0; transform: translateX(18px); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+.entry .k { color: #d8934a; }
+.entry .s { color: var(--amber); }
+.entry .n { color: #eac26f; font-variant-numeric: tabular-nums; }
+.entry .p { color: var(--ivory-4); }
+
+.receipts { padding: 32px 36px; display: flex; flex-direction: column; gap: 22px; }
+.receipts .lede {
+  font-family: var(--serif); font-weight: 200; font-size: 22px; letter-spacing: -0.01em;
+  color: var(--ivory); line-height: 1.3; font-variation-settings: 'opsz' 72;
+}
+.receipts .lede em { font-style: italic; color: var(--amber); font-weight: 300; }
+.receipts .sub { font-size: 13px; color: var(--ivory-3); line-height: 1.55; font-weight: 300; }
+.receipts .sub code { color: var(--amber-soft); }
+.stat {
+  padding-top: 20px; border-top: 1px solid var(--warm-rule);
+  display: flex; flex-direction: column; gap: 5px;
+}
+.stat .k { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--ivory-4); }
+.stat .v { font-family: var(--serif); font-weight: 200; font-size: 44px; color: var(--amber); line-height: 1; letter-spacing: -0.025em; font-variation-settings: 'opsz' 144; }
+.stat .v .unit { font-size: 18px; color: var(--ivory-3); margin-left: 2px; font-weight: 300; }
+.stat .v.mono { font-family: var(--mono); font-size: 16px; color: var(--ivory); letter-spacing: 0; font-weight: 400; }
+.stat .note { font-family: var(--mono); font-size: 10px; color: var(--ivory-4); letter-spacing: .08em; }
+
+/* ─── footer ─── */
+.foot {
+  padding: 40px 0; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; color: var(--ivory-4); text-transform: uppercase;
+}
+.foot a { color: var(--ivory-3); margin-left: 20px; }
+.foot a:hover { color: var(--amber); }
+.foot .signoff { font-family: var(--serif); font-style: italic; font-weight: 300; letter-spacing: -0.005em; font-size: 13px; text-transform: none; color: var(--ivory-3); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<nav class="nav">
+  <div class="brand">
+    <div class="mark"></div>
+    <div><span class="name">Depth<em>Fusion</em></span> <span class="ver">v0.5.2</span></div>
+  </div>
+  <div class="nav-items">
+    <a href="#how">develop</a>
+    <a href="#install">install</a>
+    <a href="#metrics">receipts</a>
+  </div>
+  <a href="#" class="nav-gh">github ↗</a>
+  <a href="#install" class="nav-escape">i prefer the cli</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="slate-top"><span class="pip"></span><span>Plate&nbsp;00</span><span class="sep">/</span><span>Cross-session memory</span><span class="sep">/</span><span>Safelight · 590nm</span></div>
+      <h1><span class="emerge">A memory</span> <span class="emerge"><em>that develops</em></span> <span class="emerge">between sessions.</span></h1>
+      <p class="lede">DepthFusion is an open-source retrieval layer for Claude&nbsp;Code. It writes every session to disk and, on the next turn, hands the relevant parts back in — slowly, patiently, through three layers of recall. Context no longer disappears when the window compacts. It keeps developing.</p>
+      <div class="hero-cta">
+        <button class="btn-primary">
+          Begin the installer
+          <svg class="arr" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+        </button>
+        <a href="#install" class="btn-link">or read the sequence</a>
+      </div>
+    </div>
+    <div class="developer">
+      <div class="tray"></div>
+      <div class="print">
+        <svg viewBox="0 0 200 200" fill="none">
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="1.6" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- connective lines -->
+          <g stroke="#c2410c" stroke-width=".7" opacity=".55">
+            <path d="M40 60 L100 100 L160 45"/>
+            <path d="M100 100 L55 160"/>
+            <path d="M100 100 L150 150"/>
+            <path d="M40 60 L55 160"/>
+            <path d="M160 45 L150 150"/>
+            <path d="M100 60 L100 100"/>
+            <path d="M100 100 L110 140"/>
+          </g>
+          <g fill="#ff8e3a" filter="url(#glow)">
+            <circle class="node pulse" cx="100" cy="100" r="5"/>
+            <circle class="node pulse" cx="40" cy="60" r="4"/>
+            <circle class="node pulse" cx="160" cy="45" r="3.5"/>
+            <circle class="node pulse" cx="55" cy="160" r="3.5"/>
+            <circle class="node pulse" cx="150" cy="150" r="3"/>
+            <circle class="node" cx="100" cy="60" r="2.5" opacity=".7"/>
+            <circle class="node" cx="110" cy="140" r="2.5" opacity=".6"/>
+          </g>
+        </svg>
+      </div>
+      <div class="tray-label"><b>tray 01</b> · developer · 20°C · <b>47 fragments</b> emerging</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div class="meta-cell"><span class="k">release</span><span class="v">v0.5.2 <em>stable</em></span><span class="sub">apache-2.0</span></div>
+    <div class="meta-cell"><span class="k">install</span><span class="v"><em>three</em> modes</span><span class="sub">local · cpu · gpu</span></div>
+    <div class="meta-cell"><span class="k">runtime</span><span class="v">python <em>3.11+</em></span><span class="sub">claude code ≥ 0.4</span></div>
+    <div class="meta-cell"><span class="k">footprint</span><span class="v"><em>50 MB</em> →  2.4 GB</span><span class="sub">by tier</span></div>
+  </div>
+</section>
+
+<!-- PART 1 : PLATES -->
+<section class="section" id="how">
+  <div class="shell" style="max-width:none;padding:0">
+    <div class="section-hd">
+      <div class="slate"><b>Plate 01</b> · Comparison<span class="dots"> •••</span></div>
+      <div>
+        <h2>Context leaves. With DepthFusion, <em>it comes back.</em></h2>
+        <div class="sub">Same conversation. Same 200k context window. At t = 12 s the host compacts. Watch what the left plate loses — and what the right plate keeps, developing.</div>
+      </div>
+    </div>
+
+    <div class="plates">
+      <div class="plate lost">
+        <div class="plate-head">
+          <div class="plate-title"><span class="stamp">Without DepthFusion</span>a fading memory</div>
+          <div class="plate-count"><b id="factsLeft">47</b>facts kept · of 47</div>
+        </div>
+        <div class="stage" id="stageLeft">
+          <svg class="svg-stage" viewBox="0 0 500 340" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id="lostGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#3e5b5e" stop-opacity=".6"/>
+                <stop offset="100%" stop-color="#3e5b5e" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect x="330" y="30" width="150" height="280" fill="none" stroke="#3a2a1e" stroke-width="1" stroke-dasharray="4 4"/>
+            <text x="405" y="22" fill="#5a4e3e" font-family="JetBrains Mono" font-size="9" text-anchor="middle" letter-spacing="2">CONTEXT · 200k</text>
+            <rect id="compactHatchL" x="330" y="30" width="150" height="280" fill="url(#lostGlow)" opacity="0"/>
+          </svg>
+          <div class="annot" style="top:20px;left:20px;max-width:160px">each turn · words drift toward the edge</div>
+          <div class="annot cold" style="bottom:30px;left:20px;max-width:180px">post-compact · a thin summary is all that survives</div>
+        </div>
+        <div class="plate-foot">Unaided, the model sees ~6% of what it said an hour ago.</div>
+      </div>
+
+      <div class="plate kept">
+        <div class="plate-head">
+          <div class="plate-title"><span class="stamp">With DepthFusion</span>a memory that <em>develops</em></div>
+          <div class="plate-count"><b id="factsRight">47</b>facts kept · of 47</div>
+        </div>
+        <div class="stage" id="stageRight">
+          <svg class="svg-stage" viewBox="0 0 500 340" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id="llmGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ff8e3a" stop-opacity=".35"/>
+                <stop offset="100%" stop-color="#ff8e3a" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <!-- glow behind LLM -->
+            <circle cx="180" cy="170" r="70" fill="url(#llmGlow)"/>
+            <circle id="llmR" cx="180" cy="170" r="16" fill="#ff8e3a" opacity=".9"/>
+            <text x="180" y="174" fill="#120e0b" font-family="JetBrains Mono" font-size="9" text-anchor="middle" letter-spacing="1">LLM</text>
+
+            <!-- layer plates -->
+            <g font-family="JetBrains Mono" font-size="9" letter-spacing="1.5">
+              <rect class="lyr" data-lyr="bm25" x="340" y="30" width="130" height="48" rx="2" fill="#120e0b" stroke="#3a2a1e"/>
+              <text x="405" y="51" text-anchor="middle" fill="#c7b89a">BM25</text>
+              <text x="405" y="66" text-anchor="middle" fill="#5a4e3e" font-size="8">keyword</text>
+
+              <rect class="lyr" data-lyr="emb" x="340" y="110" width="130" height="48" rx="2" fill="#120e0b" stroke="#3a2a1e"/>
+              <text x="405" y="131" text-anchor="middle" fill="#c7b89a">EMBEDDINGS</text>
+              <text x="405" y="146" text-anchor="middle" fill="#5a4e3e" font-size="8">semantic</text>
+
+              <rect class="lyr" data-lyr="kg" x="340" y="190" width="130" height="48" rx="2" fill="#120e0b" stroke="#3a2a1e"/>
+              <text x="405" y="211" text-anchor="middle" fill="#c7b89a">KNOWLEDGE GRAPH</text>
+              <text x="405" y="226" text-anchor="middle" fill="#5a4e3e" font-size="8">entity · edge · time</text>
+            </g>
+
+            <!-- vault -->
+            <rect x="40" y="280" width="280" height="40" rx="3" fill="#120e0b" stroke="#3a2a1e"/>
+            <rect id="vaultFillR" x="40" y="280" width="0" height="40" rx="3" fill="#ff8e3a" opacity=".25"/>
+            <text x="56" y="305" font-family="JetBrains Mono" font-size="10" fill="#c7b89a">VAULT · ~/.claude/shared/discoveries</text>
+            <text id="vaultNR" x="308" y="305" font-family="JetBrains Mono" font-size="11" fill="#ff8e3a" text-anchor="end" font-weight="500">0/47</text>
+
+            <!-- lines from layers -->
+            <g id="arrowsR" stroke="#ff8e3a" stroke-width="1" fill="none" opacity=".7" stroke-dasharray="2 4">
+              <path d="M340 54 C 280 54, 240 120, 200 160" data-from="bm25"/>
+              <path d="M340 134 C 280 134, 240 160, 200 170" data-from="emb"/>
+              <path d="M340 214 C 280 214, 240 180, 200 180" data-from="kg"/>
+            </g>
+
+            <!-- save to vault -->
+            <path id="saveArr" d="M180 186 L180 280" stroke="#ff8e3a" stroke-width="1" fill="none" opacity=".3" stroke-dasharray="1 3"/>
+          </svg>
+          <div class="annot" style="top:20px;left:40%;max-width:180px">three layers of recall fire before each turn</div>
+          <div class="annot" style="bottom:70px;left:180px;max-width:200px">compaction triggers a write · next turn pulls it back</div>
+        </div>
+        <div class="plate-foot">The print never fades; it only develops further.</div>
+      </div>
+
+      <div class="timeline">
+        <button id="playBtn">⏸ pause</button>
+        <div class="track" id="track">
+          <div class="fill" id="prog"></div>
+          <div class="marker-label" style="left:60%">compact</div>
+          <div class="marker" style="left:60%"></div>
+        </div>
+        <span class="time" id="time">00.0 / 20.0 s</span>
+        <button id="resetBtn">↺ reset</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 2 : INSTALL CARDS -->
+<section class="section" id="install">
+  <div class="shell" style="max-width:none;padding:0">
+    <div class="section-hd">
+      <div class="slate"><b>Plate 02</b> · Installer<span class="dots"> •••</span></div>
+      <div>
+        <h2>Three ways to install. One <em>upgrade path</em>.</h2>
+        <div class="sub">DepthFusion probes your host and recommends a tier. Modes stack: start <em>local</em>, add an API key for <em>vps-cpu</em>, add a GPU for <em>vps-gpu</em>. Everything you've already stored moves forward.</div>
+      </div>
+    </div>
+
+    <div class="probe">
+      <div class="probe-orb" id="probeOrb"></div>
+      <div class="probe-text" id="probeText">probing <code>/api/probe-host</code> …</div>
+      <div class="probe-toggle">
+        <button data-probe="nogpu">no gpu</button>
+        <button data-probe="cpu">cpu vps</button>
+        <button data-probe="gpu" class="on">gpu · 24gb</button>
+      </div>
+    </div>
+
+    <div class="cards" id="cards">
+      <div class="card" data-mode="local">
+        <div class="card-slate"><span>tier 0</span><span class="tier">local</span></div>
+        <div class="card-head">
+          <h3 class="card-name"><em>local</em></h3>
+          <div class="card-tag">BM25 keyword retrieval. No network, no keys, no GPU. Discoveries stay on your disk.</div>
+        </div>
+        <ul class="specs">
+          <li><span class="m">✓</span>no API key · no external calls</li>
+          <li><span class="m">✓</span>no GPU required</li>
+          <li><span class="m">✓</span>~50 MB install footprint</li>
+          <li class="no"><span class="m">·</span>no semantic embeddings</li>
+          <li class="no"><span class="m">·</span>no on-box LLM</li>
+        </ul>
+        <div class="demo">
+          <div class="lab">bm25 · single pass</div>
+          <div class="track"></div><div class="llm"></div>
+          <div class="tk"></div>
+        </div>
+        <div class="cli">
+          <div class="cli-label">▾ install</div>
+          <div class="cli-block">
+            <code><span class="p">$</span> python -m depthfusion.install.install --mode=local</code>
+            <button class="copy-btn" data-copy="python -m depthfusion.install.install --mode=local">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-mode="cpu">
+        <div class="card-slate"><span>tier 1</span><span class="tier">vps-cpu</span></div>
+        <div class="card-head">
+          <h3 class="card-name"><em>vps-cpu</em></h3>
+          <div class="card-tag">Adds Haiku reranking and ChromaDB vector search. Tier-2 auto-promotes at 500 sessions.</div>
+        </div>
+        <ul class="specs">
+          <li><span class="m">✓</span>semantic reranking · Anthropic Haiku</li>
+          <li><span class="m">✓</span>auto vector promotion at 500 sessions</li>
+          <li><span class="m">✓</span>requires <code>DEPTHFUSION_API_KEY</code></li>
+          <li class="no"><span class="m">·</span>no on-box LLM</li>
+          <li class="no"><span class="m">·</span>~180 MB install footprint</li>
+        </ul>
+        <div class="demo">
+          <div class="lab">bm25 + semantic rerank</div>
+          <div class="track"></div><div class="llm"></div>
+          <div class="tk"></div><div class="tk s2"></div>
+        </div>
+        <div class="cli">
+          <div class="cli-label">▾ install</div>
+          <div class="cli-block">
+            <code><span class="p">$</span> python -m depthfusion.install.install --mode=vps-cpu</code>
+            <button class="copy-btn" data-copy="python -m depthfusion.install.install --mode=vps-cpu">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card recommended selected" data-mode="gpu">
+        <div class="card-slate"><span>tier 2</span><span class="tier">vps-gpu</span></div>
+        <div class="card-head">
+          <h3 class="card-name"><em>vps-gpu</em></h3>
+          <div class="card-tag">Gemma on-box · local embeddings. Lowest latency, full cloud-independence, parallel fusion gates.</div>
+        </div>
+        <ul class="specs">
+          <li><span class="m">✓</span>all LLM work on-box via Gemma</li>
+          <li><span class="m">✓</span>local sentence-transformers embeddings</li>
+          <li><span class="m">✓</span>byte-identical to cloud · T-121 verified</li>
+          <li class="warn"><span class="m">⚠</span>NVIDIA · CUDA 12+ · ≥ 12 GB VRAM</li>
+        </ul>
+        <div class="demo">
+          <div class="lab">bm25 + local emb + graph · parallel</div>
+          <div class="track"></div><div class="llm"></div>
+          <div class="tk"></div><div class="tk s2"></div><div class="tk s3"></div><div class="tk s4"></div>
+        </div>
+        <div class="cli">
+          <div class="cli-label">▾ install</div>
+          <div class="cli-block">
+            <code><span class="p">$</span> python -m depthfusion.install.install --mode=vps-gpu</code>
+            <button class="copy-btn" data-copy="python -m depthfusion.install.install --mode=vps-gpu">copy</button>
+          </div>
+          <div class="cli-label">▾ smoke test · validates GPU path</div>
+          <div class="cli-block">
+            <code><span class="p">$</span> python -c "from depthfusion.install.smoke import run_vps_gpu_smoke; print(run_vps_gpu_smoke())"</code>
+            <button class="copy-btn" data-copy='python -c "from depthfusion.install.smoke import run_vps_gpu_smoke; print(run_vps_gpu_smoke())"'>copy</button>
+          </div>
+        </div>
+        <div class="warn-note" id="gpuWarn" style="display:none">
+          <span>⚠</span>
+          <span>no NVIDIA GPU detected on this host. install still runs, but the local embedding backend falls back to <code>NullBackend</code>.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 3 : FILMSTRIP -->
+<section class="section">
+  <div class="shell" style="max-width:none;padding:0">
+    <div class="section-hd">
+      <div class="slate"><b>Plate 03</b> · Sequence<span class="dots"> •••</span></div>
+      <div>
+        <h2>What the installer <em>does</em>, in four frames.</h2>
+        <div class="sub" id="walkModeLabel">Sequence for <em style="color:var(--amber);font-style:italic">vps-gpu</em> — change modes above to see the diff.</div>
+      </div>
+    </div>
+
+    <div class="filmstrip">
+      <div class="steps">
+        <div class="step">
+          <div class="step-no">01<sup>/04</sup></div>
+          <h3>Install extras</h3>
+          <div class="step-body">Pulls the exact extras for your tier. Local is a no-op; GPU pulls vLLM.</div>
+          <div class="step-asset" id="stepExtras"><span class="c"># pip install 'depthfusion[vps-gpu]'</span>
+<span class="k">requires</span>  <span class="v">sentence-transformers</span>
+<span class="k">requires</span>  <span class="v">chromadb</span>
+<span class="k">requires</span>  <span class="v">vllm</span>  <span class="c"># gemma runtime</span></div>
+        </div>
+        <div class="step">
+          <div class="step-no">02<sup>/04</sup></div>
+          <h3>Write <code>depthfusion.env</code></h3>
+          <div class="step-body">Tier-specific env vars land in <code>~/.claude/depthfusion.env</code>, sourced by every future recall.</div>
+          <div class="step-asset" id="stepEnv"><span class="c"># ~/.claude/depthfusion.env</span>
+<span class="k">DEPTHFUSION_MODE</span>=<span class="v">vps-gpu</span>
+<span class="k">DEPTHFUSION_EMBEDDING_BACKEND</span>=<span class="v">local</span>
+<span class="k">DEPTHFUSION_RERANKER_BACKEND</span>=<span class="v">gemma</span>
+<span class="k">DEPTHFUSION_GEMMA_URL</span>=<span class="v">http://localhost:8000</span></div>
+        </div>
+        <div class="step">
+          <div class="step-no">03<sup>/04</sup></div>
+          <h3>Register hooks</h3>
+          <div class="step-body">Claude Code's <code>settings.json</code> gains <code>PreCompact</code> + <code>PostCompact</code> entries.</div>
+          <div class="step-asset"><span class="c">// .claude/settings.json</span>
+<span class="k">"hooks"</span>: {
+  <span class="k">"PreCompact"</span>:  [<span class="s">"df-precompact"</span>],
+  <span class="k">"PostCompact"</span>: [<span class="s">"df-postcompact"</span>]
+}</div>
+        </div>
+        <div class="step">
+          <div class="step-no">04<sup>/04</sup></div>
+          <h3>First recall</h3>
+          <div class="step-body">A smoke query writes the first <code>-recall.jsonl</code> entry. <code>backend_summary()</code> now returns live data.</div>
+          <div class="step-asset"><span class="c"># smoke test</span>
+<span class="k">✓</span> recall_query       <span class="v">ok</span>
+<span class="k">✓</span> wrote              <span class="v">2026-04-21-recall.jsonl</span>
+<span class="k">✓</span> backend_summary()  <span class="v">reachable</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 4 : CALLOUTS -->
+<section class="section">
+  <div class="shell" style="max-width:none;padding:0">
+    <div class="section-hd">
+      <div class="slate"><b>Plate 04</b> · Notes<span class="dots"> •••</span></div>
+      <div>
+        <h2>Why <em>this tier</em> is actually the right one.</h2>
+        <div class="sub">Notes worth reading before you commit. Each one develops on hover.</div>
+      </div>
+    </div>
+    <div class="callout-tier" id="coPick">
+      <button data-tier="local">local</button>
+      <button data-tier="cpu">vps-cpu</button>
+      <button data-tier="gpu" class="on">vps-gpu</button>
+    </div>
+    <div class="callouts" id="callouts"></div>
+  </div>
+</section>
+
+<!-- PART 5 : CONTACT SHEET -->
+<section class="section" id="metrics">
+  <div class="shell" style="max-width:none;padding:0">
+    <div class="section-hd">
+      <div class="slate"><b>Plate 05</b> · Receipts<span class="dots"> •••</span></div>
+      <div>
+        <h2>Every query leaves <em>a receipt</em>.</h2>
+        <div class="sub">Structured metrics per recall, aggregated via <code>backend_summary()</code>. No external telemetry; the file is yours.</div>
+      </div>
+    </div>
+
+    <div class="contact">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="path">~/.claude/metrics/2026-04-21-recall.jsonl</div>
+          <div class="live">streaming</div>
+        </div>
+        <div class="sheet-body" id="metricsBody"></div>
+      </div>
+      <div class="receipts">
+        <div class="lede">A <em>structured line</em> per query — timings per capability, backends, result count.</div>
+        <div class="sub">Aggregate locally via <code>backend_summary()</code>. The log file is append-only plain JSONL; grep it, pipe it into DuckDB, don't tell anyone.</div>
+        <div class="stat">
+          <div class="k">p50 · vps-gpu</div>
+          <div class="v">201.7<span class="unit">ms</span></div>
+          <div class="note">vector · gates · reranker</div>
+        </div>
+        <div class="stat">
+          <div class="k">queries · session</div>
+          <div class="v" id="queryCt">0</div>
+          <div class="note">local write · stays on box</div>
+        </div>
+        <div class="stat">
+          <div class="k">backends in use</div>
+          <div class="v mono">gemma · local_embedding</div>
+          <div class="note">zero external API calls</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="signoff">Depth<em style="color:var(--amber)">Fusion</em> · open source · apache-2.0 · printed in the dark.</div>
+  <div>
+    <a href="#">docs</a><a href="#">changelog</a><a href="#">github</a><a href="#">discord</a>
+  </div>
+</footer>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   COMPARISON ANIMATION — slow, patient
+   ═══════════════════════════════════════════════════════════════ */
+const LOOP_MS = 20000;
+const COMPACT_AT = 0.6;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const anim = { t: 0, playing: !reduceMotion, last: performance.now() };
+
+const stageL = document.getElementById('stageLeft');
+const stageR = document.getElementById('stageRight');
+const factsLeft = document.getElementById('factsLeft');
+const factsRight = document.getElementById('factsRight');
+const vaultFillR = document.getElementById('vaultFillR');
+const vaultNR = document.getElementById('vaultNR');
+const prog = document.getElementById('prog');
+const timeEl = document.getElementById('time');
+const compactHatchL = document.getElementById('compactHatchL');
+const arrowsR = [...document.querySelectorAll('#arrowsR path')];
+const layerRects = [...document.querySelectorAll('#stageRight .lyr')];
+const saveArr = document.getElementById('saveArr');
+
+function mkOrb(parent, opts={}) {
+  const e = document.createElement('div');
+  const sz = opts.size || 7;
+  e.style.cssText = `position:absolute;width:${sz}px;height:${sz}px;border-radius:50%;background:${opts.color||'#ff8e3a'};box-shadow:0 0 ${sz*2}px ${opts.color||'#ff8e3a'};pointer-events:none;filter:blur(.2px);transition:opacity .6s,filter .6s;`;
+  parent.appendChild(e); return e;
+}
+const TURN = 10;
+const orbsL = Array.from({length: TURN}, () => mkOrb(stageL, { color: '#c7b89a', size: 6 }));
+const orbsR = Array.from({length: TURN}, () => mkOrb(stageR, { color: '#ff8e3a', size: 6 }));
+const frags = Array.from({length: 5}, () => mkOrb(stageR, { color: '#ff8e3a', size: 4 }));
+
+function loop(now) {
+  if (anim.playing) anim.t = (anim.t + (now - anim.last)) % LOOP_MS;
+  anim.last = now;
+  render(anim.t / LOOP_MS);
+  requestAnimationFrame(loop);
+}
+
+function render(p) {
+  prog.style.width = (p * 100) + '%';
+  timeEl.textContent = `${(p * 20).toFixed(1).padStart(4, '0')} / 20.0 s`;
+
+  const wL = stageL.clientWidth, hL = stageL.clientHeight;
+  const wR = stageR.clientWidth, hR = stageR.clientHeight;
+  const postCompact = p > COMPACT_AT;
+
+  // LEFT — fragments drift toward context window and vanish post-compact
+  const edge = wL * 0.66;
+  for (let i = 0; i < TURN; i++) {
+    const o = orbsL[i];
+    const born = i / TURN;
+    if (p < born) { o.style.opacity = '0'; continue; }
+    const age = p - born;
+    const survivor = i < 2;
+    if (postCompact && !survivor) {
+      const t = (p - COMPACT_AT) / (1 - COMPACT_AT);
+      o.style.opacity = String(Math.max(0, 1 - t * 1.6));
+      o.style.filter = `blur(${t * 3}px)`;
+    } else {
+      o.style.opacity = '1';
+      o.style.filter = 'blur(.2px)';
+    }
+    const x = 30 + age * (edge - 20) + Math.sin(i + p * 2) * 4;
+    const y = 80 + (i % 6) * 36 + Math.cos(i * 2 + p * 3) * 3;
+    o.style.left = Math.min(x, edge + 40 + (i % 4) * 18) + 'px';
+    o.style.top = y + 'px';
+  }
+  compactHatchL.setAttribute('opacity', postCompact ? '0.9' : '0');
+
+  // RIGHT — fragments orbit the LLM; at compact they drift into the vault
+  for (let i = 0; i < TURN; i++) {
+    const o = orbsR[i];
+    const born = i / TURN;
+    if (p < born) { o.style.opacity = '0'; continue; }
+    const cx = wR * (180 / 500), cy = hR * (170 / 340);
+    const ang = (i / TURN) * Math.PI * 2 + p * 1.4;
+    const r = 55 + (i % 3) * 10 + Math.sin(p * 4 + i) * 3;
+    let x = cx + Math.cos(ang) * r - 3;
+    let y = cy + Math.sin(ang) * r - 3;
+    if (postCompact) {
+      const t = (p - COMPACT_AT) / (1 - COMPACT_AT);
+      if (i < TURN - 1) {
+        const vx = wR * ((60 + (i * 22)) / 500);
+        const vy = hR * (298 / 340);
+        x += (vx - x) * t;
+        y += (vy - y) * t;
+        o.style.opacity = String(Math.max(.4, 1 - t * 0.5));
+      }
+    } else {
+      o.style.opacity = '1';
+    }
+    o.style.left = x + 'px';
+    o.style.top = y + 'px';
+  }
+
+  // layer plates pulse, fragments ride toward LLM
+  const turnPhase = (p * TURN) % 1;
+  layerRects.forEach((el, ix) => {
+    const stagger = ix * 0.18;
+    const firing = turnPhase > stagger && turnPhase < stagger + 0.3;
+    el.setAttribute('fill', firing ? '#2a1a10' : '#120e0b');
+    el.setAttribute('stroke', firing ? '#ff8e3a' : '#3a2a1e');
+    arrowsR[ix]?.setAttribute('opacity', firing ? '0.9' : '0.3');
+  });
+  frags.forEach((f, ix) => {
+    const layer = ix % 3;
+    const stagger = layer * 0.18 + (ix > 2 ? 0.08 : 0);
+    const local = turnPhase - stagger;
+    if (local < 0 || local > 0.3) { f.style.opacity = '0'; return; }
+    const t = local / 0.3;
+    const lyrY = [54, 134, 214][layer];
+    const fromX = wR * (405 / 500), fromY = hR * (lyrY / 340);
+    const toX = wR * (180 / 500) - 2, toY = hR * (170 / 340) - 2;
+    f.style.left = (fromX + (toX - fromX) * t) + 'px';
+    f.style.top = (fromY + (toY - fromY) * t) + 'px';
+    f.style.opacity = String(t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1);
+  });
+
+  saveArr.setAttribute('opacity', postCompact ? '0.85' : '0.1');
+
+  // counters
+  const fL = p < COMPACT_AT ? Math.max(2, Math.ceil(47 - p * 45)) : 2;
+  factsLeft.textContent = fL;
+  factsRight.textContent = 47;
+  const vp = Math.min(1, Math.max(0, (p - 0.05) / 0.9));
+  vaultFillR.setAttribute('width', (vp * 280).toFixed(1));
+  vaultNR.textContent = Math.floor(vp * 47) + '/47';
+}
+
+document.getElementById('playBtn').onclick = (e) => {
+  anim.playing = !anim.playing;
+  e.currentTarget.textContent = anim.playing ? '⏸ pause' : '▶ play';
+  anim.last = performance.now();
+};
+document.getElementById('resetBtn').onclick = () => { anim.t = 0; };
+document.getElementById('track').onclick = (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  anim.t = ((e.clientX - r.left) / r.width) * LOOP_MS;
+};
+requestAnimationFrame(loop);
+
+/* ═══════════════════════════════════════════════════════════════
+   PROBE · CARDS · WALKTHROUGH
+   ═══════════════════════════════════════════════════════════════ */
+const probeOrb = document.getElementById('probeOrb');
+const probeText = document.getElementById('probeText');
+const walkLabel = document.getElementById('walkModeLabel');
+const gpuWarn = document.getElementById('gpuWarn');
+const stepExtras = document.getElementById('stepExtras');
+const stepEnv = document.getElementById('stepEnv');
+
+const probeStates = {
+  gpu:   { orb: '',     text: `detected <span class="host">NVIDIA A10G · 24 GB VRAM · CUDA 12.4</span> — <span class="rec">recommending vps-gpu</span>`, rec: 'gpu' },
+  cpu:   { orb: 'warn', text: `detected <span class="host">cloud host · no GPU · 8 vCPU</span> — <span class="rec">recommending vps-cpu</span>`, rec: 'cpu' },
+  nogpu: { orb: 'dim',  text: `detected <span class="host">workstation · no GPU</span> — <span class="rec">recommending local</span>`, rec: 'local' },
+};
+
+const modeData = {
+  local: {
+    label: 'Sequence for <em style="color:var(--amber);font-style:italic">local</em> — change modes above to see the diff.',
+    extras: `<span class="c"># pip install 'depthfusion'</span>\n<span class="k">requires</span>  <span class="v">rank_bm25</span>\n<span class="c"># no external extras needed</span>`,
+    env: `<span class="c"># ~/.claude/depthfusion.env</span>\n<span class="k">DEPTHFUSION_MODE</span>=<span class="v">local</span>\n<span class="k">DEPTHFUSION_EMBEDDING_BACKEND</span>=<span class="v">null</span>\n<span class="k">DEPTHFUSION_RERANKER_BACKEND</span>=<span class="v">null</span>`,
+  },
+  cpu: {
+    label: 'Sequence for <em style="color:var(--amber);font-style:italic">vps-cpu</em> — change modes above to see the diff.',
+    extras: `<span class="c"># pip install 'depthfusion[vps-cpu]'</span>\n<span class="k">requires</span>  <span class="v">anthropic</span>\n<span class="k">requires</span>  <span class="v">chromadb</span>`,
+    env: `<span class="c"># ~/.claude/depthfusion.env</span>\n<span class="k">DEPTHFUSION_MODE</span>=<span class="v">vps-cpu</span>\n<span class="k">DEPTHFUSION_API_KEY</span>=<span class="v">sk-df-…</span>\n<span class="k">DEPTHFUSION_RERANKER_BACKEND</span>=<span class="v">haiku</span>\n<span class="k">DEPTHFUSION_EMBEDDING_BACKEND</span>=<span class="v">chroma</span>`,
+  },
+  gpu: {
+    label: 'Sequence for <em style="color:var(--amber);font-style:italic">vps-gpu</em> — change modes above to see the diff.',
+    extras: `<span class="c"># pip install 'depthfusion[vps-gpu]'</span>\n<span class="k">requires</span>  <span class="v">sentence-transformers</span>\n<span class="k">requires</span>  <span class="v">chromadb</span>\n<span class="k">requires</span>  <span class="v">vllm</span>  <span class="c"># gemma runtime</span>`,
+    env: `<span class="c"># ~/.claude/depthfusion.env</span>\n<span class="k">DEPTHFUSION_MODE</span>=<span class="v">vps-gpu</span>\n<span class="k">DEPTHFUSION_EMBEDDING_BACKEND</span>=<span class="v">local</span>\n<span class="k">DEPTHFUSION_RERANKER_BACKEND</span>=<span class="v">gemma</span>\n<span class="k">DEPTHFUSION_GEMMA_URL</span>=<span class="v">http://localhost:8000</span>`,
+  },
+};
+
+function setProbe(which) {
+  const ps = probeStates[which];
+  probeOrb.className = 'probe-orb ' + ps.orb;
+  probeText.innerHTML = ps.text;
+  document.querySelectorAll('[data-probe]').forEach(b => b.classList.toggle('on', b.dataset.probe === which));
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('recommended'));
+  document.querySelector(`.card[data-mode="${ps.rec}"]`).classList.add('recommended');
+  gpuWarn.style.display = which === 'nogpu' ? 'flex' : 'none';
+  if (!window._userSel) selectCard(ps.rec);
+}
+
+function selectCard(mode) {
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.mode === mode));
+  walkLabel.innerHTML = modeData[mode].label;
+  stepExtras.innerHTML = modeData[mode].extras;
+  stepEnv.innerHTML = modeData[mode].env;
+  renderCallouts(mode);
+  document.querySelectorAll('#coPick button').forEach(b => b.classList.toggle('on', b.dataset.tier === mode));
+}
+
+document.querySelectorAll('[data-probe]').forEach(b => b.onclick = () => setProbe(b.dataset.probe));
+document.querySelectorAll('.card').forEach(c => c.addEventListener('click', (e) => {
+  if (e.target.closest('.copy-btn')) return;
+  window._userSel = true;
+  selectCard(c.dataset.mode);
+}));
+setTimeout(() => setProbe('gpu'), 800);
+
+document.querySelectorAll('.copy-btn').forEach(b => b.onclick = (e) => {
+  e.stopPropagation();
+  navigator.clipboard?.writeText(b.dataset.copy).catch(() => {});
+  const prev = b.textContent; b.textContent = '✓ copied'; b.classList.add('copied');
+  setTimeout(() => { b.textContent = prev; b.classList.remove('copied'); }, 1400);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   CALLOUTS
+   ═══════════════════════════════════════════════════════════════ */
+const calloutsData = {
+  local: [
+    { h: 'Works <em>offline</em>, always', r: 'No API calls, ever. BM25 scoring happens in your Python process. Discoveries in <code>~/.claude/shared/discoveries/</code> never leave your machine.', stamp: '№ 01' },
+    { h: 'Zero-config <em>upgrade path</em>', r: 'Set <code>DEPTHFUSION_API_KEY</code>, re-run the installer — your discoveries migrate to vps-cpu. Add a GPU later to promote again.', stamp: '№ 02' },
+  ],
+  cpu: [
+    { h: '<em>Billing-safe</em> by design', r: 'DepthFusion reads <code>DEPTHFUSION_API_KEY</code> explicitly; it <em>never</em> reads <code>ANTHROPIC_API_KEY</code>. Your Claude Code Pro/Max subscription stays untouched.', stamp: '№ 01' },
+    { h: 'Tier-2 <em>auto-promotion</em>', r: 'At 500 sessions, DepthFusion promotes your corpus to ChromaDB vector storage. Idempotent, reversible.', stamp: '№ 02' },
+  ],
+  gpu: [
+    { h: 'True <em>offline</em> LLM', r: 'Gemma runs via vLLM on your GPU. Reranking, extraction, summarisation — all happen without an external API call. Your conversation data never leaves your box.', stamp: '№ 01' },
+    { h: 'Mamba <em>B/C/Δ</em> fusion gates', r: 'Query-similarity → topical-coherence → α-blended threshold. Outperforms flat BM25 + reranker on Category A recall benchmarks. <a href="#" class="callout-link">↗ S-51 build plan</a>', stamp: '№ 02' },
+  ],
+};
+
+function renderCallouts(tier) {
+  document.getElementById('callouts').innerHTML = calloutsData[tier].map(c => `
+    <div class="callout">
+      <span class="stamp">${c.stamp} · hover to develop</span>
+      <h4>${c.h}</h4>
+      <span class="hint">↓ expand</span>
+      <div class="reveal">${c.r}</div>
+    </div>`).join('');
+}
+
+document.querySelectorAll('#coPick button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#coPick button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  renderCallouts(b.dataset.tier);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   METRICS STREAM
+   ═══════════════════════════════════════════════════════════════ */
+const metricsBody = document.getElementById('metricsBody');
+const queryCt = document.getElementById('queryCt');
+let mCount = 0;
+const hashes = ['abc123def456', 'f0e1d2c3b4a5', 'deadbeefcafe', '0f1e2d3c4b5a', '9876543210fe'];
+
+function pushMetric() {
+  const now = new Date();
+  const ts = `2026-04-21T${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')}+00:00`;
+  const h = hashes[mCount % hashes.length];
+  const vec = (30 + Math.random() * 40).toFixed(1);
+  const gates = (8 + Math.random() * 10).toFixed(1);
+  const rer = (100 + Math.random() * 60).toFixed(1);
+  const tot = (+vec + +gates + +rer).toFixed(1);
+  const html = `<span class="p">{</span>
+  <span class="k">"timestamp"</span>: <span class="s">"${ts}"</span>,
+  <span class="k">"event"</span>: <span class="s">"recall_query"</span>,
+  <span class="k">"event_subtype"</span>: <span class="s">"ok"</span>,
+  <span class="k">"query_hash"</span>: <span class="s">"${h}"</span>,
+  <span class="k">"mode"</span>: <span class="s">"vps-gpu"</span>,
+  <span class="k">"backend_used"</span>: <span class="p">{</span> <span class="k">"reranker"</span>: <span class="s">"gemma"</span>, <span class="k">"embedding"</span>: <span class="s">"local_embedding"</span> <span class="p">}</span>,
+  <span class="k">"latency_ms_per_capability"</span>: <span class="p">{</span> <span class="k">"vector_search"</span>: <span class="n">${vec}</span>, <span class="k">"fusion_gates"</span>: <span class="n">${gates}</span>, <span class="k">"reranker"</span>: <span class="n">${rer}</span> <span class="p">}</span>,
+  <span class="k">"total_latency_ms"</span>: <span class="n">${tot}</span>,
+  <span class="k">"result_count"</span>: <span class="n">${Math.ceil(Math.random() * 8 + 2)}</span>
+<span class="p">}</span>`;
+  const el = document.createElement('div'); el.className = 'entry'; el.innerHTML = html;
+  metricsBody.prepend(el);
+  while (metricsBody.children.length > 3) metricsBody.removeChild(metricsBody.lastChild);
+  mCount++;
+  queryCt.textContent = mCount;
+}
+pushMetric();
+if (!reduceMotion) setInterval(pushMetric, 3200);
+</script>
+</body>
+</html>
