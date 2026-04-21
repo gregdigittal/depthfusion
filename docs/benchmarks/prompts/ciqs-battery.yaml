@@ -1,0 +1,177 @@
+# CIQS Benchmark Battery — machine-readable form
+# Source: docs/performance-measurement-prompt.md (v2026-03-28)
+# Used by: scripts/ciqs_harness.py
+#
+# Each category's prompt template runs once per topic; each topic runs 3×
+# per the 3-run measurement principle.
+#
+# `retrieval_only` categories can be executed end-to-end by the harness
+# (it calls DepthFusion recall and captures blocks). Other categories
+# require a full Claude Code response — the harness captures prompts +
+# retrieval context and emits a scoring template for operator/judge.
+
+version: 1
+source_doc: docs/performance-measurement-prompt.md
+
+categories:
+
+  - id: A
+    name: Retrieval Quality
+    what_it_tests: MCP retrieval + RRF + AttnRes weighting
+    retrieval_only: true        # harness can auto-execute
+    template: |
+      I'm working on {topic}. Based on my prior work and session history, what are the most
+      relevant patterns, decisions, or warnings I should be aware of? Please be specific about
+      what you recall and rate your confidence in each item.
+    topics:
+      A1: "TypeScript error handling in the SkillForge router"
+      A2: "Adding new step types to the SkillForge Skill IR"
+      A3: "My preferences for commit message style and PR structure"
+    rubric:
+      relevance:
+        0: "Completely off-topic recalls"
+        5: "Mixed: some useful, some noise"
+        10: "All recalled items directly applicable"
+      specificity:
+        0: "Generic statements (be careful)"
+        5: "File names or concepts named"
+        10: "Exact file:line, variable names, error messages"
+      confidence_calibration:
+        0: "Over-confident on stale info"
+        5: "Some appropriate hedging"
+        10: "Explicitly distinguishes high vs low confidence"
+      novel_signal:
+        0: "Nothing you didn't already know"
+        5: "1-2 new useful reminders"
+        10: "3+ non-obvious reminders you needed"
+    max_score_per_run: 40
+
+  - id: B
+    name: Code Quality
+    what_it_tests: Review gate patterns + learned conventions
+    retrieval_only: false       # requires full Claude Code response
+    template: |
+      Review this code snippet and identify any issues. Be specific about severity:
+
+      {snippet}
+    topics:
+      B1: "Function missing try/catch around external API call (security.md violation)"
+      B2: "Switch on discriminated union missing a case (TypeScript exhaustiveness)"
+      B3: "N+1 query pattern in an endpoint (performance.md violation)"
+    rubric:
+      issue_detection:
+        0: "Misses all intentional issues"
+        5: "Catches the obvious ones"
+        10: "Catches all 3 issues with correct severity"
+      standards_citation:
+        0: "No mention of project conventions"
+        5: "Mentions conventions generically"
+        10: "Cites specific rule (e.g. security.md §2)"
+      fix_quality:
+        0: "Wrong fix or no fix"
+        5: "Partial fix"
+        10: "Correct fix with explanation"
+      false_positives:
+        0: "Flags many non-issues"
+        5: "Some over-flagging"
+        10: "Zero false positives"
+    max_score_per_run: 40
+
+  - id: C
+    name: Planning Coherence
+    what_it_tests: Recall + planner agent composition
+    retrieval_only: false
+    template: |
+      I need to {task_description}. Produce a step-by-step plan with dependencies, touching
+      the relevant files in this project. Reference prior decisions where applicable.
+    topics:
+      C1: "add a new OAuth provider to the auth module"
+      C2: "refactor the feature-flag system to use typed keys"
+      C3: "migrate from class components to hooks in the dashboard"
+    rubric:
+      file_accuracy:
+        0: "Names files that don't exist"
+        5: "Mix of real and hallucinated"
+        10: "All files exist and are relevant"
+      dependency_ordering:
+        0: "Random order or cyclical"
+        5: "Mostly correct, 1-2 inversions"
+        10: "Dependencies correct end-to-end"
+      prior_decision_recall:
+        0: "Ignores relevant prior work"
+        5: "Mentions vaguely"
+        10: "Cites specific prior ADR/discovery"
+      completeness:
+        0: "Missing obvious steps"
+        5: "Missing 1-2 steps"
+        10: "Covers all necessary steps"
+    max_score_per_run: 40
+
+  - id: D
+    name: Session Continuity
+    what_it_tests: DepthFusion memory persistence across sessions
+    retrieval_only: false
+    template: |
+      {continuity_question}
+    topics:
+      D1: "What were the last three meaningful commits you made in this repo, and what do they accomplish together?"
+      D2: "What was the most recent review-gate finding that resulted in a fix? What was the fix?"
+      D3: "What is the current status of the benchmark harness work? What still needs to happen?"
+      D4: "What decisions have I made about how we handle errors in this codebase?"
+    rubric:
+      factual_accuracy:
+        0: "Confabulates content"
+        5: "Some accurate, some invented"
+        10: "Every claim verifiable"
+      specificity:
+        0: "Vague ('some work happened')"
+        5: "Names concepts"
+        10: "Cites commit SHAs, file paths, dates"
+      temporal_ordering:
+        0: "Wrong order or no order"
+        5: "Approximately correct"
+        10: "Exact chronology"
+      coverage:
+        0: "Answers one dimension"
+        5: "Answers most dimensions"
+        10: "Full answer with context"
+    max_score_per_run: 40
+
+  - id: E
+    name: Tool Suggestion Quality
+    what_it_tests: Skill registry + context awareness
+    retrieval_only: false
+    template: |
+      I need to {task}. What's the best approach and what tools should I use?
+    topics:
+      E1: "quickly find all places a specific function is called across the codebase"
+      E2: "review a large diff before committing"
+      E3: "set up a new project with standard conventions"
+      E4: "investigate an intermittent test failure"
+    rubric:
+      tool_relevance:
+        0: "Suggests wrong tool class"
+        5: "Right class, generic choice"
+        10: "Specific project-appropriate tool"
+      context_awareness:
+        0: "Generic advice"
+        5: "Some project awareness"
+        10: "Cites specific project conventions"
+      prioritization:
+        0: "Lists tools without ranking"
+        5: "Loose ordering"
+        10: "Clear primary + alternatives with reasoning"
+    max_score_per_run: 30      # only 3 rubric dims
+
+# Scoring normalisation
+# Each category produces (sum(scores across topics)) / (max_score_per_run * num_topics) * 100
+# Composite score = weighted average across categories
+composite_weights:
+  A: 0.25
+  B: 0.20
+  C: 0.20
+  D: 0.25
+  E: 0.10
+
+# Runs per topic (stochasticity control — do not reduce below 3 for reportable results)
+runs_per_topic: 3

@@ -985,15 +985,15 @@
 ### S-63: As a release, I want an automated CIQS run harness so that pre/post-change deltas can be measured reproducibly without manual per-prompt execution `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}.jsonl`
-- [ ] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI; writes `docs/benchmarks/{YYYY-MM-DD}-{mode}-summary.md`
-- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55)
-- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu)
+- [x] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md` and extracted to `docs/benchmarks/prompts/ciqs-battery.yaml`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}-scored.jsonl` — `scripts/ciqs_harness.py run` + `score` subcommands
+- [x] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI — `scripts/ciqs_summarise.py` (5000 bootstrap resamples, seed=1729; math covered by 24 unit tests in `tests/test_scripts/test_ciqs_summarise.py`)
+- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **execution pending (T-201)**
+- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **execution pending (T-201)**
 
 **Tasks:**
-- [ ] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner, env-var selectable backend, JSONL output
-- [ ] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`); markdown report template
-- [ ] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era)
+- [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
+- [x] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`) — linear-interpolated percentile, deterministic bootstrap CI, per-category stats table + raw dump; `docs/benchmarks/README.md` documents the three-stage flow
+- [ ] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era) — **calendar-blocked on executing the runs**
 
 ### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
 
