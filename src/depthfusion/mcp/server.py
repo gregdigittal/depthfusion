@@ -33,6 +33,15 @@ TOOLS: dict[str, str] = {
     "depthfusion_set_scope": "Set session graph scope (project | cross_project | global)",
     # v0.5.0 CM-5 active confirmation tool
     "depthfusion_confirm_discovery": "Actively confirm a decision or fact for immediate capture",
+    # v0.5.1 TG-14 / S-55 discovery pruner
+    "depthfusion_prune_discoveries": (
+        "Identify stale discovery files in ~/.claude/shared/discoveries/. "
+        "Args: age_days (int, default 90 or DEPTHFUSION_PRUNE_AGE_DAYS), "
+        "confirm (bool, default False). Without confirm=True, returns "
+        "candidates with reasons but does NOT move any files. "
+        "With confirm=True, moves to ~/.claude/shared/discoveries/.archive/ "
+        "(never deletes — reversible)."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -49,6 +58,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_graph_status": "graph_enabled",
     "depthfusion_set_scope": "graph_enabled",
     "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
+    "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
 }
 
 
@@ -142,6 +152,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_set_scope(arguments)
     elif tool_name == "depthfusion_confirm_discovery":
         return _tool_confirm_discovery(arguments)
+    elif tool_name == "depthfusion_prune_discoveries":
+        return _tool_prune_discoveries(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -710,6 +722,79 @@ def _tool_confirm_discovery(arguments: dict) -> str:
             "note": "Discovery file for today already exists; entry not appended "
                     "(use a new session or delete the file to re-capture)",
             "project": project,
+        }, indent=2)
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": str(exc)})
+
+
+def _tool_prune_discoveries(arguments: dict) -> str:
+    """TG-14 / S-55: identify and optionally archive stale discovery files.
+
+    Two-phase design:
+      1. `confirm=False` (default) — return candidate list with reasons.
+         No filesystem modification. Operator reviews the list.
+      2. `confirm=True` — move listed candidates to
+         `~/.claude/shared/discoveries/.archive/`. Never deletes.
+
+    Arguments:
+        age_days (int, optional): override the default 90-day threshold
+            (or `DEPTHFUSION_PRUNE_AGE_DAYS` env var).
+        confirm (bool, optional): when True, actually move the files.
+
+    Returns:
+        JSON with `candidates` (list of {path, reason, age_days}) and
+        `moved` (list of archive paths, empty when confirm=False).
+        On error, returns `{"ok": False, "error": "..."}`.
+    """
+    try:
+        age_days_raw = arguments.get("age_days")
+        age_days: int | None
+        if age_days_raw is None:
+            age_days = None
+        else:
+            age_days = int(age_days_raw)
+            if age_days <= 0:
+                return json.dumps({
+                    "ok": False,
+                    "error": f"age_days must be positive, got {age_days}",
+                })
+        confirm = bool(arguments.get("confirm", False))
+    except (TypeError, ValueError) as exc:
+        return json.dumps({"ok": False, "error": f"invalid arguments: {exc}"})
+
+    try:
+        from depthfusion.capture.pruner import (
+            identify_candidates,
+            prune_discoveries,
+        )
+        candidates = identify_candidates(age_days=age_days)
+        candidates_json = [
+            {
+                "path": str(c.path),
+                "reason": c.reason,
+                "age_days": c.age_days,
+            }
+            for c in candidates
+        ]
+
+        if not confirm:
+            return json.dumps({
+                "ok": True,
+                "candidates": candidates_json,
+                "moved": [],
+                "message": (
+                    f"{len(candidates)} prune candidates identified. "
+                    "Pass confirm=true to move them to "
+                    "~/.claude/shared/discoveries/.archive/"
+                ),
+            }, indent=2)
+
+        moved = prune_discoveries(candidates, confirm=True)
+        return json.dumps({
+            "ok": True,
+            "candidates": candidates_json,
+            "moved": [str(p) for p in moved],
+            "message": f"Moved {len(moved)} file(s) to archive.",
         }, indent=2)
     except Exception as exc:
         return json.dumps({"ok": False, "error": str(exc)})

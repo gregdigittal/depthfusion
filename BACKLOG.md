@@ -833,14 +833,18 @@
 ### S-55: As a maintainer, I want a `depthfusion_prune_discoveries` MCP tool so that stale/unreferenced discovery files can be archived safely `P3` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Tool returns prune-candidate list with reasons; does NOT delete without `confirm=true`
-- [ ] AC-2: Confirmed prune moves (not deletes) to `~/.claude/shared/discoveries/.archive/`
-- [ ] AC-3: ≥ 3 new tests
+- [x] AC-1: Tool returns prune-candidate list with reasons; does NOT delete without `confirm=true` — verified in `test_confirm_false_returns_candidates_without_moving`; `confirm=False` is an explicit first-line no-op in `prune_discoveries`
+- [x] AC-2: Confirmed prune MOVES (not deletes) to `~/.claude/shared/discoveries/.archive/` — verified in `test_confirm_true_moves_to_archive` + `test_never_deletes_only_moves`; archive collision handled with timestamp suffix to prevent overwrites
+- [x] AC-3: ≥ 3 new tests (23 tests in `test_prune_discoveries.py`)
 
 **Tasks:**
-- [ ] T-169: Implement `capture/pruner.py` (age + min-recall-score heuristics)
-- [ ] T-170: Register `depthfusion_prune_discoveries` in `mcp/server.py`
-- [ ] T-171: Author `tests/test_mcp/test_prune_discoveries.py`
+- [x] T-169: Implement `capture/pruner.py` — `PruneCandidate` frozen dataclass + `identify_candidates()` + `prune_discoveries()`. Two heuristics shipped: `age_exceeded` (default 90d via `DEPTHFUSION_PRUNE_AGE_DAYS`) and `superseded` (`.superseded` suffix from CM-2 dedup). `min-recall-score` heuristic from TG-14 deferred — requires `record_recall_query` to capture chunk_ids of returned blocks, which it doesn't in v0.5.1.
+- [x] T-170: Register `depthfusion_prune_discoveries` in `mcp/server.py` — always-enabled tool with `_tool_prune_discoveries(arguments)` handler; `age_days` validated as positive int; returns `{ok, candidates, moved, message}` JSON
+- [x] T-171: Author `tests/test_mcp/test_prune_discoveries.py` — 23 tests (4 env var, 8 identify_candidates, 5 prune_discoveries safety, 5 MCP tool, 1 review-gate regression on dot-file filter)
+
+**Follow-up noted:**
+- [ ] `superseded_min_age_hours` grace-period parameter (v0.6) — adds an age floor to the superseded heuristic so false-positive dedup runs have a safety window before archival.
+- [ ] `min-recall-score` heuristic — requires `record_recall_query` extension to capture chunk_ids of returned blocks per query (separate epic).
 
 ---
 

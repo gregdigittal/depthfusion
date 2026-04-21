@@ -8,8 +8,8 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_twelve_entries():
-    assert len(TOOLS) == 12
+def test_tools_dict_has_thirteen_entries():
+    assert len(TOOLS) == 13
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -23,6 +23,7 @@ def test_tools_dict_has_twelve_entries():
         "depthfusion_graph_status",
         "depthfusion_set_scope",
         "depthfusion_confirm_discovery",
+        "depthfusion_prune_discoveries",  # v0.5.1 S-55
     }
     assert set(TOOLS.keys()) == expected
 
@@ -31,21 +32,23 @@ def test_get_enabled_tools_all_flags_true():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=True, graph_enabled=True)
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 12
+    assert len(enabled) == 13
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
-    assert len(enabled) == 8
+    # 13 total - 1 rlm - 3 graph (graph_enabled defaults False) = 9
+    assert len(enabled) == 9
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    assert len(enabled) == 8
+    # 13 total - 1 publish - 3 graph = 9
+    assert len(enabled) == 9
 
 
 def test_get_enabled_tools_both_disabled():
@@ -53,7 +56,8 @@ def test_get_enabled_tools_both_disabled():
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    assert len(enabled) == 7
+    # 13 total - 2 flagged - 3 graph = 8
+    assert len(enabled) == 8
 
 
 def test_core_tools_always_enabled():
