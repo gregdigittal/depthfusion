@@ -10,9 +10,64 @@ Conventions:
 
 ---
 
-## [Unreleased]
+## [Unreleased] — targeting v0.6.0-alpha (GPU rollout)
 
-No changes pending beyond v0.5.2.
+**Theme:** pre-migration preparation for the GPU VPS cutover. Ships
+operational docs and the missing fallback-chain infrastructure (S-44
+AC-3/AC-4) without touching runtime defaults. Safe to deploy to vps-cpu
+operators; a follow-up v0.6.0 stable will flip the chain on by default
+for vps-gpu mode.
+
+### Added
+
+**`FallbackChain` backend wrapper (S-44 AC-3, AC-4 / E-19):**
+- `src/depthfusion/backends/chain.py` — ordered `LLMBackend` wrapper
+  that catches `RateLimitError` / `BackendOverloadError` /
+  `BackendTimeoutError` from the primary and transparently falls
+  through to the next healthy link. Emits `backend.runtime_fallback`
+  events per transition (distinct metric from the factory's
+  construction-time `backend.fallback`).
+- Protocol-conformant (`runtime_checkable` verified in tests) so it's
+  a drop-in replacement anywhere an `LLMBackend` is expected.
+- Canonical cascade for vps-gpu once wired: `FallbackChain([Gemma, Haiku, Null])`
+  — on Gemma 503 → Haiku; on Haiku 429 → Null returns safe defaults.
+- Respects `DEPTHFUSION_BACKEND_FALLBACK_LOG` env var (default on) to
+  enable/disable event emission, mirroring the factory-level gate.
+- 24 tests (`tests/test_backends/test_chain.py`) covering construction,
+  health semantics, each typed-error variant, non-fallback exception
+  propagation, unhealthy-skip, exhaustion ordering, 3-link cascade,
+  and event emission on/off.
+
+**GPU VPS migration runbook (E-19 ops support):**
+- `docs/runbooks/gpu-vps-migration.md` — end-to-end handover from a
+  current vps-cpu installation to Hetzner GEX44 (NVIDIA RTX 4000 SFF
+  Ada) running `vps-gpu` mode. Covers: pre-migration snapshot with
+  rollback tarball, SCP to new host, package install with `[vps-gpu]`
+  extras, vLLM systemd service, installer with auto-probe + smoke
+  test, per-probe troubleshooting, validation checklist (health,
+  recall, capture, latency, CIQS), rollback procedure, post-migration
+  first-week tasks.
+
+### Changed
+
+**Backlog reconciliation (docs-only):**
+- E-19 status `[backlog]` → `[done]` — both stories code-complete for
+  ~3 releases; status drift carried over from earlier epics. Live-GPU
+  benchmark ACs (S-43 AC-2/AC-3, S-44 AC-2) now referenced from E-26
+  as their measurement home.
+- S-44 AC-3 and AC-4 ticked upon FallbackChain delivery.
+- New story S-66 opened under E-26 for the post-migration 3-run CIQS
+  baseline that unblocks the benchmark ACs.
+
+### Not yet shipped (targets for v0.6.0 stable)
+
+- **Factory wiring of FallbackChain** — currently opt-in via direct
+  construction. v0.6.0 stable will switch `get_backend` on vps-gpu
+  mode to return `FallbackChain([Gemma, Haiku, Null])` for LLM
+  capabilities, gated initially on `DEPTHFUSION_FALLBACK_CHAIN_ENABLED`
+  and then flipped to default-on.
+- **Live-GPU benchmarks** (S-66) — gated on executing the migration.
+- **Post-migration dogfood report** (S-65 T-205 first pass).
 
 ---
 

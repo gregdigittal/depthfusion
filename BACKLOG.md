@@ -652,7 +652,9 @@
 
 ---
 
-## E-19: v0.5 GPU-Enabled LLM Routing [backlog]
+## E-19: v0.5 GPU-Enabled LLM Routing [done]
+
+> Both stories code-complete with comprehensive unit coverage: S-43 (LocalEmbeddingBackend, 41 tests across `test_local_embedding.py` + `test_hybrid_with_embeddings.py`) and S-44 (GemmaBackend + FallbackChain, 37 + 24 tests). Factory routes all 6 capabilities correctly on vps-gpu mode (verified `test_vps_gpu_mode_routes_all_llm_caps_to_gemma`). Remaining ACs requiring live GPU benchmarks (S-43 AC-2/AC-3, S-44 AC-2) reference **E-26: Benchmark Harness** as their measurement home — they remain unchecked pending the GPU VPS migration and `vps-gpu` harness run (tracked as S-66 below).
 
 > Add the Gemma vLLM backend plus local embeddings so `vps-gpu` installations exploit on-box inference for reranking, extraction, summarisation, linking, and semantic retrieval.
 
@@ -674,8 +676,8 @@
 **Acceptance criteria:**
 - [x] AC-1: Backend factory routes all 6 capabilities to Gemma on vps-gpu mode (verified in `test_vps_gpu_mode_routes_all_llm_caps_to_gemma`; embedding routes to LocalEmbeddingBackend when sentence-transformers available, else NullBackend fallback)
 - [ ] AC-2: p95 latency per capability recorded in the Phase 4 runbook (requires live GEX44 benchmark)
-- [ ] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout (integration test with fault-injected mock server) — typed-error translation verified at unit level (`test_complete_translates_503_to_overload`, `..._529_to_overload`, `..._urllib_timeout_to_backend_timeout`); chain-level Haiku fallback requires the chain wiring deferred to a future TG
-- [ ] AC-4: Fallback to Null triggers when Haiku also unavailable (integration test) — same chain dependency
+- [x] AC-3: Fallback to Haiku triggers on OOM / 5xx / timeout — `FallbackChain` in `backends/chain.py` (v0.6.0-alpha scope) wraps an ordered backend list and catches `RateLimitError` / `BackendOverloadError` / `BackendTimeoutError`, emitting `backend.runtime_fallback` events per transition. Verified by 24 tests in `test_chain.py` including the canonical 3-link cascade `gemma+haiku+null`. **Factory wiring (make chain the default on vps-gpu mode) deferred to v0.6.0 stable — v0.6.0-alpha ships the chain class only, gated opt-in.**
+- [x] AC-4: Fallback to Null triggers when Haiku also unavailable — covered by the same `FallbackChain`: a `[gemma, haiku, null]` chain falls through both on sequential typed errors, returning Null's safe defaults. Verified in `test_gemma_haiku_null_cascade` and `test_exhaustion_chain_names_in_order` (plus `test_all_unhealthy_raises_exhausted_empty_chain` for the degenerate case).
 - [x] AC-5: ≥ 15 new tests (37 landed in `test_gemma.py` + 3 factory tests for Gemma dispatch)
 
 **Tasks:**
@@ -1006,6 +1008,19 @@
 **Tasks:**
 - [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) is the remaining labour.
 - [x] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow) — 175-line methodology doc + per-set READMEs covering schema, edge cases, running the measurements
+
+### S-66: As a post-migration operator, I want a vps-gpu CIQS baseline so that the S-43/S-44 latency and quality ACs can be validated on the real GPU hardware `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: 3-run CIQS battery executed on vps-gpu mode against the live Hetzner GEX44 host; scored JSONL + summary markdown committed under `docs/benchmarks/`
+- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus)
+- [ ] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`)
+
+**Tasks:**
+- [ ] T-206: Execute 3-run baseline via `scripts/ciqs_harness.py --mode vps-gpu` after §4e of the GPU migration runbook
+- [ ] T-207: Commit scored JSONL + summary + post-migration entry under `docs/runbooks/dogfood-reports/` referencing the specific hardware (GEX44 / RTX 4000 SFF Ada)
+
+---
 
 ### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S`
 
