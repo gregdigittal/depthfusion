@@ -24,20 +24,25 @@ VPS Tier 1 and Tier 2 projections require `ANTHROPIC_API_KEY` and a large sessio
 ## Architecture
 
 ```
-Install mode: DEPTHFUSION_MODE=local|vps
+Install mode: DEPTHFUSION_MODE=local | vps-cpu | vps-gpu
 
-Local mode:
+local mode (laptop, zero API cost):
   query → BM25 (top-k) → results
 
-VPS Tier 1 (< 500 sessions):
-  query → BM25 (top-10) → HaikuReranker → top-k
+vps-cpu mode (current default for cloud VPSes):
+  query → BM25 (top-10) → Haiku reranker (API) → top-k
+  Tier 2 (when corpus ≥ 500 sessions):
+    query → ChromaDB (top-20) + BM25 (top-10) → RRF fusion → Haiku reranker → top-k
 
-VPS Tier 2 (≥ 500 sessions):
-  query → ChromaDB (top-20) + BM25 (top-10) → RRF fusion → HaikuReranker → top-k
+vps-gpu mode (CUDA host, local Gemma via vLLM):
+  query → BM25 (top-10) + local embeddings → RRF fusion → Gemma reranker → top-k
+  LLM capabilities (extract / summarise / link / decision_extractor)
+  route to on-box Gemma; embeddings route to local sentence-transformers.
+  Haiku fallback available via FallbackChain (v0.6.0a1) when DEPTHFUSION_API_KEY is set.
 
-Auto-capture (VPS only):
+Auto-capture (vps-cpu / vps-gpu):
   PreCompact hook  → snapshot active state to ~/.claude/.depthfusion-compact-snapshot.json
-  PostCompact hook → haiku summarization → ~/.claude/shared/discoveries/{date}-autocapture.md
+  PostCompact hook → Haiku/Gemma summarisation → ~/.claude/shared/discoveries/{date}-autocapture.md
 ```
 
 ```
@@ -59,46 +64,72 @@ src/depthfusion/
 
 ## Install
 
-### Local mode (zero external dependencies)
+DepthFusion has three install modes. Pick the one that matches your target:
+
+| Mode | Use when | LLM backend | Extras | Guide |
+|---|---|---|---|---|
+| `local` | Laptop, zero deps beyond Python | Heuristics + BM25 | none | see below |
+| `vps-cpu` | Cloud VPS, no GPU, API-backed LLM | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
+| `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
+
+The two quickstart guides are the canonical, step-by-step install
+procedures. They cover virtualenv setup, PEP 668 pitfalls, venv
+auto-activation, API-key handling, MCP registration, and the weekly
+regression-monitor timer. Follow them for any vps-cpu or vps-gpu
+deployment.
+
+> ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
+> Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and
+> will switch your entire billing from your Pro/Max subscription to
+> pay-per-token API for **all** Claude Code usage — not just DepthFusion.
+> The separate `DEPTHFUSION_API_KEY` exists specifically to prevent
+> this. The installer explicitly refuses to use `ANTHROPIC_API_KEY`.
+
+### Quick install for `local` mode (laptop, zero API cost)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-python -m depthfusion.install.install --mode local
-claude mcp add depthfusion --scope user -- $(pwd)/.venv/bin/python -m depthfusion.mcp.server
-export DEPTHFUSION_MODE=local
+# Create a venv. On Ubuntu 24.04 you may need: sudo apt install -y python3-venv
+python3 -m venv ~/venvs/depthfusion
+source ~/venvs/depthfusion/bin/activate
+
+# Install
+git clone https://github.com/gregdigittal/depthfusion.git ~/projects/depthfusion
+cd ~/projects/depthfusion
+pip install --upgrade pip
+pip install -e '.[local]'
+
+# Configure
+python3 -m depthfusion.install.install --mode=local
+
+# Register with Claude Code
+claude mcp add depthfusion --scope user -- python3 -m depthfusion.mcp.server
 ```
 
-**Limitations:** No semantic reranking. Category D continuity requires manual `/learn` after each session.
+**Limitations of `local` mode:** No semantic reranking (BM25 only).
+Category D continuity requires manual `/learn` after each session.
 
-### VPS mode (haiku reranker + ChromaDB Tier 2)
+### Quickstart for `vps-cpu` and `vps-gpu`
 
-> ⚠️ **Billing warning:** Do NOT set `ANTHROPIC_API_KEY` in `~/.claude/settings.json` or your shell
-> environment. Claude Code reads this variable as its own auth credential and will switch your entire
-> billing from your Pro/Max subscription to pay-per-token API billing for **all** Claude Code usage —
-> not just DepthFusion. Use `DEPTHFUSION_API_KEY` instead (see below).
+For a new VPS or GPU host, don't copy the local-mode snippet above —
+those environments have additional concerns (`python3-full` /
+`python3-venv` install on fresh Ubuntu, `chromadb` compile
+dependencies, vLLM systemd service, weekly timer setup, MCP
+registration quirks). The two quickstart guides cover these
+end-to-end:
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[vps-tier2]"
-export DEPTHFUSION_MODE=vps
-python -m depthfusion.install.install --mode vps
-claude mcp add depthfusion --scope user -- $(pwd)/.venv/bin/python -m depthfusion.mcp.server
-```
+- **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** — ~10 min, any CPU-only Linux host
+- **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** — ~4 hrs, CUDA host with ≥ 20 GB VRAM
+- **[docs/install/README.md](docs/install/README.md)** — decision overview: which guide to pick, when to run both (parallel-comparison plan)
 
-To enable Haiku summarization (optional — heuristic extraction works without it):
+### Tier promotion
 
-```bash
-# In ~/.claude/depthfusion.env (NOT in settings.json env block):
-DEPTHFUSION_HAIKU_ENABLED=true
-DEPTHFUSION_API_KEY=sk-ant-your-key-here
-```
-
-**Tier promotion:** When your corpus crosses 500 sessions (configurable via `DEPTHFUSION_TIER_THRESHOLD`), run the migration script to activate ChromaDB vector retrieval:
+When your corpus crosses 500 sessions (configurable via
+`DEPTHFUSION_TIER_THRESHOLD`), run the migration script to activate
+ChromaDB vector retrieval:
 
 ```bash
-python -m depthfusion.install.migrate         # index everything into ChromaDB
-python -m depthfusion.install.migrate --dry-run  # preview without writing
+python3 -m depthfusion.install.migrate         # index everything into ChromaDB
+python3 -m depthfusion.install.migrate --dry-run  # preview without writing
 ```
 
 ---
@@ -122,7 +153,7 @@ python -m depthfusion.install.migrate --dry-run  # preview without writing
 
 | Env Var | Controls | Default |
 |---------|---------|---------|
-| `DEPTHFUSION_MODE` | `local` or `vps` install mode | `local` |
+| `DEPTHFUSION_MODE` | `local`, `vps-cpu`, or `vps-gpu` install mode | `local` |
 | `DEPTHFUSION_TIER_THRESHOLD` | Session count threshold for Tier 2 promotion | `500` |
 | `DEPTHFUSION_TIER_AUTOPROMOTE` | Auto-promote to Tier 2 when corpus crosses threshold | `true` (VPS) |
 | `DEPTHFUSION_FUSION_ENABLED` | Weighted fusion path in dispatcher | `true` |
@@ -161,10 +192,24 @@ ruff check src/ tests/    # clean
 
 ## Dependencies
 
-- Python ≥ 3.10
+- Python ≥ 3.10 (any modern Python works — 3.10, 3.11, 3.12, 3.13. Ubuntu 24.04 ships 3.12 by default.)
 - `numpy` ≥ 1.24
 - `pyyaml` ≥ 6.0
 - `structlog` ≥ 24.0
-- `anthropic` ≥ 0.40 (optional — required for VPS mode haiku reranker/summarizer)
-- `chromadb` ≥ 0.4 (optional — required for VPS Tier 2; install with `pip install -e ".[vps-tier2]"`)
+- `anthropic` ≥ 0.40 (optional — required for `vps-cpu` mode Haiku reranker and the Haiku fallback in `vps-gpu`)
+- `chromadb` ≥ 0.4 (optional — required for Tier 2 vector retrieval; pulled in by both `[vps-cpu]` and `[vps-gpu]` extras)
+- `sentence-transformers` ≥ 2.2 (optional — required for `vps-gpu` local embeddings; pulled in by `[vps-gpu]` extras)
+- `vllm` (optional — required for `vps-gpu` local Gemma; installed separately via the vps-gpu quickstart)
 - `rlm` (optional — install from `~/Development/Projects/rlm/` for recursive LLM support)
+
+**Pick the right extras for your target host:**
+
+```bash
+pip install -e '.[local]'     # Laptop, zero external deps
+pip install -e '.[vps-cpu]'   # Cloud VPS, Haiku API reranker
+pip install -e '.[vps-gpu]'   # CUDA host, local Gemma + embeddings
+```
+
+The legacy `vps-tier1` / `vps-tier2` extras are deprecated in v0.5
+and will be removed in v0.6 (see S-56 / S-57). Use the three-mode
+extras above.

@@ -18,48 +18,86 @@ with the research tooling active. At the end you'll have:
 ## 0. Prerequisites
 
 ```bash
-# On the target host
-python3 --version   # must be 3.10+
-pip --version       # any recent pip
-systemctl --user status  # must exit 0; needed for weekly timer
+# Python 3.10 or newer — note "or newer", any 3.10/3.11/3.12/3.13 works.
+# Ubuntu 24.04 ships 3.12 as default. You do NOT need to install 3.10
+# specifically; the `>=3.10` constraint means "3.10 is the minimum".
+python3 --version
+
+# Build tools + venv module. On fresh Ubuntu 24.04 the venv module is
+# not pre-installed — this is the most common first-install gotcha.
+sudo apt update
+sudo apt install -y python3-full python3-venv build-essential python3-dev
+
+# systemd --user — needed for the weekly regression monitor (§4).
+# On most Hetzner boxes this works out of the box. If it reports
+# "No session" or similar:
+systemctl --user status || sudo loginctl enable-linger $USER
 ```
 
-If `systemctl --user` reports "No session" or similar on a headless
-VPS, run once as root:
-
-```bash
-sudo loginctl enable-linger $USER
-```
-
-This makes your user's systemd available without an active login session.
+> **Why `python3-full`?** On Debian/Ubuntu, `python3` is a minimal
+> bootstrap; `python3-full` brings in `venv`, `pip`, and the standard
+> library components DepthFusion's dependencies need to compile.
+> `build-essential` + `python3-dev` cover the native-compile step
+> for `chromadb` (which pulls in `hnswlib`).
 
 You'll also need a DepthFusion API key:
 
 ```bash
-# Check: is DEPTHFUSION_API_KEY already set?
+# Check: is DEPTHFUSION_API_KEY already set anywhere?
 grep DEPTHFUSION_API_KEY ~/.claude/depthfusion.env 2>/dev/null || echo "not set"
 ```
 
 If not set, [create a key from the Anthropic console] and have it
-ready for step 2.
+ready for step 2. **Important:** use `DEPTHFUSION_API_KEY`, NOT
+`ANTHROPIC_API_KEY` — see the billing-safety note in §2.
 
 [create a key from the Anthropic console]: https://console.anthropic.com/
 
 ---
 
-## 1. Clone and install
+## 1. Clone, create a venv, and install
+
+On modern Ubuntu (24.04+) pip refuses system-wide installs by design
+(PEP 668). **You must install DepthFusion into a virtualenv.** This
+section walks through the full pattern.
+
+### 1a. Clone the repo
 
 ```bash
 # Pick a stable location you won't delete
 git clone https://github.com/gregdigittal/depthfusion.git ~/projects/depthfusion
 cd ~/projects/depthfusion
+```
 
-# Install the library with CPU extras
+### 1b. Create and activate a virtualenv
+
+```bash
+# Use whichever Python 3.10+ you have. On Ubuntu 24.04 this is 3.12.
+python3 -m venv ~/venvs/depthfusion
+source ~/venvs/depthfusion/bin/activate
+```
+
+Your prompt should now show `(depthfusion)` at the front:
+
+```
+(depthfusion) gregmorris@host:~/projects/depthfusion$
+```
+
+If it doesn't, `source` failed — check that `~/venvs/depthfusion/bin/activate`
+exists and run the source line again.
+
+### 1c. Install DepthFusion with vps-cpu extras
+
+```bash
+# Upgrade pip first — venvs ship with a several-year-old pip
+pip install --upgrade pip
+
+# Install the library. The quotes around '.[vps-cpu]' are required —
+# most shells treat [brackets] as glob characters.
 pip install -e '.[vps-cpu]'
 ```
 
-The `-e` (editable) flag means updates via `git pull` don't require
-re-pip-install. Drop `-e` for a production pin.
+Takes 2-4 minutes; `anthropic` and `chromadb` are the big deps.
 
 **Verify:**
 
@@ -68,22 +106,85 @@ python3 -c "import depthfusion; print('ok')"
 # -> ok
 ```
 
+### 1d. Make the venv auto-activate in new shells
+
+Otherwise every `ssh` or `tmux new-session` drops you back to the
+system Python and DepthFusion won't import. This block is idempotent
+— safe to run multiple times.
+
+```bash
+grep -q "# depthfusion venv auto-activate" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
+
+# depthfusion venv auto-activate
+if [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/venvs/depthfusion/bin/activate" ]; then
+    source "$HOME/venvs/depthfusion/bin/activate"
+fi
+EOF
+```
+
+> **⚠ DO NOT `source ~/.bashrc` while the venv is already active.**
+> Ubuntu's default `.bashrc` unconditionally reassigns `PS1`, which
+> leaves your shell in a half-activated state (`$VIRTUAL_ENV` set but
+> `$PATH` clobbered). If you want to test the auto-activate block
+> without logging out, use `exec bash` instead — that replaces the
+> current shell with a fresh one that re-runs `.bashrc` cleanly.
+
+**Test in a fresh shell:**
+
+```bash
+exec bash           # replace current shell; picks up .bashrc fresh
+which python3       # should print ~/venvs/depthfusion/bin/python3
+echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
+```
+
+If both look right you're set. From here on, every new SSH session
+auto-activates the venv.
+
 ---
 
-## 2. Run the interactive installer
+## 2. Set the DepthFusion API key and run the interactive installer
+
+### 2a. Put the API key in the env file
+
+The installer reads `DEPTHFUSION_API_KEY` from `~/.claude/depthfusion.env`
+(or the shell environment). Write it to the env file now so the
+installer finds it.
+
+```bash
+# Create parent dir if it doesn't exist yet
+mkdir -p ~/.claude
+
+# Append the key — replace with your real key from the Anthropic console
+cat >> ~/.claude/depthfusion.env <<'EOF'
+DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
+EOF
+
+# Secure the file — it now contains a secret
+chmod 600 ~/.claude/depthfusion.env
+```
+
+> **⚠ Billing safety — use `DEPTHFUSION_API_KEY`, NOT `ANTHROPIC_API_KEY`.**
+> Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential
+> and will switch your Pro/Max subscription to pay-per-token API
+> billing for **all** Claude Code usage — not just DepthFusion.
+> The separate `DEPTHFUSION_API_KEY` name exists specifically to
+> prevent this (see E-12 S-22 in BACKLOG.md). The installer explicitly
+> refuses to use `ANTHROPIC_API_KEY` even if it's set, by design.
+
+### 2b. Run the installer
 
 ```bash
 python3 -m depthfusion.install.install --mode=vps-cpu
 ```
 
-The installer prompts for:
-- `DEPTHFUSION_API_KEY` (your Anthropic key, from step 0)
-- Confirmation of the auto-detected project root
-- Whether to install the Claude Code MCP integration
+The installer:
+- Detects the project root
+- Writes the mode-specific settings to `~/.claude/depthfusion.env`
+  (preserving your API key from step 2a)
+- Registers PreCompact + PostCompact hooks in `~/.claude/settings.json`
+- Confirms DEPTHFUSION_API_KEY is present with "Haiku features available"
 
-It writes `~/.claude/depthfusion.env` with all settings.
-
-**Verify installation:**
+### 2c. Verify the install
 
 ```bash
 python3 -c "
@@ -95,8 +196,8 @@ for cap in ('reranker', 'extractor', 'linker', 'summariser', 'decision_extractor
 ```
 
 Expected: every LLM capability routes to `haiku` with `healthy=True`.
-If any route to `null`, check that `DEPTHFUSION_API_KEY` is in
-`~/.claude/depthfusion.env`.
+If any route to `null`, the API key isn't being read — double-check
+`~/.claude/depthfusion.env` contains the line and has `chmod 600`.
 
 ---
 

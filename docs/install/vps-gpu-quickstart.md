@@ -28,29 +28,50 @@ instead — it includes the data-migration steps this quickstart omits.
 nvidia-smi                  # must show GPU; ≥ 20 GB VRAM for Gemma 3 12B AWQ
 nvcc --version              # CUDA 12.0+
 
-# Software
-python3 --version           # 3.10+
-pip --version
-systemctl status            # root-level systemd for vLLM service
-systemctl --user status     # user systemd for weekly timer
+# Python — 3.10 or newer; "or newer" means any modern Python is fine.
+# Ubuntu 24.04 ships 3.12 as default. Don't try to install 3.10
+# specifically on 24.04 — it's not in the repos and isn't needed.
+python3 --version
 
-# Network bandwidth
-# Model download is ~7 GB; plan accordingly if on metered transit
+# Build tools + venv module (fresh-install gotcha — venv isn't
+# pre-installed on Ubuntu 24.04, and chromadb / hnswlib need compile tools)
+sudo apt update
+sudo apt install -y python3-full python3-venv build-essential python3-dev
+
+# systemd — both root-level (for vLLM) and user-level (for weekly timer)
+systemctl status                           # root systemd (for vLLM)
+systemctl --user status || sudo loginctl enable-linger $USER
+
+# Network bandwidth — model download is ~7 GB; plan for metered transit
 ```
 
 You'll also need:
-- `DEPTHFUSION_API_KEY` (for the Haiku fallback path when Gemma is
-  down; not mandatory but strongly recommended)
+- `DEPTHFUSION_API_KEY` — **strongly recommended** even on GPU hosts;
+  powers the Haiku fallback path when Gemma is down or OOM
 - ≥ 30 GB free disk space (vLLM, torch CUDA build, Gemma weights)
 
 ---
 
-## 1. Clone and install with GPU extras
+## 1. Clone, create a venv, and install with GPU extras
+
+On modern Ubuntu, pip refuses system-wide installs (PEP 668). You
+must install into a virtualenv.
+
+### 1a. Clone and venv
 
 ```bash
 git clone https://github.com/gregdigittal/depthfusion.git ~/projects/depthfusion
 cd ~/projects/depthfusion
 
+python3 -m venv ~/venvs/depthfusion
+source ~/venvs/depthfusion/bin/activate
+# Prompt should now show (depthfusion) at the front
+```
+
+### 1b. Install with vps-gpu extras
+
+```bash
+pip install --upgrade pip
 # [vps-gpu] pulls in sentence-transformers + chromadb + vllm
 # (vllm install compiles CUDA kernels — can take 10+ minutes)
 pip install -e '.[vps-gpu]'
@@ -68,6 +89,31 @@ mismatch. Check `nvcc --version` matches the one `vllm` expects (see
 [vllm install docs]).
 
 [vllm install docs]: https://docs.vllm.ai/en/latest/getting_started/installation.html
+
+### 1c. Make the venv auto-activate in new shells
+
+```bash
+grep -q "# depthfusion venv auto-activate" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
+
+# depthfusion venv auto-activate
+if [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/venvs/depthfusion/bin/activate" ]; then
+    source "$HOME/venvs/depthfusion/bin/activate"
+fi
+EOF
+```
+
+> **⚠ Do NOT `source ~/.bashrc` while the venv is already active.**
+> Use `exec bash` to test, or disconnect + re-ssh. Sourcing `.bashrc`
+> on an active venv leaves the shell in a half-activated state
+> (`$VIRTUAL_ENV` set but `$PATH` clobbered).
+
+**Test in a fresh shell:**
+
+```bash
+exec bash
+which python3       # should print ~/venvs/depthfusion/bin/python3
+echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
+```
 
 ---
 
@@ -117,7 +163,28 @@ If vLLM fails to start, common causes:
 
 ---
 
-## 3. Run the interactive installer in vps-gpu mode
+## 3. Set the DepthFusion API key and run the installer
+
+### 3a. Put the API key in the env file (Haiku fallback safety-net)
+
+Even on a GPU host where Gemma is primary, setting `DEPTHFUSION_API_KEY`
+is strongly recommended so the `FallbackChain` (v0.6.0a1) can fall
+through to Haiku if Gemma is OOM, rate-limited, or down.
+
+```bash
+mkdir -p ~/.claude
+cat >> ~/.claude/depthfusion.env <<'EOF'
+DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
+EOF
+chmod 600 ~/.claude/depthfusion.env
+```
+
+> **⚠ Billing safety — use `DEPTHFUSION_API_KEY`, NOT `ANTHROPIC_API_KEY`.**
+> Setting `ANTHROPIC_API_KEY` flips Claude Code's billing to
+> pay-per-token for all usage, not just DepthFusion. The installer
+> refuses to use `ANTHROPIC_API_KEY` by design (E-12 S-22).
+
+### 3b. Run the interactive installer in vps-gpu mode
 
 ```bash
 python3 -m depthfusion.install.install --mode=vps-gpu
@@ -133,7 +200,7 @@ actually executes nvidia-smi, imports sentence-transformers,
 and issues a one-shot Gemma completion. Failure is non-fatal —
 install completes, smoke can be re-run later.
 
-**Verify installation:**
+### 3c. Verify the install
 
 ```bash
 python3 -c "
