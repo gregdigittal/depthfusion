@@ -119,6 +119,13 @@ grep -q "# depthfusion venv auto-activate" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
 if [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/venvs/depthfusion/bin/activate" ]; then
     source "$HOME/venvs/depthfusion/bin/activate"
 fi
+
+# depthfusion PS1 prefix enforcement — robust against whatever the
+# activate script does or doesn't do with PS1 (Ubuntu 24.04's Python
+# 3.12 venv sometimes fails to apply the (depthfusion) prompt prefix).
+if [ -n "$VIRTUAL_ENV" ] && [[ "$PS1" != *"(depthfusion)"* ]]; then
+    PS1="(depthfusion) $PS1"
+fi
 EOF
 ```
 
@@ -126,8 +133,9 @@ EOF
 > Ubuntu's default `.bashrc` unconditionally reassigns `PS1`, which
 > leaves your shell in a half-activated state (`$VIRTUAL_ENV` set but
 > `$PATH` clobbered). If you want to test the auto-activate block
-> without logging out, use `exec bash` instead — that replaces the
-> current shell with a fresh one that re-runs `.bashrc` cleanly.
+> without logging out, use `deactivate; exec bash` — that replaces
+> the current shell with a fresh one that starts with empty state
+> and re-runs `.bashrc` cleanly.
 
 **Test in a fresh shell:**
 
@@ -137,30 +145,50 @@ which python3       # should print ~/venvs/depthfusion/bin/python3
 echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
 ```
 
-If both look right you're set. From here on, every new SSH session
-auto-activates the venv.
+Prompt should show `(depthfusion) …$`. If it doesn't, the PS1
+enforcement line isn't firing — check `declare -p PS1` output for
+clues and see the §1d troubleshooting in
+[`../runbooks/gpu-vps-migration.md`](../runbooks/gpu-vps-migration.md)
+(applies identically to vps-cpu installs).
+
+From here on, every new SSH session auto-activates the venv.
 
 ---
 
-## 2. Set the DepthFusion API key and run the interactive installer
+## 2. Run the installer, then add credentials + shell integration
 
-### 2a. Put the API key in the env file
+> **Order matters.** The installer **overwrites** `~/.claude/depthfusion.env`
+> with mode-specific defaults — any API key you add beforehand gets wiped.
+> Run the installer FIRST, then append your credentials. (Tracked as
+> E-17 S-68; future installer will merge instead of overwrite.)
 
-The installer reads `DEPTHFUSION_API_KEY` from `~/.claude/depthfusion.env`
-(or the shell environment). Write it to the env file now so the
-installer finds it.
+### 2a. Run the installer
 
 ```bash
-# Create parent dir if it doesn't exist yet
-mkdir -p ~/.claude
+python3 -m depthfusion.install.install --mode=vps-cpu
+```
 
-# Append the key — replace with your real key from the Anthropic console
+The installer:
+- Writes mode-specific defaults to `~/.claude/depthfusion.env`
+- Registers PreCompact + PostCompact hooks in `~/.claude/settings.json`
+- Warns that Haiku is disabled until you set the API key (next step)
+
+### 2b. Append your credentials to the env file
+
+Both `DEPTHFUSION_API_KEY` and `DEPTHFUSION_HAIKU_ENABLED=true` are
+required for Haiku features to activate — the key alone isn't enough.
+
+```bash
+# Replace with your real key from https://console.anthropic.com/settings/keys
 cat >> ~/.claude/depthfusion.env <<'EOF'
 DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
+DEPTHFUSION_HAIKU_ENABLED=true
 EOF
 
-# Secure the file — it now contains a secret
-chmod 600 ~/.claude/depthfusion.env
+chmod 600 ~/.claude/depthfusion.env   # file now contains a secret
+
+# Sanity-check both made it in
+grep -E "^(DEPTHFUSION_API_KEY|DEPTHFUSION_HAIKU_ENABLED)=" ~/.claude/depthfusion.env
 ```
 
 > **⚠ Billing safety — use `DEPTHFUSION_API_KEY`, NOT `ANTHROPIC_API_KEY`.**
@@ -171,20 +199,56 @@ chmod 600 ~/.claude/depthfusion.env
 > prevent this (see E-12 S-22 in BACKLOG.md). The installer explicitly
 > refuses to use `ANTHROPIC_API_KEY` even if it's set, by design.
 
-### 2b. Run the installer
+### 2c. Make the shell auto-load the env file
+
+Writing to `depthfusion.env` doesn't put variables in your shell
+environment — nothing auto-sources it. Python tools read `os.environ`,
+so without this block the factory check in 2e will route everything to
+`null` despite the env file being correct. Append this alongside the
+venv auto-activate block from §1d:
 
 ```bash
-python3 -m depthfusion.install.install --mode=vps-cpu
+grep -q "# depthfusion env auto-source" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
+
+# depthfusion env auto-source — export vars from the config file
+# so Python processes spawned from this shell see them via os.environ
+if [ -f "$HOME/.claude/depthfusion.env" ]; then
+    set -a
+    source "$HOME/.claude/depthfusion.env"
+    set +a
+fi
+EOF
 ```
 
-The installer:
-- Detects the project root
-- Writes the mode-specific settings to `~/.claude/depthfusion.env`
-  (preserving your API key from step 2a)
-- Registers PreCompact + PostCompact hooks in `~/.claude/settings.json`
-- Confirms DEPTHFUSION_API_KEY is present with "Haiku features available"
+> The `set -a` / `set +a` wrapper turns every plain `KEY=value` line
+> in the env file into an exported variable, without requiring the
+> file itself to use `export KEY=value` syntax.
 
-### 2c. Verify the install
+### 2d. Reload the shell so the env file loads
+
+Do NOT `source ~/.bashrc` while the venv is active — same half-activated-
+state trap as §1d. Instead `deactivate` first, then `exec bash` so the
+new shell starts with empty state and runs all auto-blocks from scratch:
+
+```bash
+deactivate 2>/dev/null; exec bash
+```
+
+Your prompt should still show `(depthfusion)`, and these env vars
+should now be live:
+
+```bash
+echo "haiku: $DEPTHFUSION_HAIKU_ENABLED"
+echo "key:   ${DEPTHFUSION_API_KEY:0:16}..."
+```
+
+Expected:
+```
+haiku: true
+key:   sk-ant-api03-xxx...
+```
+
+### 2e. Verify the factory now routes to Haiku
 
 ```bash
 python3 -c "
@@ -196,8 +260,11 @@ for cap in ('reranker', 'extractor', 'linker', 'summariser', 'decision_extractor
 ```
 
 Expected: every LLM capability routes to `haiku` with `healthy=True`.
-If any route to `null`, the API key isn't being read — double-check
-`~/.claude/depthfusion.env` contains the line and has `chmod 600`.
+If any route to `null`, step through the checks in 2d — specifically
+that `echo $DEPTHFUSION_API_KEY` returns a non-empty value in this
+shell. If the env var is empty but the file contains the key, the
+auto-source block didn't run (check that 2c actually appended to
+`.bashrc` via `tail ~/.bashrc`).
 
 ---
 

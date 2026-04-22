@@ -99,18 +99,24 @@ grep -q "# depthfusion venv auto-activate" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
 if [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/venvs/depthfusion/bin/activate" ]; then
     source "$HOME/venvs/depthfusion/bin/activate"
 fi
+
+# depthfusion PS1 prefix enforcement — robust against whatever the
+# activate script does or doesn't do with PS1.
+if [ -n "$VIRTUAL_ENV" ] && [[ "$PS1" != *"(depthfusion)"* ]]; then
+    PS1="(depthfusion) $PS1"
+fi
 EOF
 ```
 
 > **⚠ Do NOT `source ~/.bashrc` while the venv is already active.**
-> Use `exec bash` to test, or disconnect + re-ssh. Sourcing `.bashrc`
-> on an active venv leaves the shell in a half-activated state
-> (`$VIRTUAL_ENV` set but `$PATH` clobbered).
+> Use `deactivate; exec bash` instead — sourcing on an active venv
+> leaves the shell in a half-activated state (`$VIRTUAL_ENV` set
+> but `$PATH` clobbered).
 
 **Test in a fresh shell:**
 
 ```bash
-exec bash
+deactivate 2>/dev/null; exec bash
 which python3       # should print ~/venvs/depthfusion/bin/python3
 echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
 ```
@@ -163,28 +169,15 @@ If vLLM fails to start, common causes:
 
 ---
 
-## 3. Set the DepthFusion API key and run the installer
+## 3. Run the installer, then add credentials + shell integration
 
-### 3a. Put the API key in the env file (Haiku fallback safety-net)
+> **Order matters.** The installer **overwrites** `~/.claude/depthfusion.env`
+> with mode-specific defaults — any credentials you add beforehand get
+> wiped. Run the installer FIRST, then append your credentials.
+> (Tracked as E-17 S-68; future installer will merge instead of
+> overwrite.)
 
-Even on a GPU host where Gemma is primary, setting `DEPTHFUSION_API_KEY`
-is strongly recommended so the `FallbackChain` (v0.6.0a1) can fall
-through to Haiku if Gemma is OOM, rate-limited, or down.
-
-```bash
-mkdir -p ~/.claude
-cat >> ~/.claude/depthfusion.env <<'EOF'
-DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
-EOF
-chmod 600 ~/.claude/depthfusion.env
-```
-
-> **⚠ Billing safety — use `DEPTHFUSION_API_KEY`, NOT `ANTHROPIC_API_KEY`.**
-> Setting `ANTHROPIC_API_KEY` flips Claude Code's billing to
-> pay-per-token for all usage, not just DepthFusion. The installer
-> refuses to use `ANTHROPIC_API_KEY` by design (E-12 S-22).
-
-### 3b. Run the interactive installer in vps-gpu mode
+### 3a. Run the installer in vps-gpu mode
 
 ```bash
 python3 -m depthfusion.install.install --mode=vps-gpu
@@ -195,12 +188,61 @@ The installer auto-probes for:
 - `sentence-transformers` (pass, installed via `[vps-gpu]` extra)
 - vLLM at `DEPTHFUSION_GEMMA_URL` (pass, service is running)
 
-Then runs `run_vps_gpu_smoke()`: three-probe smoke test that
-actually executes nvidia-smi, imports sentence-transformers,
-and issues a one-shot Gemma completion. Failure is non-fatal —
-install completes, smoke can be re-run later.
+Then runs `run_vps_gpu_smoke()`: three-probe smoke test that actually
+executes nvidia-smi, imports sentence-transformers, and issues a
+one-shot Gemma completion. Failure is non-fatal — install completes,
+smoke can be re-run later.
 
-### 3c. Verify the install
+### 3b. Append credentials + enable flag to the env file
+
+Even on a GPU host where Gemma is primary, setting `DEPTHFUSION_API_KEY`
+is strongly recommended so the `FallbackChain` (v0.6.0a1) can fall
+through to Haiku if Gemma is OOM, rate-limited, or down.
+
+```bash
+cat >> ~/.claude/depthfusion.env <<'EOF'
+DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
+DEPTHFUSION_HAIKU_ENABLED=true
+EOF
+chmod 600 ~/.claude/depthfusion.env
+```
+
+> **⚠ Billing safety — use `DEPTHFUSION_API_KEY`, NOT `ANTHROPIC_API_KEY`.**
+> Setting `ANTHROPIC_API_KEY` flips Claude Code's billing to
+> pay-per-token for all usage, not just DepthFusion. The installer
+> refuses to use `ANTHROPIC_API_KEY` by design (E-12 S-22).
+
+### 3c. Make the shell auto-load the env file
+
+Writing to `depthfusion.env` doesn't put variables in your shell
+environment — nothing auto-sources it. Python tools read `os.environ`,
+so without this block the factory check in 3e will route LLM
+capabilities to `null` despite the env file being correct.
+
+```bash
+grep -q "# depthfusion env auto-source" ~/.bashrc || cat >> ~/.bashrc <<'EOF'
+
+# depthfusion env auto-source — export vars from the config file
+if [ -f "$HOME/.claude/depthfusion.env" ]; then
+    set -a
+    source "$HOME/.claude/depthfusion.env"
+    set +a
+fi
+EOF
+```
+
+### 3d. Reload the shell
+
+```bash
+deactivate 2>/dev/null; exec bash
+
+# Confirm the env vars are live
+echo "haiku:     $DEPTHFUSION_HAIKU_ENABLED"
+echo "key:       ${DEPTHFUSION_API_KEY:0:16}..."
+echo "gemma URL: ${DEPTHFUSION_GEMMA_URL:-not set (default http://127.0.0.1:8000/v1)}"
+```
+
+### 3e. Verify the install
 
 ```bash
 python3 -c "
@@ -214,6 +256,12 @@ for cap in ('reranker', 'extractor', 'linker', 'summariser', 'decision_extractor
 Expected:
 - LLM capabilities → `gemma` (healthy)
 - `embedding` → `local` (healthy)
+
+If LLM capabilities route to `haiku` instead of `gemma`, vLLM isn't
+reachable — check `curl http://127.0.0.1:8000/v1/models` and
+`sudo systemctl status vllm-gemma`. This is expected behaviour
+(the factory falls back to Haiku when Gemma is unhealthy) so the
+install is usable, just not running on GPU until vLLM comes up.
 
 ---
 

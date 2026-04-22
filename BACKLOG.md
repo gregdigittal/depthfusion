@@ -604,6 +604,64 @@
 **Tasks:**
 - [x] T-114: Enforce confidence threshold at `graph/store.py` write path
 
+### S-68: As a user re-running the installer, I want it to preserve my user-authored env file content so that my API key + custom flags aren't silently deleted `P1` `S`
+
+> Surfaced 2026-04-22 during the Hetzner walk-through. Current
+> `_write_env_config()` in `src/depthfusion/install/install.py`
+> uses `Path.write_text()` which **truncates** the file — any
+> user-authored lines (e.g. `DEPTHFUSION_API_KEY=…`, custom
+> `DEPTHFUSION_HAIKU_ENABLED=true`, `DEPTHFUSION_GEMMA_URL=…`)
+> added before the installer runs are silently wiped. This is a
+> P1 because it's silent data loss on re-install / upgrade paths
+> — users who add the API key first (as earlier versions of the
+> quickstart instructed) lose it when the installer writes
+> mode-specific defaults.
+
+**Acceptance criteria:**
+- [ ] AC-1: `_write_env_config()` merges with existing file content
+  rather than overwriting — reads existing lines, keys values by
+  `KEY=` prefix, preserves user-authored keys not in the mode-specific
+  set
+- [ ] AC-2: Known mode-specific keys (`DEPTHFUSION_MODE`,
+  `DEPTHFUSION_TIER_THRESHOLD`, `DEPTHFUSION_*_BACKEND`) get
+  overwritten to reflect the selected mode — those ARE owned by
+  the installer
+- [ ] AC-3: User-authored keys (`DEPTHFUSION_API_KEY`,
+  `DEPTHFUSION_HAIKU_ENABLED`, `DEPTHFUSION_GEMMA_URL`,
+  `DEPTHFUSION_FUSION_*`, etc.) are preserved verbatim
+- [ ] AC-4: File permissions preserved — if existing file was
+  `chmod 600`, new file is `chmod 600` (no reopen-as-world-readable)
+- [ ] AC-5: Comment lines (`# …`) and blank lines preserved in
+  their original positions
+- [ ] AC-6: If the installer would change a user-authored key's
+  value (rare; only when a mode explicitly manages it), it prints
+  a warning with the key name + old value + new value — never
+  silent mutation
+- [ ] AC-7: ≥ 5 tests in `tests/test_install/test_env_merge.py`:
+  no existing file (fresh write); existing file with no DepthFusion
+  keys (append-only); existing file with user-authored API key
+  (preserved); existing file with outdated mode key (updated);
+  existing file with chmod 600 (preserved)
+- [ ] AC-8: Quickstart guides updated — remove the "Order matters"
+  warning in §2/§3 once the merge is live; re-fold credential
+  append into the same step as the installer run
+
+**Tasks:**
+- [ ] T-212: Add `_parse_env_file(path: Path) -> list[tuple[str, str | None]]`
+  helper that returns ordered pairs of (line, key_or_None) preserving
+  original structure (blank lines + comments as `(line, None)`)
+- [ ] T-213: Rewrite `_write_env_config()` to:
+  1. Parse existing file if present
+  2. Build ordered output: existing lines with known-mode-keys
+     updated; remaining mode-keys appended at the end
+  3. Preserve file permissions via `os.stat`/`os.chmod`
+- [ ] T-214: Tests in `tests/test_install/test_env_merge.py` covering
+  the five AC-7 scenarios + warning emission (AC-6)
+- [ ] T-215: Remove the "Order matters" preamble + restructure §2/§3
+  in both quickstart guides once the merge is live
+
+---
+
 ### S-67: As a new user, I want the installer to register the MCP server automatically so that DepthFusion tools are usable in Claude Code without a separate `claude mcp add` step `P2` `S`
 
 > Surfaced 2026-04-21 while answering "do I need to enable per session?" — the installer writes env config and registers compaction hooks, but **does not** register the DepthFusion MCP server with Claude Code. The current `vps-cpu-quickstart.md` and `vps-gpu-quickstart.md` have a dedicated "Register the MCP server" step (§3/§4 respectively) as a workaround. This story folds that step back into the installer.
