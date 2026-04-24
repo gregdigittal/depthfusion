@@ -370,3 +370,75 @@ def test_register_hooks_uses_runtime_resolved_home(tmp_path, monkeypatch):
     data = settings_file.read_text()
     assert "depthfusion-pre-compact.sh" in data
     assert "depthfusion-post-compact.sh" in data
+
+
+# ---------------------------------------------------------------------------
+# Placeholder-key guard (regression for 2026-04-24 incident where
+# `sk-ant-api03-your-real-key-here` was live for ~4 weeks, silently
+# no-op'ing every Haiku-backed capability via NullBackend fallback.)
+# ---------------------------------------------------------------------------
+
+class TestPlaceholderKeyGuard:
+    @pytest.mark.parametrize("value", [
+        "sk-ant-api03-your-real-key-here",
+        "sk-ant-api03-YOUR-real-key-here-appended-garbage",
+        "anything-containing-your-real-key-here-substring",
+    ])
+    def test_is_placeholder_key_flags_documented_markers(self, value):
+        assert install_mod._is_placeholder_key(value) is True
+
+    @pytest.mark.parametrize("value", [
+        "sk-ant-api03-realbase64characterstring",
+        "sk-ant-test",
+        "abc-def-here",  # "-here" alone is not a marker — only the full
+                         # documented placeholder phrase is matched
+    ])
+    def test_is_placeholder_key_accepts_real_looking_keys(self, value):
+        assert install_mod._is_placeholder_key(value) is False
+
+    def test_is_placeholder_key_treats_none_as_unset(self):
+        assert install_mod._is_placeholder_key(None) is False
+
+    def test_is_placeholder_key_treats_empty_as_unset(self):
+        assert install_mod._is_placeholder_key("") is False
+
+    def test_check_api_key_warns_on_placeholder(self, monkeypatch, capsys):
+        """_check_depthfusion_api_key must emit a loud WARNING when the
+        configured key is a documented placeholder — otherwise the
+        install appears successful and Haiku silently no-ops."""
+        monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-your-real-key-here")
+        install_mod._check_depthfusion_api_key()
+        out = capsys.readouterr().out
+        assert "WARNING" in out
+        assert "placeholder" in out.lower()
+        assert "NullBackend" in out
+
+    def test_check_api_key_happy_path_unchanged(self, monkeypatch, capsys):
+        """Real keys continue to produce the 'found' message."""
+        monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-realvalue")
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        install_mod._check_depthfusion_api_key()
+        out = capsys.readouterr().out
+        assert "DEPTHFUSION_API_KEY found" in out
+        assert "WARNING" not in out
+
+    def test_recommend_mode_treats_placeholder_as_no_key(self, monkeypatch):
+        """With no GPU and a placeholder key, the recommender must pick
+        `local` — not `vps-cpu`. Recommending vps-cpu with a placeholder
+        key produces a functional NullBackend install (the exact regression
+        that triggered this guard)."""
+        monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-your-real-key-here")
+        no_gpu = GPUInfo(False, "", 0.0, 0, "no gpu")
+        with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
+            mode, reason = install_mod._recommend_mode_from_gpu()
+        assert mode == "local"
+        assert "placeholder" in reason.lower()
+
+    def test_recommend_mode_with_real_key_still_picks_vps_cpu(self, monkeypatch):
+        """Real key + no GPU → vps-cpu (the original v0.5.2 behaviour,
+        unchanged by the guard)."""
+        monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-realvalue")
+        no_gpu = GPUInfo(False, "", 0.0, 0, "no gpu")
+        with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
+            mode, _ = install_mod._recommend_mode_from_gpu()
+        assert mode == "vps-cpu"

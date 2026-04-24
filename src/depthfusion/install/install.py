@@ -71,6 +71,30 @@ _VPS_GPU_ENV_LINES = [
     "DEPTHFUSION_EMBEDDING_BACKEND=local",
 ]
 
+# Substrings that identify documented placeholder API-key values. The
+# factory's health check already rejects these at runtime (fall-through
+# to NullBackend), but catching them at install and recommend time
+# surfaces the misconfiguration instead of silently degrading.
+_PLACEHOLDER_KEY_MARKERS: tuple[str, ...] = (
+    "your-real-key-here",  # literal from install.py + quickstart docs
+)
+
+
+def _is_placeholder_key(value: str | None) -> bool:
+    """Return True if `value` contains a documented placeholder marker.
+
+    Case-insensitive: copy-paste variants like `YOUR-real-key-here`
+    also count, since real Anthropic keys never contain the marker
+    phrase in any case (base64 alphabet has no hyphen-prefixed words).
+
+    Empty / None values are "unset", not "placeholder" — callers need
+    to distinguish those states, so this returns False for them.
+    """
+    if not value:
+        return False
+    lowered = value.lower()
+    return any(marker in lowered for marker in _PLACEHOLDER_KEY_MARKERS)
+
 
 def _print_step(msg: str, dry_run: bool = False) -> None:
     prefix = "[DRY-RUN]" if dry_run else "[INSTALL]"
@@ -266,7 +290,21 @@ def _register_hooks() -> None:
 
 
 def _check_depthfusion_api_key() -> None:
-    if os.environ.get("DEPTHFUSION_API_KEY"):
+    key = os.environ.get("DEPTHFUSION_API_KEY")
+    if key and _is_placeholder_key(key):
+        print(
+            "  WARNING: DEPTHFUSION_API_KEY is set to a placeholder value "
+            "(contains 'your-real-key-here')."
+        )
+        print(
+            "  The Haiku backend will fall back to NullBackend until you "
+            "replace it with a real key from https://console.anthropic.com/."
+        )
+        print(
+            "  This silently disables reranker, summariser, extractor, and "
+            "linker — all vps-cpu mode's Haiku-dependent features."
+        )
+    elif key:
         print(
             "  DEPTHFUSION_API_KEY found. Haiku features available when "
             "DEPTHFUSION_HAIKU_ENABLED=true."
@@ -315,13 +353,20 @@ def _recommend_mode_from_gpu() -> tuple[str, str]:
             "vps-gpu runs Gemma + local embeddings on-box for lowest latency."
         )
     # No GPU — the choice between local and vps-cpu depends on whether the
-    # user has a DEPTHFUSION_API_KEY configured. If they do, vps-cpu is
-    # worth recommending (enables Haiku reranker). If not, local is the
-    # zero-config baseline.
-    if os.environ.get("DEPTHFUSION_API_KEY"):
+    # user has a real DEPTHFUSION_API_KEY configured. A placeholder value is
+    # treated as no key: recommending vps-cpu when only a placeholder is set
+    # would produce an install that silently runs in NullBackend mode.
+    key = os.environ.get("DEPTHFUSION_API_KEY")
+    if key and not _is_placeholder_key(key):
         return "vps-cpu", (
             "No GPU, but DEPTHFUSION_API_KEY is set — vps-cpu enables the "
             "Haiku reranker via Anthropic's API."
+        )
+    if key and _is_placeholder_key(key):
+        return "local", (
+            "No GPU, and DEPTHFUSION_API_KEY is a placeholder — local mode "
+            "runs BM25-only until you replace the key with a real one. "
+            "Re-run the installer after setting it to upgrade to vps-cpu."
         )
     return "local", (
         "No GPU, no DEPTHFUSION_API_KEY — local mode runs BM25-only with "

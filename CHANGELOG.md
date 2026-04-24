@@ -57,6 +57,17 @@ v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
 
 ### Fixed
 
+**Placeholder-key guard in installer (`install.py`):** `_check_depthfusion_api_key()`
+now detects values containing `your-real-key-here` (case-insensitive) and emits
+a loud WARNING explaining that Haiku falls back to NullBackend. `_recommend_mode_from_gpu()`
+treats a placeholder as "no key" and recommends `local` instead of `vps-cpu`, preventing
+the installer from confidently configuring a mode that can't actually run its
+flagship features. Regression for 2026-04-24 incident where the placeholder shipped in
+`~/.claude/depthfusion.env` lived for ~4 weeks undetected — the factory's
+NullBackend fallback was silent enough that recall returned BM25-only results
+and the knowledge graph accumulated 0 entities across 171 sessions. 11 unit tests
+added under `TestPlaceholderKeyGuard`.
+
 **Review-gate findings on the three new scripts (2 High, 2 Medium, 2 Low):**
 - `ciqs-weekly.service`: `%i` specifier expanded to empty string in
   non-template unit (filename became `-YYYY-MM-DD.md` with leading dash).
