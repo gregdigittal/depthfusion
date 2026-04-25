@@ -29,7 +29,13 @@ WorkingDirectory=/home/gregmorris/projects/depthfusion
 # and exits 127 with a clear error if vllm is missing.
 Environment="PATH=/home/gregmorris/projects/depthfusion/.venv/bin:/usr/bin:/bin"
 # Default model — override here, in /etc/default/vllm-gemma, or via drop-in.
-Environment="DEPTHFUSION_GEMMA_MODEL=google/gemma-3-12b-it-AWQ"
+# As of 2026-04-22, Google's official AWQ repo for Gemma 4 26B-IT is the
+# expected identifier; verify with `huggingface-cli search` or the vLLM
+# recipe page (https://docs.vllm.ai/projects/recipes/en/latest/Google/Gemma4.html)
+# before deploying — community quants may use a different repo path.
+# Earlier versions of this service used google/gemma-3-12b-it-AWQ; the
+# unit shape is identical, only the model identifier changed.
+Environment="DEPTHFUSION_GEMMA_MODEL=google/gemma-4-26b-it-AWQ"
 Environment="DEPTHFUSION_GEMMA_PORT=8000"
 Environment="DEPTHFUSION_GEMMA_HOST=127.0.0.1"
 Environment="DEPTHFUSION_GEMMA_GPU_MEMORY=0.90"
@@ -40,8 +46,10 @@ ExecStart=/home/gregmorris/projects/depthfusion/scripts/vllm-serve-gemma.sh
 Restart=on-failure
 RestartSec=5
 
-# vLLM can take ~60s to load Gemma 3 12B into VRAM on the GEX44; give it
-# headroom before systemd treats slow startup as a failure.
+# vLLM can take 60-180s to load a Gemma 4 26B AWQ checkpoint into VRAM on
+# a 20 GB GPU (Gemma 3 12B was ~60s; the larger MoE weights take longer
+# to deserialize even though only 3.8B params are active per forward pass).
+# 300s leaves headroom before systemd treats slow startup as a failure.
 TimeoutStartSec=300
 
 # Resource limits — the GEX44 has 64 GB RAM + 20 GB VRAM; vLLM is mostly

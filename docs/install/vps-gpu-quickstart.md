@@ -3,14 +3,14 @@
 > **Target:** Hetzner GEX44 (NVIDIA RTX 4000 SFF Ada) or any CUDA-12+ host
 > **Time:** ~4 hours (mostly GPU-driver + Gemma model download)
 > **Produces:** working DepthFusion in `vps-gpu` mode + weekly regression monitor + initial prompt corpus
-> **Estimated first-run size on disk:** ~30 GB (vLLM + Gemma 3 12B AWQ + sentence-transformers)
+> **Estimated first-run size on disk:** ~36 GB (vLLM + Gemma 4 26B AWQ + sentence-transformers + torch CUDA build). Gemma 4 26B AWQ weights are ~13 GB, up from ~7 GB for Gemma 3 12B AWQ used in earlier versions of this guide.
 
 This is the GPU-enabled counterpart to
 [`vps-cpu-quickstart.md`](vps-cpu-quickstart.md). At the end you'll
 have:
 
 - DepthFusion in `vps-gpu` mode (local Gemma LLM + local embeddings)
-- vLLM serving Gemma 3 12B AWQ as a systemd service
+- vLLM serving Gemma 4 26B AWQ as a systemd service
 - Weekly regression monitor scheduled
 - Initial prompt corpus mined
 
@@ -23,9 +23,33 @@ instead — it includes the data-migration steps this quickstart omits.
 
 ## 0. Prerequisites
 
+### Pick a Gemma 4 variant matching your hardware
+
+The recommended model is **Gemma 4 26B MoE** in AWQ 4-bit quantization,
+which is what the rest of this guide assumes. Use the table below to
+pick the right variant if your VRAM differs from the GEX44 reference.
+
+| GPU VRAM | Recommended Gemma 4 variant | Quantization | Notes |
+|----------|-----------------------------|--------------|-------|
+| 12-16 GB | E4B (4B effective)          | BF16 or AWQ  | Smallest competent variant; runs comfortably on consumer cards |
+| **20-24 GB** | **26B MoE (this guide)**     | **AWQ 4-bit** | 3.8B active params per forward pass, but ALL 26B must fit in VRAM (~13 GB AWQ); the GEX44 reference target |
+| 40+ GB   | 31B Dense                   | BF16 or AWQ  | Highest quality; needs a higher-VRAM host than this guide assumes |
+
+> **MoE memory note (counter-intuitive):** Gemma 4 26B is a Mixture-of-Experts
+> model with ~3.8B active parameters per forward pass. MoE is a *compute*
+> optimization, NOT a *memory* optimization — every expert weight must
+> still be resident in VRAM. AWQ 4-bit takes the 26B from ~52 GB (BF16)
+> down to ~13 GB, which is what makes it fit a 20 GB card. If you assume
+> "3.8B active means it'll fit on a 12 GB card" you'll OOM at load.
+
+For the rest of this guide, "Gemma 4" without qualification means the
+26B MoE AWQ variant.
+
+### System checks
+
 ```bash
 # Hardware
-nvidia-smi                  # must show GPU; ≥ 20 GB VRAM for Gemma 3 12B AWQ
+nvidia-smi                  # must show GPU; ≥ 20 GB VRAM for Gemma 4 26B AWQ
 nvcc --version              # CUDA 12.0+
 
 # Python — 3.10 or newer; "or newer" means any modern Python is fine.
@@ -42,7 +66,8 @@ sudo apt install -y python3-full python3-venv build-essential python3-dev
 systemctl status                           # root systemd (for vLLM)
 systemctl --user status || sudo loginctl enable-linger $USER
 
-# Network bandwidth — model download is ~7 GB; plan for metered transit
+# Network bandwidth — model download is ~13 GB (Gemma 4 26B AWQ);
+# plan for metered transit
 ```
 
 You'll also need:
@@ -68,20 +93,45 @@ source ~/venvs/depthfusion/bin/activate
 # Prompt should now show (depthfusion) at the front
 ```
 
-### 1b. Install with vps-gpu extras
+### 1b. Install with vps-gpu extras + vLLM
 
 ```bash
 pip install --upgrade pip
-# [vps-gpu] pulls in sentence-transformers + chromadb + vllm
-# (vllm install compiles CUDA kernels — can take 10+ minutes)
+
+# [vps-gpu] pulls in sentence-transformers + chromadb (NOT vllm — see note below)
 pip install -e '.[vps-gpu]'
+
+# vLLM is installed separately because the version requirement depends on
+# which Gemma you want to serve. For Gemma 4 (26B MoE / 31B Dense / E4B
+# / E2B) you need the version that landed PR #38826. The latest
+# release on PyPI is the safe bet:
+pip install -U vllm
+
+# CUDA kernels compile on first install — can take 10+ minutes.
+# After it finishes, confirm the version supports Gemma 4:
+pip show vllm | grep Version
 ```
+
+> **Why is vLLM separate from the `[vps-gpu]` extras?** vLLM's Python
+> wheel pins specific CUDA + PyTorch versions, and Gemma 4 support
+> requires a vLLM release ≥ the one that includes
+> [vllm-project/vllm#38826](https://github.com/vllm-project/vllm/pull/38826).
+> Bundling vLLM into the extras would force every DepthFusion install
+> to also drag in those constraints; keeping it separate lets the
+> operator pin the version they want. The `[vps-gpu]` extras stay
+> minimal: `sentence-transformers` (for local embeddings) plus
+> `chromadb` (for Tier 2).
 
 **Verify:**
 
 ```bash
 python3 -c "import depthfusion, sentence_transformers, vllm; print('ok')"
 # -> ok
+
+# Confirm vLLM has Gemma 4 architecture support (the architecture name
+# may be 'Gemma4ForCausalLM' or similar — check vLLM's supported-models
+# list output)
+python3 -c "import vllm; print(vllm.__version__)"
 ```
 
 If `import vllm` fails, the most common cause is a CUDA version
@@ -125,7 +175,16 @@ echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
 
 ## 2. Set up vLLM as a systemd service
 
-A ready-to-use service file ships in the repo:
+A ready-to-use service file ships in the repo. It's pre-configured for
+**Gemma 4 26B AWQ** (`google/gemma-4-26b-it-AWQ`); change the model
+identifier if you picked a different variant from the hardware-fit
+table in §0.
+
+> **Verify the model identifier before deploying.** Google's official
+> AWQ release for Gemma 4 26B-IT and any community AWQ quants may use
+> different repo paths. Cross-check with the vLLM Gemma 4 recipe page
+> ([docs.vllm.ai/projects/recipes/.../Gemma4](https://docs.vllm.ai/projects/recipes/en/latest/Google/Gemma4.html))
+> and `huggingface-cli search gemma-4-26b` before committing.
 
 ```bash
 # Review it first — paths and model choice may need adjustment
@@ -138,7 +197,7 @@ sudo systemctl enable vllm-gemma
 sudo systemctl start vllm-gemma
 ```
 
-First start downloads the Gemma 3 12B AWQ weights (~7 GB). Wait for
+First start downloads the Gemma 4 26B AWQ weights (~13 GB). Wait for
 the server to be ready:
 
 ```bash

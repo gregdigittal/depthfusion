@@ -17,7 +17,13 @@
 #   journalctl -u vllm-gemma -f
 #
 # Env vars (all optional):
-#   DEPTHFUSION_GEMMA_MODEL         default: google/gemma-3-12b-it-AWQ
+#   DEPTHFUSION_GEMMA_MODEL         default: google/gemma-4-26b-it-AWQ
+#                                   (Gemma 4 26B MoE in 4-bit AWQ; ~13 GB VRAM
+#                                    for weights, fits a 20 GB card with
+#                                    headroom for KV cache + activations.
+#                                    Verify exact repo at https://docs.vllm.ai/projects/recipes/en/latest/Google/Gemma4.html
+#                                    before deploying — Google's official AWQ
+#                                    repo and community quants may differ.)
 #   DEPTHFUSION_GEMMA_PORT          default: 8000
 #   DEPTHFUSION_GEMMA_HOST          default: 127.0.0.1
 #   DEPTHFUSION_GEMMA_GPU_MEMORY    default: 0.90 (fraction of GPU VRAM to reserve)
@@ -26,7 +32,7 @@
 
 set -euo pipefail
 
-MODEL="${DEPTHFUSION_GEMMA_MODEL:-google/gemma-3-12b-it-AWQ}"
+MODEL="${DEPTHFUSION_GEMMA_MODEL:-google/gemma-4-26b-it-AWQ}"
 PORT="${DEPTHFUSION_GEMMA_PORT:-8000}"
 HOST="${DEPTHFUSION_GEMMA_HOST:-127.0.0.1}"
 GPU_MEMORY="${DEPTHFUSION_GEMMA_GPU_MEMORY:-0.90}"
