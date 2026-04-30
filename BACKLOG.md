@@ -1203,6 +1203,28 @@
 - [ ] T-236: JSONL writer with daily rotation (size cap optional)
 - [ ] T-237: Tests in `tests/test_capture/test_event_hook.py`
 
+### S-78: As a publish caller, I want `publish_context` to actually persist items idempotently by `content_hash` so that retries on transient failures don't create duplicate context entries `P1` `M`
+
+> **Cross-project blocker:** agent-ops ADR 0004 (DepthFusion publish retry policy) cannot accept option β (single retry on transient errors) until this story lands. Today, `_tool_publish_context` in `mcp/server.py:629-631` is a stub that echoes success without storing the item; even when it persists, `FileBus.publish()` (`router/bus.py:62-73`) does unconditional append and `ContextItem` (`core/types.py:34-43`) has no `content_hash` field. Without dedup-on-publish, agent-ops retries would create duplicate `bus.jsonl` rows that distort recall until the next prune cycle. See `~/projects/agent-ops/docs/decisions/0004-depthfusion-publish-retry.md` and the audit report at `~/projects/agent-ops/docs/depthfusion-feature-inventory.md`.
+
+**Acceptance criteria:**
+- [ ] AC-1: `_tool_publish_context` (`mcp/server.py`) calls a real `ContextBus.publish()` (DI-injected the same way `recall_relevant` is wired). The current stub return — `{"published": True, "item": item}` — is replaced.
+- [ ] AC-2: `ContextItem` (`core/types.py`) gains `content_hash: str` field, computed as sha256 of `content` at construction time. Auto-derive in a factory function or `__post_init__` so callers cannot mismatch hash and content.
+- [ ] AC-3: `FileBus.publish()` and `InMemoryBus.publish()` (`router/bus.py`) skip the append/insert when an item with the same `content_hash` already exists in the bus. Skip is silent — no exception, no log warning at default level.
+- [ ] AC-4: The MCP tool response shape becomes `{published: bool, item_id: str, deduped: bool}` so callers can distinguish first-publish from retry-dedup. `published: true, deduped: false` = newly stored. `published: true, deduped: true` = idempotent hit (already present). The original `item_id` of the existing record is returned in the deduped case.
+- [ ] AC-5: Idempotency is exact-content — bytewise-identical `content` produces the same hash and dedupes; any whitespace, casing, or metadata difference produces a different hash and is stored as a new item. Tag differences alone do not affect the hash.
+- [ ] AC-6: Backward compatible — existing `bus.jsonl` rows written before this story (which lack `content_hash`) are loaded as legacy items with no hash, and are never matched for dedup. New rows include `content_hash`.
+- [ ] AC-7: ≥ 8 tests covering: first publish stores; repeat publish dedupes and returns the original item_id; 1-character difference creates a new item; tag-only difference still dedupes; backward-compat load of pre-existing rows; concurrent publish of identical content (file-locking or read-then-write race) doesn't double-insert; MCP tool returns correct response shape; large content (>1 MB) hashes and persists correctly.
+
+**Tasks:**
+- [ ] T-255: Add `content_hash: str` field to `ContextItem` in `core/types.py` with sha256 auto-derivation (factory function `make_context_item(...)` or `__post_init__`)
+- [ ] T-256: Implement dedup-on-publish in `FileBus.publish()` (`router/bus.py`) — maintain an in-memory hash index built from `bus.jsonl` on init, update on each successful append; handle the legacy-row case (rows with no `content_hash` are never indexed)
+- [ ] T-257: Implement dedup-on-publish in `InMemoryBus.publish()` (`router/bus.py`) — simple set-based hash index
+- [ ] T-258: Wire `_tool_publish_context` in `mcp/server.py` to call a DI-injected `ContextBus`, mirroring how `recall_relevant` resolves its dependencies
+- [ ] T-259: Update MCP tool response shape to `{published: bool, item_id, deduped: bool}` and document the contract in the tool description string
+- [ ] T-260: Author tests in `tests/test_router/test_bus_idempotency.py` (covers both `InMemoryBus` and `FileBus`; uses tmp_path for FileBus)
+- [ ] T-261: Update `docs/runbooks/` (or equivalent) with the publish-API idempotency contract so consumers (agent-ops, future MCP clients) can rely on it
+
 ---
 
 ## E-28: Tier-1 Engagement Audit & Introspection Surface [backlog]
