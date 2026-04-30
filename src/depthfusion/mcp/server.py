@@ -6,10 +6,13 @@ import logging
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
+from depthfusion.core.types import ContextItem
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
+from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +28,15 @@ TOOLS: dict[str, str] = {
         "exception message; `blocks` is always present (empty list on error)."
     ),
     "depthfusion_tag_session": "Tag a session file with metadata",
-    "depthfusion_publish_context": "Publish a context item to the bus",
+    "depthfusion_publish_context": (
+        "Publish a context item to the bus with idempotent dedup by content_hash (S-78). "
+        "Args: item (object with item_id, content, source_agent, tags; optional priority, "
+        "ttl_seconds, metadata). Response: {published: bool, item_id: str, deduped: bool}. "
+        "On dedup, `item_id` is the ORIGINAL stored item's id, not the retry's. "
+        "Idempotency is exact-content: any byte-level difference in `content` produces "
+        "a different hash and is stored as a new item; tag-only or metadata-only "
+        "differences do not affect the hash and still dedupe."
+    ),
     "depthfusion_run_recursive": "Run recursive LLM on large content",
     # v0.3.0 additions
     "depthfusion_tier_status": "Return corpus size, active tier, and promotion estimate",
@@ -139,7 +150,7 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
     elif tool_name == "depthfusion_tag_session":
         return _tool_tag_session(arguments)
     elif tool_name == "depthfusion_publish_context":
-        return _tool_publish_context(arguments)
+        return _tool_publish_context(arguments, config)
     elif tool_name == "depthfusion_run_recursive":
         return _tool_run_recursive(arguments, config)
     elif tool_name == "depthfusion_tier_status":
@@ -626,9 +637,68 @@ def _tool_tag_session(arguments: dict) -> str:
     return json.dumps({"session_id": session_id, "tags": tags, "tagged": True})
 
 
-def _tool_publish_context(arguments: dict) -> str:
-    item = arguments.get("item", {})
-    return json.dumps({"published": True, "item": item})
+# Module-level ContextBus cache (S-78). Patchable for tests:
+#   patch.object(mcp_server, "_get_context_bus", return_value=test_bus, create=True)
+_BUS_INSTANCE: ContextBus | None = None
+
+
+def _get_context_bus(config: Any = None) -> ContextBus:
+    """Return the process-wide ContextBus, lazily constructed from config.
+
+    The instance is cached on first call to avoid rebuilding FileBus's hash
+    index on every MCP request. Tests should patch this function directly via
+    ``unittest.mock.patch.object(..., create=True)`` rather than mutate the
+    cache. ``config`` may be ``None`` — defaults are used (file backend at
+    ``~/.claude/context-bus``).
+    """
+    global _BUS_INSTANCE
+    if _BUS_INSTANCE is not None:
+        return _BUS_INSTANCE
+
+    backend = getattr(config, "bus_backend", "file")
+    bus_dir_str = getattr(config, "bus_file_dir", "~/.claude/context-bus")
+    if backend == "memory":
+        _BUS_INSTANCE = InMemoryBus()
+    else:
+        _BUS_INSTANCE = FileBus(bus_dir=Path(bus_dir_str).expanduser())
+    return _BUS_INSTANCE
+
+
+def _tool_publish_context(arguments: dict, config: Any = None) -> str:
+    """Publish a context item to the bus with idempotent dedup (S-78).
+
+    Returns JSON of the canonical publish-result shape:
+      ``{"published": True, "item_id": <id>, "deduped": <bool>}``
+    On dedup, ``item_id`` is the ORIGINAL stored item's id, not the retry's.
+    """
+    item_payload = arguments.get("item")
+    if not isinstance(item_payload, dict):
+        return json.dumps(
+            {"error": "publish_context: 'item' must be an object", "published": False}
+        )
+    try:
+        item = ContextItem(
+            item_id=item_payload["item_id"],
+            content=item_payload["content"],
+            source_agent=item_payload["source_agent"],
+            tags=list(item_payload.get("tags", [])),
+            priority=item_payload.get("priority", "normal"),
+            ttl_seconds=item_payload.get("ttl_seconds"),
+            metadata=item_payload.get("metadata", {}),
+        )
+    except (KeyError, TypeError) as exc:
+        return json.dumps(
+            {"error": f"publish_context: invalid item payload: {exc}", "published": False}
+        )
+
+    bus = _get_context_bus(config)
+    try:
+        result = bus.publish(item)
+    except Exception as exc:  # noqa: BLE001 — surface bus errors verbatim
+        return json.dumps(
+            {"error": f"publish_context: bus error: {exc}", "published": False}
+        )
+    return json.dumps(result)
 
 
 def _tool_run_recursive(arguments: dict, config: Any) -> str:
