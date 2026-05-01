@@ -8,9 +8,9 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_fifteen_entries():
-    """Total tool count: 15 (S-72 added depthfusion_recall_feedback)."""
-    assert len(TOOLS) == 15
+def test_tools_dict_has_sixteen_entries():
+    """Total tool count: 16 (S-69 added depthfusion_pin_discovery)."""
+    assert len(TOOLS) == 16
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -27,6 +27,7 @@ def test_tools_dict_has_fifteen_entries():
         "depthfusion_prune_discoveries",      # v0.5.1 S-55
         "depthfusion_set_memory_score",       # E-27 / S-70
         "depthfusion_recall_feedback",        # E-27 / S-72
+        "depthfusion_pin_discovery",          # E-27 / S-69
     }
     assert set(TOOLS.keys()) == expected
 
@@ -35,23 +36,23 @@ def test_get_enabled_tools_all_flags_true():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=True, graph_enabled=True)
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 15
+    assert len(enabled) == 16
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
-    # 15 total - 1 rlm - 3 graph (graph_enabled defaults False) = 11
-    assert len(enabled) == 11
+    # 16 total - 1 rlm - 3 graph (graph_enabled defaults False) = 12
+    assert len(enabled) == 12
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 15 total - 1 publish - 3 graph = 11
-    assert len(enabled) == 11
+    # 16 total - 1 publish - 3 graph = 12
+    assert len(enabled) == 12
 
 
 def test_get_enabled_tools_both_disabled():
@@ -59,8 +60,8 @@ def test_get_enabled_tools_both_disabled():
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    # 15 total - 2 flagged - 3 graph = 10
-    assert len(enabled) == 10
+    # 16 total - 2 flagged - 3 graph = 11
+    assert len(enabled) == 11
 
 
 def test_core_tools_always_enabled():

@@ -1118,7 +1118,7 @@
 >
 > **Source:** Surfaced from a 2026-04-29 read-only audit comparing ClaudeClaw OS Memory v2 against DepthFusion's live surface — see `docs/depthfusion-feature-inventory.md` in the agent-ops repo (sibling project at `~/projects/agent-ops/`). The audit's full report and source prompt are at `docs/depthfusion-evaluation-prompt.md` and `docs/claudeclaw-feature-analysis.md` in the same repo. Most ClaudeClaw v2 features turned out either COVERED or NOT-APPLICABLE; this epic captures only what was confirmed missing in DepthFusion's own backlog.
 
-### S-69: As an operator, I want to pin discoveries so that high-value entries are exempt from age-based pruning `P2` `S`
+### S-69: As an operator, I want to pin discoveries so that high-value entries are exempt from age-based pruning `P2` `S` [done]
 
 **Acceptance criteria:**
 - [ ] AC-1: New YAML frontmatter field `pinned: bool` on discovery markdown (default `false` if absent — backward compatible).
@@ -1152,7 +1152,7 @@
 
 **Consensus review:** dual-LLM (Claude + Codex CLI) — see `docs/reviews/2026-05-01-s70-consensus.md` — reached at MEDIUM+ severity in Round 1+ Claude-consolidation across all three commits. Codex caught the highest-impact bug Claude missed (partial-update lost-write race in the unlocked RMW); Claude caught the format-consistency gap and `__all__` omission; both agreed on 6 MEDIUMs across the three commits, all fixed before each commit landed. Codex's first invocation stalled and required cancel-and-retry with a tighter prompt — recorded as a process learning.
 
-### S-71: As a memory store, I want bucketed decay rates tied to `importance` so that high-value discoveries persist longer than transient ones `P2` `S`
+### S-71: As a memory store, I want bucketed decay rates tied to `importance` so that high-value discoveries persist longer than transient ones `P2` `S` [done]
 
 > Depends on S-70.
 
@@ -1205,7 +1205,7 @@
 - [ ] T-236: JSONL writer with daily rotation (size cap optional)
 - [ ] T-237: Tests in `tests/test_capture/test_event_hook.py`
 
-### S-78: As a publish caller, I want `publish_context` to actually persist items idempotently by `content_hash` so that retries on transient failures don't create duplicate context entries `P1` `M`
+### S-78: As a publish caller, I want `publish_context` to actually persist items idempotently by `content_hash` so that retries on transient failures don't create duplicate context entries `P1` `M` [done]
 
 > **Cross-project blocker:** agent-ops ADR 0004 (DepthFusion publish retry policy) cannot accept option β (single retry on transient errors) until this story lands. Today, `_tool_publish_context` in `mcp/server.py:629-631` is a stub that echoes success without storing the item; even when it persists, `FileBus.publish()` (`router/bus.py:62-73`) does unconditional append and `ContextItem` (`core/types.py:34-43`) has no `content_hash` field. Without dedup-on-publish, agent-ops retries would create duplicate `bus.jsonl` rows that distort recall until the next prune cycle. See `~/projects/agent-ops/docs/decisions/0004-depthfusion-publish-retry.md` and the audit report at `~/projects/agent-ops/docs/depthfusion-feature-inventory.md`.
 

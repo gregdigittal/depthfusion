@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -99,6 +100,33 @@ def _read_age_days() -> int:
         return _DEFAULT_AGE_DAYS
 
 
+def _is_pinned(path: Path) -> bool:
+    """Return True if ``path``'s YAML frontmatter contains ``pinned: true``.
+
+    Uses a lightweight regex scan rather than a full YAML parse to avoid
+    importing PyYAML in a hot loop. Treats any parse/read error as "not
+    pinned" so a corrupt file still becomes a prune candidate — the operator
+    can decide what to do with it.
+
+    The key must be exactly ``"pinned"`` as agreed by S-69/S-71 (decay
+    buckets also reads this key).
+    """
+    try:
+        body = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+    # Extract the frontmatter block only (between the first pair of `---`).
+    fm_re = re.compile(r"\A---\s*\n(.*?)\n---\s*(?:\n|\Z)", re.DOTALL)
+    m = fm_re.match(body)
+    if not m:
+        return False
+
+    # Look for `pinned: true` (case-insensitive value).
+    pin_re = re.compile(r"^pinned:\s*(true|yes|1)\s*$", re.IGNORECASE | re.MULTILINE)
+    return bool(pin_re.search(m.group(1)))
+
+
 def identify_candidates(
     output_dir: Path | None = None,
     *,
@@ -142,6 +170,12 @@ def identify_candidates(
         # discoveries have the suffix appended (`foo.md.superseded`), not
         # prefixed, so they pass through this check.
         if path.name.startswith("."):
+            continue
+
+        # S-69: skip files whose frontmatter carries `pinned: true`.
+        # Reading the file is cheap; we do it before the stat so a pinned
+        # file never appears in candidates regardless of age or suffix.
+        if _is_pinned(path):
             continue
 
         try:

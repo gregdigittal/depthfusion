@@ -79,6 +79,16 @@ TOOLS: dict[str, str] = {
         "Response: {ok, applied, skipped_unsupported, skipped_missing, "
         "skipped_already_applied, skipped_expired}."
     ),
+    # S-69 pin — exempt high-value discoveries from age-based pruning
+    "depthfusion_pin_discovery": (
+        "Pin or unpin a discovery file so it is exempt from age-based pruning "
+        "(S-69). Args: filename (str, required) — absolute path to a discovery "
+        "markdown file; pinned (bool, optional, default true) — true to pin, "
+        "false to unpin. Idempotent — calling pin twice or unpin twice is safe. "
+        "Atomic — uses tmp + os.replace so a kill mid-write leaves the previous "
+        "file intact. Returns {pinned: bool, filename: str} or "
+        "{error: str, filename: str}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -98,6 +108,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
     "depthfusion_set_memory_score": None,           # always enabled (S-70)
     "depthfusion_recall_feedback": None,    # always enabled (S-72)
+    "depthfusion_pin_discovery": None,      # always enabled (S-69)
 }
 
 
@@ -197,6 +208,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_prune_discoveries(arguments)
     elif tool_name == "depthfusion_recall_feedback":
         return _tool_recall_feedback(arguments)
+    elif tool_name == "depthfusion_pin_discovery":
+        return _tool_pin_discovery(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -1182,6 +1195,77 @@ def _tool_prune_discoveries(arguments: dict) -> str:
         }, indent=2)
     except Exception as exc:
         return json.dumps({"ok": False, "error": str(exc)})
+
+
+def _tool_pin_discovery(arguments: dict) -> str:
+    """S-69 — pin or unpin a discovery file to exempt it from age-based pruning.
+
+    Atomic, lock-serialized read-modify-write (same pattern as
+    ``_tool_set_memory_score``):
+      1. Validate ``filename`` and ``pinned`` arguments.
+      2. Resolve the path; return a structured error if not found.
+      3. Acquire the sidecar lock and splice ``pinned: true/false`` into
+         the YAML frontmatter via ``_splice_pin_frontmatter``.
+      4. Write via mkstemp + os.replace.
+
+    Idempotent: calling pin twice or unpin twice produces the same result.
+    Missing file: returns ``{"error": "file not found", "filename": str}``
+    (does NOT raise).
+    """
+    filename = arguments.get("filename")
+    pinned_raw = arguments.get("pinned", True)
+
+    if not isinstance(filename, str) or not filename.strip():
+        return json.dumps({
+            "error": "pin_discovery: 'filename' must be a non-empty string",
+            "filename": filename,
+        })
+    if not isinstance(pinned_raw, bool):
+        return json.dumps({
+            "error": (
+                f"pin_discovery: 'pinned' must be a bool, "
+                f"got {type(pinned_raw).__name__}"
+            ),
+            "filename": filename,
+        })
+
+    target = Path(filename).expanduser()
+    if not target.exists():
+        return json.dumps({
+            "error": "file not found",
+            "filename": filename,
+        })
+    if not target.is_file():
+        return json.dumps({
+            "error": "not a regular file",
+            "filename": filename,
+        })
+
+    from depthfusion.core.file_locking import atomic_frontmatter_rewrite
+
+    try:
+        with atomic_frontmatter_rewrite(target) as ctx:
+            ctx.set_pinned(pinned_raw)
+    except FileNotFoundError:
+        return json.dumps({
+            "error": "file not found",
+            "filename": filename,
+        })
+    except OSError as exc:
+        return json.dumps({
+            "error": f"write failed: {exc}",
+            "filename": filename,
+        })
+    except Exception as exc:  # noqa: BLE001 — MCP tool boundary; must not raise
+        return json.dumps({
+            "error": f"unexpected error: {exc}",
+            "filename": filename,
+        })
+
+    return json.dumps({
+        "pinned": pinned_raw,
+        "filename": str(target),
+    })
 
 
 def _tool_set_scope(arguments: dict) -> str:
