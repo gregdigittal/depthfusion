@@ -1137,18 +1137,20 @@
 > **Foundational story.** S-71 (decay buckets), S-72 (recall feedback), and S-73 (high-importance hook) all depend on this landing first.
 
 **Acceptance criteria:**
-- [ ] AC-1: New frontmatter fields `importance: float ∈ [0.0, 1.0]` and `salience: float ∈ [0.0, 5.0]` on every discovery markdown. Defaults: `importance: 0.5`, `salience: 1.0` if not set.
-- [ ] AC-2: Set at publish time by `publish_context` (operator-supplied) and at extract time by `auto_learn` / decision extractor (S-45) / negative extractor (S-48) / confirm_discovery (S-47) — extractors derive `importance` from their existing confidence score.
-- [ ] AC-3: Backward compatible — existing discoveries without these fields are treated as defaults; no migration required.
-- [ ] AC-4: New MCP tool `depthfusion_set_memory_score(filename, importance?, salience?)` for explicit operator overrides; idempotent.
-- [ ] AC-5: ≥ 8 tests covering: defaults applied, extractor-derived values, operator override, backward-compat with old files, persistence across recall.
+- [x] AC-1: New frontmatter fields `importance: float ∈ [0.0, 1.0]` and `salience: float ∈ [0.0, 5.0]` on every discovery markdown. Defaults: `importance: 0.5`, `salience: 1.0` if not set.
+- [x] AC-2: Set at publish time by `publish_context` (operator-supplied) and at extract time by `auto_learn` / decision extractor (S-45) / negative extractor (S-48) / confirm_discovery (S-47) — extractors derive `importance` from their existing confidence score.
+- [x] AC-3: Backward compatible — existing discoveries without these fields are treated as defaults; no migration required.
+- [x] AC-4: New MCP tool `depthfusion_set_memory_score(filename, importance?, salience?)` for explicit operator overrides; idempotent.
+- [x] AC-5: ≥ 8 tests covering: defaults applied, extractor-derived values, operator override, backward-compat with old files, persistence across recall. *(41 tests delivered, including consensus-driven cross-thread RMW serialization, byte-equivalent format, type-validation boundary, body-text spoofing, malformed-scalar fallback.)*
 
 **Tasks:**
-- [ ] T-220: Frontmatter schema additions in `capture/types.py` (or equivalent canonical types module)
-- [ ] T-221: Default-derivation rules in each extractor (decision/negative/regex/Haiku) — confidence → importance mapping
-- [ ] T-222: `publish_context` plumbing for explicit importance arg
-- [ ] T-223: `depthfusion_set_memory_score` MCP tool
-- [ ] T-224: Tests in `tests/test_capture/test_scoring.py`
+- [x] T-220: Frontmatter schema additions in `core/types.py` (`MemoryScore` dataclass, `DEFAULT_IMPORTANCE`, `DEFAULT_SALIENCE`, `_normalize_score`) and `capture/dedup.py` (`extract_memory_score` + frontmatter-block-scoped regexes)
+- [x] T-221: Default-derivation rules in each extractor — `decision_extractor.write_decisions` and `negative_extractor.write_negatives` emit `importance: <max-of-confidences>` and `salience: 1.0000` to frontmatter; `auto_learn` and `confirm_discovery` inherit via their delegating call sites
+- [x] T-222: `publish_context` plumbing for explicit importance/salience args; `ContextItem` extended; `FileBus.publish` / `FileBus.subscribe` thread the new fields
+- [x] T-223: `depthfusion_set_memory_score` MCP tool — atomic + lock-serialized read-modify-write (`fcntl.LOCK_EX` on sidecar `.scorelock`, `mkstemp` + `os.replace`); replace-all duplicate-key handling; CRLF tolerance; type-validation boundary
+- [x] T-224: Tests in `tests/test_capture/test_scoring.py` (41 tests)
+
+**Consensus review:** dual-LLM (Claude + Codex CLI) — see `docs/reviews/2026-05-01-s70-consensus.md` — reached at MEDIUM+ severity in Round 1+ Claude-consolidation across all three commits. Codex caught the highest-impact bug Claude missed (partial-update lost-write race in the unlocked RMW); Claude caught the format-consistency gap and `__all__` omission; both agreed on 6 MEDIUMs across the three commits, all fixed before each commit landed. Codex's first invocation stalled and required cancel-and-retry with a tighter prompt — recorded as a process learning.
 
 ### S-71: As a memory store, I want bucketed decay rates tied to `importance` so that high-value discoveries persist longer than transient ones `P2` `S`
 
