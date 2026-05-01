@@ -57,6 +57,18 @@ TOOLS: dict[str, str] = {
         "With confirm=True, moves to ~/.claude/shared/discoveries/.archive/ "
         "(never deletes — reversible)."
     ),
+    # E-27 / S-70 explicit operator override of memory scoring
+    "depthfusion_set_memory_score": (
+        "Override importance and/or salience scalars on a discovery file (S-70). "
+        "Args: filename (str, required) — absolute path to a discovery markdown "
+        "file; importance (float, optional) ∈ [0.0, 1.0]; salience (float, "
+        "optional) ∈ [0.0, 5.0]. At least one of importance/salience must be "
+        "supplied. Idempotent — calling with the same values produces the same "
+        "file state. Atomic — uses tmp + os.replace so a process kill mid-write "
+        "leaves the previous file intact. Out-of-range values are clamped via "
+        "MemoryScore. Returns {ok: bool, importance, salience} or "
+        "{ok: false, error}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -74,6 +86,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_set_scope": "graph_enabled",
     "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
     "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
+    "depthfusion_set_memory_score": None,           # always enabled (S-70)
 }
 
 
@@ -167,6 +180,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_set_scope(arguments)
     elif tool_name == "depthfusion_confirm_discovery":
         return _tool_confirm_discovery(arguments)
+    elif tool_name == "depthfusion_set_memory_score":
+        return _tool_set_memory_score(arguments)
     elif tool_name == "depthfusion_prune_discoveries":
         return _tool_prune_discoveries(arguments)
     else:
@@ -685,6 +700,10 @@ def _tool_publish_context(arguments: dict, config: Any = None) -> str:
             priority=item_payload.get("priority", "normal"),
             ttl_seconds=item_payload.get("ttl_seconds"),
             metadata=item_payload.get("metadata", {}),
+            # S-70 — operator-supplied scoring (optional, defaults via
+            # ContextItem.__post_init__). Unsupplied → canonical defaults.
+            importance=item_payload.get("importance"),
+            salience=item_payload.get("salience"),
         )
     except (KeyError, TypeError) as exc:
         return json.dumps(
@@ -939,6 +958,189 @@ def _tool_confirm_discovery(arguments: dict) -> str:
         }, indent=2)
     except Exception as exc:
         return json.dumps({"ok": False, "error": str(exc)})
+
+
+def _tool_set_memory_score(arguments: dict) -> str:
+    """E-27 / S-70 — operator override of importance/salience on a discovery.
+
+    Atomic, lock-serialized read-modify-write:
+      1. Acquire ``fcntl.LOCK_EX`` on a sidecar lock file
+         (``<target>.scorelock``). Holds for the entire RMW critical
+         section so two concurrent partial updates (caller A supplies
+         only ``importance``, caller B supplies only ``salience``) cannot
+         each read a stale version and silently overwrite the other's
+         change. Mirrors the S-78 ``FileBus`` flock pattern.
+      2. Re-read the file under lock; parse existing scoring frontmatter.
+      3. For each unsupplied field, preserve the file's current value;
+         for each supplied field, validate / clamp via ``MemoryScore``.
+      4. Splice the new scalars into the frontmatter block.
+      5. Write to a unique ``mkstemp`` sibling, ``fsync``, then
+         ``os.replace`` over the target. ``os.replace`` is atomic on
+         POSIX — a kill mid-write leaves the previous file intact.
+      6. Release the lock.
+
+    Idempotent: replaying the same payload produces byte-identical file
+    content (provided no concurrent writer ran between calls). Out-of-
+    range values are clamped via ``MemoryScore.__post_init__``.
+    """
+    filename = arguments.get("filename")
+    importance = arguments.get("importance")
+    salience = arguments.get("salience")
+
+    if not isinstance(filename, str) or not filename.strip():
+        return json.dumps({
+            "ok": False,
+            "error": "set_memory_score: 'filename' must be a non-empty string",
+        })
+    if importance is None and salience is None:
+        return json.dumps({
+            "ok": False,
+            "error": "set_memory_score: at least one of 'importance' or "
+                     "'salience' must be supplied",
+        })
+
+    # Type-validate scalar inputs at the boundary so a JSON-RPC client
+    # passing strings (e.g. `"0.88"`) gets the documented error shape
+    # rather than a TypeError bubbling out of MemoryScore.__post_init__.
+    for fname, fval in (("importance", importance), ("salience", salience)):
+        if fval is not None and not isinstance(fval, (int, float)):
+            return json.dumps({
+                "ok": False,
+                "error": f"set_memory_score: '{fname}' must be a number, "
+                         f"got {type(fval).__name__}",
+            })
+
+    target = Path(filename).expanduser()
+    if not target.exists():
+        return json.dumps({
+            "ok": False,
+            "error": f"set_memory_score: file not found: {filename}",
+        })
+    if not target.is_file():
+        return json.dumps({
+            "ok": False,
+            "error": f"set_memory_score: not a regular file: {filename}",
+        })
+
+    from depthfusion.capture.dedup import extract_memory_score
+    from depthfusion.core.types import MemoryScore
+
+    # Sidecar lock — separate file so we don't open the target with write
+    # intent before we know we'll write to it, and so the lock survives
+    # the os.replace that swaps target's inode.
+    import fcntl
+    import tempfile
+    lock_path = target.parent / f".{target.name}.scorelock"
+    try:
+        # Create the lock file if missing; then flock it.
+        with open(lock_path, "a", encoding="utf-8") as lock_fh:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            try:
+                # Re-read under lock — protects the unsupplied-field
+                # preservation against TOCTOU.
+                try:
+                    body = target.read_text(encoding="utf-8")
+                except OSError as exc:
+                    return json.dumps({
+                        "ok": False,
+                        "error": f"set_memory_score: read failed: {exc}",
+                    })
+
+                existing = extract_memory_score(body)
+                final_imp = existing.importance if importance is None else importance
+                final_sal = existing.salience if salience is None else salience
+                normalized = MemoryScore(
+                    importance=final_imp, salience=final_sal,
+                )
+
+                new_body = _splice_memory_score_frontmatter(
+                    body, normalized.importance, normalized.salience,
+                )
+
+                fd, tmp_str = tempfile.mkstemp(
+                    prefix=target.name + ".", suffix=".tmp",
+                    dir=str(target.parent),
+                )
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as tf:
+                        tf.write(new_body)
+                        tf.flush()
+                        os.fsync(tf.fileno())
+                    os.replace(tmp_str, str(target))
+                except Exception:
+                    try:
+                        os.unlink(tmp_str)
+                    except OSError:
+                        pass
+                    raise
+            finally:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+    except OSError as exc:
+        return json.dumps({
+            "ok": False,
+            "error": f"set_memory_score: write failed: {exc}",
+        })
+
+    return json.dumps({
+        "ok": True,
+        "filename": str(target),
+        "importance": normalized.importance,
+        "salience": normalized.salience,
+    })
+
+
+def _splice_memory_score_frontmatter(
+    body: str, importance: float, salience: float,
+) -> str:
+    """Return ``body`` with importance/salience set in the frontmatter block.
+
+    - Existing ``importance:`` / ``salience:`` lines are rewritten in place.
+    - Missing lines are appended just before the closing ``---``.
+    - If the body has no frontmatter block, one is created at the top.
+    - Preserves all other frontmatter fields and body content verbatim.
+    """
+    imp_line = f"importance: {importance:.4f}"
+    sal_line = f"salience: {salience:.4f}"
+
+    # Frontmatter detection mirrors capture/dedup._extract_frontmatter_block:
+    # opening ``---\n``, body until ``\n---\n`` or end-of-string. The
+    # search here is line-anchored to avoid false-matching ``---`` inside
+    # body text.
+    fm_re = re.compile(r"\A(---\s*\n)(.*?)(\n---\s*(?:\n|\Z))", re.DOTALL)
+    m = fm_re.match(body)
+    if not m:
+        # No frontmatter — synthesize a minimal one. This path is unusual
+        # (legitimate discovery files always have frontmatter) but we
+        # don't want to silently fail on a hand-edited or partial file.
+        synthesized = (
+            "---\n"
+            f"{imp_line}\n"
+            f"{sal_line}\n"
+            "---\n"
+        )
+        return synthesized + body
+
+    open_fence, fm_body, close_fence = m.group(1), m.group(2), m.group(3)
+
+    # Drop ALL existing importance/salience lines (handles duplicate keys
+    # in malformed frontmatter) and append exactly one canonical line for
+    # each. ``count=0`` removes every match, including any CRLF-terminated
+    # lines (the ``.*?\r?`` segment absorbs the optional CR so the
+    # replacement does not strand a lone \r).
+    fm_body = re.sub(
+        r"^importance:.*?\r?$", "", fm_body, count=0, flags=re.MULTILINE,
+    )
+    fm_body = re.sub(
+        r"^salience:.*?\r?$", "", fm_body, count=0, flags=re.MULTILINE,
+    )
+    # Collapse the empty lines left by the deletions, preserve the rest.
+    fm_body = re.sub(r"\n{2,}", "\n", fm_body).strip("\n")
+
+    # Append canonical lines (always at the end of the frontmatter block;
+    # YAML parsers treat order as insignificant for these scalars).
+    fm_body = fm_body + "\n" + imp_line + "\n" + sal_line
+
+    return open_fence + fm_body + close_fence + body[m.end():]
 
 
 def _tool_prune_discoveries(arguments: dict) -> str:

@@ -177,6 +177,10 @@ class FileBus:
                         "ttl_seconds": item.ttl_seconds,
                         "metadata": item.metadata,
                         "content_hash": item.content_hash,
+                        # S-70 — scoring scalars travel with the bus row so
+                        # consumers can read them without a separate lookup.
+                        "importance": item.importance,
+                        "salience": item.salience,
                     }
                     f.seek(0, os.SEEK_END)
                     # If a prior crash left a torn write (file ends mid-line, no
@@ -239,16 +243,27 @@ class FileBus:
                 stored_hash = record.get("content_hash")
                 content_hash_for_item = "" if stored_hash is None else stored_hash
 
-                results.append(ContextItem(
-                    item_id=record["item_id"],
-                    content=record["content"],
-                    source_agent=record["source_agent"],
-                    tags=record["tags"],
-                    priority=record.get("priority", "normal"),
-                    ttl_seconds=record.get("ttl_seconds"),
-                    metadata=record.get("metadata", {}),
-                    content_hash=content_hash_for_item,
-                ))
+                # S-70 consensus: malformed score field (e.g. string-typed
+                # importance from a third-party-written row) must not crash
+                # subscribe — skip the bad row and continue, mirroring the
+                # malformed-JSON path above.
+                try:
+                    results.append(ContextItem(
+                        item_id=record["item_id"],
+                        content=record["content"],
+                        source_agent=record["source_agent"],
+                        tags=record["tags"],
+                        priority=record.get("priority", "normal"),
+                        ttl_seconds=record.get("ttl_seconds"),
+                        metadata=record.get("metadata", {}),
+                        content_hash=content_hash_for_item,
+                        # Legacy rows lacking these fields parse back as
+                        # canonical defaults via ContextItem.__post_init__.
+                        importance=record.get("importance"),
+                        salience=record.get("salience"),
+                    ))
+                except (TypeError, ValueError):
+                    continue
 
         return results
 

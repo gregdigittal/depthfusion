@@ -252,6 +252,13 @@ def write_negatives(
         )
         return None
 
+    # S-70 — same scoring convention as decision_extractor: file-level
+    # importance = MAX of per-entry confidence; salience defaults to 1.0.
+    # Both formatted with :.4f for byte-equivalence with the splice path
+    # in _tool_set_memory_score (consensus Round 1, Commit 3).
+    from depthfusion.core.types import DEFAULT_SALIENCE
+    aggregate_importance = max((e.confidence for e in entries), default=0.5)
+
     lines = [
         "---",
         f"project: {project}",
@@ -259,6 +266,8 @@ def write_negatives(
         f"date: {today}",
         f"entries: {len(entries)}",
         "type: negative",
+        f"importance: {aggregate_importance:.4f}",
+        f"salience: {DEFAULT_SALIENCE:.4f}",
         "---",
         "",
         f"# Negative Signals: {project} — {today}",

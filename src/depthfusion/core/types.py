@@ -134,6 +134,14 @@ class ContextItem:
     Tags, metadata, priority, ttl, item_id, and source_agent are deliberately
     *not* part of the hash (AC-5): a retry that arrives with different routing
     metadata but the same payload is still a duplicate.
+
+    The ``importance`` and ``salience`` fields (S-70) carry the same scoring
+    scalars used on discovery markdown frontmatter. They flow through the
+    bus so consumers can read scoring metadata without a second persistence
+    layer. Both default to canonical defaults via ``_normalize_score`` —
+    legacy bus rows lacking these fields parse back to defaults on subscribe.
+    These scalars are NOT part of ``content_hash`` (a retry with different
+    score still dedupes), preserving S-78's exact-content idempotency.
     """
     item_id: str
     content: str
@@ -143,12 +151,24 @@ class ContextItem:
     ttl_seconds: Optional[int] = None
     metadata: dict[str, Any] = field(default_factory=dict)
     content_hash: Optional[str] = None
+    importance: Optional[float] = None
+    salience: Optional[float] = None
 
     def __post_init__(self) -> None:
         if self.content_hash is None:
             self.content_hash = hashlib.sha256(
                 self.content.encode("utf-8")
             ).hexdigest()
+        # S-70: normalize scores in-place. None / non-finite → canonical
+        # default; out-of-range → clamped. Does not alter content_hash.
+        self.importance = _normalize_score(
+            self.importance, DEFAULT_IMPORTANCE,
+            _IMPORTANCE_MIN, _IMPORTANCE_MAX,
+        )
+        self.salience = _normalize_score(
+            self.salience, DEFAULT_SALIENCE,
+            _SALIENCE_MIN, _SALIENCE_MAX,
+        )
 
 
 @dataclass

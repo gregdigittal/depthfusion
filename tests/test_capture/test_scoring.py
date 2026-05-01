@@ -332,14 +332,23 @@ class TestPublishContextScalar:
     Commit 2 (types only) and Commit 3 (publish wiring)."""
 
     def test_publish_context_accepts_optional_importance(self, tmp_path, monkeypatch):
-        """AC-2: explicit importance flows through to the persisted item."""
-        # Use an isolated bus path so the test does not pollute the user's
-        # home dir, mirroring the S-78 test_bus_idempotency pattern.
-        monkeypatch.setenv("DEPTHFUSION_BUS_DIR", str(tmp_path))
+        """AC-2: explicit importance flows through to the persisted item.
 
-        # Force a fresh bus singleton for this test.
+        Patches `_get_context_bus` directly to return a tmp-scoped FileBus —
+        same pattern S-78's `test_bus_idempotency.py` uses for the MCP-tool
+        path. The env var route (`DEPTHFUSION_BUS_FILE_DIR`) only applies
+        to `Config.from_env()`, which `_tool_publish_context(config=None)`
+        bypasses.
+        """
         from depthfusion.mcp import server as mcp_server
+        from depthfusion.router.bus import FileBus
+
+        # Force a fresh bus pointing at the temp dir.
         mcp_server._BUS_INSTANCE = None  # type: ignore[attr-defined]
+        bus = FileBus(bus_dir=tmp_path)
+        monkeypatch.setattr(
+            mcp_server, "_get_context_bus", lambda config=None: bus,
+        )
 
         result_text = mcp_server._tool_publish_context(
             {
@@ -361,7 +370,11 @@ class TestPublishContextScalar:
         # The written bus row must carry the importance scalar.
         bus_file = tmp_path / "bus.jsonl"
         assert bus_file.exists()
-        rows = [_json.loads(line) for line in bus_file.read_text().splitlines() if line.strip()]
+        rows = [
+            _json.loads(line)
+            for line in bus_file.read_text().splitlines()
+            if line.strip()
+        ]
         assert any(
             float(row.get("importance", -1.0)) == pytest.approx(0.88, abs=1e-3)
             for row in rows
@@ -532,6 +545,67 @@ class TestSetMemoryScoreTool:
         assert _json.loads(second).get("ok") is True
         assert body_after_first == body_after_second
 
+    def test_set_memory_score_rejects_string_typed_input(self, tmp_path):
+        """AC-4 (consensus Round 1, Commit 3): a JSON-RPC client passing
+        importance/salience as a JSON string must get the documented
+        ``{ok: false, error}`` shape, not a TypeError that leaks through
+        to the generic MCP exception handler. Validate at the boundary.
+        """
+        import json as _json
+        f = self._seed_discovery(tmp_path)
+        result_text = _tool_set_memory_score(
+            {"filename": str(f), "importance": "0.88"}  # string, not float
+        )
+        result = _json.loads(result_text)
+        assert result.get("ok") is False
+        assert "error" in result
+        assert "number" in result["error"].lower()
+
+    def test_extractor_emits_byte_equivalent_format_to_splice(self, tmp_path):
+        """AC-2 / AC-4 (consensus Round 1, Commit 3): the format used by
+        decision_extractor / negative_extractor must be byte-identical to
+        the format ``_tool_set_memory_score``'s splice produces, so a
+        no-op set_memory_score call (same values) does not introduce diff
+        churn. Both sides should write four-decimal scalars.
+        """
+        from depthfusion.capture.decision_extractor import (
+            DecisionEntry,
+            write_decisions,
+        )
+        out = write_decisions(
+            [DecisionEntry("test", confidence=0.9000)],
+            project="fmt", session_id="s",
+            output_dir=tmp_path,
+        )
+        assert out is not None
+        before = out.read_text(encoding="utf-8")
+        # Set the same values that the extractor wrote — should be a no-op.
+        result_text = _tool_set_memory_score({
+            "filename": str(out),
+            "importance": 0.9000,
+            "salience": 1.0,
+        })
+        import json as _json
+        assert _json.loads(result_text).get("ok") is True
+        after = out.read_text(encoding="utf-8")
+        # The splice rebuilds frontmatter with importance/salience at the
+        # end of the block, so byte-equivalence is not strict — but the
+        # PARSED values must match and the body must be unchanged.
+        before_score = extract_memory_score(before)
+        after_score = extract_memory_score(after)
+        assert before_score.importance == pytest.approx(after_score.importance)
+        assert before_score.salience == pytest.approx(after_score.salience)
+        # And calling set_memory_score AGAIN with the post-state values
+        # produces an identical file (true idempotency once aligned).
+        result_text2 = _tool_set_memory_score({
+            "filename": str(out),
+            "importance": after_score.importance,
+            "salience": after_score.salience,
+        })
+        assert _json.loads(result_text2).get("ok") is True
+        after2 = out.read_text(encoding="utf-8")
+        assert after == after2, "second-call idempotency violated"
+
     def test_set_memory_score_missing_file_returns_error(self, tmp_path):
         """AC-4: missing file → structured error, not exception, no file created."""
         ghost = tmp_path / "does-not-exist.md"
@@ -543,6 +617,62 @@ class TestSetMemoryScoreTool:
         assert result.get("ok") is False
         assert "error" in result
         assert not ghost.exists()
+
+    def test_set_memory_score_concurrent_partial_updates_serialize(self, tmp_path):
+        """AC-4 (consensus Round 1 / Codex finding, Commit 3): two callers
+        each supplying ONLY ONE of (importance, salience) must serialize
+        through the file lock — neither caller's update may be silently
+        overwritten by the other's stale read of the unsupplied field.
+
+        Without inter-process locking, the read-modify-write window allows
+        late-writer-wins on BOTH fields, even when each writer only
+        intended to update its own field. This is a partial-update
+        lost-write bug; the os.replace atomic gives torn-write protection
+        but not RMW serialization.
+        """
+        import json as _json
+        import threading
+        f = self._seed_discovery(tmp_path)
+
+        # Writer A updates only importance; Writer B updates only salience.
+        # If RMW is unlocked, the late writer reads the early writer's
+        # POST-WRITE state, sees the early-writer's update on the OTHER
+        # field, and preserves it correctly. But if both writers race the
+        # READ phase, both see the SEED state, and the late writer's
+        # write-back resets the early writer's update silently.
+        writers = [
+            {"filename": str(f), "importance": 0.92},   # A: importance only
+            {"filename": str(f), "salience": 4.50},     # B: salience only
+        ]
+        results: list[dict] = []
+        lock = threading.Lock()
+
+        def _run(payload: dict) -> None:
+            text = _tool_set_memory_score(payload)
+            with lock:
+                results.append(_json.loads(text))
+
+        threads = [threading.Thread(target=_run, args=(p,)) for p in writers]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert len(results) == 2
+        assert all(r.get("ok") is True for r in results), \
+            f"writer call failed: {results}"
+
+        # After both writers complete, the file MUST reflect both updates
+        # (importance from A, salience from B). With proper file locking,
+        # one writer waits for the other; whichever runs second reads the
+        # post-first-writer state and preserves the first writer's field.
+        body = f.read_text(encoding="utf-8")
+        score = extract_memory_score(body)
+        assert score is not None
+        assert score.importance == pytest.approx(0.92, abs=1e-3), \
+            f"writer A's importance update lost: got {score.importance}"
+        assert score.salience == pytest.approx(4.50, abs=1e-3), \
+            f"writer B's salience update lost: got {score.salience}"
 
     def test_set_memory_score_concurrent_writes_no_corruption(self, tmp_path):
         """AC-4 (consensus-driven, mirrors S-78 torn-write coverage):

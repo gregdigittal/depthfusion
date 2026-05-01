@@ -252,6 +252,17 @@ def write_decisions(
         )
         return None
 
+    # S-70 — file-level importance is the MAX of per-entry confidence
+    # (loudest signal wins; see test_aggregate_importance_uses_max_confidence
+    # for the documented design choice). Salience defaults to 1.0 at
+    # capture time; S-72 recall feedback mutates it post-capture. Both
+    # values are formatted with ``:.4f`` to stay byte-identical to what
+    # ``_splice_memory_score_frontmatter`` writes — set_memory_score on a
+    # freshly-captured file should produce no diff churn for unchanged
+    # fields (consensus Round 1, Commit 3).
+    from depthfusion.core.types import DEFAULT_SALIENCE
+    aggregate_importance = max((e.confidence for e in filtered), default=0.5)
+
     lines = [
         "---",
         f"project: {project}",
@@ -259,6 +270,8 @@ def write_decisions(
         f"date: {today}",
         f"entries: {len(filtered)}",
         "type: decisions",
+        f"importance: {aggregate_importance:.4f}",
+        f"salience: {DEFAULT_SALIENCE:.4f}",
         "---",
         "",
         f"# Decisions: {project} — {today}",
