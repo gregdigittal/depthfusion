@@ -1171,23 +1171,23 @@
 
 ### S-72: As a recall caller, I want a feedback loop so that the system learns which surfaced chunks were actually useful `P1` `M`
 
-> Depends on S-70.
+> Depends on S-70. **Done** — 3 commits (f031766, 024ff3c, 31717a2). Consensus log: `docs/reviews/2026-05-01-s72-consensus.md`.
 
 **Acceptance criteria:**
-- [ ] AC-1: `recall_relevant` response includes `recall_id` (uuid v4) per call.
-- [ ] AC-2: A short-term store maps `recall_id → [chunk_id]` for at least 24 hours.
-- [ ] AC-3: New MCP tool `depthfusion_recall_feedback(recall_id, used: chunk_id[], ignored: chunk_id[])` applies `salience += 0.1` per used and `-= 0.05` per ignored chunk.
-- [ ] AC-4: Idempotent — replaying the same `recall_id + items` payload doesn't double-apply.
-- [ ] AC-5: Salience changes are bounded (`max 5.0`, `min 0.0`).
-- [ ] AC-6: ≥ 6 tests covering: id correlation, used/ignored signals, idempotency, bounds, expiry of unfetched recall_ids.
+- [x] AC-1: `recall_relevant` response includes `recall_id` (uuid v4) per call.
+- [x] AC-2: A short-term store maps `recall_id → [chunk_id]` for at least 24 hours.
+- [x] AC-3: New MCP tool `depthfusion_recall_feedback(recall_id, used: chunk_id[], ignored: chunk_id[])` applies `salience += 0.1` per used and `-= 0.05` per ignored chunk.
+- [x] AC-4: Idempotent — replaying the same `recall_id + items` payload doesn't double-apply.
+- [x] AC-5: Salience changes are bounded (`max 5.0`, `min 0.0`).
+- [x] AC-6: ≥ 6 tests covering: id correlation, used/ignored signals, idempotency, bounds, expiry of unfetched recall_ids.
 
 **Tasks:**
-- [ ] T-229: Add `recall_id` to `recall_relevant` response shape
-- [ ] T-230: Short-term recall-id store (in-memory dict with TTL eviction, or sqlite, depending on tier)
-- [ ] T-231: Register `depthfusion_recall_feedback` in `mcp/server.py`
-- [ ] T-232: Salience boost/decay applied to discovery frontmatter
-- [ ] T-233: Idempotency guard (track applied `(recall_id, chunk_id)` pairs)
-- [ ] T-234: Tests in `tests/test_analyzer/test_recall_feedback.py`
+- [x] T-229: Add `recall_id` to `recall_relevant` response shape
+- [x] T-230: Short-term recall-id store (in-memory dict with TTL eviction, or sqlite, depending on tier)
+- [x] T-231: Register `depthfusion_recall_feedback` in `mcp/server.py`
+- [x] T-232: Salience boost/decay applied to discovery frontmatter
+- [x] T-233: Idempotency guard (track applied `(recall_id, chunk_id)` pairs)
+- [x] T-234: Tests in `tests/test_analyzer/test_recall_feedback.py`
 
 ### S-73: As a consumer, I want a structured event when a discovery is published with high importance so that downstream systems can review high-stakes context as it's captured `P3` `S`
 
