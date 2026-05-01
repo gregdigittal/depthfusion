@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from depthfusion.capture.event_hook import emit_if_high_importance
 from depthfusion.core.types import ContextItem
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
@@ -754,6 +755,19 @@ def _tool_publish_context(arguments: dict, config: Any = None) -> str:
         return json.dumps(
             {"error": f"publish_context: bus error: {exc}", "published": False}
         )
+
+    # S-73: emit event on first publish of a high-importance item (skip dedup retries)
+    if isinstance(result, dict) and not result.get("deduped", False):
+        _cfg = config if config is not None else type("_C", (), {
+            "high_importance_threshold": 0.8,
+            "event_log": "~/.claude/shared/depthfusion-events.jsonl",
+        })()
+        emit_if_high_importance(
+            item,
+            event_log=getattr(_cfg, "event_log", "~/.claude/shared/depthfusion-events.jsonl"),
+            threshold=getattr(_cfg, "high_importance_threshold", 0.8),
+        )
+
     return json.dumps(result)
 
 

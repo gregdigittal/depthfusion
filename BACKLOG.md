@@ -1189,7 +1189,7 @@
 - [x] T-233: Idempotency guard (track applied `(recall_id, chunk_id)` pairs)
 - [x] T-234: Tests in `tests/test_analyzer/test_recall_feedback.py`
 
-### S-73: As a consumer, I want a structured event when a discovery is published with high importance so that downstream systems can review high-stakes context as it's captured `P3` `S`
+### S-73: As a consumer, I want a structured event when a discovery is published with high importance so that downstream systems can review high-stakes context as it's captured `P3` `S` [done]
 
 > Depends on S-70.
 

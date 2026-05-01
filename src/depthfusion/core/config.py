@@ -94,6 +94,10 @@ class DepthFusionConfig:
     decay_rate_low: float = 0.05         # importance < 0.5  → 5%/day
     hard_archive_threshold: float = 0.05 # salience < 0.05 → move to .archive/
 
+    # S-73 High-importance event hook
+    high_importance_threshold: float = 0.8
+    event_log: str = "~/.claude/shared/depthfusion-events.jsonl"
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -139,4 +143,8 @@ class DepthFusionConfig:
             decay_rate_mid=_env_float("DEPTHFUSION_DECAY_RATE_MID", 0.02),
             decay_rate_low=_env_float("DEPTHFUSION_DECAY_RATE_LOW", 0.05),
             hard_archive_threshold=_env_float("DEPTHFUSION_HARD_ARCHIVE_THRESHOLD", 0.05),
+            high_importance_threshold=_env_float("DEPTHFUSION_HIGH_IMPORTANCE_THRESHOLD", 0.8),
+            event_log=os.environ.get(
+                "DEPTHFUSION_EVENT_LOG", "~/.claude/shared/depthfusion-events.jsonl"
+            ),
         )
