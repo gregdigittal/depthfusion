@@ -88,6 +88,12 @@ class DepthFusionConfig:
     bus_backend: str = "file"        # "memory" | "file" | "supabase"
     bus_file_dir: str = "~/.claude/context-bus"
 
+    # S-71 Decay rates (bucketed by importance)
+    decay_rate_high: float = 0.01        # importance >= 0.8 → 1%/day
+    decay_rate_mid: float = 0.02         # importance >= 0.5 → 2%/day
+    decay_rate_low: float = 0.05         # importance < 0.5  → 5%/day
+    hard_archive_threshold: float = 0.05 # salience < 0.05 → move to .archive/
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -129,4 +135,8 @@ class DepthFusionConfig:
             gemma_url=os.environ.get("DEPTHFUSION_GEMMA_URL", "http://127.0.0.1:8000/v1"),
             gemma_model=os.environ.get("DEPTHFUSION_GEMMA_MODEL", "google/gemma-3-12b-it-AWQ"),
             backend_fallback_log=_env_bool("DEPTHFUSION_BACKEND_FALLBACK_LOG", True),
+            decay_rate_high=_env_float("DEPTHFUSION_DECAY_RATE_HIGH", 0.01),
+            decay_rate_mid=_env_float("DEPTHFUSION_DECAY_RATE_MID", 0.02),
+            decay_rate_low=_env_float("DEPTHFUSION_DECAY_RATE_LOW", 0.05),
+            hard_archive_threshold=_env_float("DEPTHFUSION_HARD_ARCHIVE_THRESHOLD", 0.05),
         )
