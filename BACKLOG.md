@@ -1112,6 +1112,202 @@
 
 ---
 
+## E-27: Memory Policy Layer [backlog]
+
+> Per-discovery operator-controlled lifecycle policy: pinning, importance/salience scoring, bucketed decay, recall-feedback loop, and high-importance event hook. Augments E-09/E-11/E-20/E-21 by adding per-item policy on top of the existing file-system + capture pipeline.
+>
+> **Source:** Surfaced from a 2026-04-29 read-only audit comparing ClaudeClaw OS Memory v2 against DepthFusion's live surface — see `docs/depthfusion-feature-inventory.md` in the agent-ops repo (sibling project at `~/projects/agent-ops/`). The audit's full report and source prompt are at `docs/depthfusion-evaluation-prompt.md` and `docs/claudeclaw-feature-analysis.md` in the same repo. Most ClaudeClaw v2 features turned out either COVERED or NOT-APPLICABLE; this epic captures only what was confirmed missing in DepthFusion's own backlog.
+
+### S-69: As an operator, I want to pin discoveries so that high-value entries are exempt from age-based pruning `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: New YAML frontmatter field `pinned: bool` on discovery markdown (default `false` if absent — backward compatible).
+- [ ] AC-2: `prune_discoveries` skips files where `pinned: true` regardless of age.
+- [ ] AC-3: New MCP tool `depthfusion_pin_discovery(filename, pinned=true)` toggles the field; idempotent.
+- [ ] AC-4: ≥ 4 tests covering pin/unpin/skip-during-prune/missing-file edge case.
+
+**Tasks:**
+- [ ] T-216: Extend frontmatter parser in `capture/` to read `pinned` (with default-false fallback)
+- [ ] T-217: Update `analyzer/prune.py` (or equivalent) to honour `pinned` in candidate selection
+- [ ] T-218: Register `depthfusion_pin_discovery` in `mcp/server.py`
+- [ ] T-219: Author `tests/test_capture/test_pin.py`
+
+### S-70: As a discovery, I want separate `importance` and `salience` scalars so that lifecycle policy can weigh intrinsic value distinctly from recent usefulness `P1` `M`
+
+> **Foundational story.** S-71 (decay buckets), S-72 (recall feedback), and S-73 (high-importance hook) all depend on this landing first.
+
+**Acceptance criteria:**
+- [ ] AC-1: New frontmatter fields `importance: float ∈ [0.0, 1.0]` and `salience: float ∈ [0.0, 5.0]` on every discovery markdown. Defaults: `importance: 0.5`, `salience: 1.0` if not set.
+- [ ] AC-2: Set at publish time by `publish_context` (operator-supplied) and at extract time by `auto_learn` / decision extractor (S-45) / negative extractor (S-48) / confirm_discovery (S-47) — extractors derive `importance` from their existing confidence score.
+- [ ] AC-3: Backward compatible — existing discoveries without these fields are treated as defaults; no migration required.
+- [ ] AC-4: New MCP tool `depthfusion_set_memory_score(filename, importance?, salience?)` for explicit operator overrides; idempotent.
+- [ ] AC-5: ≥ 8 tests covering: defaults applied, extractor-derived values, operator override, backward-compat with old files, persistence across recall.
+
+**Tasks:**
+- [ ] T-220: Frontmatter schema additions in `capture/types.py` (or equivalent canonical types module)
+- [ ] T-221: Default-derivation rules in each extractor (decision/negative/regex/Haiku) — confidence → importance mapping
+- [ ] T-222: `publish_context` plumbing for explicit importance arg
+- [ ] T-223: `depthfusion_set_memory_score` MCP tool
+- [ ] T-224: Tests in `tests/test_capture/test_scoring.py`
+
+### S-71: As a memory store, I want bucketed decay rates tied to `importance` so that high-value discoveries persist longer than transient ones `P2` `S`
+
+> Depends on S-70.
+
+**Acceptance criteria:**
+- [ ] AC-1: Decay policy: pinned → 0 %/day, `importance ≥ 0.8` → 1 %/day, `≥ 0.5` → 2 %/day, `< 0.5` → 5 %/day. Decay applies to `salience`.
+- [ ] AC-2: Hard-archive threshold: when `salience < 0.05`, file is moved to `.archive/` immediately on next prune cycle regardless of age.
+- [ ] AC-3: Decay job runnable as `scripts/decay-job.py` (cron-friendly) or as a new MCP tool `depthfusion_apply_decay()`.
+- [ ] AC-4: All four bucket boundaries + threshold are env-configurable (`DEPTHFUSION_DECAY_RATE_HIGH`, `_MID`, `_LOW`, `_HARD_ARCHIVE_THRESHOLD`).
+- [ ] AC-5: ≥ 4 tests covering each bucket + the hard-archive case.
+
+**Tasks:**
+- [ ] T-225: Implement bucketed decay computation in `capture/decay.py` (new module)
+- [ ] T-226: `scripts/decay-job.py` (calls decay, writes audit summary) + cron documentation
+- [ ] T-227: Env-var plumbing in `core/config.py`
+- [ ] T-228: Tests in `tests/test_capture/test_decay.py`
+
+### S-72: As a recall caller, I want a feedback loop so that the system learns which surfaced chunks were actually useful `P1` `M`
+
+> Depends on S-70.
+
+**Acceptance criteria:**
+- [ ] AC-1: `recall_relevant` response includes `recall_id` (uuid v4) per call.
+- [ ] AC-2: A short-term store maps `recall_id → [chunk_id]` for at least 24 hours.
+- [ ] AC-3: New MCP tool `depthfusion_recall_feedback(recall_id, used: chunk_id[], ignored: chunk_id[])` applies `salience += 0.1` per used and `-= 0.05` per ignored chunk.
+- [ ] AC-4: Idempotent — replaying the same `recall_id + items` payload doesn't double-apply.
+- [ ] AC-5: Salience changes are bounded (`max 5.0`, `min 0.0`).
+- [ ] AC-6: ≥ 6 tests covering: id correlation, used/ignored signals, idempotency, bounds, expiry of unfetched recall_ids.
+
+**Tasks:**
+- [ ] T-229: Add `recall_id` to `recall_relevant` response shape
+- [ ] T-230: Short-term recall-id store (in-memory dict with TTL eviction, or sqlite, depending on tier)
+- [ ] T-231: Register `depthfusion_recall_feedback` in `mcp/server.py`
+- [ ] T-232: Salience boost/decay applied to discovery frontmatter
+- [ ] T-233: Idempotency guard (track applied `(recall_id, chunk_id)` pairs)
+- [ ] T-234: Tests in `tests/test_analyzer/test_recall_feedback.py`
+
+### S-73: As a consumer, I want a structured event when a discovery is published with high importance so that downstream systems can review high-stakes context as it's captured `P3` `S`
+
+> Depends on S-70.
+
+**Acceptance criteria:**
+- [ ] AC-1: When a discovery is published with `importance ≥ 0.8`, append a JSONL line to `~/.claude/shared/depthfusion-events.jsonl` (path env-configurable via `DEPTHFUSION_EVENT_LOG`).
+- [ ] AC-2: Event schema: `{timestamp, event: "high_importance_discovery", project, file_path, importance, salience, summary}`.
+- [ ] AC-3: Threshold env-configurable (`DEPTHFUSION_HIGH_IMPORTANCE_THRESHOLD`, default 0.8).
+- [ ] AC-4: Consumers tail the file or use inotify; DepthFusion does not own delivery (no Slack/webhook coupling here).
+- [ ] AC-5: ≥ 3 tests covering threshold trigger, schema, env-var override.
+
+**Tasks:**
+- [ ] T-235: Event emitter in publish path (single emit point, after dedup + decay decisions)
+- [ ] T-236: JSONL writer with daily rotation (size cap optional)
+- [ ] T-237: Tests in `tests/test_capture/test_event_hook.py`
+
+### S-78: As a publish caller, I want `publish_context` to actually persist items idempotently by `content_hash` so that retries on transient failures don't create duplicate context entries `P1` `M`
+
+> **Cross-project blocker:** agent-ops ADR 0004 (DepthFusion publish retry policy) cannot accept option β (single retry on transient errors) until this story lands. Today, `_tool_publish_context` in `mcp/server.py:629-631` is a stub that echoes success without storing the item; even when it persists, `FileBus.publish()` (`router/bus.py:62-73`) does unconditional append and `ContextItem` (`core/types.py:34-43`) has no `content_hash` field. Without dedup-on-publish, agent-ops retries would create duplicate `bus.jsonl` rows that distort recall until the next prune cycle. See `~/projects/agent-ops/docs/decisions/0004-depthfusion-publish-retry.md` and the audit report at `~/projects/agent-ops/docs/depthfusion-feature-inventory.md`.
+
+**Acceptance criteria:**
+- [x] AC-1: `_tool_publish_context` (`mcp/server.py`) calls a real `ContextBus.publish()` (DI-injected the same way `recall_relevant` is wired). The current stub return — `{"published": True, "item": item}` — is replaced.
+- [x] AC-2: `ContextItem` (`core/types.py`) gains `content_hash: str` field, computed as sha256 of `content` at construction time. Auto-derive in a factory function or `__post_init__` so callers cannot mismatch hash and content.
+- [x] AC-3: `FileBus.publish()` and `InMemoryBus.publish()` (`router/bus.py`) skip the append/insert when an item with the same `content_hash` already exists in the bus. Skip is silent — no exception, no log warning at default level.
+- [x] AC-4: The MCP tool response shape becomes `{published: bool, item_id: str, deduped: bool}` so callers can distinguish first-publish from retry-dedup. `published: true, deduped: false` = newly stored. `published: true, deduped: true` = idempotent hit (already present). The original `item_id` of the existing record is returned in the deduped case.
+- [x] AC-5: Idempotency is exact-content — bytewise-identical `content` produces the same hash and dedupes; any whitespace, casing, or metadata difference produces a different hash and is stored as a new item. Tag differences alone do not affect the hash.
+- [x] AC-6: Backward compatible — existing `bus.jsonl` rows written before this story (which lack `content_hash`) are loaded as legacy items with no hash, and are never matched for dedup. New rows include `content_hash`.
+- [x] AC-7: ≥ 8 tests covering: first publish stores; repeat publish dedupes and returns the original item_id; 1-character difference creates a new item; tag-only difference still dedupes; backward-compat load of pre-existing rows; concurrent publish of identical content (file-locking or read-then-write race) doesn't double-insert; MCP tool returns correct response shape; large content (>1 MB) hashes and persists correctly. *(22 tests delivered, including consensus-driven cross-process flock + torn-write + malformed-row coverage.)*
+
+**Tasks:**
+- [x] T-255: Add `content_hash: str` field to `ContextItem` in `core/types.py` with sha256 auto-derivation (factory function `make_context_item(...)` or `__post_init__`)
+- [x] T-256: Implement dedup-on-publish in `FileBus.publish()` (`router/bus.py`) — maintain an in-memory hash index built from `bus.jsonl` on init, update on each successful append; handle the legacy-row case (rows with no `content_hash` are never indexed)
+- [x] T-257: Implement dedup-on-publish in `InMemoryBus.publish()` (`router/bus.py`) — simple set-based hash index
+- [x] T-258: Wire `_tool_publish_context` in `mcp/server.py` to call a DI-injected `ContextBus`, mirroring how `recall_relevant` resolves its dependencies
+- [x] T-259: Update MCP tool response shape to `{published: bool, item_id, deduped: bool}` and document the contract in the tool description string
+- [x] T-260: Author tests in `tests/test_router/test_bus_idempotency.py` (covers both `InMemoryBus` and `FileBus`; uses tmp_path for FileBus)
+- [x] T-261: Update `docs/runbooks/` (or equivalent) with the publish-API idempotency contract so consumers (agent-ops, future MCP clients) can rely on it
+
+**Consensus review:** dual-LLM (Claude + Codex CLI) — see `docs/reviews/2026-04-30-s78-consensus.md` — reached at MEDIUM+ severity after 2 rounds; 4 findings fixed before commit (clear-under-flock, torn-write recovery, malformed-row guard, cross-process flock test).
+
+---
+
+## E-28: Tier-1 Engagement Audit & Introspection Surface [backlog]
+
+> Verify why graph subsystems (E-11) and embedding-augmented recall (E-19/S-43) don't engage on `vps-tier1` despite being code-complete and env-flagged on, then add MCP introspection so operators can tell what's running without reading source.
+>
+> **Source:** Same 2026-04-29 audit as E-27. The live `vps-tier1` deployment showed `graph_status` returning 0/0/{} after 44 sessions with `DEPTHFUSION_GRAPH_ENABLED=true` set, and `recall_relevant` reporting only `BM25+RRF` despite `DEPTHFUSION_EMBEDDING_BACKEND=local` being set. Either is by design (and currently undocumented from the MCP surface) or it's a deployment / wiring gap; this epic resolves the ambiguity.
+
+### S-74: As an operator, I want the vps-tier1 graph engagement state explained or fixed so that empty graphs after dozens of sessions aren't ambiguous `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Reproduce: confirm whether a fresh vps-tier1 install with auto_learn invocations populates the graph or leaves it empty.
+- [ ] AC-2: Triage to one of: (a) by design — graph extraction is gated to vps-gpu; (b) configuration gap on this deployment; (c) silent extraction failure (e.g., Haiku not invoked from auto_learn on tier-1).
+- [ ] AC-3: If (a): document in `docs/runbooks/tier-feature-matrix.md` + update `graph_status` response to surface `extraction_active: bool` and `tier_gates_extraction: bool`.
+- [ ] AC-4: If (b) or (c): fix and add a regression test.
+
+**Tasks:**
+- [ ] T-238: Reproduce in a fresh vps-tier1 dev install
+- [ ] T-239: Read `capture/auto_learn.py` and `graph/extractor.py` to confirm tier gating
+- [ ] T-240: Document or fix per AC-3 / AC-4
+- [ ] T-241: Update `graph_status` MCP response if (a)
+
+### S-75: As an operator, I want the vps-tier1 embedding-recall engagement state explained or fixed so that `EMBEDDING_BACKEND=local` doesn't silently no-op `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Reproduce: confirm whether `recall_relevant` ever invokes vector search on vps-tier1 with `DEPTHFUSION_EMBEDDING_BACKEND=local`.
+- [ ] AC-2: Triage to: (a) by design — semantic recall gated to vps-gpu (S-43 only); (b) wiring gap; (c) embedding model not loaded.
+- [ ] AC-3: If (a): document in `docs/runbooks/tier-feature-matrix.md`. Update recall response to include `engaged_layers: ["bm25", ...]` (see S-76).
+- [ ] AC-4: If (b) or (c): fix and benchmark p95 latency impact on tier-1.
+
+**Tasks:**
+- [ ] T-242: Reproduce + log inspection of recall path
+- [ ] T-243: Read `retrieval/hybrid.py` `apply_vector_search()` to confirm tier gating
+- [ ] T-244: Document or fix per AC-3 / AC-4
+- [ ] T-245: Benchmark if engagement is enabled on tier-1
+
+### S-76: As an MCP consumer, I want introspection tools so that I can tell which retrieval layers and capture mechanisms are engaged in a given recall or publish without reading source `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `recall_relevant` response includes a new field `engaged_layers: string[]` listing the layers that contributed (subset of `["bm25", "embedding", "graph_traverse", "reranker"]`).
+- [ ] AC-2: New MCP tool `depthfusion_describe_capabilities()` returns: `{tier, mode, engaged_layers_per_op: {recall: [...], publish: [...], confirm_discovery: [...], ...}}`.
+- [ ] AC-3: Tool descriptions for `publish_context` and `confirm_discovery` document the input schema explicitly (currently absent from MCP surface).
+- [ ] AC-4: New optional MCP tool `depthfusion_inspect_discovery(filename)` returns parsed frontmatter (importance, salience, pinned, project, etc.) — useful once S-69 + S-70 land.
+- [ ] AC-5: ≥ 4 tests.
+
+**Tasks:**
+- [ ] T-246: Add `engaged_layers` to `RecallPipeline` response
+- [ ] T-247: New `depthfusion_describe_capabilities` MCP tool
+- [ ] T-248: Augment tool descriptions for publish_context + confirm_discovery
+- [ ] T-249: New `depthfusion_inspect_discovery` MCP tool (gated on S-69 / S-70 frontmatter)
+- [ ] T-250: Tests in `tests/test_analyzer/test_introspection.py`
+
+### S-77: As an operator, I want `compress_session` and `auto_learn` to fire on a configurable cadence so that the capture pipeline doesn't depend on session-end memory `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: New env var `DEPTHFUSION_AUTO_COMPRESS_HOURS` (default unset = manual only); when set, idle sessions older than N hours are compressed automatically.
+- [ ] AC-2: Implementation may use the existing Stop hook (`hooks/depthfusion-stop.sh` per S-45 T-138), a cron entry shipped via the installer, or both — no internal scheduler.
+- [ ] AC-3: Idle detection: no session-file writes in the last N hours.
+- [ ] AC-4: Logged via the existing observability stream (capture_summary).
+- [ ] AC-5: ≥ 3 tests.
+
+**Tasks:**
+- [ ] T-251: Idle detection in `capture/compress_session.py`
+- [ ] T-252: Cron entry template + installer hook (or extend Stop hook with cadence parameter)
+- [ ] T-253: Env-var plumbing
+- [ ] T-254: Tests in `tests/test_capture/test_auto_compress.py`
+
+### Cross-cutting notes for E-27 / E-28
+
+- **Dependency graph:** S-70 blocks S-71, S-72, S-73 (all rely on importance/salience fields). S-69 is independent. S-74 and S-75 must precede S-76 so the `engaged_layers` documentation reflects real tier behaviour. S-77 is independent.
+- **Effort summary:** E-27 ~ 1 P1-M (S-70) + 1 P1-M (S-72) + 1 P2-S (S-69) + 1 P2-S (S-71) + 1 P3-S (S-73) ≈ 1 week. E-28 ~ 4 P2-S + 1 P3-S ≈ 3-4 days. Total: ~ 2 weeks at a relaxed pace.
+- **Items deliberately out of scope** (covered in `docs/claudeclaw-feature-analysis.md` §7 in the agent-ops repo): War Room voice, Telegram bot per agent, Pika video meeting, TTS/STT cascades, PIN lock, launchd/systemd plist generation. ClaudeClaw-style consumer features belong in agent-ops or a future ClaudeClaw-shaped peer; they should not land in DepthFusion.
+- **Confirmed already shipped, no new story needed** (audit findings that landed in earlier epics):
+  - Embedding-based dedup at `cos-sim ≥ 0.92` (S-49 in E-20)
+  - Knowledge graph with 8 entity types + Haiku linker incl. `CONFLICTS_WITH` and `REPLACES` edges (S-14–S-21 in E-11) — supersession is covered for graph entities
+  - Pattern recognition / consolidation insights via `compress_session` (E-08)
+  - Local embedding backend wired into hybrid retrieval (S-43 in E-19) — but see S-75 for tier-1 engagement
+- **Side-channel finding from the audit (worth a separate look, not a story here):** `DEPTHFUSION_API_KEY` is exposed in env to any process inheriting the shell. Normal for self-hosted services, but verify the value isn't echoed into discovery files, recall responses, or the new event log proposed in S-73.
+
+---
+
 - **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
