@@ -106,23 +106,45 @@ between our `__init__` and our first `publish()` are observed.
 
 ## 5. Retry pattern (recommended)
 
-```python
-from depthfusion.mcp.client import call  # or your MCP client of choice
+DepthFusion is the MCP **server**; clients live elsewhere (Claude Code, custom
+MCP-protocol clients, agent-ops, etc.). Invoke the tool by name through
+whatever MCP client you're using. The example below is pseudocode showing the
+response-handling shape callers should implement — substitute your client's
+actual call API:
 
-result = call("depthfusion_publish_context", {"item": {...}})
+```python
+# Pseudocode — `mcp.call(tool_name, args) -> dict` is whatever your MCP client
+# library exposes (e.g. JSON-RPC over stdio, the Anthropic MCP SDK, etc.).
+result = mcp.call("depthfusion_publish_context", {"item": {
+    "item_id": "...",
+    "content": "...",
+    "source_agent": "...",
+    "tags": ["..."],
+}})
+
+# `result` is the parsed JSON of the tool response. Three branches:
 
 if not result.get("published"):
-    # Bus error or invalid payload — the caller decides whether to retry.
-    # Retries are safe: identical `item.content` will dedupe.
+    # Bus error or invalid payload. Caller decides retry policy.
+    # Retries are safe — identical `item.content` will dedupe on the next try.
     log.warning("publish failed: %s", result.get("error"))
     schedule_retry(item)
 elif result["deduped"]:
     # Already stored — this was a retry of a previous successful publish.
-    # The canonical record is at `result["item_id"]`.
+    # `result["item_id"]` is the canonical (original) record id, NOT the retry's.
     log.debug("publish dedupe hit: original id %s", result["item_id"])
 else:
     # First-publish path. `result["item_id"]` is the id we just sent.
     log.debug("publish stored: %s", result["item_id"])
+```
+
+For in-process tests within the DepthFusion repo itself, you can call the tool
+implementation directly:
+
+```python
+from depthfusion.mcp import server as mcp_server
+raw = mcp_server._tool_publish_context({"item": {...}})
+result = json.loads(raw)
 ```
 
 A retry of identical content is always safe. Callers do not need to track

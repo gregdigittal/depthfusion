@@ -361,18 +361,23 @@ class TestFileBusRobustness:
 # ---------------------------------------------------------------------------
 
 class TestMcpPublishContextToolShape:
-    """Forces Task 4 to expose `_get_context_bus` as a module-level patch point.
+    """Patch ``_get_context_bus`` at module scope to inject a test bus.
 
-    Until Task 4 lands, `patch.object(..., create=True)` will succeed at the patch
-    site, but the production `_tool_publish_context` stub still echoes a different
-    shape, so the assertions fail. Once Task 4 wires the real DI, the test passes.
+    ``_get_context_bus`` is a real module-level function in ``depthfusion.mcp.server``
+    (added by S-78 Task 4). ``patch.object`` without ``create=True`` is the right
+    call: if a future refactor renames or removes the function, the patch site
+    raises ``AttributeError`` immediately and these tests fail loudly — which is
+    what we want. ``create=True`` would silently fabricate a phantom attribute
+    and let the tests pass for the wrong reason (cubic 2026-04-30 review caught
+    that the original ``create=True`` rationale in the consensus report was
+    inverted).
     """
 
     def test_tool_returns_published_item_id_deduped_keys(self, tmp_path):
         from depthfusion.mcp import server as mcp_server
 
         bus = FileBus(bus_dir=tmp_path)
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus, create=True):
+        with patch.object(mcp_server, "_get_context_bus", return_value=bus):
             payload = {
                 "item": {
                     "item_id": "mcp1",
@@ -395,7 +400,7 @@ class TestMcpPublishContextToolShape:
         from depthfusion.mcp import server as mcp_server
 
         bus = FileBus(bus_dir=tmp_path)
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus, create=True):
+        with patch.object(mcp_server, "_get_context_bus", return_value=bus):
             first_payload = {
                 "item": {
                     "item_id": "first",
