@@ -6,8 +6,91 @@ plus Protocol definitions for pluggable embedding and storage backends.
 from __future__ import annotations
 
 import hashlib
+import math
 from dataclasses import dataclass, field
 from typing import Any, Optional, Protocol, runtime_checkable
+
+# ---------------------------------------------------------------------------
+# E-27 / S-70 — memory policy scoring scalars
+# ---------------------------------------------------------------------------
+
+DEFAULT_IMPORTANCE: float = 0.5
+"""Canonical default importance for a discovery (∈ [0.0, 1.0])."""
+
+DEFAULT_SALIENCE: float = 1.0
+"""Canonical default salience for a discovery (∈ [0.0, 5.0])."""
+
+_IMPORTANCE_MIN, _IMPORTANCE_MAX = 0.0, 1.0
+_SALIENCE_MIN, _SALIENCE_MAX = 0.0, 5.0
+
+
+def _normalize_score(
+    value: Optional[float],
+    default: float,
+    lo: float,
+    hi: float,
+) -> float:
+    """Coerce a score input into a finite, in-range float.
+
+    Contract (S-70 consensus, refined post-Commit-2 review):
+      - ``None`` → canonical ``default``
+      - non-finite (NaN, +Inf, -Inf) → canonical ``default``
+      - finite outside [lo, hi] → clamped to the nearest boundary
+      - finite inside [lo, hi] → preserved verbatim
+
+    Accepts only ``Optional[float]`` (or anything Python silently treats
+    as a numeric like ``int``). String parsing is the caller's problem —
+    ``extract_memory_score`` does that on the parse layer so the type
+    contract here stays tight (no ``# type: ignore`` propagation, no
+    surprise ``OverflowError`` from custom ``__float__``).
+    """
+    if value is None:
+        return default
+    # ``math.isfinite`` accepts int and float; rejects NaN, +Inf, -Inf.
+    # If a non-numeric type slipped through, ``isfinite`` raises
+    # ``TypeError`` — surface that loudly rather than silent-default,
+    # because it indicates a programming bug at the call site.
+    if not math.isfinite(value):
+        return default
+    if value < lo:
+        return lo
+    if value > hi:
+        return hi
+    return float(value)
+
+
+@dataclass
+class MemoryScore:
+    """Per-discovery scoring scalars (S-70).
+
+    Two independent dimensions:
+      * ``importance`` ∈ [0.0, 1.0], default 0.5 — intrinsic value of the
+        captured discovery. Set at capture time by extractors (derived from
+        their existing ``confidence``) or by an explicit operator override.
+      * ``salience`` ∈ [0.0, 5.0], default 1.0 — recent usefulness; mutated
+        over time by S-72 recall-feedback signals (separate story).
+
+    Both fields are clamped in ``__post_init__``. Non-finite inputs
+    (NaN, ±Inf) collapse to the canonical default for that dimension —
+    Python's ``min``/``max`` propagate NaN, so silent passthrough would
+    poison the whole policy layer (a NaN ``salience`` always loses
+    comparisons against any finite threshold, hard-archiving everything).
+
+    The ``__post_init__`` mirrors S-78's ``ContextItem.content_hash``
+    auto-derive idiom for consistency across the core types module.
+    """
+    importance: Optional[float] = None
+    salience: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        self.importance = _normalize_score(
+            self.importance, DEFAULT_IMPORTANCE,
+            _IMPORTANCE_MIN, _IMPORTANCE_MAX,
+        )
+        self.salience = _normalize_score(
+            self.salience, DEFAULT_SALIENCE,
+            _SALIENCE_MIN, _SALIENCE_MAX,
+        )
 
 
 @dataclass

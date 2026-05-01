@@ -403,6 +403,35 @@ class TestBackwardCompat:
         assert score.importance == DEFAULT_IMPORTANCE
         assert score.salience == DEFAULT_SALIENCE
 
+    def test_body_text_does_not_spoof_score(self):
+        """AC-3 (consensus-driven, Round 1 of Commit 2): body text mentioning
+        `importance:` or `salience:` must NOT be parsed as the file's score.
+
+        Discoveries are markdown documents; their bodies frequently quote
+        scores in prose ("the importance: 0.9 rating from S-71..."). The
+        regex parser must scope to the YAML frontmatter block only —
+        otherwise a body line silently spoofs the file's score.
+        """
+        body = (
+            "---\n"
+            "project: legit\n"
+            "type: decisions\n"
+            "---\n"
+            "\n"
+            "# Discovery\n"
+            "\n"
+            "Notes on prior captures:\n"
+            "- importance: 0.99\n"   # body line — must NOT be parsed
+            "- salience: 4.99\n"     # body line — must NOT be parsed
+            "\n"
+        )
+        score = extract_memory_score(body)
+        assert score is not None
+        assert score.importance == DEFAULT_IMPORTANCE, \
+            f"body-text spoofing detected: importance={score.importance}"
+        assert score.salience == DEFAULT_SALIENCE, \
+            f"body-text spoofing detected: salience={score.salience}"
+
     @pytest.mark.parametrize(
         "raw_imp,raw_sal",
         [

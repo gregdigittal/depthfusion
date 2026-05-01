@@ -51,6 +51,31 @@ _SUPERSEDED_SUFFIX = ".superseded"
 
 _FRONTMATTER_PROJECT_RE = re.compile(r"^project:\s*(\S+)\s*$", re.MULTILINE)
 
+# S-70 — importance/salience frontmatter parsers.
+#
+# `\S+` captures single-token values (e.g. `0.83`, `five`, `not-a-number`)
+# so single-token malformed inputs reach `extract_memory_score()` and are
+# normalized to the canonical default. Multi-word malformed values (e.g.
+# `importance: not a number`) fail the regex entirely and fall through
+# the missing-field path, which also yields the canonical default — both
+# routes converge on the same safe outcome.
+#
+# IMPORTANT: these regexes are applied to the *frontmatter block only*
+# (sliced by `_extract_frontmatter_block` before the `.search` call), not
+# to the full markdown body. Without that slice, a discovery whose body
+# contains a line like `importance: 0.9` (e.g., a markdown bullet quoting
+# the number) would silently spoof the file's score (Codex consensus
+# finding, S-70 Round 1).
+_FRONTMATTER_IMPORTANCE_RE = re.compile(
+    r"^importance:\s*(\S+)\s*$", re.MULTILINE
+)
+_FRONTMATTER_SALIENCE_RE = re.compile(
+    r"^salience:\s*(\S+)\s*$", re.MULTILINE
+)
+_FRONTMATTER_BLOCK_RE = re.compile(
+    r"\A---\s*\n(.*?)\n---\s*(?:\n|\Z)", re.DOTALL
+)
+
 
 def _read_threshold() -> float:
     """Dedup threshold — env-var overridable for tuning without code change."""
@@ -68,6 +93,82 @@ def extract_project(content: str) -> str | None:
     """Pull the `project:` frontmatter value from a discovery file body."""
     m = _FRONTMATTER_PROJECT_RE.search(content)
     return m.group(1).strip() if m else None
+
+
+def _extract_frontmatter_block(content: str) -> str:
+    """Return the YAML frontmatter block from a discovery file body.
+
+    A discovery starts with ``---\\n...\\n---\\n``; we slice between those
+    fences and apply scoring regexes only to the inner block. Falls back
+    to the empty string when no frontmatter is detected — the regex
+    searches will then return no matches, and the caller fills defaults.
+
+    Why slice instead of just running the existing ``re.MULTILINE``
+    regexes against the whole document: ``importance`` and ``salience``
+    are common English words. A discovery body containing a line like
+    ``importance: 0.9`` (e.g. a markdown bullet quoting a value) would
+    otherwise silently spoof the file's score. ``project:`` (the existing
+    pattern at line 52) doesn't have this problem because it's not a
+    word that appears casually in prose.
+    """
+    m = _FRONTMATTER_BLOCK_RE.match(content)
+    return m.group(1) if m else ""
+
+
+def _try_parse_float(raw: str | None) -> float | None:
+    """Parse a frontmatter scalar string to a float, or None if malformed.
+
+    Returns ``None`` for any input that ``float()`` would reject —
+    non-numeric strings, empty strings, multi-word values that the regex
+    captured partially. Callers must treat ``None`` as "use default."
+    Never raises.
+    """
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_memory_score(content: str) -> "MemoryScore":  # noqa: F821 — runtime-imported below
+    """Parse importance/salience scalars from discovery frontmatter (S-70).
+
+    Returns a fully-populated ``MemoryScore``. Missing or malformed values
+    fall back to canonical defaults via ``MemoryScore.__post_init__``.
+    Never returns ``None``, never raises on malformed input, never bleeds
+    NaN/Inf through to callers — the policy layer must be able to trust
+    the return value end-to-end.
+
+    Backward-compatible with pre-S-70 discovery files: a frontmatter
+    without these fields parses to ``MemoryScore()`` (default importance
+    0.5, default salience 1.0). Scoping the regex to the frontmatter
+    block (not the whole document) prevents body-text spoofing.
+
+    The ``MemoryScore`` import is lazy to keep the capture hot-path
+    import cost low (matches the rationale documented at the top of
+    ``_cosine``: this module runs under the git post-commit hook).
+    """
+    from depthfusion.core.types import MemoryScore as _MS
+
+    block = _extract_frontmatter_block(content)
+    if not block:
+        return _MS()  # No frontmatter — pure defaults.
+
+    imp_match = _FRONTMATTER_IMPORTANCE_RE.search(block)
+    sal_match = _FRONTMATTER_SALIENCE_RE.search(block)
+
+    # String → float happens here at the parse layer; MemoryScore stays
+    # strictly typed as Optional[float] (no `# type: ignore` propagated
+    # downstream). NaN/Inf are caught by MemoryScore.__post_init__'s
+    # `math.isfinite` check.
+    importance = _try_parse_float(imp_match.group(1) if imp_match else None)
+    salience = _try_parse_float(sal_match.group(1) if sal_match else None)
+
+    return _MS(importance=importance, salience=salience)
 
 
 def load_discovery_corpus(
@@ -292,6 +393,7 @@ def dedup_against_corpus(
 
 __all__ = [
     "dedup_against_corpus",
+    "extract_memory_score",
     "extract_project",
     "find_duplicates",
     "load_discovery_corpus",
