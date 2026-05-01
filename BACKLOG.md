@@ -1237,7 +1237,7 @@
 >
 > **Source:** Same 2026-04-29 audit as E-27. The live `vps-tier1` deployment showed `graph_status` returning 0/0/{} after 44 sessions with `DEPTHFUSION_GRAPH_ENABLED=true` set, and `recall_relevant` reporting only `BM25+RRF` despite `DEPTHFUSION_EMBEDDING_BACKEND=local` being set. Either is by design (and currently undocumented from the MCP surface) or it's a deployment / wiring gap; this epic resolves the ambiguity.
 
-### S-74: As an operator, I want the vps-tier1 graph engagement state explained or fixed so that empty graphs after dozens of sessions aren't ambiguous `P2` `S`
+### S-74: As an operator, I want the vps-tier1 graph engagement state explained or fixed so that empty graphs after dozens of sessions aren't ambiguous `P2` `S` [done]
 
 **Acceptance criteria:**
 - [ ] AC-1: Reproduce: confirm whether a fresh vps-tier1 install with auto_learn invocations populates the graph or leaves it empty.
@@ -1251,7 +1251,7 @@
 - [ ] T-240: Document or fix per AC-3 / AC-4
 - [ ] T-241: Update `graph_status` MCP response if (a)
 
-### S-75: As an operator, I want the vps-tier1 embedding-recall engagement state explained or fixed so that `EMBEDDING_BACKEND=local` doesn't silently no-op `P2` `S`
+### S-75: As an operator, I want the vps-tier1 embedding-recall engagement state explained or fixed so that `EMBEDDING_BACKEND=local` doesn't silently no-op `P2` `S` [done]
 
 **Acceptance criteria:**
 - [ ] AC-1: Reproduce: confirm whether `recall_relevant` ever invokes vector search on vps-tier1 with `DEPTHFUSION_EMBEDDING_BACKEND=local`.
@@ -1265,7 +1265,7 @@
 - [ ] T-244: Document or fix per AC-3 / AC-4
 - [ ] T-245: Benchmark if engagement is enabled on tier-1
 
-### S-76: As an MCP consumer, I want introspection tools so that I can tell which retrieval layers and capture mechanisms are engaged in a given recall or publish without reading source `P2` `S`
+### S-76: As an MCP consumer, I want introspection tools so that I can tell which retrieval layers and capture mechanisms are engaged in a given recall or publish without reading source `P2` `S` [done]
 
 **Acceptance criteria:**
 - [ ] AC-1: `recall_relevant` response includes a new field `engaged_layers: string[]` listing the layers that contributed (subset of `["bm25", "embedding", "graph_traverse", "reranker"]`).

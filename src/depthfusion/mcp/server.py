@@ -90,6 +90,20 @@ TOOLS: dict[str, str] = {
         "file intact. Returns {pinned: bool, filename: str} or "
         "{error: str, filename: str}."
     ),
+    # S-76 introspection tools
+    "depthfusion_describe_capabilities": (
+        "Return which retrieval layers and capture mechanisms are engaged in this "
+        "DepthFusion instance. No args required. Response: {tier, mode, flags, "
+        "engaged_layers_per_op: {recall: [...], publish: [...], auto_learn: [...]}}. "
+        "Useful for diagnosing silent no-ops (e.g. why graph or embedding is not "
+        "contributing to recall without reading source code)."
+    ),
+    "depthfusion_inspect_discovery": (
+        "Return parsed frontmatter of a discovery file (S-76). "
+        "Args: filename (str, required) — absolute path to a discovery markdown file. "
+        "Response: {filename, exists, frontmatter: {importance, salience, pinned, "
+        "project, type, ...}} or {filename, exists: false, error}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -108,8 +122,10 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
     "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
     "depthfusion_set_memory_score": None,           # always enabled (S-70)
-    "depthfusion_recall_feedback": None,    # always enabled (S-72)
-    "depthfusion_pin_discovery": None,      # always enabled (S-69)
+    "depthfusion_recall_feedback": None,          # always enabled (S-72)
+    "depthfusion_pin_discovery": None,            # always enabled (S-69)
+    "depthfusion_describe_capabilities": None,    # always enabled (S-76)
+    "depthfusion_inspect_discovery": None,        # always enabled (S-76)
 }
 
 
@@ -211,6 +227,10 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_recall_feedback(arguments)
     elif tool_name == "depthfusion_pin_discovery":
         return _tool_pin_discovery(arguments)
+    elif tool_name == "depthfusion_describe_capabilities":
+        return _tool_describe_capabilities()
+    elif tool_name == "depthfusion_inspect_discovery":
+        return _tool_inspect_discovery(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -675,11 +695,23 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         b.pop("file_stem", None)
         b.pop("content", None)
 
+    # S-76: build engaged_layers from what actually ran this call
+    engaged_layers = ["bm25"]
+    if "vector_search" in perf_ms:
+        engaged_layers.append("embedding")
+    if "fusion_gates" in perf_ms:
+        engaged_layers.append("fusion_gates")
+    if "reranker" in perf_ms:
+        engaged_layers.append("reranker")
+    if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true":
+        engaged_layers.append("graph_traverse")
+
     return json.dumps({
         "query": query,
         "blocks": blocks_out,
         "recall_id": recall_id,
         "total_sources_scanned": len(raw_blocks),
+        "engaged_layers": engaged_layers,
         "message": f"Retrieved {len(blocks_out)} relevant blocks (BM25+RRF)",
     }, indent=2)
 
@@ -813,10 +845,23 @@ def _tool_auto_learn(arguments: dict) -> str:
     """Trigger auto-learn extraction from recent .tmp session files."""
     from pathlib import Path
     max_files = min(int(arguments.get("max_files", 5)), 50)
+    project = arguments.get("project", "")
     sessions_dir = Path.home() / ".claude" / "sessions"
     if not sessions_dir.exists():
         return json.dumps({"compressed": 0, "message": "No sessions directory"})
+
+    # S-74 fix: obtain graph_store once if graph extraction is enabled.
+    # summarize_and_extract_graph is internally gated — safe to call always.
+    graph_store = None
+    if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true":
+        try:
+            from depthfusion.graph.store import get_store as _get_graph_store
+            graph_store = _get_graph_store()
+        except Exception:
+            pass
+
     try:
+        from depthfusion.capture.auto_learn import summarize_and_extract_graph
         from depthfusion.capture.compressor import SessionCompressor
         compressor = SessionCompressor()
         recent = sorted(sessions_dir.glob("*.tmp"),
@@ -826,6 +871,7 @@ def _tool_auto_learn(arguments: dict) -> str:
             out = compressor.compress(tmp)
             if out:
                 results.append(str(out.name))
+                summarize_and_extract_graph(out, project, graph_store)
         return json.dumps({
             "compressed": len(results),
             "files": results,
@@ -918,12 +964,15 @@ def _tool_graph_status() -> str:
     for e in entities:
         type_breakdown[e.type] = type_breakdown.get(e.type, 0) + 1
 
+    haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").lower() == "true"
     return json.dumps({
         "graph_enabled": True,
         "node_count": store.node_count(),
         "edge_count": store.edge_count(),
         "entities_by_type": type_breakdown,
         "tier": os.environ.get("DEPTHFUSION_MODE", "local"),
+        "extraction_active": haiku_enabled,   # S-74: graph extraction requires HAIKU_ENABLED
+        "tier_gates_extraction": False,        # no tier gate — runs on any tier when flags set
     }, indent=2)
 
 
@@ -1280,6 +1329,113 @@ def _tool_pin_discovery(arguments: dict) -> str:
         "pinned": pinned_raw,
         "filename": str(target),
     })
+
+
+def _tool_describe_capabilities() -> str:
+    """S-76: describe which layers and mechanisms are engaged on this instance."""
+    graph_enabled = os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true"
+    haiku_enabled = os.environ.get("DEPTHFUSION_HAIKU_ENABLED", "false").lower() == "true"
+    vector_search_enabled = os.environ.get(
+        "DEPTHFUSION_VECTOR_SEARCH_ENABLED", "false"
+    ).lower() == "true"
+    embedding_backend = os.environ.get("DEPTHFUSION_EMBEDDING_BACKEND", "")
+    fusion_gates_enabled = os.environ.get(
+        "DEPTHFUSION_FUSION_GATES_ENABLED", "false"
+    ).lower() == "true"
+    router_enabled = os.environ.get("DEPTHFUSION_ROUTER_ENABLED", "true").lower() == "true"
+    decision_extractor_enabled = os.environ.get(
+        "DEPTHFUSION_DECISION_EXTRACTOR_ENABLED", "false"
+    ).lower() == "true"
+    install_mode = os.environ.get("DEPTHFUSION_MODE", "local")
+
+    # Determine effective tier
+    tier = install_mode
+    if install_mode == "vps":
+        try:
+            from depthfusion.storage.tier_manager import TierManager
+            cfg = TierManager().detect_tier()
+            tier = cfg.tier.value if hasattr(cfg.tier, "value") else str(cfg.tier)
+        except Exception:
+            tier = "vps-tier1"
+
+    # Recall layers that will engage on this instance
+    recall_layers = ["bm25"]
+    if vector_search_enabled and embedding_backend:
+        recall_layers.append("embedding")
+    if fusion_gates_enabled:
+        recall_layers.append("fusion_gates")
+    if install_mode == "vps" and haiku_enabled:
+        recall_layers.append("reranker")
+    if graph_enabled:
+        recall_layers.append("graph_traverse")
+
+    # auto_learn capture mechanisms
+    auto_learn_layers = ["heuristic"]
+    if haiku_enabled:
+        auto_learn_layers.append("haiku_summarizer")
+    if decision_extractor_enabled:
+        auto_learn_layers.append("decision_extractor")
+    if graph_enabled and haiku_enabled:
+        auto_learn_layers.append("graph_extraction")
+
+    return json.dumps({
+        "tier": tier,
+        "mode": install_mode,
+        "flags": {
+            "graph_enabled": graph_enabled,
+            "haiku_enabled": haiku_enabled,
+            "vector_search_enabled": vector_search_enabled,
+            "embedding_backend": embedding_backend or "none",
+            "fusion_gates_enabled": fusion_gates_enabled,
+            "router_enabled": router_enabled,
+            "decision_extractor_enabled": decision_extractor_enabled,
+        },
+        "engaged_layers_per_op": {
+            "recall": recall_layers,
+            "publish": ["file_bus" if router_enabled else "disabled"],
+            "auto_learn": auto_learn_layers,
+        },
+    }, indent=2)
+
+
+def _tool_inspect_discovery(arguments: dict) -> str:
+    """S-76: return parsed frontmatter of a discovery file."""
+    import re as _re
+    filename = arguments.get("filename", "")
+    if not filename:
+        return json.dumps({"error": "filename argument required", "exists": False})
+
+    target = Path(os.path.expanduser(filename))
+    if not target.exists():
+        return json.dumps({"filename": str(target), "exists": False, "error": "file not found"})
+
+    try:
+        text = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return json.dumps({"filename": str(target), "exists": True, "error": str(exc)})
+
+    frontmatter: dict = {}
+    fm_match = _re.match(r"^---\s*\n(.*?)\n---", text, _re.DOTALL)
+    if fm_match:
+        for line in fm_match.group(1).splitlines():
+            kv = line.split(":", 1)
+            if len(kv) == 2:
+                key = kv[0].strip()
+                val = kv[1].strip()
+                # coerce common scalar types
+                if val.lower() in ("true", "false"):
+                    frontmatter[key] = val.lower() == "true"
+                else:
+                    try:
+                        frontmatter[key] = float(val) if "." in val else int(val)
+                    except ValueError:
+                        frontmatter[key] = val
+
+    return json.dumps({
+        "filename": str(target),
+        "exists": True,
+        "frontmatter": frontmatter,
+    }, indent=2)
 
 
 def _tool_set_scope(arguments: dict) -> str:
