@@ -1025,60 +1025,29 @@ def _tool_set_memory_score(arguments: dict) -> str:
     from depthfusion.capture.dedup import extract_memory_score
     from depthfusion.core.types import MemoryScore
 
-    # Sidecar lock — separate file so we don't open the target with write
-    # intent before we know we'll write to it, and so the lock survives
-    # the os.replace that swaps target's inode.
-    import fcntl
-    import tempfile
-    lock_path = target.parent / f".{target.name}.scorelock"
+    from depthfusion.core.file_locking import atomic_frontmatter_rewrite
+
     try:
-        # Create the lock file if missing; then flock it.
-        with open(lock_path, "a", encoding="utf-8") as lock_fh:
-            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
-            try:
-                # Re-read under lock — protects the unsupplied-field
-                # preservation against TOCTOU.
-                try:
-                    body = target.read_text(encoding="utf-8")
-                except OSError as exc:
-                    return json.dumps({
-                        "ok": False,
-                        "error": f"set_memory_score: read failed: {exc}",
-                    })
-
-                existing = extract_memory_score(body)
-                final_imp = existing.importance if importance is None else importance
-                final_sal = existing.salience if salience is None else salience
-                normalized = MemoryScore(
-                    importance=final_imp, salience=final_sal,
-                )
-
-                new_body = _splice_memory_score_frontmatter(
-                    body, normalized.importance, normalized.salience,
-                )
-
-                fd, tmp_str = tempfile.mkstemp(
-                    prefix=target.name + ".", suffix=".tmp",
-                    dir=str(target.parent),
-                )
-                try:
-                    with os.fdopen(fd, "w", encoding="utf-8") as tf:
-                        tf.write(new_body)
-                        tf.flush()
-                        os.fsync(tf.fileno())
-                    os.replace(tmp_str, str(target))
-                except Exception:
-                    try:
-                        os.unlink(tmp_str)
-                    except OSError:
-                        pass
-                    raise
-            finally:
-                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+        with atomic_frontmatter_rewrite(target) as ctx:
+            existing = extract_memory_score(ctx.body)
+            final_imp = existing.importance if importance is None else importance
+            final_sal = existing.salience if salience is None else salience
+            normalized = MemoryScore(importance=final_imp, salience=final_sal)
+            ctx.set_score(
+                importance=normalized.importance,
+                salience=normalized.salience,
+            )
+    except FileNotFoundError:
+        return json.dumps({
+            "ok": False, "error": f"set_memory_score: file not found: {filename}",
+        })
     except OSError as exc:
         return json.dumps({
-            "ok": False,
-            "error": f"set_memory_score: write failed: {exc}",
+            "ok": False, "error": f"set_memory_score: write failed: {exc}",
+        })
+    except Exception as exc:  # noqa: BLE001 — MCP tool boundary; must not raise
+        return json.dumps({
+            "ok": False, "error": f"set_memory_score: unexpected error: {exc}",
         })
 
     return json.dumps({
@@ -1087,60 +1056,6 @@ def _tool_set_memory_score(arguments: dict) -> str:
         "importance": normalized.importance,
         "salience": normalized.salience,
     })
-
-
-def _splice_memory_score_frontmatter(
-    body: str, importance: float, salience: float,
-) -> str:
-    """Return ``body`` with importance/salience set in the frontmatter block.
-
-    - Existing ``importance:`` / ``salience:`` lines are rewritten in place.
-    - Missing lines are appended just before the closing ``---``.
-    - If the body has no frontmatter block, one is created at the top.
-    - Preserves all other frontmatter fields and body content verbatim.
-    """
-    imp_line = f"importance: {importance:.4f}"
-    sal_line = f"salience: {salience:.4f}"
-
-    # Frontmatter detection mirrors capture/dedup._extract_frontmatter_block:
-    # opening ``---\n``, body until ``\n---\n`` or end-of-string. The
-    # search here is line-anchored to avoid false-matching ``---`` inside
-    # body text.
-    fm_re = re.compile(r"\A(---\s*\n)(.*?)(\n---\s*(?:\n|\Z))", re.DOTALL)
-    m = fm_re.match(body)
-    if not m:
-        # No frontmatter — synthesize a minimal one. This path is unusual
-        # (legitimate discovery files always have frontmatter) but we
-        # don't want to silently fail on a hand-edited or partial file.
-        synthesized = (
-            "---\n"
-            f"{imp_line}\n"
-            f"{sal_line}\n"
-            "---\n"
-        )
-        return synthesized + body
-
-    open_fence, fm_body, close_fence = m.group(1), m.group(2), m.group(3)
-
-    # Drop ALL existing importance/salience lines (handles duplicate keys
-    # in malformed frontmatter) and append exactly one canonical line for
-    # each. ``count=0`` removes every match, including any CRLF-terminated
-    # lines (the ``.*?\r?`` segment absorbs the optional CR so the
-    # replacement does not strand a lone \r).
-    fm_body = re.sub(
-        r"^importance:.*?\r?$", "", fm_body, count=0, flags=re.MULTILINE,
-    )
-    fm_body = re.sub(
-        r"^salience:.*?\r?$", "", fm_body, count=0, flags=re.MULTILINE,
-    )
-    # Collapse the empty lines left by the deletions, preserve the rest.
-    fm_body = re.sub(r"\n{2,}", "\n", fm_body).strip("\n")
-
-    # Append canonical lines (always at the end of the frontmatter block;
-    # YAML parsers treat order as insignificant for these scalars).
-    fm_body = fm_body + "\n" + imp_line + "\n" + sal_line
-
-    return open_fence + fm_body + close_fence + body[m.end():]
 
 
 def _tool_prune_discoveries(arguments: dict) -> str:
