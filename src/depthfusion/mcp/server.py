@@ -69,6 +69,16 @@ TOOLS: dict[str, str] = {
         "MemoryScore. Returns {ok: bool, importance, salience} or "
         "{ok: false, error}."
     ),
+    "depthfusion_recall_feedback": (
+        "Apply bounded salience deltas based on which retrieved chunks were "
+        "actually used (S-72). Args: recall_id (str, required) — uuid4 from a "
+        "prior recall_relevant response; used (chunk_id[]) — chunks that were "
+        "useful (each contributes +0.1 salience to its discovery file); ignored "
+        "(chunk_id[]) — chunks that were not (each contributes -0.05). "
+        "Idempotent — replaying the same payload skips already-applied chunks. "
+        "Response: {ok, applied, skipped_unsupported, skipped_missing, "
+        "skipped_already_applied, skipped_expired}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -87,6 +97,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
     "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
     "depthfusion_set_memory_score": None,           # always enabled (S-70)
+    "depthfusion_recall_feedback": None,    # always enabled (S-72)
 }
 
 
@@ -184,6 +195,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_set_memory_score(arguments)
     elif tool_name == "depthfusion_prune_discoveries":
         return _tool_prune_discoveries(arguments)
+    elif tool_name == "depthfusion_recall_feedback":
+        return _tool_recall_feedback(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -432,6 +445,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     _raw_explicit = str(arguments.get("project", "")).strip()
     explicit_project = _sanitise_project_slug(_raw_explicit) or None
 
+    recall_id: str | None = None  # minted after raw_blocks assembled; None on empty-result paths
+
     home = Path.home()
     raw_blocks: list[dict] = []  # list of {chunk_id, file_stem, source, content, title}
 
@@ -479,7 +494,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             _load_file(md_file, "memory")
 
     if not raw_blocks:
-        return json.dumps({"query": query, "blocks": [], "message": "No session context available"})
+        return json.dumps({"query": query, "blocks": [], "recall_id": None, "message": "No session context available"})
 
     # S-52 T-161: apply project-scoped filter before scoring so BM25 IDF
     # weights are computed against the filtered corpus, not the full
@@ -511,12 +526,19 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             if not raw_blocks:
                 return json.dumps({
                     "query": query, "blocks": [],
+                    "recall_id": None,
                     "message": (
                         f"No context found for project {current_project!r} "
                         f"(filtered {before_count} blocks). Pass "
                         "cross_project=true to search all projects."
                     ),
                 })
+
+    # S-72: mint recall_id after filtering so chunk_ids match the caller-visible set.
+    from depthfusion.core.feedback import RecallStore
+    recall_id = RecallStore.singleton().register_recall(
+        [b["chunk_id"] for b in raw_blocks]
+    )
 
     # Recency ordering: insertion order reflects mtime desc (used as a small tie-breaker)
     recency_list: list[str] = [b["chunk_id"] for b in raw_blocks]
@@ -536,6 +558,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         return json.dumps({
             "query": query,
             "blocks": blocks_out,
+            "recall_id": recall_id,
             "total_sources_scanned": len(raw_blocks),
             "message": f"Retrieved {len(blocks_out)} blocks (recency order, no query)",
         }, indent=2)
@@ -641,6 +664,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     return json.dumps({
         "query": query,
         "blocks": blocks_out,
+        "recall_id": recall_id,
         "total_sources_scanned": len(raw_blocks),
         "message": f"Retrieved {len(blocks_out)} relevant blocks (BM25+RRF)",
     }, indent=2)
@@ -1056,6 +1080,35 @@ def _tool_set_memory_score(arguments: dict) -> str:
         "importance": normalized.importance,
         "salience": normalized.salience,
     })
+
+
+def _tool_recall_feedback(arguments: dict) -> str:
+    """E-27 / S-72 — recall feedback loop entry point."""
+    recall_id = arguments.get("recall_id")
+    used = arguments.get("used", [])
+    ignored = arguments.get("ignored", [])
+
+    if not isinstance(recall_id, str) or not recall_id.strip():
+        return json.dumps({
+            "ok": False,
+            "error": "recall_feedback: 'recall_id' must be a non-empty string",
+        })
+    if not isinstance(used, list) or not isinstance(ignored, list):
+        return json.dumps({
+            "ok": False,
+            "error": "recall_feedback: 'used' and 'ignored' must be lists",
+        })
+    if not all(isinstance(c, str) for c in used + ignored):
+        return json.dumps({
+            "ok": False,
+            "error": "recall_feedback: chunk_ids must be strings",
+        })
+
+    from depthfusion.core.feedback import RecallStore
+    result = RecallStore.singleton().apply_feedback(
+        recall_id, used=list(used), ignored=list(ignored),
+    )
+    return json.dumps(result.to_dict())
 
 
 def _tool_prune_discoveries(arguments: dict) -> str:

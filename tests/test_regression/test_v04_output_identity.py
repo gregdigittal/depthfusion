@@ -126,6 +126,11 @@ def fixture_home(tmp_path, monkeypatch):
 # ── The regression tests ─────────────────────────────────────────────────
 
 
+def _strip_recall_id(output: dict) -> dict:
+    """Remove recall_id before golden comparisons (S-72: uuid changes each call)."""
+    return {k: v for k, v in output.items() if k != "recall_id"}
+
+
 def test_recall_output_matches_v04_baseline(fixture_home):
     """Primary regression guard: _tool_recall output on fixture corpus
     must match the captured v0.4.x golden file byte-for-byte.
@@ -136,6 +141,9 @@ def test_recall_output_matches_v04_baseline(fixture_home):
     If an intentional pipeline change produces different output, delete
     the golden file and re-run to re-capture — but note the change
     prominently in the commit message (this is the v0.5 / T-120 gate).
+
+    Note: recall_id (S-72) is stripped before comparison — it is a uuid4
+    that changes each call and is not part of the deterministic pipeline output.
     """
     from depthfusion.mcp.server import _tool_recall
 
@@ -144,7 +152,7 @@ def test_recall_output_matches_v04_baseline(fixture_home):
         "top_k": 3,
         "snippet_len": 500,
     })
-    output = json.loads(output_json)
+    output = _strip_recall_id(json.loads(output_json))
 
     golden_path = Path(__file__).parent / "golden" / "v04_recall_output.json"
     if not golden_path.exists():
@@ -155,7 +163,7 @@ def test_recall_output_matches_v04_baseline(fixture_home):
             "Re-run the test to assert stability."
         )
 
-    golden = json.loads(golden_path.read_text())
+    golden = _strip_recall_id(json.loads(golden_path.read_text()))
     assert output == golden, (
         f"Recall output drifted from v0.4.x baseline.\n"
         f"If this change is intentional, delete {golden_path} and "
@@ -167,11 +175,15 @@ def test_recall_output_matches_v04_baseline(fixture_home):
 def test_recall_output_is_deterministic_across_runs(fixture_home):
     """Two consecutive calls on the same fixture must produce identical output.
     This catches non-determinism (e.g., unstable sort, random tie-break).
+
+    Note: recall_id (S-72) is stripped before comparison — it is a uuid4
+    that changes each call intentionally and does not indicate non-determinism
+    in the retrieval pipeline.
     """
     from depthfusion.mcp.server import _tool_recall
     args = {"query": "architecture decisions", "top_k": 3, "snippet_len": 500}
-    first = _tool_recall(args)
-    second = _tool_recall(args)
+    first = _strip_recall_id(json.loads(_tool_recall(args)))
+    second = _strip_recall_id(json.loads(_tool_recall(args)))
     assert first == second
 
 
