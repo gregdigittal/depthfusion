@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-02 (S-32 AC-3 + S-33 AC-3 done: Seam E5 trajectory-depth telemetry + A/B fusion harness)
+> Last updated: 2026-05-02 (S-34 AC-1 done: QueryDispatcher TS port in @depthfusion/core)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -527,12 +527,12 @@
 ### S-34: As SkillForge's validator, I want semantic recall fallback so that past judgments match on similarity not just hash `P3` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `dispatcher.py` ported to TS — `QueryDispatcher` routing logic not yet in TS; `recommendStrategy` in @depthfusion/core covers content-size routing only
+- [x] AC-1: `dispatcher.py` ported to TS — `QueryDispatcher` routing logic not yet in TS; `recommendStrategy` in @depthfusion/core covers content-size routing only
 - [x] AC-2: `recallSimilarSemantic()` overload added at Seam B
 - [x] AC-3: Existing exact-match path unchanged
 
 **Tasks:**
-- [ ] T-101: Port dispatcher → TS
+- [x] T-101: Port dispatcher → TS
 - [x] T-102: Add semantic recall overload
 
 ### S-35: As SkillForge, I want `recursive_llm_call` step support so that Skill IR can express recursive reasoning `P3` `XL`
