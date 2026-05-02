@@ -485,7 +485,7 @@
 - [x] AC-1: `docs/performance-measurement-prompt.md` defines 5-category benchmark battery
 - [x] AC-2: Baseline → Enhancement → Delta methodology documented
 - [x] AC-3: Rubric scoring guide (0/5/10) per dimension
-- [ ] AC-4: Graph-specific benchmarks defined (traverse <100ms depth≤3, extraction <500ms/file)
+- [x] AC-4: Graph-specific benchmarks defined (traverse <100ms depth≤3, extraction <500ms/file)
 
 **Tasks:**
 - [x] T-91: Author measurement prompt doc
@@ -1194,16 +1194,16 @@
 > Depends on S-70.
 
 **Acceptance criteria:**
-- [ ] AC-1: When a discovery is published with `importance ≥ 0.8`, append a JSONL line to `~/.claude/shared/depthfusion-events.jsonl` (path env-configurable via `DEPTHFUSION_EVENT_LOG`).
-- [ ] AC-2: Event schema: `{timestamp, event: "high_importance_discovery", project, file_path, importance, salience, summary}`.
-- [ ] AC-3: Threshold env-configurable (`DEPTHFUSION_HIGH_IMPORTANCE_THRESHOLD`, default 0.8).
-- [ ] AC-4: Consumers tail the file or use inotify; DepthFusion does not own delivery (no Slack/webhook coupling here).
-- [ ] AC-5: ≥ 3 tests covering threshold trigger, schema, env-var override.
+- [x] AC-1: When a discovery is published with `importance ≥ 0.8`, append a JSONL line to `~/.claude/shared/depthfusion-events.jsonl` (path env-configurable via `DEPTHFUSION_EVENT_LOG`).
+- [x] AC-2: Event schema: `{timestamp, event: "high_importance_discovery", project, file_path, importance, salience, summary}`.
+- [x] AC-3: Threshold env-configurable (`DEPTHFUSION_HIGH_IMPORTANCE_THRESHOLD`, default 0.8).
+- [x] AC-4: Consumers tail the file or use inotify; DepthFusion does not own delivery (no Slack/webhook coupling here).
+- [x] AC-5: ≥ 3 tests covering threshold trigger, schema, env-var override.
 
 **Tasks:**
-- [ ] T-235: Event emitter in publish path (single emit point, after dedup + decay decisions)
-- [ ] T-236: JSONL writer with daily rotation (size cap optional)
-- [ ] T-237: Tests in `tests/test_capture/test_event_hook.py`
+- [x] T-235: Event emitter in publish path (single emit point, after dedup + decay decisions)
+- [x] T-236: JSONL writer with daily rotation (size cap optional)
+- [x] T-237: Tests in `tests/test_capture/test_event_hook.py`
 
 ### S-78: As a publish caller, I want `publish_context` to actually persist items idempotently by `content_hash` so that retries on transient failures don't create duplicate context entries `P1` `M` [done]
 
@@ -1268,33 +1268,33 @@
 ### S-76: As an MCP consumer, I want introspection tools so that I can tell which retrieval layers and capture mechanisms are engaged in a given recall or publish without reading source `P2` `S` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: `recall_relevant` response includes a new field `engaged_layers: string[]` listing the layers that contributed (subset of `["bm25", "embedding", "graph_traverse", "reranker"]`).
-- [ ] AC-2: New MCP tool `depthfusion_describe_capabilities()` returns: `{tier, mode, engaged_layers_per_op: {recall: [...], publish: [...], confirm_discovery: [...], ...}}`.
-- [ ] AC-3: Tool descriptions for `publish_context` and `confirm_discovery` document the input schema explicitly (currently absent from MCP surface).
-- [ ] AC-4: New optional MCP tool `depthfusion_inspect_discovery(filename)` returns parsed frontmatter (importance, salience, pinned, project, etc.) — useful once S-69 + S-70 land.
-- [ ] AC-5: ≥ 4 tests.
+- [x] AC-1: `recall_relevant` response includes a new field `engaged_layers: string[]` listing the layers that contributed (subset of `["bm25", "embedding", "graph_traverse", "reranker"]`).
+- [x] AC-2: New MCP tool `depthfusion_describe_capabilities()` returns: `{tier, mode, engaged_layers_per_op: {recall: [...], publish: [...], confirm_discovery: [...], ...}}`.
+- [x] AC-3: Tool descriptions for `publish_context` and `confirm_discovery` document the input schema explicitly (currently absent from MCP surface).
+- [x] AC-4: New optional MCP tool `depthfusion_inspect_discovery(filename)` returns parsed frontmatter (importance, salience, pinned, project, etc.) — useful once S-69 + S-70 land.
+- [x] AC-5: ≥ 4 tests.
 
 **Tasks:**
-- [ ] T-246: Add `engaged_layers` to `RecallPipeline` response
-- [ ] T-247: New `depthfusion_describe_capabilities` MCP tool
-- [ ] T-248: Augment tool descriptions for publish_context + confirm_discovery
-- [ ] T-249: New `depthfusion_inspect_discovery` MCP tool (gated on S-69 / S-70 frontmatter)
-- [ ] T-250: Tests in `tests/test_analyzer/test_introspection.py`
+- [x] T-246: Add `engaged_layers` to `RecallPipeline` response
+- [x] T-247: New `depthfusion_describe_capabilities` MCP tool
+- [x] T-248: Augment tool descriptions for publish_context + confirm_discovery
+- [x] T-249: New `depthfusion_inspect_discovery` MCP tool (gated on S-69 / S-70 frontmatter)
+- [x] T-250: Tests in `tests/test_analyzer/test_introspection.py`
 
 ### S-77: As an operator, I want `compress_session` and `auto_learn` to fire on a configurable cadence so that the capture pipeline doesn't depend on session-end memory `P3` `S` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: New env var `DEPTHFUSION_AUTO_COMPRESS_HOURS` (default unset = manual only); when set, idle sessions older than N hours are compressed automatically.
-- [ ] AC-2: Implementation may use the existing Stop hook (`hooks/depthfusion-stop.sh` per S-45 T-138), a cron entry shipped via the installer, or both — no internal scheduler.
-- [ ] AC-3: Idle detection: no session-file writes in the last N hours.
-- [ ] AC-4: Logged via the existing observability stream (capture_summary).
-- [ ] AC-5: ≥ 3 tests.
+- [x] AC-1: New env var `DEPTHFUSION_AUTO_COMPRESS_HOURS` (default unset = manual only); when set, idle sessions older than N hours are compressed automatically.
+- [x] AC-2: Implementation may use the existing Stop hook (`hooks/depthfusion-stop.sh` per S-45 T-138), a cron entry shipped via the installer, or both — no internal scheduler.
+- [x] AC-3: Idle detection: no session-file writes in the last N hours.
+- [x] AC-4: Logged via the existing observability stream (capture_summary).
+- [x] AC-5: ≥ 3 tests.
 
 **Tasks:**
-- [ ] T-251: Idle detection in `capture/compress_session.py`
-- [ ] T-252: Cron entry template + installer hook (or extend Stop hook with cadence parameter)
-- [ ] T-253: Env-var plumbing
-- [ ] T-254: Tests in `tests/test_capture/test_auto_compress.py`
+- [x] T-251: Idle detection in `capture/compress_session.py`
+- [x] T-252: Cron entry template + installer hook (or extend Stop hook with cadence parameter)
+- [x] T-253: Env-var plumbing
+- [x] T-254: Tests in `tests/test_capture/test_auto_compress.py`
 
 ### Cross-cutting notes for E-27 / E-28
 
