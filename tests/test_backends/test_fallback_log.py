@@ -162,10 +162,16 @@ def test_factory_fallback_suppressed_when_flag_disabled(monkeypatch):
 
 
 def test_factory_gemma_fallback_emits_record(monkeypatch):
-    """Gemma with empty URL → NullBackend + fallback event."""
+    """Gemma with empty URL (and haiku also unavailable) → NullBackend + fallback event.
+
+    Both real backends in the vps-gpu chain must be unhealthy to reach null;
+    clearing the API key ensures haiku is also skipped (S-41 AC-8 quality chain).
+    """
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
     monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true")
     monkeypatch.setenv("DEPTHFUSION_GEMMA_URL", "")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("DEPTHFUSION_RERANKER_BACKEND", raising=False)
 
     with patch("depthfusion.metrics.collector.MetricsCollector.record") as mock_record:
@@ -173,9 +179,14 @@ def test_factory_gemma_fallback_emits_record(monkeypatch):
         backend = get_backend("reranker")
 
     assert isinstance(backend, NullBackend)
-    mock_record.assert_called_once()
-    labels = mock_record.call_args.kwargs.get("labels") or mock_record.call_args.args[2]
-    assert labels["requested"] == "gemma"
+    # AC-8 quality chain: gemma skipped, then haiku skipped → 2 fallback events
+    assert mock_record.call_count >= 1
+    all_labels = [
+        (call.kwargs.get("labels") or call.args[2])
+        for call in mock_record.call_args_list
+    ]
+    requested_backends = {lbl["requested"] for lbl in all_labels}
+    assert "gemma" in requested_backends
 
 
 def test_null_backend_requested_directly_no_fallback_event(monkeypatch):

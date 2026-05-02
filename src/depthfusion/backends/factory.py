@@ -4,27 +4,22 @@ Given a capability name and the current mode, returns an `LLMBackend`
 implementation. Resolution order:
 
   1. Per-capability env-var override (e.g. `DEPTHFUSION_RERANKER_BACKEND=null`)
-  2. Default dispatch table keyed on `(DEPTHFUSION_MODE, capability)`
+  2. Quality-ranked fallback chain keyed on `(DEPTHFUSION_MODE, capability)`
   3. Terminal fallback to `NullBackend`
 
-v0.5.0 scaffolding: the `haiku`, `gemma`, and `local` dispatch targets
-currently fall back to `NullBackend`. Their actual implementations land
-in T-116 (Haiku), T-118 (LocalEmbedding), T-132 (Gemma). The factory's
-dispatch table is complete and forward-compatible with those landings.
+Quality ranking (descending): gemma (3) > haiku (2) > local (1) > null (0).
+The chain is walked in quality-descending order; the first healthy backend
+is returned. If there are multiple healthy backends, a `FallbackChain` is
+returned so runtime errors (rate-limit, overload, timeout) cascade correctly.
 
-Fallback-chain ordering (AC-01-8 quality-ranked per DR-018 §4 → I-18):
-a future iteration will return a list of backends rather than a single
-backend, so callers can cascade on `RateLimitError` / `BackendOverloadError`
-/ `BackendTimeoutError`. For v0.5.0 foundation, the factory returns a
-single backend and the fallback is implicit (NullBackend when others
-haven't shipped yet).
+This implements S-41 AC-8 (DR-018 §4 ratification → I-18): cost/latency
+optimisation applies only within a quality tier; a lower-quality backend
+may never be promoted ahead of a higher-quality one.
 
 T-123 — Fallback observability:
 When a healthy-check fails and the factory falls back from a real backend
 (haiku, gemma) to NullBackend, a JSONL event is emitted to the metrics
 collector if `DEPTHFUSION_BACKEND_FALLBACK_LOG` is not explicitly disabled.
-This gives operators a durable audit trail for silent-degradation events
-that would otherwise appear only in Python logging output.
 
 Spec: docs/plans/v0.5/02-build-plan.md §2.2.2
 Backlog: T-119, T-123
@@ -52,27 +47,28 @@ _CAPABILITY_ENV_VARS = {
     "decision_extractor": "DEPTHFUSION_DECISION_EXTRACTOR_BACKEND",
 }
 
-# Default dispatch keyed on (mode, capability). Values are backend names.
-# Missing entries default to "null".
-_DEFAULT_DISPATCH = {
-    ("local", "reranker"): "null",
-    ("local", "extractor"): "null",
-    ("local", "linker"): "null",
-    ("local", "summariser"): "null",
-    ("local", "embedding"): "null",
-    ("local", "decision_extractor"): "null",
-    ("vps-cpu", "reranker"): "haiku",
-    ("vps-cpu", "extractor"): "haiku",
-    ("vps-cpu", "linker"): "haiku",
-    ("vps-cpu", "summariser"): "haiku",
-    ("vps-cpu", "embedding"): "null",  # opt-in via env-var override
-    ("vps-cpu", "decision_extractor"): "haiku",
-    ("vps-gpu", "reranker"): "gemma",
-    ("vps-gpu", "extractor"): "gemma",
-    ("vps-gpu", "linker"): "gemma",
-    ("vps-gpu", "summariser"): "gemma",
-    ("vps-gpu", "embedding"): "local",
-    ("vps-gpu", "decision_extractor"): "gemma",
+# Quality-ranked fallback chains per (mode, capability).
+# Lists are quality-descending: highest-quality backend first, NullBackend last.
+# DR-018 §4 (I-18): cost/latency may reorder within a tier but not across tiers.
+_QUALITY_CHAINS: dict[tuple[str, str], list[str]] = {
+    ("local", "reranker"):           ["null"],
+    ("local", "extractor"):          ["null"],
+    ("local", "linker"):             ["null"],
+    ("local", "summariser"):         ["null"],
+    ("local", "embedding"):          ["null"],
+    ("local", "decision_extractor"): ["null"],
+    ("vps-cpu", "reranker"):           ["haiku", "null"],
+    ("vps-cpu", "extractor"):          ["haiku", "null"],
+    ("vps-cpu", "linker"):             ["haiku", "null"],
+    ("vps-cpu", "summariser"):         ["haiku", "null"],
+    ("vps-cpu", "embedding"):          ["null"],  # opt-in via env-var override
+    ("vps-cpu", "decision_extractor"): ["haiku", "null"],
+    ("vps-gpu", "reranker"):           ["gemma", "haiku", "null"],
+    ("vps-gpu", "extractor"):          ["gemma", "haiku", "null"],
+    ("vps-gpu", "linker"):             ["gemma", "haiku", "null"],
+    ("vps-gpu", "summariser"):         ["gemma", "haiku", "null"],
+    ("vps-gpu", "embedding"):          ["local", "null"],
+    ("vps-gpu", "decision_extractor"): ["gemma", "haiku", "null"],
 }
 
 # v0.5 compatibility alias: the legacy single "vps" mode maps to vps-cpu.
@@ -83,6 +79,11 @@ _VPS_LEGACY_ALIAS = "vps-cpu"
 def get_backend(capability: str, *, mode: Optional[str] = None) -> LLMBackend:
     """Return the configured `LLMBackend` for a capability.
 
+    Returns a `FallbackChain` when multiple backends in the quality chain are
+    healthy (enabling runtime cascade on `RateLimitError` / `BackendOverloadError`
+    / `BackendTimeoutError`). Returns a single backend when only one is healthy.
+    Always returns a concrete object — never `None`.
+
     Args:
         capability: one of `reranker`, `extractor`, `linker`, `summariser`,
             `embedding`, `decision_extractor`.
@@ -91,9 +92,6 @@ def get_backend(capability: str, *, mode: Optional[str] = None) -> LLMBackend:
 
     Raises:
         ValueError: on unknown capability or unknown backend name.
-
-    Returns:
-        An `LLMBackend` instance. Always a concrete object — never `None`.
     """
     if capability not in _CAPABILITY_ENV_VARS:
         known = sorted(_CAPABILITY_ENV_VARS)
@@ -110,27 +108,54 @@ def get_backend(capability: str, *, mode: Optional[str] = None) -> LLMBackend:
     if resolved_mode == "vps":
         resolved_mode = _VPS_LEGACY_ALIAS  # v0.5 alias; deprecated
 
-    default_name = _DEFAULT_DISPATCH.get((resolved_mode, capability), "null")
-    return _instantiate(default_name, capability)
+    chain_names = _QUALITY_CHAINS.get((resolved_mode, capability), ["null"])
+    return _resolve_chain(chain_names, capability)
 
 
-def _instantiate(name: str, capability: str) -> LLMBackend:
-    """Construct the backend by name. v0.5 scaffolding: haiku/gemma/local
-    fall through to NullBackend until their implementations land.
+def _resolve_chain(names: list[str], capability: str) -> LLMBackend:
+    """Walk a quality-ranked list of backend names and return the best result.
+
+    Rules (DR-018 §4 / I-18 — quality-descending order preserved):
+      - If 2+ real (non-null) backends are healthy, return a `FallbackChain`
+        so runtime errors (rate-limit, overload) cascade across quality tiers.
+      - If exactly 1 real backend is healthy, return it directly.
+      - If no real backends are healthy, return `NullBackend`.
+
+    NullBackend is always the terminal fallback and is included in the chain
+    only when other real backends are also present (so chain.name includes it).
+    """
+    from depthfusion.backends.chain import FallbackChain
+
+    real_backends: list[LLMBackend] = []
+    for name in names:
+        if name == "null":
+            continue
+        backend = _try_construct(name, capability)
+        if backend is not None:
+            real_backends.append(backend)
+
+    if not real_backends:
+        return NullBackend()
+    if len(real_backends) == 1:
+        return real_backends[0]
+    # Multiple real backends available — wrap in FallbackChain with null terminal.
+    return FallbackChain([*real_backends, NullBackend()])
+
+
+def _try_construct(name: str, capability: str) -> LLMBackend | None:
+    """Construct a backend by name. Returns None (with log + fallback event)
+    if the backend is requested but not healthy.
     """
     if name == "null":
         return NullBackend()
 
     if name == "haiku":
-        # T-116 HaikuBackend. If construction succeeds but the backend
-        # reports unhealthy (no DEPTHFUSION_API_KEY, no SDK), fall through
-        # to NullBackend rather than returning an unusable backend.
         haiku: LLMBackend = HaikuBackend()
         if haiku.healthy():
             return haiku
         logger.info(
             "HaikuBackend requested for capability %r but not healthy "
-            "(no DEPTHFUSION_API_KEY or anthropic SDK); falling back to NullBackend.",
+            "(no DEPTHFUSION_API_KEY or anthropic SDK); skipping in chain.",
             capability,
         )
         _emit_fallback_event(
@@ -138,18 +163,15 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
             capability=capability,
             reason="unhealthy: no DEPTHFUSION_API_KEY or anthropic SDK unavailable",
         )
-        return NullBackend()
+        return None
 
     if name == "gemma":
-        # T-132 GemmaBackend. Healthy whenever URL + model are configured
-        # (construction-time check; no network probe). Falls back to
-        # NullBackend only in the extreme case of empty config.
         gemma: LLMBackend = GemmaBackend()
         if gemma.healthy():
             return gemma
         logger.info(
             "GemmaBackend requested for capability %r but not healthy "
-            "(missing URL or model config); falling back to NullBackend.",
+            "(missing URL or model config); skipping in chain.",
             capability,
         )
         _emit_fallback_event(
@@ -157,20 +179,16 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
             capability=capability,
             reason="unhealthy: DEPTHFUSION_GEMMA_URL or DEPTHFUSION_GEMMA_MODEL empty",
         )
-        return NullBackend()
+        return None
 
     if name == "local":
-        # T-118/T-129 LocalEmbeddingBackend (sentence-transformers).
-        # Healthy when the `sentence_transformers` package is importable.
-        # Same pattern as haiku/gemma: if unhealthy, fall through to Null
-        # and emit a fallback event so operators can see the degradation.
         from depthfusion.backends.local_embedding import LocalEmbeddingBackend
         local: LLMBackend = LocalEmbeddingBackend()
         if local.healthy():
             return local
         logger.info(
             "LocalEmbeddingBackend requested for capability %r but not healthy "
-            "(sentence_transformers not installed); falling back to NullBackend.",
+            "(sentence_transformers not installed); skipping in chain.",
             capability,
         )
         _emit_fallback_event(
@@ -178,13 +196,19 @@ def _instantiate(name: str, capability: str) -> LLMBackend:
             capability=capability,
             reason="unhealthy: sentence_transformers package not importable",
         )
-        return NullBackend()
+        return None
 
     known = {"null", "haiku", "gemma", "local"}
     raise ValueError(
         f"Unknown backend: {name!r} for capability {capability!r}. "
         f"Known backends: {sorted(known)}"
     )
+
+
+def _instantiate(name: str, capability: str) -> LLMBackend:
+    """Single-name backend construction (used by env-var override path)."""
+    result = _try_construct(name, capability)
+    return result if result is not None else NullBackend()
 
 
 def _emit_fallback_event(

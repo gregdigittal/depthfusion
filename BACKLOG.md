@@ -697,7 +697,7 @@
 - [x] AC-5: All 439 pre-existing tests pass
 - [x] AC-6: ≥ 25 new tests in `tests/test_backends/` covering protocol contract, factory dispatch, fallback chain, and C2 fix
 - [x] AC-7: CIQS benchmark run shows no category regression > 2 points vs v0.4.x baseline
-- [ ] AC-8: Fallback chain is **quality-ranked** (per DR-018 §4 ratification → I-18); cost/latency optimisation applies only within a quality tier
+- [x] AC-8: Fallback chain is **quality-ranked** (per DR-018 §4 ratification → I-18); cost/latency optimisation applies only within a quality tier — `_QUALITY_CHAINS` + `_resolve_chain` in `factory.py`; 25 tests in `test_fallback_order.py` (2026-05-02)
 
 **Tasks:**
 - [x] T-115: Implement `backends/base.py` Protocol (complete/embed/rerank/extract_structured/healthy)

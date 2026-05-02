@@ -230,15 +230,16 @@ def test_gemma_override_returns_gemma():
 
 def test_vps_gpu_mode_routes_all_llm_caps_to_gemma(monkeypatch):
     """vps-gpu default: reranker/extractor/linker/summariser/decision_extractor
-    all resolve to GemmaBackend. Embedding routes to LocalEmbeddingBackend
-    when sentence_transformers is installed; when the package is not
-    available (as in most CI), the factory's healthy-check safety net
-    falls back to NullBackend. Either outcome is contract-compliant.
+    all resolve to GemmaBackend when gemma is healthy and haiku is not (no API key).
+    With AC-8 quality chains, both gemma AND haiku healthy returns FallbackChain —
+    so this test explicitly clears the API key to isolate gemma-only.
     """
     from depthfusion.backends.gemma import GemmaBackend
     from depthfusion.backends.local_embedding import LocalEmbeddingBackend
     from depthfusion.backends.null import NullBackend
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor"]:
         monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
         backend = get_backend(cap)
@@ -289,11 +290,16 @@ def test_local_embedding_falls_back_to_null_when_package_missing(monkeypatch):
 
 def test_gemma_factory_uses_custom_url_from_env(monkeypatch):
     """The factory instantiates GemmaBackend with default __init__ args,
-    which then reads DEPTHFUSION_GEMMA_URL from env. Verifies the
-    pipeline from env → factory → GemmaBackend is intact.
+    which then reads DEPTHFUSION_GEMMA_URL from env. Clears API key so
+    haiku is unhealthy and the factory returns a plain GemmaBackend (not
+    a FallbackChain), making _url accessible directly.
     """
+    from depthfusion.backends.gemma import GemmaBackend
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
     monkeypatch.setenv("DEPTHFUSION_GEMMA_URL", "http://gex44.test:8000/v1")
+    monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("DEPTHFUSION_RERANKER_BACKEND", raising=False)
     backend = get_backend("reranker")
+    assert isinstance(backend, GemmaBackend)
     assert backend._url == "http://gex44.test:8000/v1"
