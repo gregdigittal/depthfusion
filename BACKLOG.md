@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-02 (E-17 closed `[done]`: S-56/S-57 shipped; S-63 local-3-run baseline committed under `docs/benchmarks/`)
+> Last updated: 2026-05-02 (S-33 AC-3 done: fusion-ab-comparison.test.ts, 15 tests passing in SkillForge)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -517,12 +517,12 @@
 **Acceptance criteria:**
 - [x] AC-1: `rrf.py` + `reranker.py` ported to TypeScript
 - [x] AC-2: `FusionStrategy` interface added at `phases.ts:97` (Seam A)
-- [ ] AC-3: A/B validation: fusion scoring vs flat on recorded invocations
+- [x] AC-3: A/B validation: fusion scoring vs flat on recorded invocations
 
 **Tasks:**
 - [x] T-98: Port RRF + reranker → TS
 - [x] T-99: Add `FusionStrategy` interface at Seam A
-- [ ] T-100: A/B test harness
+- [x] T-100: A/B test harness
 
 ### S-34: As SkillForge's validator, I want semantic recall fallback so that past judgments match on similarity not just hash `P3` `M`
 
