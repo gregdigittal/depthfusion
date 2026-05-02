@@ -249,6 +249,9 @@ executes nvidia-smi, imports sentence-transformers, and issues a
 one-shot Gemma completion. Failure is non-fatal — install completes,
 smoke can be re-run later.
 
+The installer also registers the DepthFusion MCP server with Claude Code
+via `claude mcp add` (if the `claude` CLI is present on this host).
+
 ### 3b. Add credentials + enable flag to the env file
 
 Even on a GPU host where Gemma is primary, setting `DEPTHFUSION_API_KEY`
@@ -323,34 +326,7 @@ install is usable, just not running on GPU until vLLM comes up.
 
 ---
 
-## 4. Register the MCP server with Claude Code
-
-**Important — this step is easy to miss.** The previous step set up
-hooks, env config, and the vps-gpu smoke test, but did NOT register
-DepthFusion's MCP tools (recall, confirm-discovery, prune) with
-Claude Code. Without this, Claude Code sessions won't have access to
-the tools even though the library is installed.
-
-```bash
-# Register DepthFusion as an MCP server at user scope.
-claude mcp add depthfusion --scope user -- python3 -m depthfusion.mcp.server
-```
-
-**Verify:**
-
-```bash
-claude mcp list
-# DepthFusion should appear. If not, check the command ran without error.
-```
-
-> **Why isn't this automatic?** The installer doesn't invoke
-> `claude mcp add` today — tracked as a v0.7 polish item (see
-> `BACKLOG.md` E-17 S-67). Once that lands, step 4 will be folded
-> into step 3.
-
----
-
-## 5. Install the research tools
+## 4. Install the research tools
 
 ```bash
 bash ~/projects/depthfusion/scripts/install-research-tools.sh
@@ -368,7 +344,7 @@ ls -lh ~/.local/share/depthfusion/corpus/
 
 ---
 
-## 6. Smoke test the full pipeline
+## 5. Smoke test the full pipeline
 
 ```bash
 # End-to-end recall via the real MCP interface
@@ -392,7 +368,7 @@ print(json.dumps(s, indent=2, default=str))
 
 ---
 
-## 7. Record the baseline CIQS run
+## 6. Record the baseline CIQS run
 
 If you're running the parallel-comparison plan, now is the moment
 to capture a 3-run CIQS baseline on this GPU host:
