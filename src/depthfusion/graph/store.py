@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
 
 from depthfusion.graph.types import Edge, Entity
 
@@ -343,7 +343,7 @@ class ChromaGraphStore:
     def upsert_entity(self, entity: Entity) -> None:
         if entity.confidence < _min_confidence():
             return
-        meta = {
+        meta: dict[str, str | int | float | bool] = {
             "name": entity.name,
             "type": entity.type,
             "project": entity.project,
@@ -363,24 +363,25 @@ class ChromaGraphStore:
         result = self._collection.get(ids=[entity_id], include=["metadatas", "documents"])
         if not result["ids"]:
             return None
-        m = result["metadatas"][0]
+        m = result["metadatas"][0]  # type: ignore[index]
         return Entity(
             entity_id=entity_id,
-            name=m["name"],
-            type=m["type"],
-            project=m["project"],
-            source_files=json.loads(m["source_files"]),
-            confidence=float(m["confidence"]),
-            first_seen=m["first_seen"],
-            metadata=json.loads(m.get("extra_metadata", "{}")),
+            name=cast(str, m["name"]),
+            type=cast(str, m["type"]),
+            project=cast(str, m["project"]),
+            source_files=json.loads(cast(str, m["source_files"])),
+            confidence=float(cast(str, m["confidence"])),
+            first_seen=cast(str, m["first_seen"]),
+            metadata=json.loads(cast(str, m.get("extra_metadata", "{}"))),
         )
 
     def all_entities(self) -> list[Entity]:
         result = self._collection.get(include=["metadatas"])
+        metadatas = cast(list[dict[str, str]], result["metadatas"] or [])
         entities = []
-        for eid, m in zip(result["ids"], result["metadatas"]):
+        for eid, m in zip(result["ids"], metadatas):
             entities.append(Entity(
-                entity_id=eid,
+                entity_id=cast(str, eid),
                 name=m["name"],
                 type=m["type"],
                 project=m["project"],

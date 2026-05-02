@@ -272,7 +272,7 @@ def _parse_env_file(path: Path) -> list[tuple[str | None, str | None, str]]:
     Comments and blank lines have key=None, value=None.
     The raw_line preserves the original text (no trailing newline).
     """
-    result = []
+    result: list[tuple[str | None, str | None, str]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):

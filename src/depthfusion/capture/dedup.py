@@ -40,7 +40,10 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from depthfusion.core.types import MemoryScore
 
 logger = logging.getLogger(__name__)
 

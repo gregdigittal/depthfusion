@@ -201,6 +201,8 @@ def apply_decay(
 
         # --- compute new salience ---
         score = extract_memory_score(body)
+        # __post_init__ always normalizes these to float; assert for mypy
+        assert score.importance is not None and score.salience is not None
         rate = _bucket_rate(score.importance, rate_high, rate_mid, rate_low)
         new_salience = score.salience * (1.0 - rate) ** days
         new_salience = max(_SALIENCE_MIN, min(_SALIENCE_MAX, new_salience))

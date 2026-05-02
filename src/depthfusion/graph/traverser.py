@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from depthfusion.graph.types import Edge, Entity, TraversalResult
 
 if TYPE_CHECKING:
-    from depthfusion.graph.store import JSONGraphStore, SQLiteGraphStore
+    from depthfusion.graph.store import ChromaGraphStore, JSONGraphStore, SQLiteGraphStore
 
 # Threshold: entities below this are excluded from query expansion
 _CONFIDENCE_THRESHOLD = 0.70
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def traverse(
     entity_id: str,
-    store: "JSONGraphStore | SQLiteGraphStore",
+    store: "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore",
     depth: int = 1,
     relationship_filter: list[str] | None = None,
     time_window_hours: float | None = None,
@@ -85,7 +85,7 @@ def traverse(
     )
 
 
-def expand_query(query: str, store: "JSONGraphStore | SQLiteGraphStore") -> str:
+def expand_query(query: str, store: "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore") -> str:
     """Expand a query string with entity-linked terms from the graph.
 
     1. Find entities whose name appears in the query (case-insensitive word match).
@@ -130,7 +130,7 @@ def expand_query(query: str, store: "JSONGraphStore | SQLiteGraphStore") -> str:
 def boost_scores(
     blocks: list[dict],
     top_result_entity_id: str,
-    store: "JSONGraphStore | SQLiteGraphStore",
+    store: "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore",
 ) -> list[dict]:
     """Boost block scores if they mention entities linked to the top-1 result.
 
