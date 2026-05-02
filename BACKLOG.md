@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-04-21 (E-14/E-15/E-20/E-21 reconciled to `[done]`; E-26 benchmark-harness epic opened)
+> Last updated: 2026-05-02 (E-17 closed `[done]`: S-56/S-57 shipped; S-63 local-3-run baseline committed under `docs/benchmarks/`)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -565,7 +565,7 @@
 
 ---
 
-## E-17: Tech Debt [backlog]
+## E-17: Tech Debt [done]
 
 > Cleanup items surfaced during audit that don't fit a user-facing epic.
 
@@ -1072,7 +1072,7 @@
 **Tasks:**
 - [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
 - [x] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`) — linear-interpolated percentile, deterministic bootstrap CI, per-category stats table + raw dump; `docs/benchmarks/README.md` documents the three-stage flow
-- [ ] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era) — **calendar-blocked on executing the runs**
+- [~] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era) — **local 3-run committed 2026-05-02 (raw JSONL + scoring templates); vps-cpu run pending; vps-gpu run tracked in S-66**
 
 ### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
 

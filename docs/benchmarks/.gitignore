@@ -1,0 +1,2 @@
+# Allow JSONL benchmark outputs (root .gitignore blocks *.jsonl globally)
+!*.jsonl
