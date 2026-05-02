@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-02 (S-34 AC-1 done: QueryDispatcher TS port in @depthfusion/core)
+> Last updated: 2026-05-02 (S-34 AC-1 + S-65 AC-1 done: QueryDispatcher TS port; dogfood runbook confirmed)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1104,7 +1104,7 @@
 ### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Runbook in `docs/runbooks/dogfood-telemetry.md` prescribes: enable instrumentation, use DepthFusion for ≥ 1 week of real work, collect JSONL streams, run aggregators, inspect outputs
+- [x] AC-1: Runbook in `docs/runbooks/dogfood-telemetry.md` prescribes: enable instrumentation, use DepthFusion for ≥ 1 week of real work, collect JSONL streams, run aggregators, inspect outputs
 - [ ] AC-2: First dogfood pass committed as `docs/runbooks/dogfood-reports/{YYYY-MM-DD}-week1.md` with concrete findings (fields with empty values, fields that lied, missing fields we wish existed)
 - [ ] AC-3: Findings triaged into v0.5.3 polish backlog (new stories under a fresh epic if warranted)
 
