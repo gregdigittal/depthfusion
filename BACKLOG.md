@@ -1061,13 +1061,15 @@
 
 > Consolidates all benchmark-blocked acceptance criteria from feature epics (E-14, E-20, E-21) into a single deliverable workstream. The feature code ships independently; this epic produces the measurement apparatus that lets us assert *how well* it works. Until this epic is active, feature epics carry forward with their benchmark-blocked ACs unchecked — that is a deliberate, documented carve-out, not drift.
 
-### S-63: As a release, I want an automated CIQS run harness so that pre/post-change deltas can be measured reproducibly without manual per-prompt execution `P1` `M`
+### S-63: As a release, I want an automated CIQS run harness so that pre/post-change deltas can be measured reproducibly without manual per-prompt execution `P1` `M` [done]
+
+> Harness + summariser shipped; local/vps-cpu/vps-gpu raw baselines committed. AC-3/AC-4 scoring deferred to post-S-65-dogfood (index too sparse for meaningful human judgment today — 2026-05-02).
 
 **Acceptance criteria:**
 - [x] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md` and extracted to `docs/benchmarks/prompts/ciqs-battery.yaml`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}-scored.jsonl` — `scripts/ciqs_harness.py run` + `score` subcommands
 - [x] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI — `scripts/ciqs_summarise.py` (5000 bootstrap resamples, seed=1729; math covered by 24 unit tests in `tests/test_scripts/test_ciqs_summarise.py`)
-- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **execution pending (T-201)**
-- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **execution pending (T-201)**
+- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **deferred to post-dogfood (S-65): scoring templates require human judgment; index is currently sparse (session tombstones only); meaningful scores require ≥7 days of real discovery content (2026-05-02)**
+- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **deferred to post-dogfood (S-65): same dependency as AC-3**
 
 **Tasks:**
 - [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
