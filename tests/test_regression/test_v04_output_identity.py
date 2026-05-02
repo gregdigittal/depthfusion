@@ -119,6 +119,9 @@ def fixture_home(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_HAIKU_ENABLED", "false")
     monkeypatch.setenv("DEPTHFUSION_RERANKER_ENABLED", "false")
+    monkeypatch.delenv("DEPTHFUSION_GRAPH_ENABLED", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
 
     return tmp_path
 

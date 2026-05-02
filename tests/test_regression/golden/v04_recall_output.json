@@ -21,5 +21,8 @@
     }
   ],
   "total_sources_scanned": 14,
+  "engaged_layers": [
+    "bm25"
+  ],
   "message": "Retrieved 3 relevant blocks (BM25+RRF)"
 }

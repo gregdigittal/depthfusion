@@ -171,7 +171,7 @@ class GemmaBackend:
         prompt = _RERANK_PROMPT.format(query=query, docs_text=docs_text)
 
         try:
-            raw = self.complete(prompt, max_tokens=128)
+            raw = self.complete(prompt, max_tokens=512)
         except (RateLimitError, BackendOverloadError, BackendTimeoutError):
             raise
 
