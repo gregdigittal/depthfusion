@@ -1,7 +1,5 @@
 """Tests for S-76 introspection tools and S-74/S-75 audit fixes."""
 import json
-import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +11,6 @@ from depthfusion.mcp.server import (
     _tool_inspect_discovery,
     get_enabled_tools,
 )
-
 
 # ---------------------------------------------------------------------------
 # S-76: depthfusion_describe_capabilities

@@ -10,9 +10,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import pytest
-
-
 REPO_ROOT = Path(__file__).parent.parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "install-research-tools.sh"
 
@@ -63,7 +60,7 @@ def test_dry_run_no_side_effects(tmp_path, monkeypatch):
         "PATH": "/usr/bin:/bin",  # minimal but real
     }
 
-    result = subprocess.run(
+    subprocess.run(
         ["bash", str(SCRIPT), "--dry-run"],
         capture_output=True, text=True, env=env, timeout=30,
     )

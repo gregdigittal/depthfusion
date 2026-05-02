@@ -10,10 +10,18 @@ Format is compatible with CLaRa feedback logs if CLaRa is later deployed
 from __future__ import annotations
 
 import json
+import logging
+import threading
+import time
+import uuid
 from dataclasses import asdict
+from dataclasses import asdict as _asdict
+from dataclasses import dataclass as _dataclass
+from dataclasses import field as _field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from typing import Optional as _Optional
 
 from depthfusion.core.types import FeedbackEntry
 
@@ -95,15 +103,6 @@ class FeedbackStore:
 # ---------------------------------------------------------------------------
 # E-27 / S-72 — in-memory recall store for salience feedback
 # ---------------------------------------------------------------------------
-
-import logging
-import threading
-import time
-import uuid
-from dataclasses import asdict as _asdict
-from dataclasses import dataclass as _dataclass
-from dataclasses import field as _field
-from typing import Optional as _Optional
 
 _logger = logging.getLogger(__name__)
 

@@ -14,16 +14,12 @@ from __future__ import annotations
 import os
 import stat
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from depthfusion.install.install import (
+    _LOCAL_ENV_LINES,
     _parse_env_file,
     _write_env_config,
-    _LOCAL_ENV_LINES,
 )
-
 
 # ---------------------------------------------------------------------------
 # _parse_env_file

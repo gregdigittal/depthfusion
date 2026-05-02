@@ -1046,7 +1046,7 @@
 **Acceptance criteria:**
 - [x] AC-1: `mypy src/depthfusion` reports 0 errors — `Success: no issues found in 72 source files`
 - [x] AC-2: `ruff check src/ tests/` reports 0 errors — `All checks passed!`
-- [ ] AC-3: CI / pre-commit hooks guard against re-introduction (follow-up — current commit + push workflows run ruff but not mypy in the gate)
+- [x] AC-3: CI / pre-commit hooks guard against re-introduction — `.pre-commit-config.yaml` + `.github/workflows/lint.yml` (ruff + mypy) added 2026-05-02
 
 **Tasks:**
 - [x] T-181: Added `types-PyYAML>=6.0.0` to `[dev]` extras; `# type: ignore[import-untyped]` on `import yaml` in `session/loader.py` + `session/tagger.py` with explanatory comment for minimal-deploy environments where the stubs aren't installed
@@ -1112,7 +1112,7 @@
 
 ---
 
-## E-27: Memory Policy Layer [backlog]
+## E-27: Memory Policy Layer [done]
 
 > Per-discovery operator-controlled lifecycle policy: pinning, importance/salience scoring, bucketed decay, recall-feedback loop, and high-importance event hook. Augments E-09/E-11/E-20/E-21 by adding per-item policy on top of the existing file-system + capture pipeline.
 >
@@ -1132,7 +1132,7 @@
 - [ ] T-218: Register `depthfusion_pin_discovery` in `mcp/server.py`
 - [ ] T-219: Author `tests/test_capture/test_pin.py`
 
-### S-70: As a discovery, I want separate `importance` and `salience` scalars so that lifecycle policy can weigh intrinsic value distinctly from recent usefulness `P1` `M`
+### S-70: As a discovery, I want separate `importance` and `salience` scalars so that lifecycle policy can weigh intrinsic value distinctly from recent usefulness `P1` `M` [done]
 
 > **Foundational story.** S-71 (decay buckets), S-72 (recall feedback), and S-73 (high-importance hook) all depend on this landing first.
 
@@ -1169,7 +1169,7 @@
 - [ ] T-227: Env-var plumbing in `core/config.py`
 - [ ] T-228: Tests in `tests/test_capture/test_decay.py`
 
-### S-72: As a recall caller, I want a feedback loop so that the system learns which surfaced chunks were actually useful `P1` `M`
+### S-72: As a recall caller, I want a feedback loop so that the system learns which surfaced chunks were actually useful `P1` `M` [done]
 
 > Depends on S-70. **Done** — 3 commits (f031766, 024ff3c, 31717a2). Consensus log: `docs/reviews/2026-05-01-s72-consensus.md`.
 

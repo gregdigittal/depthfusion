@@ -13,8 +13,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from depthfusion.install.install import _register_mcp_server
 
 

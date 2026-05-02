@@ -9,13 +9,12 @@ and uses ``monkeypatch`` so env-var changes don't bleed between tests.
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import pytest
 
-from depthfusion.capture.decay import apply_decay, DecaySummary
-
+from depthfusion.capture.decay import apply_decay
 
 # ------------------------------------------------------------------
 # Helpers

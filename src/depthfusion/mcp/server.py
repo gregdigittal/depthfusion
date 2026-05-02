@@ -528,7 +528,10 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             _load_file(md_file, "memory")
 
     if not raw_blocks:
-        return json.dumps({"query": query, "blocks": [], "recall_id": None, "message": "No session context available"})
+        return json.dumps({
+            "query": query, "blocks": [], "recall_id": None,
+            "message": "No session context available",
+        })
 
     # S-52 T-161: apply project-scoped filter before scoring so BM25 IDF
     # weights are computed against the filtered corpus, not the full
@@ -1123,9 +1126,8 @@ def _tool_set_memory_score(arguments: dict) -> str:
         })
 
     from depthfusion.capture.dedup import extract_memory_score
-    from depthfusion.core.types import MemoryScore
-
     from depthfusion.core.file_locking import atomic_frontmatter_rewrite
+    from depthfusion.core.types import MemoryScore
 
     try:
         with atomic_frontmatter_rewrite(target) as ctx:

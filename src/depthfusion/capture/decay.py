@@ -38,7 +38,7 @@ import logging
 import re
 import shutil
 from dataclasses import dataclass, field
-from datetime import date, timezone
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -169,7 +169,10 @@ def apply_decay(
         return summary
 
     try:
-        files = sorted(f for f in out_dir.iterdir() if f.is_file() and f.suffix == ".md" and not f.name.startswith("."))
+        files = sorted(
+            f for f in out_dir.iterdir()
+            if f.is_file() and f.suffix == ".md" and not f.name.startswith(".")
+        )
     except OSError as exc:
         logger.debug("apply_decay: could not list %s: %s", out_dir, exc)
         return summary

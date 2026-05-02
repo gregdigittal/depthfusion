@@ -15,16 +15,13 @@ Additional tests cover:
 from __future__ import annotations
 
 import json
-import time
 import os
+import time
 from pathlib import Path
 
-import pytest
-
-from depthfusion.core.file_locking import _splice_pin_frontmatter
 from depthfusion.capture.pruner import _is_pinned, identify_candidates
-from depthfusion.mcp.server import _tool_pin_discovery, TOOLS, _TOOL_FLAGS, get_enabled_tools
-
+from depthfusion.core.file_locking import _splice_pin_frontmatter
+from depthfusion.mcp.server import _TOOL_FLAGS, TOOLS, _tool_pin_discovery, get_enabled_tools
 
 # ---------------------------------------------------------------------------
 # Helper

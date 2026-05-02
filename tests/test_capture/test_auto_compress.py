@@ -4,13 +4,10 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from depthfusion.capture.compressor import idle_sessions, SessionCompressor
-
+from depthfusion.capture.compressor import idle_sessions
 
 # ---------------------------------------------------------------------------
 # idle_sessions — core idle detection

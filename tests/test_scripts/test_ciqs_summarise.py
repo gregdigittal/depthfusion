@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
 

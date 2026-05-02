@@ -1,7 +1,5 @@
 """Tests for S-73 high-importance event hook (capture/event_hook.py)."""
 import json
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 

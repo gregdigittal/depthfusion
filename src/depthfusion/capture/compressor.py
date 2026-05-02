@@ -6,7 +6,6 @@ Idempotent: skips files already compressed (output file exists).
 from __future__ import annotations
 
 import logging
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional

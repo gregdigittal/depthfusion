@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).parent.parent.parent / "scripts"
 
 
@@ -370,8 +369,8 @@ class TestFormatReport:
 class TestMainExitCodes:
     def test_exit_zero_when_no_data_and_no_regressions(self, weekly, monkeypatch, tmp_path):
         # Force aggregator to return empty for everything
-        from depthfusion.metrics.collector import MetricsCollector
         from depthfusion.metrics.aggregator import MetricsAggregator
+        from depthfusion.metrics.collector import MetricsCollector
 
         class _Empty(MetricsAggregator):
             def backend_summary(self, target_date=None):

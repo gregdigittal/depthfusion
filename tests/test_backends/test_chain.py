@@ -17,7 +17,6 @@ from depthfusion.backends.base import (
 )
 from depthfusion.backends.chain import FallbackChain
 
-
 # --------------------------------------------------------------------------
 # Fake backends
 # --------------------------------------------------------------------------

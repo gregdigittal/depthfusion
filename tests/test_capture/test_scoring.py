@@ -75,8 +75,11 @@ def _probe_extractor_wiring_lazy() -> bool:
     try:
         import tempfile
         from pathlib import Path as _P
+
         from depthfusion.capture.decision_extractor import (
             DecisionEntry as _DE,
+        )
+        from depthfusion.capture.decision_extractor import (
             write_decisions as _wd,
         )
         with tempfile.TemporaryDirectory() as td:
@@ -123,6 +126,7 @@ def _probe_publish_wiring_lazy() -> bool:
         return False
     try:
         import inspect as _inspect
+
         from depthfusion.core.types import ContextItem as _CI
         sig = _inspect.signature(_CI)
         return "importance" in sig.parameters

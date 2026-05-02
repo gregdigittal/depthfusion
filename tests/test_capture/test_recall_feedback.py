@@ -29,10 +29,10 @@ except ImportError:
 
 try:
     from depthfusion.core.feedback import (
-        RecallStore,
+        IGNORED_DECAY,
         RECALL_TTL_SECONDS,
         USED_BOOST,
-        IGNORED_DECAY,
+        RecallStore,
     )
     FEEDBACK_AVAILABLE = True
 except ImportError:

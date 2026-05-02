@@ -24,8 +24,8 @@ from typing import Iterator, Optional
 
 def _splice_memory_score_frontmatter(
     body: str,
-    importance: float,
-    salience: float,
+    importance: Optional[float],
+    salience: Optional[float],
     last_decay_date: Optional[str] = None,
 ) -> str:
     """Return ``body`` with importance/salience (and optionally last_decay_date)
@@ -41,8 +41,8 @@ def _splice_memory_score_frontmatter(
     has no dependency on the MCP layer.  S-71 added the optional
     ``last_decay_date`` parameter.
     """
-    imp_line = f"importance: {importance:.4f}"
-    sal_line = f"salience: {salience:.4f}"
+    imp_line = f"importance: {importance:.4f}" if importance is not None else "importance: 0.5000"
+    sal_line = f"salience: {salience:.4f}" if salience is not None else "salience: 0.5000"
 
     fm_re = re.compile(r"\A(---\s*\n)(.*?)(\n---\s*(?:\n|\Z))", re.DOTALL)
     m = fm_re.match(body)
