@@ -1074,7 +1074,7 @@
 **Tasks:**
 - [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
 - [x] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`) — linear-interpolated percentile, deterministic bootstrap CI, per-category stats table + raw dump; `docs/benchmarks/README.md` documents the three-stage flow
-- [~] T-201: Commit baseline 3-run for each of local / vps-cpu under `docs/benchmarks/` (vps-gpu run blocked on VPS migration — S-43/S-44 era) — **local 3-run committed 2026-05-02 (raw JSONL + scoring templates); vps-cpu run pending; vps-gpu run tracked in S-66**
+- [x] T-201: Commit baseline 3-run for each of local / vps-cpu / vps-gpu under `docs/benchmarks/` — **all three modes committed 2026-05-02; vps-gpu via S-66 on hetzner-gpu (RTX 4000 SFF Ada)**
 
 ### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
 
@@ -1088,16 +1088,16 @@
 - [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) is the remaining labour.
 - [x] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow) — 175-line methodology doc + per-set READMEs covering schema, edge cases, running the measurements
 
-### S-66: As a post-migration operator, I want a vps-gpu CIQS baseline so that the S-43/S-44 latency and quality ACs can be validated on the real GPU hardware `P1` `S`
+### S-66: As a post-migration operator, I want a vps-gpu CIQS baseline so that the S-43/S-44 latency and quality ACs can be validated on the real GPU hardware `P1` `S` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: 3-run CIQS battery executed on vps-gpu mode against the live Hetzner GEX44 host; scored JSONL + summary markdown committed under `docs/benchmarks/`
-- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus)
-- [ ] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`)
+- [x] AC-1: 3-run CIQS battery executed on vps-gpu mode against the live Hetzner GEX44 host; scored JSONL + summary markdown committed under `docs/benchmarks/` — **committed 2026-05-02 (commits 2136d91, 541e37d)**
+- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) — **deferred to post-dogfood (S-65): scoring sparse; p95 latency requires harness instrumentation**
+- [ ] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`) — **deferred: same blocker as AC-2**
 
 **Tasks:**
-- [ ] T-206: Execute 3-run baseline via `scripts/ciqs_harness.py --mode vps-gpu` after §4e of the GPU migration runbook
-- [ ] T-207: Commit scored JSONL + summary + post-migration entry under `docs/runbooks/dogfood-reports/` referencing the specific hardware (GEX44 / RTX 4000 SFF Ada)
+- [x] T-206: Execute 3-run baseline via `scripts/ciqs_harness.py --mode vps-gpu` after §4e of the GPU migration runbook
+- [x] T-207: Commit scored JSONL + summary + post-migration entry under `docs/runbooks/dogfood-reports/` referencing the specific hardware (GEX44 / RTX 4000 SFF Ada)
 
 ---
 
