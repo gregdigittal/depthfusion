@@ -1,6 +1,7 @@
-"""Graph storage backends: JSON (local), SQLite (vps-tier1)."""
+"""Graph storage backends: JSON (local), SQLite (vps-tier1), ChromaDB (Tier 2)."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import sqlite3
@@ -283,18 +284,189 @@ class SQLiteGraphStore:
         return self._conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
 
 
+_DEFAULT_CHROMA_DB_PATH = Path.home() / ".claude" / "depthfusion-graph-chroma"
+_DEFAULT_CHROMA_EDGE_DB_PATH = Path.home() / ".claude" / "depthfusion-graph-chroma-edges.db"
+
+
+def _chroma_available() -> bool:
+    return importlib.util.find_spec("chromadb") is not None
+
+
+class ChromaGraphStore:
+    """ChromaDB-backed entity store with SQLite sidecar for edges.
+
+    Entities are stored in a ChromaDB collection, enabling semantic entity
+    search over names and types. Edges are stored in a SQLite sidecar (edges
+    are relational, not vector-searchable).
+
+    Requires the `chromadb` package (installed as part of the [vps-gpu] extra).
+    When chromadb is unavailable, get_store() falls back to SQLiteGraphStore.
+
+    S-39: AC-1 (ChromaDB entity collection), AC-2 (factory selects when Tier 2 active).
+    """
+
+    def __init__(
+        self,
+        chroma_path: Path | None = None,
+        edge_db_path: Path | None = None,
+    ):
+        import chromadb  # noqa: PLC0415 — lazy import; package is optional
+
+        self._chroma_path = chroma_path or _DEFAULT_CHROMA_DB_PATH
+        self._chroma_path.mkdir(parents=True, exist_ok=True)
+        self._client = chromadb.PersistentClient(path=str(self._chroma_path))
+        self._collection = self._client.get_or_create_collection(
+            name="entities",
+            metadata={"hnsw:space": "cosine"},
+        )
+
+        # SQLite sidecar for edges — same schema as SQLiteGraphStore.edges
+        edge_path = edge_db_path or _DEFAULT_CHROMA_EDGE_DB_PATH
+        self._edge_conn = sqlite3.connect(str(edge_path), check_same_thread=False)
+        self._edge_conn.execute("""
+            CREATE TABLE IF NOT EXISTS edges (
+                edge_id TEXT PRIMARY KEY,
+                source_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                relationship TEXT NOT NULL,
+                weight REAL NOT NULL DEFAULT 1.0,
+                signals TEXT NOT NULL DEFAULT '[]',
+                metadata TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
+        self._edge_conn.commit()
+
+    # ------------------------------------------------------------------
+    # Entities (ChromaDB)
+    # ------------------------------------------------------------------
+
+    def upsert_entity(self, entity: Entity) -> None:
+        if entity.confidence < _min_confidence():
+            return
+        meta = {
+            "name": entity.name,
+            "type": entity.type,
+            "project": entity.project,
+            "source_files": json.dumps(entity.source_files),
+            "confidence": entity.confidence,
+            "first_seen": entity.first_seen,
+            "extra_metadata": json.dumps(entity.metadata),
+        }
+        # Use entity name as document text for semantic search
+        self._collection.upsert(
+            ids=[entity.entity_id],
+            documents=[entity.name],
+            metadatas=[meta],
+        )
+
+    def get_entity(self, entity_id: str) -> Entity | None:
+        result = self._collection.get(ids=[entity_id], include=["metadatas", "documents"])
+        if not result["ids"]:
+            return None
+        m = result["metadatas"][0]
+        return Entity(
+            entity_id=entity_id,
+            name=m["name"],
+            type=m["type"],
+            project=m["project"],
+            source_files=json.loads(m["source_files"]),
+            confidence=float(m["confidence"]),
+            first_seen=m["first_seen"],
+            metadata=json.loads(m.get("extra_metadata", "{}")),
+        )
+
+    def all_entities(self) -> list[Entity]:
+        result = self._collection.get(include=["metadatas"])
+        entities = []
+        for eid, m in zip(result["ids"], result["metadatas"]):
+            entities.append(Entity(
+                entity_id=eid,
+                name=m["name"],
+                type=m["type"],
+                project=m["project"],
+                source_files=json.loads(m["source_files"]),
+                confidence=float(m["confidence"]),
+                first_seen=m["first_seen"],
+                metadata=json.loads(m.get("extra_metadata", "{}")),
+            ))
+        return entities
+
+    def node_count(self) -> int:
+        return self._collection.count()
+
+    # ------------------------------------------------------------------
+    # Edges (SQLite sidecar)
+    # ------------------------------------------------------------------
+
+    def upsert_edge(self, edge: Edge) -> None:
+        self._edge_conn.execute(
+            """
+            INSERT OR REPLACE INTO edges
+                (edge_id, source_id, target_id, relationship, weight, signals, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                edge.edge_id, edge.source_id, edge.target_id,
+                edge.relationship, edge.weight,
+                json.dumps(edge.signals), json.dumps(edge.metadata),
+            ),
+        )
+        self._edge_conn.commit()
+
+    def get_edges(
+        self, entity_id: str, relationship_filter: list[str] | None = None
+    ) -> list[Edge]:
+        if relationship_filter:
+            placeholders = ",".join("?" * len(relationship_filter))
+            rows = self._edge_conn.execute(
+                f"""
+                SELECT edge_id, source_id, target_id, relationship, weight, signals, metadata
+                FROM edges
+                WHERE (source_id = ? OR target_id = ?)
+                  AND relationship IN ({placeholders})
+                """,
+                [entity_id, entity_id, *relationship_filter],
+            ).fetchall()
+        else:
+            rows = self._edge_conn.execute(
+                """
+                SELECT edge_id, source_id, target_id, relationship, weight, signals, metadata
+                FROM edges WHERE source_id = ? OR target_id = ?
+                """,
+                (entity_id, entity_id),
+            ).fetchall()
+        return [
+            Edge(
+                edge_id=r[0], source_id=r[1], target_id=r[2],
+                relationship=r[3], weight=r[4],
+                signals=json.loads(r[5]), metadata=json.loads(r[6]),
+            )
+            for r in rows
+        ]
+
+    def edge_count(self) -> int:
+        return self._edge_conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
+
+
 def get_store(
     graph_json_path: Path | None = None,
     graph_db_path: Path | None = None,
     corpus_size: int = 0,
-) -> "JSONGraphStore | SQLiteGraphStore":
-    """Return the appropriate store backend based on DEPTHFUSION_MODE and corpus size.
+    chroma_path: Path | None = None,
+    chroma_edge_db_path: Path | None = None,
+) -> "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore":
+    """Return the appropriate store backend based on DEPTHFUSION_MODE and Tier 2 status.
 
-    Local mode → JSONGraphStore
-    VPS + corpus < 500 → SQLiteGraphStore
-    VPS + corpus >= 500 → SQLiteGraphStore (ChromaDB extension future work)
+    local → JSONGraphStore
+    vps-cpu / vps (alias) → SQLiteGraphStore
+    vps-gpu (Tier 2 active) + chromadb available → ChromaGraphStore
+    vps-gpu + chromadb unavailable → SQLiteGraphStore (fallback)
     """
-    mode = os.environ.get("DEPTHFUSION_MODE", "local")
-    if mode != "vps":
-        return JSONGraphStore(path=graph_json_path)
-    return SQLiteGraphStore(path=graph_db_path)
+    mode = os.environ.get("DEPTHFUSION_MODE", "local").strip().lower()
+    if mode == "vps":
+        mode = "vps-cpu"  # legacy alias
+    if mode == "vps-gpu" and _chroma_available():
+        return ChromaGraphStore(chroma_path=chroma_path, edge_db_path=chroma_edge_db_path)
+    if mode in ("vps-cpu", "vps-gpu"):
+        return SQLiteGraphStore(path=graph_db_path)
+    return JSONGraphStore(path=graph_json_path)

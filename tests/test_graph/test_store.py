@@ -1,7 +1,12 @@
 """Tests for graph store backends."""
 import pytest
 
-from depthfusion.graph.store import JSONGraphStore, SQLiteGraphStore, get_store
+from depthfusion.graph.store import (
+    ChromaGraphStore,
+    JSONGraphStore,
+    SQLiteGraphStore,
+    get_store,
+)
 from depthfusion.graph.types import Entity
 
 
@@ -154,6 +159,12 @@ def test_get_store_returns_sqlite_in_vps_tier1(tmp_path, monkeypatch):
     assert isinstance(store, SQLiteGraphStore)
 
 
+def test_get_store_returns_sqlite_in_vps_cpu(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
+    store = get_store(graph_db_path=tmp_path / "g.db")
+    assert isinstance(store, SQLiteGraphStore)
+
+
 # ---- Confidence threshold tests ----
 
 def _low_confidence_entity(base: "Entity") -> "Entity":
@@ -263,3 +274,142 @@ class TestSQLiteStoreConfidenceThreshold:
         low = _low_confidence_entity(sample_entity)
         store.upsert_entity(low)
         assert store.get_entity(low.entity_id) is None
+
+
+# ---------------------------------------------------------------------------
+# S-39: ChromaGraphStore — entity collection + SQLite edge sidecar
+# ---------------------------------------------------------------------------
+
+chromadb = pytest.importorskip("chromadb", reason="chromadb not installed")
+
+
+@pytest.fixture
+def chroma_store(tmp_path):
+    return ChromaGraphStore(
+        chroma_path=tmp_path / "chroma",
+        edge_db_path=tmp_path / "edges.db",
+    )
+
+
+class TestChromaGraphStore:
+    def test_upsert_and_get_entity(self, chroma_store, sample_entity):
+        chroma_store.upsert_entity(sample_entity)
+        result = chroma_store.get_entity(sample_entity.entity_id)
+        assert result is not None
+        assert result.name == "TierManager"
+        assert result.type == "class"
+        assert result.project == "depthfusion"
+
+    def test_get_missing_entity_returns_none(self, chroma_store):
+        assert chroma_store.get_entity("nonexistent") is None
+
+    def test_upsert_entity_twice_updates(self, chroma_store, sample_entity):
+        chroma_store.upsert_entity(sample_entity)
+        updated = Entity(
+            entity_id=sample_entity.entity_id,
+            name=sample_entity.name,
+            type=sample_entity.type,
+            project=sample_entity.project,
+            source_files=["memory/new.md"],
+            confidence=0.95,
+            first_seen=sample_entity.first_seen,
+            metadata={},
+        )
+        chroma_store.upsert_entity(updated)
+        result = chroma_store.get_entity(sample_entity.entity_id)
+        assert result.confidence == pytest.approx(0.95)
+
+    def test_all_entities_empty(self, chroma_store):
+        assert chroma_store.all_entities() == []
+
+    def test_all_entities_returns_all(self, chroma_store, sample_entity, sample_entity_b):
+        chroma_store.upsert_entity(sample_entity)
+        chroma_store.upsert_entity(sample_entity_b)
+        entities = chroma_store.all_entities()
+        assert len(entities) == 2
+        ids = {e.entity_id for e in entities}
+        assert sample_entity.entity_id in ids
+        assert sample_entity_b.entity_id in ids
+
+    def test_node_count(self, chroma_store, sample_entity, sample_entity_b):
+        chroma_store.upsert_entity(sample_entity)
+        chroma_store.upsert_entity(sample_entity_b)
+        assert chroma_store.node_count() == 2
+
+    def test_upsert_and_get_edge(
+        self, chroma_store, sample_entity, sample_entity_b, sample_edge
+    ):
+        chroma_store.upsert_entity(sample_entity)
+        chroma_store.upsert_entity(sample_entity_b)
+        chroma_store.upsert_edge(sample_edge)
+        edges = chroma_store.get_edges(sample_entity.entity_id)
+        assert len(edges) == 1
+        assert edges[0].relationship == "CO_OCCURS"
+
+    def test_get_edges_relationship_filter(
+        self, chroma_store, sample_entity, sample_entity_b, sample_edge
+    ):
+        chroma_store.upsert_entity(sample_entity)
+        chroma_store.upsert_entity(sample_entity_b)
+        chroma_store.upsert_edge(sample_edge)
+        edges = chroma_store.get_edges(
+            sample_entity.entity_id, relationship_filter=["CO_OCCURS"]
+        )
+        assert len(edges) == 1
+        empty = chroma_store.get_edges(
+            sample_entity.entity_id, relationship_filter=["DEPENDS_ON"]
+        )
+        assert empty == []
+
+    def test_edge_count(
+        self, chroma_store, sample_entity, sample_entity_b, sample_edge
+    ):
+        chroma_store.upsert_entity(sample_entity)
+        chroma_store.upsert_entity(sample_entity_b)
+        chroma_store.upsert_edge(sample_edge)
+        assert chroma_store.edge_count() == 1
+
+    def test_low_confidence_entity_not_stored(
+        self, chroma_store, sample_entity, monkeypatch
+    ):
+        monkeypatch.delenv("DEPTHFUSION_GRAPH_MIN_CONFIDENCE", raising=False)
+        low = _low_confidence_entity(sample_entity)
+        chroma_store.upsert_entity(low)
+        assert chroma_store.get_entity(low.entity_id) is None
+        assert chroma_store.node_count() == 0
+
+    def test_entity_metadata_roundtrips(self, chroma_store, sample_entity):
+        entity_with_meta = Entity(
+            entity_id=sample_entity.entity_id,
+            name=sample_entity.name,
+            type=sample_entity.type,
+            project=sample_entity.project,
+            source_files=["a.md", "b.md"],
+            confidence=1.0,
+            first_seen=sample_entity.first_seen,
+            metadata={"key": "value", "count": 3},
+        )
+        chroma_store.upsert_entity(entity_with_meta)
+        result = chroma_store.get_entity(entity_with_meta.entity_id)
+        assert result.source_files == ["a.md", "b.md"]
+        assert result.metadata == {"key": "value", "count": 3}
+
+
+class TestGetStoreChromaFactory:
+    def test_vps_gpu_with_chroma_returns_chroma_store(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+        store = get_store(
+            chroma_path=tmp_path / "chroma",
+            chroma_edge_db_path=tmp_path / "edges.db",
+        )
+        assert isinstance(store, ChromaGraphStore)
+
+    def test_vps_gpu_without_chroma_falls_back_to_sqlite(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEPTHFUSION_MODE", "vps-gpu")
+        monkeypatch.setattr(
+            "depthfusion.graph.store._chroma_available", lambda: False
+        )
+        store = get_store(graph_db_path=tmp_path / "g.db")
+        assert isinstance(store, SQLiteGraphStore)

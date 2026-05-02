@@ -138,7 +138,7 @@
 **Acceptance criteria:**
 - [x] AC-1: C1-C11 checks runnable via `python -m depthfusion.analyzer.compatibility`
 - [x] AC-2: Status: 10 GREEN / 1 YELLOW (C4 — benign postcss artifact)
-- [ ] AC-3: Close the C4 YELLOW to reach full GREEN
+- [x] AC-3: Close the C4 YELLOW to reach full GREEN — C4 GREEN confirmed 2026-05-02
 
 **Tasks:**
 - [x] T-31: Implement all 11 compatibility checks
@@ -588,12 +588,12 @@
 ### S-39: As a future migration, I want ChromaDB entity-collection support for the graph so that Tier 2 exploits vector search over entity embeddings `P3` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Third graph store backend: ChromaDB entity collection
-- [ ] AC-2: `get_store()` factory selects it when Tier 2 active
+- [x] AC-1: Third graph store backend: ChromaDB entity collection
+- [x] AC-2: `get_store()` factory selects it when Tier 2 active
 
 **Tasks:**
-- [ ] T-112: Implement ChromaDB `GraphStore` backend
-- [ ] T-113: Extend factory
+- [x] T-112: Implement ChromaDB `GraphStore` backend
+- [x] T-113: Extend factory
 
 ### S-40: As the graph linker, I want a confidence threshold so that noisy entities (<0.7) are filtered before persistence `P3` `XS`
 
