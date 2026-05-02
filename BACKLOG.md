@@ -494,74 +494,74 @@
 
 ---
 
-## E-16: SkillForge Integration [backlog]
+## E-16: SkillForge Integration [active]
 
-> Integrate DepthFusion retrieval/fusion primitives into SkillForge via 5 non-destructive seams. Full spec in `docs/skillforge-integration-plan.md`. **Awaiting approval** — no SkillForge code changed yet.
+> Integrate DepthFusion retrieval/fusion primitives into SkillForge via 5 non-destructive seams. Full spec in `docs/skillforge-integration-plan.md`. Most seams already wired in SkillForge; 3 ACs remain open across S-32/S-33/S-34 + S-35 HTTP sidecar.
 
 ### S-32: As SkillForge, I want attention-weighted vector retrieval so that session blocks are weighted by recency + source reliability `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `scoring.py` + `weighted.py` ported to TypeScript under `packages/runtime/src/fusion/`
-- [ ] AC-2: AttnRes layer injected at `vector-store.ts:165` (Seam C)
-- [ ] AC-3: Trajectory telemetry added (Seam E5)
-- [ ] AC-4: SkillForge test suite stays GREEN
+- [x] AC-1: `scoring.py` + `weighted.py` ported to TypeScript under `packages/runtime/src/fusion/`
+- [x] AC-2: AttnRes layer injected at `vector-store.ts:165` (Seam C)
+- [ ] AC-3: Trajectory telemetry added (Seam E5) — EMA exists; time-decay scoring on trajectory depth not yet wired
+- [x] AC-4: SkillForge test suite stays GREEN (119 @depthfusion/core + 423 runtime, all pass)
 
 **Tasks:**
-- [ ] T-94: Port `scoring.py` → TS
-- [ ] T-95: Port `weighted.py` → TS
-- [ ] T-96: Inject at Seam C
+- [x] T-94: Port `scoring.py` → TS
+- [x] T-95: Port `weighted.py` → TS
+- [x] T-96: Inject at Seam C
 - [ ] T-97: Add trajectory telemetry (E5)
 
 ### S-33: As SkillForge's router, I want RRF × attention scoring so that flat scoring is replaced with fusion `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `rrf.py` + `reranker.py` ported to TypeScript
-- [ ] AC-2: `FusionStrategy` interface added at `phases.ts:97` (Seam A)
+- [x] AC-1: `rrf.py` + `reranker.py` ported to TypeScript
+- [x] AC-2: `FusionStrategy` interface added at `phases.ts:97` (Seam A)
 - [ ] AC-3: A/B validation: fusion scoring vs flat on recorded invocations
 
 **Tasks:**
-- [ ] T-98: Port RRF + reranker → TS
-- [ ] T-99: Add `FusionStrategy` interface at Seam A
+- [x] T-98: Port RRF + reranker → TS
+- [x] T-99: Add `FusionStrategy` interface at Seam A
 - [ ] T-100: A/B test harness
 
 ### S-34: As SkillForge's validator, I want semantic recall fallback so that past judgments match on similarity not just hash `P3` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `dispatcher.py` ported to TS
-- [ ] AC-2: `recallSimilarSemantic()` overload added at Seam B
-- [ ] AC-3: Existing exact-match path unchanged
+- [ ] AC-1: `dispatcher.py` ported to TS — `QueryDispatcher` routing logic not yet in TS; `recommendStrategy` in @depthfusion/core covers content-size routing only
+- [x] AC-2: `recallSimilarSemantic()` overload added at Seam B
+- [x] AC-3: Existing exact-match path unchanged
 
 **Tasks:**
 - [ ] T-101: Port dispatcher → TS
-- [ ] T-102: Add semantic recall overload
+- [x] T-102: Add semantic recall overload
 
 ### S-35: As SkillForge, I want `recursive_llm_call` step support so that Skill IR can express recursive reasoning `P3` `XL`
 
 **Acceptance criteria:**
-- [ ] AC-1: `recursive_llm_call` + `weighted_retrieval` step types added to Zod discriminatedUnion
-- [ ] AC-2: Retrieval quality validator implemented
-- [ ] AC-3: `routeSubCall()` method on `CapabilityRouter`
+- [x] AC-1: `recursive_llm_call` + `weighted_retrieval` step types added to Zod discriminatedUnion
+- [x] AC-2: Retrieval quality validator implemented
+- [x] AC-3: `routeSubCall()` method on `CapabilityRouter`
 - [ ] AC-4: `recursive/client.py` wrapped as HTTP sidecar service
 - [ ] AC-5: Blocked until SF-2 is stable (ordering constraint from plan)
 
 **Tasks:**
-- [ ] T-103: Extend Skill IR schema (E1, E2)
-- [ ] T-104: Retrieval quality validator (E3)
-- [ ] T-105: Implement `routeSubCall()` (E4)
+- [x] T-103: Extend Skill IR schema (E1, E2)
+- [x] T-104: Retrieval quality validator (E3)
+- [x] T-105: Implement `routeSubCall()` (E4)
 - [ ] T-106: HTTP sidecar for `recursive/client.py`
 
 ### S-36: As SkillForge's RL router, I want trajectory-level feedback + configurable budget allocation so that reward accumulates beyond step-level `P3` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `trajectory.py` + `strategies.py` ported to TS
-- [ ] AC-2: `LearnedRoutingState` at Seam D (Phase 4 RL stub)
-- [ ] AC-3: `ContextAllocationStrategy` interface at Seam E (`types.ts:23`)
-- [ ] AC-4: Default const preserved as backwards-compatible implementation
+- [x] AC-1: `trajectory.py` + `strategies.py` ported to TS
+- [x] AC-2: `LearnedRoutingState` at Seam D (Phase 4 RL stub)
+- [x] AC-3: `ContextAllocationStrategy` interface at Seam E (`types.ts:23`)
+- [x] AC-4: Default const preserved as backwards-compatible implementation
 
 **Tasks:**
-- [ ] T-107: Port trajectory + strategies → TS
-- [ ] T-108: Add `LearnedRoutingState` (Seam D)
-- [ ] T-109: Add `ContextAllocationStrategy` interface (Seam E)
+- [x] T-107: Port trajectory + strategies → TS
+- [x] T-108: Add `LearnedRoutingState` (Seam D)
+- [x] T-109: Add `ContextAllocationStrategy` interface (Seam E)
 
 ---
 
