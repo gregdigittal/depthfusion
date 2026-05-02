@@ -24,6 +24,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -71,6 +73,18 @@ _VPS_GPU_ENV_LINES = [
     "DEPTHFUSION_EMBEDDING_BACKEND=local",
 ]
 
+# Keys that the installer owns across all three modes. When merging with an
+# existing env file, only these keys are ever updated; all others are treated
+# as user-authored and preserved verbatim.  (S-68 AC-2)
+_INSTALLER_MANAGED_KEYS: frozenset[str] = frozenset({
+    "DEPTHFUSION_MODE",
+    "DEPTHFUSION_TIER_AUTOPROMOTE",
+    "DEPTHFUSION_RERANKER_ENABLED",
+    "DEPTHFUSION_GRAPH_ENABLED",
+    "DEPTHFUSION_EMBEDDING_BACKEND",
+    "DEPTHFUSION_TIER_THRESHOLD",
+})
+
 # Substrings that identify documented placeholder API-key values. The
 # factory's health check already rejects these at runtime (fall-through
 # to NullBackend), but catching them at install and recommend time
@@ -114,6 +128,7 @@ def install_local(dry_run: bool = False) -> None:
     if not dry_run:
         _write_env_config(_LOCAL_ENV_LINES)
         _register_hooks()
+        _register_mcp_server()
     _print_step("Local install complete.", dry_run)
     _print_step("Add to your environment: DEPTHFUSION_MODE=local", dry_run)
 
@@ -139,6 +154,7 @@ def install_vps_cpu(dry_run: bool = False, tier_threshold: int = 500) -> None:
         env_lines.append(f"DEPTHFUSION_TIER_THRESHOLD={tier_threshold}")
         _write_env_config(env_lines)
         _register_hooks()
+        _register_mcp_server()
         _check_depthfusion_api_key()
     _print_step("VPS-CPU install complete.", dry_run)
     _print_step(
@@ -215,6 +231,7 @@ def install_vps_gpu(
         env_lines.append(f"DEPTHFUSION_TIER_THRESHOLD={tier_threshold}")
         _write_env_config(env_lines)
         _register_hooks()
+        _register_mcp_server()
         _check_sentence_transformers_installed()
         # S-62 / T-197: run the vps-gpu-specific smoke test immediately
         # after env-write so driver/SDK/extras gaps surface at install
@@ -249,11 +266,138 @@ def install_vps_gpu(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _parse_env_file(path: Path) -> list[tuple[str | None, str | None, str]]:
+    """Parse an env file into (key, value, raw_line) tuples.
+
+    Comments and blank lines have key=None, value=None.
+    The raw_line preserves the original text (no trailing newline).
+    """
+    result = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            result.append((None, None, line))
+        elif "=" in line:
+            key, _, value = line.partition("=")
+            result.append((key.strip(), value, line))
+        else:
+            result.append((None, None, line))
+    return result
+
+
 def _write_env_config(lines: list[str]) -> None:
+    """Write (or merge-update) the DepthFusion env file.
+
+    On a fresh install (no existing file): writes lines directly — byte-identical
+    to the pre-S-68 behaviour (preserves S-42 AC-6 regression contract).
+
+    On re-install (existing file present): merges — installer-managed keys are
+    updated in place; user-authored keys are preserved verbatim; comments and
+    blank lines are kept in their original positions.  (S-68)
+    """
     env_file = Path.home() / ".claude" / "depthfusion.env"
     env_file.parent.mkdir(parents=True, exist_ok=True)
-    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  Wrote config: {env_file}")
+
+    new_env: dict[str, str] = {}
+    for line in lines:
+        if "=" in line:
+            k, _, v = line.partition("=")
+            new_env[k.strip()] = v
+
+    if not env_file.exists():
+        env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"  Wrote config: {env_file}")
+        return
+
+    # Merge path: preserve existing structure, update managed keys.
+    old_mode = env_file.stat().st_mode
+    parsed = _parse_env_file(env_file)
+    out_lines: list[str] = []
+    placed: set[str] = set()
+
+    for key, old_val, raw in parsed:
+        if key is None:
+            out_lines.append(raw)
+        elif key in new_env:
+            new_val = new_env[key]
+            if old_val != new_val:
+                print(f"  Updating {key}: {old_val!r} → {new_val!r}")
+            out_lines.append(f"{key}={new_val}")
+            placed.add(key)
+        else:
+            out_lines.append(raw)
+
+    for k, v in new_env.items():
+        if k not in placed:
+            out_lines.append(f"{k}={v}")
+
+    env_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    os.chmod(env_file, old_mode)
+    print(f"  Updated config: {env_file}")
+
+
+def _register_mcp_server(dry_run: bool = False) -> None:
+    """Register the DepthFusion MCP server with the Claude CLI.  (S-67)
+
+    Idempotent: skips if already registered. Prints manual command if CLI
+    is absent. Non-fatal: a failed registration never aborts the install.
+    """
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        print(
+            "  claude CLI not found — register the MCP server manually:\n"
+            f"    claude mcp add depthfusion --scope user -- "
+            f"{sys.executable} -m depthfusion.mcp.server"
+        )
+        return
+
+    # Idempotency probe: check settings.json mcpServers key.
+    settings_path = _settings_path()
+    already_registered = False
+    if settings_path.exists():
+        try:
+            with open(settings_path) as f:
+                settings = json.load(f)
+            already_registered = "depthfusion" in settings.get("mcpServers", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    if already_registered:
+        print("  MCP server already registered — skipping.")
+        return
+
+    if dry_run:
+        print(
+            f"  [DRY-RUN] Would register MCP: claude mcp add depthfusion "
+            f"--scope user -- {sys.executable} -m depthfusion.mcp.server"
+        )
+        return
+
+    cmd = [
+        claude_bin, "mcp", "add", "depthfusion",
+        "--scope", "user",
+        "--", sys.executable, "-m", "depthfusion.mcp.server",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            print("  Registered DepthFusion MCP server.")
+        else:
+            print(
+                f"  Warning: claude mcp add returned {result.returncode}. "
+                f"Register manually:\n"
+                f"    claude mcp add depthfusion --scope user -- "
+                f"{sys.executable} -m depthfusion.mcp.server"
+            )
+            if result.stderr:
+                print(f"  stderr: {result.stderr.strip()}")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(
+            f"  Warning: could not invoke claude CLI ({exc}). "
+            "Register manually:\n"
+            f"    claude mcp add depthfusion --scope user -- "
+            f"{sys.executable} -m depthfusion.mcp.server"
+        )
 
 
 def _register_hooks() -> None:

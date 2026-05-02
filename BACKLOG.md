@@ -604,7 +604,7 @@
 **Tasks:**
 - [x] T-114: Enforce confidence threshold at `graph/store.py` write path
 
-### S-68: As a user re-running the installer, I want it to preserve my user-authored env file content so that my API key + custom flags aren't silently deleted `P1` `S`
+### S-68: As a user re-running the installer, I want it to preserve my user-authored env file content so that my API key + custom flags aren't silently deleted `P1` `S` [done]
 
 > Surfaced 2026-04-22 during the Hetzner walk-through. Current
 > `_write_env_config()` in `src/depthfusion/install/install.py`
@@ -662,7 +662,7 @@
 
 ---
 
-### S-67: As a new user, I want the installer to register the MCP server automatically so that DepthFusion tools are usable in Claude Code without a separate `claude mcp add` step `P2` `S`
+### S-67: As a new user, I want the installer to register the MCP server automatically so that DepthFusion tools are usable in Claude Code without a separate `claude mcp add` step `P2` `S` [done]
 
 > Surfaced 2026-04-21 while answering "do I need to enable per session?" — the installer writes env config and registers compaction hooks, but **does not** register the DepthFusion MCP server with Claude Code. The current `vps-cpu-quickstart.md` and `vps-gpu-quickstart.md` have a dedicated "Register the MCP server" step (§3/§4 respectively) as a workaround. This story folds that step back into the installer.
 
