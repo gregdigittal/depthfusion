@@ -1231,7 +1231,7 @@
 
 ---
 
-## E-28: Tier-1 Engagement Audit & Introspection Surface [backlog]
+## E-28: Tier-1 Engagement Audit & Introspection Surface [done]
 
 > Verify why graph subsystems (E-11) and embedding-augmented recall (E-19/S-43) don't engage on `vps-tier1` despite being code-complete and env-flagged on, then add MCP introspection so operators can tell what's running without reading source.
 >
@@ -1281,7 +1281,7 @@
 - [ ] T-249: New `depthfusion_inspect_discovery` MCP tool (gated on S-69 / S-70 frontmatter)
 - [ ] T-250: Tests in `tests/test_analyzer/test_introspection.py`
 
-### S-77: As an operator, I want `compress_session` and `auto_learn` to fire on a configurable cadence so that the capture pipeline doesn't depend on session-end memory `P3` `S`
+### S-77: As an operator, I want `compress_session` and `auto_learn` to fire on a configurable cadence so that the capture pipeline doesn't depend on session-end memory `P3` `S` [done]
 
 **Acceptance criteria:**
 - [ ] AC-1: New env var `DEPTHFUSION_AUTO_COMPRESS_HOURS` (default unset = manual only); when set, idle sessions older than N hours are compressed automatically.

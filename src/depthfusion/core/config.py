@@ -6,8 +6,9 @@ to disable any component without touching hook or MCP code.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 
 def _load_env_file() -> None:
@@ -46,6 +47,17 @@ def _env_float(key: str, default: float) -> float:
         return float(os.environ.get(key, ""))
     except (ValueError, TypeError):
         return default
+
+
+def _env_float_opt(key: str) -> Optional[float]:
+    """Return float if env var is set and valid, else None."""
+    val = os.environ.get(key, "").strip()
+    if not val:
+        return None
+    try:
+        return float(val)
+    except ValueError:
+        return None
 
 
 def _env_int(key: str, default: int) -> int:
@@ -98,6 +110,9 @@ class DepthFusionConfig:
     high_importance_threshold: float = 0.8
     event_log: str = "~/.claude/shared/depthfusion-events.jsonl"
 
+    # S-77 Auto-compress cadence (None = manual-only)
+    auto_compress_hours: Optional[float] = None
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -147,4 +162,5 @@ class DepthFusionConfig:
             event_log=os.environ.get(
                 "DEPTHFUSION_EVENT_LOG", "~/.claude/shared/depthfusion-events.jsonl"
             ),
+            auto_compress_hours=_env_float_opt("DEPTHFUSION_AUTO_COMPRESS_HOURS"),
         )

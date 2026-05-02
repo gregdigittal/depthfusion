@@ -6,13 +6,56 @@ Idempotent: skips files already compressed (output file exists).
 from __future__ import annotations
 
 import logging
+import time
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from depthfusion.capture.auto_learn import HaikuSummarizer, HeuristicExtractor
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_DISCOVERIES = Path.home() / ".claude" / "shared" / "discoveries"
+
+
+def idle_sessions(
+    sessions_dir: Path,
+    min_age_hours: float,
+    *,
+    now: Optional[datetime] = None,
+) -> list[Path]:
+    """Return .tmp session files whose mtime is older than min_age_hours.
+
+    A session is "idle" when it hasn't been written to in min_age_hours. This
+    is a pure read — it does not modify any files.
+
+    Args:
+        sessions_dir: Directory containing .tmp session files.
+        min_age_hours: Minimum age in hours before a session is considered idle.
+        now: Override current time (for testing). Defaults to UTC now.
+
+    Returns:
+        Sorted list (oldest first) of idle .tmp file paths.
+    """
+    if not sessions_dir.is_dir():
+        return []
+    if min_age_hours <= 0:
+        return []
+
+    cutoff_ts = (now or datetime.now(timezone.utc)).timestamp() - min_age_hours * 3600
+    candidates = []
+    for p in sessions_dir.iterdir():
+        if p.suffix != ".tmp":
+            continue
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            continue
+        if mtime <= cutoff_ts:
+            candidates.append((mtime, p))
+
+    candidates.sort()
+    return [p for _, p in candidates]
 
 
 class SessionCompressor:
