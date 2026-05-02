@@ -1157,17 +1157,17 @@
 > Depends on S-70.
 
 **Acceptance criteria:**
-- [ ] AC-1: Decay policy: pinned → 0 %/day, `importance ≥ 0.8` → 1 %/day, `≥ 0.5` → 2 %/day, `< 0.5` → 5 %/day. Decay applies to `salience`.
-- [ ] AC-2: Hard-archive threshold: when `salience < 0.05`, file is moved to `.archive/` immediately on next prune cycle regardless of age.
-- [ ] AC-3: Decay job runnable as `scripts/decay-job.py` (cron-friendly) or as a new MCP tool `depthfusion_apply_decay()`.
-- [ ] AC-4: All four bucket boundaries + threshold are env-configurable (`DEPTHFUSION_DECAY_RATE_HIGH`, `_MID`, `_LOW`, `_HARD_ARCHIVE_THRESHOLD`).
-- [ ] AC-5: ≥ 4 tests covering each bucket + the hard-archive case.
+- [x] AC-1: Decay policy: pinned → 0 %/day, `importance ≥ 0.8` → 1 %/day, `≥ 0.5` → 2 %/day, `< 0.5` → 5 %/day. Decay applies to `salience`.
+- [x] AC-2: Hard-archive threshold: when `salience < 0.05`, file is moved to `.archive/` immediately on next prune cycle regardless of age.
+- [x] AC-3: Decay job runnable as `scripts/decay-job.py` (cron-friendly) or as a new MCP tool `depthfusion_apply_decay()`.
+- [x] AC-4: All four bucket boundaries + threshold are env-configurable (`DEPTHFUSION_DECAY_RATE_HIGH`, `_MID`, `_LOW`, `_HARD_ARCHIVE_THRESHOLD`).
+- [x] AC-5: ≥ 4 tests covering each bucket + the hard-archive case.
 
 **Tasks:**
-- [ ] T-225: Implement bucketed decay computation in `capture/decay.py` (new module)
-- [ ] T-226: `scripts/decay-job.py` (calls decay, writes audit summary) + cron documentation
-- [ ] T-227: Env-var plumbing in `core/config.py`
-- [ ] T-228: Tests in `tests/test_capture/test_decay.py`
+- [x] T-225: Implement bucketed decay computation in `capture/decay.py` (new module)
+- [x] T-226: `scripts/decay-job.py` (calls decay, writes audit summary) + cron documentation
+- [x] T-227: Env-var plumbing in `core/config.py`
+- [x] T-228: Tests in `tests/test_capture/test_decay.py`
 
 ### S-72: As a recall caller, I want a feedback loop so that the system learns which surfaced chunks were actually useful `P1` `M` [done]
 
