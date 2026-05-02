@@ -122,6 +122,15 @@ from the user-level weekly timer).
 
 ---
 
+## [v0.6.0] — unreleased
+
+### Removed
+
+- Removed the deprecated `--mode=vps` installer alias. Use `--mode=vps-cpu` instead. (S-56)
+- Removed deprecated `vps-tier1` and `vps-tier2` pyproject extras. Migrate to `local`, `vps-cpu`, or `vps-gpu`. (S-57)
+
+---
+
 ## [v0.6.0a1] — 2026-04-21
 
 **Theme:** benchmark infrastructure, pre-migration preparation, and

@@ -1004,29 +1004,29 @@
 
 > Remove v0.5-era deprecations, wire `config_version_id` for full I-8 compliance, and retire pre-existing mypy/ruff errors. No new features — this epic exists to keep the tech-debt surface from accumulating across v0.6 feature work.
 
-### S-56: As a maintainer, I want the deprecated `--mode=vps` installer alias removed so that the CLI surface doesn't carry indefinite compatibility shims `P2` `XS`
+### S-56: As a maintainer, I want the deprecated `--mode=vps` installer alias removed so that the CLI surface doesn't carry indefinite compatibility shims `P2` `XS` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: `python -m depthfusion.install.install --mode=vps` exits with a non-zero argparse error naming the valid choices `{local, vps-cpu, vps-gpu}` — no deprecation-warning pass-through path
-- [ ] AC-2: The v0.5-era deprecation test (`test_vps_alias_prints_deprecation_and_runs_vps_cpu`) is replaced with a "rejects vps" regression test
-- [ ] AC-3: CHANGELOG §Removed documents the break with an explicit migration note pointing at `--mode=vps-cpu`
+- [x] AC-1: `python -m depthfusion.install.install --mode=vps` exits with a non-zero argparse error naming the valid choices `{local, vps-cpu, vps-gpu}` — no deprecation-warning pass-through path
+- [x] AC-2: The v0.5-era deprecation test (`test_vps_alias_prints_deprecation_and_runs_vps_cpu`) is replaced with a "rejects vps" regression test
+- [x] AC-3: CHANGELOG §Removed documents the break with an explicit migration note pointing at `--mode=vps-cpu`
 
 **Tasks:**
-- [ ] T-172: Remove `"vps"` from argparse choices in `install/install.py`; delete the `if mode == "vps"` deprecation branch in `main()`
-- [ ] T-173: Update `test_vps_alias_prints_deprecation_and_runs_vps_cpu` → `test_vps_alias_rejected_in_v06`
-- [ ] T-174: Add `[Removed]` entry to `CHANGELOG.md` under `## [v0.6.0]`
+- [x] T-172: Remove `"vps"` from argparse choices in `install/install.py`; delete the `if mode == "vps"` deprecation branch in `main()`
+- [x] T-173: Update `test_vps_alias_prints_deprecation_and_runs_vps_cpu` → `test_vps_alias_rejected_in_v06`
+- [x] T-174: Add `[Removed]` entry to `CHANGELOG.md` under `## [v0.6.0]`
 
-### S-57: As a package installer, I want the legacy `vps-tier1`/`vps-tier2` pyproject extras removed so that users migrate cleanly to the three-mode extras `P3` `XS`
+### S-57: As a package installer, I want the legacy `vps-tier1`/`vps-tier2` pyproject extras removed so that users migrate cleanly to the three-mode extras `P3` `XS` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: `pyproject.toml` `[project.optional-dependencies]` contains only `local`, `vps-cpu`, `vps-gpu`, `dev`, `rlm` — no `vps-tier1` / `vps-tier2` keys
-- [ ] AC-2: `pip install '.[vps-tier1]'` fails with a clear "no matching distribution" error message (standard pip behaviour on removed extras)
-- [ ] AC-3: Release notes + migration guide updated
+- [x] AC-1: `pyproject.toml` `[project.optional-dependencies]` contains only `local`, `vps-cpu`, `vps-gpu`, `dev`, `rlm` — no `vps-tier1` / `vps-tier2` keys
+- [x] AC-2: `pip install '.[vps-tier1]'` fails with a clear "no matching distribution" error message (standard pip behaviour on removed extras)
+- [x] AC-3: Release notes + migration guide updated
 
 **Tasks:**
-- [ ] T-175: Delete `vps-tier1` / `vps-tier2` entries from `pyproject.toml`
-- [ ] T-176: Grep the repo for remaining references to `vps-tier1` / `vps-tier2`; update any install docs, runbooks, or agent skills that reference them
-- [ ] T-177: Add `[Removed]` entry to `CHANGELOG.md`
+- [x] T-175: Delete `vps-tier1` / `vps-tier2` entries from `pyproject.toml`
+- [x] T-176: Grep the repo for remaining references to `vps-tier1` / `vps-tier2`; update any install docs, runbooks, or agent skills that reference them
+- [x] T-177: Add `[Removed]` entry to `CHANGELOG.md`
 
 ### S-58: As an auditor, I want `config_version_id` populated on every gate-log record so that gate decisions can be reproduced against the config snapshot active at invocation (I-8 compliance) `P1` `M`
 
@@ -1121,16 +1121,16 @@
 ### S-69: As an operator, I want to pin discoveries so that high-value entries are exempt from age-based pruning `P2` `S` [done]
 
 **Acceptance criteria:**
-- [ ] AC-1: New YAML frontmatter field `pinned: bool` on discovery markdown (default `false` if absent — backward compatible).
-- [ ] AC-2: `prune_discoveries` skips files where `pinned: true` regardless of age.
-- [ ] AC-3: New MCP tool `depthfusion_pin_discovery(filename, pinned=true)` toggles the field; idempotent.
-- [ ] AC-4: ≥ 4 tests covering pin/unpin/skip-during-prune/missing-file edge case.
+- [x] AC-1: New YAML frontmatter field `pinned: bool` on discovery markdown (default `false` if absent — backward compatible).
+- [x] AC-2: `prune_discoveries` skips files where `pinned: true` regardless of age.
+- [x] AC-3: New MCP tool `depthfusion_pin_discovery(filename, pinned=true)` toggles the field; idempotent.
+- [x] AC-4: ≥ 4 tests covering pin/unpin/skip-during-prune/missing-file edge case.
 
 **Tasks:**
-- [ ] T-216: Extend frontmatter parser in `capture/` to read `pinned` (with default-false fallback)
-- [ ] T-217: Update `analyzer/prune.py` (or equivalent) to honour `pinned` in candidate selection
-- [ ] T-218: Register `depthfusion_pin_discovery` in `mcp/server.py`
-- [ ] T-219: Author `tests/test_capture/test_pin.py`
+- [x] T-216: Extend frontmatter parser in `capture/` to read `pinned` (with default-false fallback)
+- [x] T-217: Update `analyzer/prune.py` (or equivalent) to honour `pinned` in candidate selection
+- [x] T-218: Register `depthfusion_pin_discovery` in `mcp/server.py`
+- [x] T-219: Author `tests/test_capture/test_pin.py`
 
 ### S-70: As a discovery, I want separate `importance` and `salience` scalars so that lifecycle policy can weigh intrinsic value distinctly from recent usefulness `P1` `M` [done]
 

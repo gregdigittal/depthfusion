@@ -26,7 +26,7 @@ class ChromaDBStore:
     def __init__(self, persist_dir: Optional[Path] = None):
         if not _CHROMADB_AVAILABLE:
             raise ImportError(
-                "chromadb not installed. Run: pip install 'depthfusion[vps-tier2]'"
+                "chromadb not installed. Run: pip install 'depthfusion[vps-gpu]'"
             )
         dir_ = persist_dir or _PERSIST_DIR
         dir_.mkdir(parents=True, exist_ok=True)

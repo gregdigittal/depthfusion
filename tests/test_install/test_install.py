@@ -1,9 +1,9 @@
 # tests/test_install/test_install.py
-"""Installer CLI + per-mode install path tests — T-124 / T-127 / T-128 / S-42.
+"""Installer CLI + per-mode install path tests — T-124 / T-127 / T-128 / S-42 / S-56.
 
 Covers:
-  * argparse: all four mode tokens (local / vps-cpu / vps-gpu / vps-alias)
-  * Deprecation warning on --mode=vps
+  * argparse: all three mode tokens (local / vps-cpu / vps-gpu)
+  * Rejection of removed --mode=vps alias (S-56)
   * Byte-identity of the local mode env file vs v0.4.x (AC-6)
   * GPU probe refusal path (AC-1)
   * Vps-gpu env file contents when GPU check is bypassed (AC-2)
@@ -85,18 +85,19 @@ def test_migrate_help():
 
 
 # ---------------------------------------------------------------------------
-# --mode=vps deprecation alias (AC-3)
+# --mode=vps removed in v0.6.0 (S-56 AC-2)
 # ---------------------------------------------------------------------------
 
-def test_vps_alias_prints_deprecation_and_runs_vps_cpu(capsys):
-    """--mode=vps should warn AND execute the vps-cpu install path."""
-    with patch.object(install_mod, "install_vps_cpu") as mock_cpu:
-        rc = install_mod.main(["--mode", "vps", "--dry-run"])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert "DEPRECATION" in captured.err
-    assert "vps-cpu" in captured.err
-    mock_cpu.assert_called_once()
+def test_vps_alias_rejected():
+    """--mode=vps must be rejected by argparse with a non-zero exit."""
+    result = subprocess.run(
+        [sys.executable, "-m", "depthfusion.install.install",
+         "--mode", "vps"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "vps" in result.stderr  # argparse names the invalid choice
+    assert "local" in result.stderr or "vps-cpu" in result.stderr
 
 
 # ---------------------------------------------------------------------------

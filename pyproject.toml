@@ -33,10 +33,7 @@ vps-gpu = [
     "chromadb>=0.4",
 ]
 
-# ── Legacy aliases (v0.4.x compatibility; removed in v0.6) ──────────
 rlm = ["rlms"]
-vps-tier1 = []  # anthropic SDK is already available in the environment
-vps-tier2 = ["chromadb>=0.4"]
 
 dev = [
     "pytest>=8.0",

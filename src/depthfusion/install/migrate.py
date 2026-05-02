@@ -32,7 +32,7 @@ def run_migration(dry_run: bool = False) -> None:
 
     from depthfusion.storage.vector_store import ChromaDBStore, is_chromadb_available
     if not is_chromadb_available():
-        print("Error: chromadb not installed. Run: pip install 'depthfusion[vps-tier2]'")
+        print("Error: chromadb not installed. Run: pip install 'depthfusion[vps-gpu]'")
         raise SystemExit(1)
 
     store = ChromaDBStore()

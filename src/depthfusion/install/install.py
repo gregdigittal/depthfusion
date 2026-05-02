@@ -567,17 +567,15 @@ def main(argv: list[str] | None = None) -> int:
         description="DepthFusion installer (three-mode: local / vps-cpu / vps-gpu)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    # Note: `vps` is accepted as a deprecated alias for `vps-cpu` below.
     # `--mode` is NOT required — when absent, the installer runs an
     # interactive probe + recommendation (v0.5.2 S-62).
     parser.add_argument(
         "--mode",
-        choices=["local", "vps-cpu", "vps-gpu", "vps"],
+        choices=["local", "vps-cpu", "vps-gpu"],
         default=None,
         help=(
             "Install mode: 'local' (BM25 only), 'vps-cpu' (Haiku reranker), "
             "'vps-gpu' (Gemma on-box + local embeddings). "
-            "'vps' is a deprecated alias for 'vps-cpu'. "
             "When omitted, the installer auto-detects your hardware and "
             "prompts you to confirm the recommended mode."
         ),
@@ -623,13 +621,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  → Proceeding with mode={mode}")
             print("")
 
-    if mode == "vps":
-        print(
-            "[DEPRECATION] --mode=vps is a deprecated alias for --mode=vps-cpu; "
-            "please update your install script.",
-            file=sys.stderr,
-        )
-        mode = "vps-cpu"
 
     # Warn if --skip-gpu-check is passed to a mode that doesn't use it.
     # Silent acceptance is a footgun: a CI script that shifts from vps-gpu to
