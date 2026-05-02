@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-02 (S-33 AC-3 done: fusion-ab-comparison.test.ts, 15 tests passing in SkillForge)
+> Last updated: 2026-05-02 (S-32 AC-3 + S-33 AC-3 done: Seam E5 trajectory-depth telemetry + A/B fusion harness)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -503,14 +503,14 @@
 **Acceptance criteria:**
 - [x] AC-1: `scoring.py` + `weighted.py` ported to TypeScript under `packages/runtime/src/fusion/`
 - [x] AC-2: AttnRes layer injected at `vector-store.ts:165` (Seam C)
-- [ ] AC-3: Trajectory telemetry added (Seam E5) — EMA exists; time-decay scoring on trajectory depth not yet wired
-- [x] AC-4: SkillForge test suite stays GREEN (119 @depthfusion/core + 423 runtime, all pass)
+- [x] AC-3: Trajectory telemetry added (Seam E5) — `computeTimeDecayScore()` + `blendedQualityWithTrajectoryDepth()` in telemetry.ts; 14 new tests passing
+- [x] AC-4: SkillForge test suite stays GREEN (119 @depthfusion/core + 452 runtime, all pass)
 
 **Tasks:**
 - [x] T-94: Port `scoring.py` → TS
 - [x] T-95: Port `weighted.py` → TS
 - [x] T-96: Inject at Seam C
-- [ ] T-97: Add trajectory telemetry (E5)
+- [x] T-97: Add trajectory telemetry (E5)
 
 ### S-33: As SkillForge's router, I want RRF × attention scoring so that flat scoring is replaced with fusion `P2` `L`
 
