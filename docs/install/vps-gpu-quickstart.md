@@ -228,13 +228,10 @@ If vLLM fails to start, common causes:
 
 ---
 
-## 3. Run the installer, then add credentials + shell integration
+## 3. Run the installer and add credentials
 
-> **Order matters.** The installer **overwrites** `~/.claude/depthfusion.env`
-> with mode-specific defaults — any credentials you add beforehand get
-> wiped. Run the installer FIRST, then append your credentials.
-> (Tracked as E-17 S-68; future installer will merge instead of
-> overwrite.)
+The installer merges with any existing `~/.claude/depthfusion.env` —
+credentials you add before or after are preserved across re-installs.
 
 ### 3a. Run the installer in vps-gpu mode
 
@@ -252,11 +249,13 @@ executes nvidia-smi, imports sentence-transformers, and issues a
 one-shot Gemma completion. Failure is non-fatal — install completes,
 smoke can be re-run later.
 
-### 3b. Append credentials + enable flag to the env file
+### 3b. Add credentials + enable flag to the env file
 
 Even on a GPU host where Gemma is primary, setting `DEPTHFUSION_API_KEY`
-is strongly recommended so the `FallbackChain` (v0.6.0a1) can fall
-through to Haiku if Gemma is OOM, rate-limited, or down.
+is strongly recommended so the `FallbackChain` can fall through to
+Haiku if Gemma is OOM, rate-limited, or down. You can do this before
+or after the installer runs; re-running the installer will not wipe
+these lines.
 
 ```bash
 cat >> ~/.claude/depthfusion.env <<'EOF'

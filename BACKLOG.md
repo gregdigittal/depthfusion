@@ -618,46 +618,46 @@
 > mode-specific defaults.
 
 **Acceptance criteria:**
-- [ ] AC-1: `_write_env_config()` merges with existing file content
+- [x] AC-1: `_write_env_config()` merges with existing file content
   rather than overwriting — reads existing lines, keys values by
   `KEY=` prefix, preserves user-authored keys not in the mode-specific
   set
-- [ ] AC-2: Known mode-specific keys (`DEPTHFUSION_MODE`,
+- [x] AC-2: Known mode-specific keys (`DEPTHFUSION_MODE`,
   `DEPTHFUSION_TIER_THRESHOLD`, `DEPTHFUSION_*_BACKEND`) get
   overwritten to reflect the selected mode — those ARE owned by
   the installer
-- [ ] AC-3: User-authored keys (`DEPTHFUSION_API_KEY`,
+- [x] AC-3: User-authored keys (`DEPTHFUSION_API_KEY`,
   `DEPTHFUSION_HAIKU_ENABLED`, `DEPTHFUSION_GEMMA_URL`,
   `DEPTHFUSION_FUSION_*`, etc.) are preserved verbatim
-- [ ] AC-4: File permissions preserved — if existing file was
+- [x] AC-4: File permissions preserved — if existing file was
   `chmod 600`, new file is `chmod 600` (no reopen-as-world-readable)
-- [ ] AC-5: Comment lines (`# …`) and blank lines preserved in
+- [x] AC-5: Comment lines (`# …`) and blank lines preserved in
   their original positions
-- [ ] AC-6: If the installer would change a user-authored key's
+- [x] AC-6: If the installer would change a user-authored key's
   value (rare; only when a mode explicitly manages it), it prints
   a warning with the key name + old value + new value — never
   silent mutation
-- [ ] AC-7: ≥ 5 tests in `tests/test_install/test_env_merge.py`:
+- [x] AC-7: ≥ 5 tests in `tests/test_install/test_env_merge.py`:
   no existing file (fresh write); existing file with no DepthFusion
   keys (append-only); existing file with user-authored API key
   (preserved); existing file with outdated mode key (updated);
   existing file with chmod 600 (preserved)
-- [ ] AC-8: Quickstart guides updated — remove the "Order matters"
+- [x] AC-8: Quickstart guides updated — remove the "Order matters"
   warning in §2/§3 once the merge is live; re-fold credential
   append into the same step as the installer run
 
 **Tasks:**
-- [ ] T-212: Add `_parse_env_file(path: Path) -> list[tuple[str, str | None]]`
+- [x] T-212: Add `_parse_env_file(path: Path) -> list[tuple[str, str | None]]`
   helper that returns ordered pairs of (line, key_or_None) preserving
   original structure (blank lines + comments as `(line, None)`)
-- [ ] T-213: Rewrite `_write_env_config()` to:
+- [x] T-213: Rewrite `_write_env_config()` to:
   1. Parse existing file if present
   2. Build ordered output: existing lines with known-mode-keys
      updated; remaining mode-keys appended at the end
   3. Preserve file permissions via `os.stat`/`os.chmod`
-- [ ] T-214: Tests in `tests/test_install/test_env_merge.py` covering
+- [x] T-214: Tests in `tests/test_install/test_env_merge.py` covering
   the five AC-7 scenarios + warning emission (AC-6)
-- [ ] T-215: Remove the "Order matters" preamble + restructure §2/§3
+- [x] T-215: Remove the "Order matters" preamble + restructure §2/§3
   in both quickstart guides once the merge is live
 
 ---

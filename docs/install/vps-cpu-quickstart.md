@@ -155,12 +155,10 @@ From here on, every new SSH session auto-activates the venv.
 
 ---
 
-## 2. Run the installer, then add credentials + shell integration
+## 2. Run the installer and add credentials
 
-> **Order matters.** The installer **overwrites** `~/.claude/depthfusion.env`
-> with mode-specific defaults — any API key you add beforehand gets wiped.
-> Run the installer FIRST, then append your credentials. (Tracked as
-> E-17 S-68; future installer will merge instead of overwrite.)
+The installer merges with any existing `~/.claude/depthfusion.env` —
+credentials you add before or after are preserved across re-installs.
 
 ### 2a. Run the installer
 
@@ -173,10 +171,12 @@ The installer:
 - Registers PreCompact + PostCompact hooks in `~/.claude/settings.json`
 - Warns that Haiku is disabled until you set the API key (next step)
 
-### 2b. Append your credentials to the env file
+### 2b. Add your credentials to the env file
 
 Both `DEPTHFUSION_API_KEY` and `DEPTHFUSION_HAIKU_ENABLED=true` are
 required for Haiku features to activate — the key alone isn't enough.
+You can do this before or after the installer runs; re-running the
+installer will not wipe these lines.
 
 ```bash
 # Replace with your real key from https://console.anthropic.com/settings/keys
