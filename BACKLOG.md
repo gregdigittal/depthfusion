@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-02 (S-34 AC-1 + S-65 AC-1 done: QueryDispatcher TS port; dogfood runbook confirmed)
+> Last updated: 2026-05-04 (added T-262 under S-43: pip upgrade on hetzner-gpu to retire PYTHONPATH workaround)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -747,6 +747,7 @@
 - [x] T-129: Implement `backends/local_embedding.py` (sentence-transformers, default `all-MiniLM-L6-v2`) — same file as T-118 (ticked once, shared across S-41/S-43)
 - [x] T-130: Wire embedding step into `retrieval/hybrid.py` RRF fusion alongside BM25/ChromaDB (added `apply_vector_search()` + `_cosine_similarity` helper; fuses with existing `rrf_fuse`)
 - [x] T-131: Author `tests/test_backends/test_local_embedding.py` + `tests/test_retrieval/test_hybrid_with_embeddings.py` (39 tests across both files)
+- [ ] T-262: Upgrade pip on hetzner-gpu (currently 22.0.2, predates PEP 660) so `pip install -e '.[vps-gpu]'` succeeds without the `PYTHONPATH=src` workaround used during the 2026-05-02 vps-gpu CIQS baseline (`docs/runbooks/dogfood-reports/2026-05-02-vps-gpu-ciqs-baseline.md` §Install Method)
 
 ### S-44: As a vps-gpu operator, I want a Gemma backend for all LLM capabilities so that reranking, extraction, summarisation, and linking run on-box with Haiku fallback `P1` `L`
 
