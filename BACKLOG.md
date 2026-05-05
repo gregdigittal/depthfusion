@@ -1102,16 +1102,16 @@
 
 ---
 
-### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S`
+### S-65: As a maintainer, I want a dogfood-telemetry runbook so that `backend_summary()` + `capture_summary()` outputs from real sessions validate the observability layer shipped in v0.5.1/v0.5.2 `P1` `S` [done]
 
 **Acceptance criteria:**
 - [x] AC-1: Runbook in `docs/runbooks/dogfood-telemetry.md` prescribes: enable instrumentation, use DepthFusion for ≥ 1 week of real work, collect JSONL streams, run aggregators, inspect outputs
-- [ ] AC-2: First dogfood pass committed as `docs/runbooks/dogfood-reports/{YYYY-MM-DD}-week1.md` with concrete findings (fields with empty values, fields that lied, missing fields we wish existed)
-- [ ] AC-3: Findings triaged into v0.5.3 polish backlog (new stories under a fresh epic if warranted)
+- [x] AC-2: First dogfood pass committed as `docs/runbooks/dogfood-reports/2026-05-04-week1.md` with concrete findings — headline finding (100% test-fixture telemetry over 13 days; zero production-path emissions) plus 5 field-level findings (empty `config_version_id` in 987/987 events, `latency_ms_per_capability` only populated for `reranker`, dead `backend_fallback_chain` field, gates stream never wrote, runbook §2 vs §4d self-contradiction)
+- [x] AC-3: Findings triaged into v0.5.3 polish backlog — new epic **E-29** with six stories (S-79 P0 through S-84 P3) covering substrate gap, per-capability latency, config_version_id plumbing, test/prod telemetry separation, fallback double-emission, and runbook self-correction
 
 **Tasks:**
 - [x] T-204: Author the runbook — `docs/runbooks/dogfood-telemetry.md` (252 lines; mental model + prereqs + daily protocol + aggregation incantations + analysis checklists for all four streams + triage workflow + report template + known limits)
-- [ ] T-205: Execute the first pass on this repo; commit the report — **calendar-blocked ≥ 7 days**
+- [x] T-205: Execute the first pass on this repo; commit the report — first pass authored 2026-05-04 as `docs/runbooks/dogfood-reports/2026-05-04-week1.md` after 13-day calendar window. Calendar-blocked annotation captured the wrong constraint: calendar elapsed but the substrate condition (real-session emission) never engaged. See report §"What surprised me" for the runbook-authoring lesson
 
 ---
 
@@ -1313,6 +1313,106 @@
 
 ---
 
-- **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
+## E-29: v0.5.3 Polish — Dogfood-Surfaced Instrumentation Gaps [active]
+
+> Six stories surfaced by the 2026-05-04 dogfood pass (`docs/runbooks/dogfood-reports/2026-05-04-week1.md`). The headline finding is that 100% of telemetry over 13 days came from test fixtures — zero production-path emissions. The other five findings are field-level: missing per-capability latency, empty `config_version_id` everywhere, double-emission of fallback events, and a self-contradicting runbook §2.
+>
+> **Sequencing:** S-79 (P0) is the substrate fix and unblocks meaningful re-measurement of S-43 AC-3, S-64 AC-2, and the deferred S-65 follow-up dogfood passes. S-80–S-83 (P1/P2) are field-level fixes that can land in any order. S-84 (P3) is a one-line doc fix. Total estimated effort: ~1 week at a relaxed pace.
+
+### S-79: As a maintainer, I want production-path Claude Code sessions to actually emit capture & recall events so that the v0.5.1/v0.5.2 observability layer is validated against real workloads, not just test fixtures `P0` `M`
+
+> Headline finding from the 2026-05-04 dogfood pass: 957/957 capture events and 30/30 recall events over 13 days came from test fixtures (`/tmp/...` paths or 9-event minute-bucket bursts). Zero production-path emissions in the entire window. The instrumentation works in tests; it has not been exercised by a real session. Either (a) Claude Code on this host isn't invoking the depthfusion MCP server, (b) the MCP server is invoked but the capture/recall emitters aren't reached, or (c) emissions are routed to a different metrics directory. Blocks every other dogfood AC and downstream measurement work.
+
+**Acceptance criteria:**
+- [ ] AC-1: Root cause identified — exactly which of (a)/(b)/(c) above, with code-level pointers
+- [ ] AC-2: Fix landed; a single real Claude Code session writes ≥ 1 capture event and ≥ 1 recall event with `file_path` outside `/tmp/` (i.e., under `~/.claude/depthfusion-discoveries/<project>/`)
+- [ ] AC-3: Startup self-check added: when DepthFusion MCP server initializes, verify that the production-path emission target is writable AND record a `system.startup` event into the legacy stream so an empty metrics directory at end-of-day is detectable
+- [ ] AC-4: Re-run dogfood-telemetry runbook for ≥ 5 days; confirm production-path emissions in ≥ 4 of those days; commit follow-up report under `docs/runbooks/dogfood-reports/`
+- [ ] AC-5: ≥ 3 tests covering the startup self-check, the production-path emission target validation, and the new `system.startup` legacy event
+
+**Tasks:**
+- [ ] T-263: Investigate MCP server invocation path on this host — confirm settings.json `mcpServers.depthfusion` is correctly wired and the server actually starts on Claude Code session launch
+- [ ] T-264: Trace `MetricsCollector()` instantiation in production code paths — confirm the default-constructor (no `tmp_path`) is reached from real `_tool_publish_context` / `_tool_recall_relevant` calls
+- [ ] T-265: Implement startup self-check + `system.startup` event in `mcp/server.py` initialization
+- [ ] T-266: Re-run dogfood-telemetry runbook; commit follow-up report
+- [ ] T-267: Tests in `tests/test_metrics/test_startup_check.py` (or extend existing test module)
+
+### S-80: As a maintainer, I want `latency_ms_per_capability` populated for all six capabilities so that S-43 AC-3 (p95 recall latency per capability) can actually close `P1` `S`
+
+> Today only `reranker` latency is recorded, and only on 10/30 observed events. The other five capabilities (`extractor`, `linker`, `summariser`, `embedding`, `decision_extractor`) appear in `backend_used` on every event but never appear in the latency dict. **S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) cannot close** until per-capability latency is captured. Same gap blocks S-64 AC-2 (p95 latency per capability in the Phase 4 GPU migration runbook).
+
+**Acceptance criteria:**
+- [ ] AC-1: All six capabilities present in `backend_used` for a recall event also appear as keys in `latency_ms_per_capability` for that same event
+- [ ] AC-2: Latency value is the per-capability wall-clock in milliseconds (not cumulative); units match the existing `reranker` value
+- [ ] AC-3: When a capability is invoked but the backend returns an error, the latency is still recorded (with the `event_subtype: "error"` marker on the parent event)
+- [ ] AC-4: S-43 AC-3 and S-64 AC-2 are unblocked — re-run the relevant scoring/measurement after S-79 lands and tick those ACs
+- [ ] AC-5: ≥ 4 tests covering happy-path multi-capability recall, single-capability fallback, error-path latency capture, and the dict-shape contract
+
+**Tasks:**
+- [ ] T-268: Identify the recording site for `reranker` latency and replicate the pattern for the other five capabilities
+- [ ] T-269: Wire latency capture into `extractor`, `linker`, `summariser`, `embedding`, `decision_extractor` invocation sites (likely a single decorator or context manager)
+- [ ] T-270: Tests in `tests/test_metrics/test_per_capability_latency.py`
+
+### S-81: As an auditor, I want `config_version_id` populated in every emitted capture and recall event so that the D-3 invariant per DR-018 §4 (auditor reproducibility) is enforced, not just declared `P1` `S`
+
+> Empty string `""` in **987/987 observed events** (957 capture + 30 recall). The field is structurally present but never populated in non-gate code paths. The only caller that sets it is `record_gate_log()` (`src/depthfusion/retrieval/hybrid.py:198`) — which never executed during the dogfood window because `DEPTHFUSION_FUSION_GATES_ENABLED` defaults to `false` (see S-84). DR-018 §4 ratification declares this field mandatory; today it's a placeholder.
+
+**Acceptance criteria:**
+- [ ] AC-1: `MetricsCollector.record_capture_event()` and `record_recall_query()` both populate `config_version_id` from the active `GateConfig` hash (or a documented fallback for non-gate callers)
+- [ ] AC-2: For non-gate code paths where a `GateConfig` is not in scope, the field is populated with a deterministic hash of the active runtime config (mode, backend mix, env-var snapshot) so different runtime configurations produce different ids
+- [ ] AC-3: A documented "non-applicable" sentinel (e.g., `"none"`) is emitted for genuinely config-invariant events — empty string is no longer valid output
+- [ ] AC-4: ≥ 3 tests covering capture-path population, recall-path population, and the non-applicable sentinel case
+
+**Tasks:**
+- [ ] T-271: Plumb `GateConfig.version_id()` (or runtime-config hash) into `MetricsCollector` constructor or per-event call args
+- [ ] T-272: Update `record_capture_event` and `record_recall_query` to populate the field at emit time
+- [ ] T-273: Tests in `tests/test_metrics/test_config_version_id.py`
+
+### S-82: As a maintainer, I want test-fixture telemetry routed to a separate directory so that `~/.claude/depthfusion-metrics/` reflects only production-path activity `P1` `S`
+
+> Today pytest invocations of `MetricsCollector()` (default constructor with no `tmp_path`) write to the user-home production directory. Over the 13-day dogfood window this caused 100% of observed telemetry to be test data. Without separation, future dogfood passes will continue to see polluted signal regardless of S-79's outcome.
+
+**Acceptance criteria:**
+- [ ] AC-1: Tests routed to `tmp_path` by default (pytest fixture) OR the production path is guarded against test invocation (e.g., abort if `PYTEST_CURRENT_TEST` is set without an explicit override)
+- [ ] AC-2: Existing test files updated to use the new fixture / guard pattern; no test writes to `~/.claude/depthfusion-metrics/` after this story lands
+- [ ] AC-3: Documentation in `tests/README.md` (or equivalent) explains the test-vs-production separation
+- [ ] AC-4: ≥ 2 tests verifying the guard fires when expected and is bypassable for legitimate integration tests
+
+**Tasks:**
+- [ ] T-274: Audit all `MetricsCollector()` instantiations in test files; identify which use `tmp_path` and which use the default
+- [ ] T-275: Implement the guard or pytest fixture; update offending test files
+- [ ] T-276: Tests in `tests/test_metrics/test_path_isolation.py`
+
+### S-83: As an operator, I want a single source of truth for fallback events so that I'm not reconciling legacy `backend.fallback*` metric tuples against an empty structured `backend_fallback_chain` field `P2` `S`
+
+> Today the legacy stream wrote 931 fallback events (483 `backend.fallback` + 448 `backend.runtime_fallback`) over the dogfood window while the structured recall stream wrote `backend_fallback_chain: {}` on every recall. Two emission paths for the same data; only the legacy one produced anything. Migration from legacy → structured is incomplete.
+
+**Acceptance criteria:**
+- [ ] AC-1: One canonical emission path is chosen — either populate `backend_fallback_chain` in the structured stream (and deprecate the legacy events) OR keep the legacy events as the source of truth (and document them as such)
+- [ ] AC-2: The non-canonical path is either removed or explicitly documented as complementary (with the contract: legacy = aggregate count per (capability, error_type); structured = per-query detail)
+- [ ] AC-3: Migration note in CHANGELOG under the next version anchor
+- [ ] AC-4: ≥ 3 tests covering the chosen canonical path's fallback recording
+
+**Tasks:**
+- [ ] T-277: Decide canonical path (likely the structured one — it carries per-query context); document the decision
+- [ ] T-278: Implement the chosen path; remove or deprecate the other
+- [ ] T-279: Tests in `tests/test_metrics/test_fallback_canonical.py`
+
+### S-84: As a runbook reader, I want `docs/runbooks/dogfood-telemetry.md` §2 prereqs to actually list the gates flag so that the next operator doesn't repeat my "no env flags needed → empty gates stream" mistake `P3` `XS`
+
+> §2 says "**No env flags need setting.** All four streams emit by default as of v0.5.2." §4d (analysis checklist) admits "Should emit when `DEPTHFUSION_FUSION_GATES_ENABLED` is on." The contradiction misled the 2026-05-04 dogfood operator (me); same contradiction will mislead future operators. Three other doc improvements identified in the 2026-05-04 report §"What to change in the runbook" should land in the same edit pass.
+
+**Acceptance criteria:**
+- [ ] AC-1: §2 either lists `DEPTHFUSION_FUSION_GATES_ENABLED=true` as a prereq for the gates stream OR removes the gates stream from the §1 table (and explains it's an opt-in side channel)
+- [ ] AC-2: §3 daily protocol gains a day-1 verification step ("check that `<today>-capture.jsonl` contains at least one event with a `file_path` outside `/tmp/`")
+- [ ] AC-3: §6 triage table gains a sixth row: "Substrate gap" (instrumentation works but isn't being invoked; default P0; blocks all other findings)
+- [ ] AC-4: §7 report template adds a "Headline finding" section above "Stream health"
+
+**Tasks:**
+- [ ] T-280: Apply the four corrections to `docs/runbooks/dogfood-telemetry.md` in a single docs commit
+
+---
+
+ Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
