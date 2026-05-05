@@ -1385,7 +1385,7 @@
 
 ### S-83: As an operator, I want a single source of truth for fallback events so that I'm not reconciling legacy `backend.fallback*` metric tuples against an empty structured `backend_fallback_chain` field `P2` `S`
 
-> Today the legacy stream wrote 931 fallback events (483 `backend.fallback` + 448 `backend.runtime_fallback`) over the dogfood window while the structured recall stream wrote `backend_fallback_chain: {}` on every recall. Two emission paths for the same data; only the legacy one produced anything. Migration from legacy → structured is incomplete.
+> Today the legacy stream wrote 981 fallback events (505 `backend.fallback` + 476 `backend.runtime_fallback`) over the dogfood window while the structured recall stream wrote `backend_fallback_chain: {}` on every recall. Two emission paths for the same data; only the legacy one produced anything. Migration from legacy → structured is incomplete.
 
 **Acceptance criteria:**
 - [ ] AC-1: One canonical emission path is chosen — either populate `backend_fallback_chain` in the structured stream (and deprecate the legacy events) OR keep the legacy events as the source of truth (and document them as such)
@@ -1413,6 +1413,6 @@
 
 ---
 
- Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
+- **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

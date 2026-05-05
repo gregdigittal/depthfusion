@@ -48,13 +48,8 @@ Authoritative source: `src/depthfusion/mcp/server.py`. All four MCP tools return
   "pinned": true                                  // optional, default true; bool only
 }
 
-// Response — success
-{
-  "ok": true,
-  "filename": "2026-05-04-myproj-decisions.md",
-  "pinned": true,
-  "previous": false        // the value before this call (lets callers detect no-op vs change)
-}
+// Response — success (verified against mcp/server.py:1330-1333)
+{ "pinned": true, "filename": "/home/gregmorris/.claude/shared/discoveries/2026-05-04-myproj-decisions.md" }
 
 // Response — file not found
 { "error": "file not found", "filename": "<input>" }
@@ -62,12 +57,15 @@ Authoritative source: `src/depthfusion/mcp/server.py`. All four MCP tools return
 // Response — invalid args
 { "error": "pin_discovery: 'filename' must be a non-empty string", "filename": null }
 { "error": "pin_discovery: 'pinned' must be a bool, got int", "filename": "<input>" }
+
+// Response — unexpected error during write
+{ "error": "unexpected error: <msg>", "filename": "<input>" }
 ```
 
 - **Unpin** is the same tool with `pinned: false`. There is no separate `depthfusion_unpin_discovery`.
-- **Idempotency:** re-pinning a pinned file (or unpinning an unpinned file) is a successful no-op — `ok: true`, `previous` reveals state didn't change.
+- **Idempotency:** re-pinning a pinned file (or unpinning an unpinned file) is a successful no-op. The response shape is identical to a state-changing call (`{pinned, filename}`) — there is no `previous` or `was_changed` field. If you need to detect "did this actually change anything," call the read side (e.g., re-fetch the file's frontmatter) before and after, or file an agent-ops story to add a `previous` field upstream (filed today as informal P3 follow-up; see footnote at end of §2).
 - **Locking:** atomic via `fcntl.LOCK_EX` on `<file>.scorelock` sidecar + `mkstemp` + `os.replace`. Safe under concurrent callers.
-- **Filename resolution:** the bare filename (e.g. `2026-05-04-myproj-decisions.md`) resolves under `~/.claude/depthfusion-discoveries/<project>/`, where `<project>` is the active project slug as set by the most recent `depthfusion_set_scope` call (or the cwd's git-repo name as fallback). Do NOT pass an absolute path. If the file lives in a sibling project's discovery directory, switch scope first or include the project segment in the filename — see `core/types.py:_resolve_discovery_path()` for the exact rules.
+- **Filename resolution:** pass an **absolute path** to a discovery markdown file (the tool description in `mcp/server.py:65` says exactly that, and the implementation does only `Path(filename).expanduser()` — no scope-aware resolution, no project segment inference). The discovery root on this host is `~/.claude/shared/discoveries/` (flat layout — no per-project subdirectories; project membership is encoded in the filename via `extract_project_from_filename`). The internal helper that resolves a file_stem back to a path is `core/feedback.py:_resolve_discovery_file()`.
 
 ### 2.2 S-70 — `depthfusion_set_memory_score`
 
@@ -79,55 +77,57 @@ Authoritative source: `src/depthfusion/mcp/server.py`. All four MCP tools return
   "salience": 2.5                                 // optional, float ∈ [0.0, 5.0]; clamped if out of range
 }
 
-// Response — success
+// Response — success (verified against mcp/server.py:1155-1160)
 {
   "ok": true,
-  "filename": "2026-05-04-myproj-decisions.md",
+  "filename": "/home/gregmorris/.claude/shared/discoveries/2026-05-04-myproj-decisions.md",
   "importance": 0.85,
-  "salience": 2.5,
-  "previous": { "importance": 0.5, "salience": 1.0 }
+  "salience": 2.5
 }
 
 // Response — invalid args
 { "ok": false, "error": "set_memory_score: 'filename' must be a non-empty string" }
+
+// Response — unexpected error
+{ "ok": false, "error": "set_memory_score: unexpected error: <msg>" }
 ```
 
 - **Both fields are independent inputs** — supply one or both. Unsupplied fields preserve the file's current value (true partial-update under the same lock).
 - **Value type:** float. Defaults: `importance: 0.5`, `salience: 1.0` (constants `DEFAULT_IMPORTANCE` / `DEFAULT_SALIENCE` in `core/types.py`).
 - **Clamping:** out-of-range values are silently clamped via `MemoryScore.__post_init__` — no error returned. If you need strict validation on the agent-ops side, validate before calling.
-- **Heads-up on default importance for extracted discoveries:** the decision/negative extractors derive `importance` from `max(per-entry-confidence)` across all entries written to the same file, not the mean. A file with one high-confidence + four low-confidence entries gets the high-confidence file-level importance. Documented in `core/feedback.py`-adjacent memory and in the S-70 consensus review (`docs/reviews/2026-05-01-s70-consensus.md`). Do not assume mean.
-- **Idempotency:** replaying the same payload produces a byte-identical file (provided no concurrent writer interleaved).
-- **Filename resolution:** same rules as §2.1 — bare filename under `~/.claude/depthfusion-discoveries/<project>/`; no absolute paths.
+- **Heads-up on default importance for extracted discoveries:** the decision/negative extractors derive `importance` from `max(per-entry-confidence)` across all entries written to the same file, not the mean. A file with one high-confidence + four low-confidence entries gets the high-confidence file-level importance. Verified at `capture/decision_extractor.py:264` and `capture/negative_extractor.py:260`. Do not assume mean.
+- **Idempotency:** replaying the same payload produces a byte-identical file (provided no concurrent writer interleaved). The response itself does NOT include the previous values — see the §2.1 idempotency note for how to detect no-op vs change.
+- **Filename resolution:** same rules as §2.1 — pass an absolute path; the discovery root is `~/.claude/shared/discoveries/` (flat).
 
 ### 2.3 S-72 — `depthfusion_recall_feedback` (+ `recall_relevant` change)
 
 **`depthfusion_recall_relevant` response shape changed** — it now includes `recall_id`. Full response (so you can see exactly which `chunk_id` value to thread into the `used`/`ignored` lists for `recall_feedback`):
 
 ```jsonc
-// recall_relevant response — full shape
+// recall_relevant response — actual full shape (verified against mcp/server.py:712-719 and :595-601)
 {
   "query": "the query string passed in",
   "blocks": [
     {
-      "chunk_id": "abc123def456-0",          // ← this is what goes into used/ignored
-      "snippet": "…up to 1500 chars of body…",
+      "chunk_id": "2026-05-04-foo#0",         // ← this is what goes into used/ignored
       "source": "discoveries/myproj/2026-05-04-foo.md",
       "score": 0.847,
-      "tier": "vps-gpu",
-      "tags": ["decision", "auth"],
-      "metadata": { "project": "myproj", "file_mtime": "2026-05-04T10:11:12Z" }
+      "snippet": "…up to snippet_len chars of body (default 1500)…"
     }
-    // ...up to N blocks (N = top_k from request, default 10)
+    // ...up to top_k blocks (default 5)
   ],
-  "recall_id": "5f8a8b30-9c7e-4d3a-b21f-8e6a4d5c2b1a",   // NEW: feed this to recall_feedback
-  "result_count": 5,
-  "total_latency_ms": 803.245,
-  "backend_used": { "reranker": "haiku", "embedding": "local_embedding", ... }
+  "recall_id": "5f8a8b30-9c7e-4d3a-b21f-8e6a4d5c2b1a",   // NEW (S-72): feed this to recall_feedback
+  "total_sources_scanned": 142,
+  "engaged_layers": ["bm25", "embedding", "reranker"],   // present only on the BM25 path
+  "message": "Retrieved 5 relevant blocks (BM25+RRF)"
 }
 
-// On empty-result paths, recall_id is null:
-{ "query": "...", "blocks": [], "recall_id": null, "result_count": 0, ... }
+// On empty-result paths, recall_id is null and engaged_layers is omitted:
+{ "query": "...", "blocks": [], "recall_id": null, "total_sources_scanned": 0,
+  "message": "No discovery files indexed yet for this scope" }
 ```
+
+**Per-block fields:** only `chunk_id`, `source`, `score`, `snippet`. The handoff originally documented `tier`, `tags`, and `metadata` per-block — those do **not** exist in the response. The `tier` and `backend_used` info is recorded into the metrics JSONL stream (`MetricsCollector.record_recall_query`) but is **not** returned to the MCP caller. If you need per-call backend telemetry on the consumer side, file an agent-ops story; for now read the metrics JSONL out-of-band.
 
 **Threading `recall_id → chunk_id` into feedback:**
 
@@ -150,19 +150,24 @@ await mcpClient.call('depthfusion_recall_feedback', {
   "ignored": ["chunk_c"]              // optional, default []
 }
 
-// Response — success
+// Response — success (verified against core/feedback.py:120-144)
 {
   "ok": true,
-  "recall_id": "5f8a8b30-…-uuid4",
-  "applied": { "used": 2, "ignored": 1 },
-  "skipped_already_applied": 0,
-  "skipped_unknown_chunk_id": 0
+  "applied": 3,                       // INTEGER — total chunks applied across used+ignored (NOT an object)
+  "skipped_unsupported": 0,           // chunk_id not in this recall_id's registered set
+  "skipped_missing": 0,               // recall_id never registered (or already pruned) — see note below
+  "skipped_already_applied": 0,       // (recall_id, chunk_id) pair already counted
+  "skipped_expired": 0                // recall_id older than RECALL_TTL_SECONDS (24h)
 }
 
-// Response — recall_id not found (expired or never registered)
-{ "ok": false, "error": "recall_feedback: recall_id not found", "recall_id": "<input>" }
+// Response — argument validation failure
+{ "ok": false, "error": "recall_feedback: 'recall_id' must be a non-empty string" }
+{ "ok": false, "error": "recall_feedback: 'used' and 'ignored' must be lists" }
+{ "ok": false, "error": "recall_feedback: chunk_ids must be strings" }
 ```
 
+- **Important: unknown `recall_id` is NOT an error.** When the recall_id was never registered or was already pruned, the response is **`{ok: true, skipped_missing: <total chunks>, ...}`** — your retry logic must check `skipped_missing > 0` rather than `r.error`. Source: `RecallStore.apply_feedback` at `core/feedback.py:229-231`.
+- **`recall_id` is NOT echoed back** in the response. If you need correlation, track it client-side.
 - **Input shape decision:** two disjoint lists (`used`, `ignored`) — NOT a single list of per-chunk verdicts. We considered the per-chunk verdicts shape and rejected it as more verbose without observable benefit. We do NOT model "harmful" as a third state — you either used a chunk or you didn't. If you need to flag harm, that's a separate signal (file an agent-ops story; we can extend).
 - **Effect:** salience changes are bounded `[0.0, 5.0]`. Per S-72 AC-3: `+0.1` per used, `−0.05` per ignored. Bounds enforced; replays are tracked in an applied-set keyed by `(recall_id, chunk_id)` for idempotency.
 - **`recall_id` lifetime:** in-memory `RecallStore` singleton, process-local. Default TTL is 24 hours per S-72 AC-2. **The store does not survive an MCP server restart** — see §4 known issue #2.
@@ -182,7 +187,7 @@ await mcpClient.call('depthfusion_recall_feedback', {
   "timestamp": "2026-05-04T18:42:11.527301+00:00",
   "event": "high_importance_discovery",
   "project": "agent-ops",
-  "file_path": "/home/gregmorris/.claude/depthfusion-discoveries/agent-ops/2026-05-04-checkpoint.md",
+  "file_path": "/home/gregmorris/.claude/shared/discoveries/2026-05-04-agent-ops-checkpoint.md",
   "importance": 0.92,
   "salience": 1.0,
   "summary": "checkpoint published with 7 decisions, 2 negatives"
@@ -252,7 +257,7 @@ const wasIdempotentHit = r.deduped;
 return { ok: r.published, id, wasIdempotentHit };
 ```
 
-No other breaking changes. `depthfusion_recall_relevant` gained `recall_id` (additive — old consumers ignoring it are unaffected). All other E-27 work introduced new tools / new fields, no removals or signature changes.
+No other breaking changes. `depthfusion_recall_relevant` gained `recall_id` (additive — old consumers ignoring it are unaffected). All other E-27 work introduced new tools / new fields, no removals or signature changes. **One caveat for strict-schema consumers:** if you validate `recall_relevant` responses against a JSON schema with `additionalProperties: false`, you will need to add `recall_id` (and `engaged_layers` if you weren't already accepting it) to the allowed properties.
 
 ---
 
@@ -260,11 +265,11 @@ No other breaking changes. `depthfusion_recall_relevant` gained `recall_id` (add
 
 1. **`config_version_id` is empty string in 100% of capture & recall events** (957/957 capture, 30/30 recall observed over 13 days). This field carries the D-3 invariant per DR-018 §4 (auditor reproducibility). It's structurally present but never populated in non-gate emit paths. Filed as DepthFusion **S-81 (P1)** in our v0.5.3 polish epic. Doesn't affect agent-ops's tool calls — flagging only because if you build any audit-trail features on top, do not depend on this field yet.
 
-2. **`RecallStore` (S-72) is process-local in-memory.** A DepthFusion MCP server restart between `recall_relevant` and `recall_feedback` calls will lose the `recall_id → chunk_ids` mapping; the feedback call returns `{ok: false, error: "recall_id not found"}`. In normal operation this is fine (calls are seconds apart). For long-running async agent flows that may span a restart, design defensively (treat feedback as best-effort).
+2. **`RecallStore` (S-72) is process-local in-memory** (`core/feedback.py:167`, class docstring at line 168). A DepthFusion MCP server restart between `recall_relevant` and `recall_feedback` calls will lose the `recall_id → chunk_ids` mapping; the feedback call returns `{ok: true, skipped_missing: <total chunks>}` (NOT an error). In normal operation this is fine (calls are seconds apart). For long-running async agent flows that may span a restart, treat feedback as best-effort and check `skipped_missing` to detect the lost-mapping case.
 
 3. **Default file-level `importance` is `max()` of per-entry confidences, not mean** (S-70 design). Already covered in §2.2 — repeating because it surprises operators expecting a mean. Documented in `docs/reviews/2026-05-01-s70-consensus.md`.
 
-4. **Capture pipeline emission is currently zero on this host** for production-path sessions (real Claude Code invocations writing to `~/.claude/depthfusion-discoveries/<project>/`). All 957 observed capture events over 13 days came from test fixtures (`/tmp/...` paths). Filed as DepthFusion **S-79 (P0)** under v0.5.3 polish — see `docs/runbooks/dogfood-reports/2026-05-04-week1.md`. **This may or may not affect agent-ops** depending on how your MCP server is wired.
+4. **Capture pipeline emission is currently zero on this host** for production-path sessions (real Claude Code invocations writing to `~/.claude/shared/discoveries/`). All 957 observed capture events over 13 days came from test fixtures (`/tmp/...` paths). Filed as DepthFusion **S-79 (P0)** under v0.5.3 polish — see `docs/runbooks/dogfood-reports/2026-05-04-week1.md`. **This may or may not affect agent-ops** depending on how your MCP server is wired.
 
    **3-step diagnostic to check your environment** (run after pinning the SHA + restarting your MCP client + executing one real `publish_context` call from your agent-ops code):
 
@@ -273,7 +278,8 @@ No other breaking changes. `depthfusion_recall_relevant` gained `recall_id` (add
    ls -la ~/.claude/depthfusion-metrics/ | grep "$(date -u +%Y-%m-%d)"
    # Expected: 1–4 files (YYYY-MM-DD.jsonl, -capture, -recall, optionally -gates)
 
-   # 2. The capture stream should reference YOUR project, not /tmp/ paths
+   # 2. The capture stream should reference a real project path, not /tmp/
+   #    Real prod paths live under ~/.claude/shared/discoveries/
    tail -1 ~/.claude/depthfusion-metrics/$(date -u +%Y-%m-%d)-capture.jsonl 2>/dev/null \
      | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print('PROD-PATH OK' if not d.get('file_path','').startswith('/tmp/') else 'AFFECTED: routing to /tmp/')"
 
