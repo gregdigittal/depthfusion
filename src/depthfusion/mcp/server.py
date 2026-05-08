@@ -1494,6 +1494,39 @@ def _process_request(request: dict, config: Any) -> dict:
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
+def _emit_startup_event(tools_enabled: int, metrics_dir: "Path | None" = None) -> None:
+    """Write a system.startup record to the legacy metrics stream.
+
+    Serves two purposes: (a) confirms the metrics directory is writable at
+    startup rather than discovering the problem during the first real event,
+    and (b) makes an empty metrics directory at end-of-day detectable —
+    absence of any system.startup record means the MCP server never ran that
+    day, which is a distinct condition from "ran but emitted nothing".
+
+    Logs a warning (never raises) so a broken metrics path cannot prevent
+    the server from serving tools.  `metrics_dir` is injectable for tests.
+    """
+    try:
+        from depthfusion.metrics.collector import MetricsCollector
+        import importlib.metadata as _meta
+        try:
+            _version = _meta.version("depthfusion")
+        except _meta.PackageNotFoundError:
+            _version = "unknown"
+        MetricsCollector(metrics_dir).record(
+            "system.startup",
+            1.0,
+            {"tools_enabled": tools_enabled, "server_version": _version},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "system.startup event could not be written to metrics directory "
+            "(observability degraded — check ~/.claude/depthfusion-metrics/ "
+            "permissions): %s",
+            exc,
+        )
+
+
 def main() -> None:
     """MCP server entry point.
 
@@ -1504,6 +1537,7 @@ def main() -> None:
     config = DepthFusionConfig.from_env()
     enabled = get_enabled_tools(config)
     logger.info(f"DepthFusion MCP server starting — {len(enabled)} tools enabled")
+    _emit_startup_event(len(enabled))
 
     for line in sys.stdin:
         line = line.strip()
