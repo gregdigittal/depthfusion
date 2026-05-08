@@ -406,9 +406,19 @@ def _tool_recall(arguments: dict) -> str:
         # this point, so they are NOT overwritten here.  Probe-time entries
         # are written to a copy so we can selectively fill only capabilities
         # that don't already have a pipeline measurement.
+        # S-83 / T-278: populate the per-query `backend_fallback_chain`
+        # alongside `backend_used`. Single-backend resolutions record
+        # `[name]`; FallbackChain resolutions record the cascade
+        # (split from backend.name on "+"). Empty on the error path —
+        # the legacy `backend.fallback*` simple-stream events remain the
+        # complementary aggregate-count source there.
+        backend_fallback_chain: dict[str, list[str]] = {}
         if event_subtype == "ok":
             _probe_ms: dict[str, float] = {}
-            backend_used = _detect_current_backends(perf_ms=_probe_ms)
+            backend_used = _detect_current_backends(
+                perf_ms=_probe_ms,
+                fallback_chain=backend_fallback_chain,
+            )
             # Merge: pipeline measurements win; probe times fill any gap.
             for _cap, _t in _probe_ms.items():
                 if _cap not in perf_ms:
@@ -421,6 +431,7 @@ def _tool_recall(arguments: dict) -> str:
             query_hash=query_hash,
             mode=os.environ.get("DEPTHFUSION_MODE", "local"),
             backend_used=backend_used,
+            backend_fallback_chain=backend_fallback_chain,
             latency_ms_per_capability=perf_ms,
             total_latency_ms=round(total_latency_ms, 3),
             result_count=result_count,
@@ -432,8 +443,29 @@ def _tool_recall(arguments: dict) -> str:
     return response_json
 
 
+def _backend_name_to_chain(name: str) -> list[str]:
+    """Split a (possibly composite) backend name into its cascade list.
+
+    `FallbackChain.name` is the literal `"+".join(b.name for b in chain)`,
+    e.g. ``"gemma+haiku+null"``. A single-backend resolution has no ``+``
+    in its name, so the result is ``[name]``. A composite name splits to
+    the underlying cascade order. Empty / falsy names return ``[]``.
+
+    S-83 / T-278: this is the building block for the per-query
+    ``backend_fallback_chain`` field in recall events. Every capability
+    is recorded as ``[name]`` (single backend) or ``[name1, name2, ...]``
+    (cascade) — never empty for a successfully-resolved capability — so
+    the aggregator's ``per_capability_fallback`` view always has a value
+    to walk for capabilities that appeared in ``backend_used``.
+    """
+    if not name:
+        return []
+    return [part for part in name.split("+") if part]
+
+
 def _detect_current_backends(
     perf_ms: "dict[str, float] | None" = None,
+    fallback_chain: "dict[str, list[str]] | None" = None,
 ) -> dict[str, str]:
     """Return {capability: backend_name} for all 6 LLM capabilities.
 
@@ -452,6 +484,16 @@ def _detect_current_backends(
     ``summariser``, ``decision_extractor``) retain the probe-time latency
     — it is the only real backend interaction for those capabilities within
     the scope of a recall event.
+
+    S-83 / T-278: when `fallback_chain` is supplied, each resolved
+    capability writes its cascade list (split from ``backend.name`` on
+    ``+``) into ``fallback_chain[cap]``. Single-backend resolutions
+    record ``[name]``; ``FallbackChain`` resolutions record the full
+    cascade in declared order (e.g. ``["gemma", "haiku", "null"]``).
+    This drives the structured ``backend_fallback_chain`` field in the
+    recall stream — complementary to the legacy aggregate-count
+    ``backend.fallback`` / ``backend.runtime_fallback`` simple-stream
+    events emitted from ``factory.py`` and ``chain.py`` respectively.
     """
     import time as _time  # shadow-free local import for timing
 
@@ -466,6 +508,8 @@ def _detect_current_backends(
                 result[cap] = backend.name
                 if perf_ms is not None:
                     perf_ms[cap] = round((_time.monotonic() - _t) * 1000.0, 3)
+                if fallback_chain is not None:
+                    fallback_chain[cap] = _backend_name_to_chain(backend.name)
             except Exception:  # noqa: BLE001 — per-cap failure → skip
                 continue
     except Exception:  # noqa: BLE001

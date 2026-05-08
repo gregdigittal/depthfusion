@@ -395,7 +395,17 @@ class MetricsCollector:
           - `mode`: `local` / `vps-cpu` / `vps-gpu` / `unknown`
           - `backend_used`: {capability: backend_name} — e.g. {"reranker": "haiku"}
           - `backend_fallback_chain`: {capability: [name1, name2]} — the
-            cascade attempted, including final fallback (usually "null")
+            per-query cascade trace, including final fallback (usually
+            "null"). Single-backend resolutions record ``[name]``;
+            ``FallbackChain`` resolutions record the full cascade
+            (e.g. ``["gemma", "haiku", "null"]``). Populated by the MCP
+            server on every successful recall (S-83 / T-278).
+            **Complementary to the simple-stream `backend.fallback`
+            (factory-time) and `backend.runtime_fallback` (chain-time)
+            events**, which aggregate counts per (capability, error_type)
+            for rate dashboards. The structured field carries per-query
+            detail so operators can answer "what cascade did *this*
+            specific query use?" — the simple stream cannot.
           - `latency_ms_per_capability`: {capability: latency_float}
           - `total_latency_ms`: end-to-end query latency
           - `result_count`: number of blocks returned to the caller

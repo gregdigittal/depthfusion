@@ -112,6 +112,17 @@ class MetricsAggregator:
 
         Returns an empty dict when no recall events were recorded for the
         target date. Malformed lines are skipped.
+
+        Contract (S-83):
+          The ``backend_fallback_chain`` field consumed at the line below
+          is the **per-query cascade trace** populated by the MCP server
+          on every successful recall. It is **complementary to** the
+          legacy simple-stream events ``backend.fallback`` (factory-time)
+          and ``backend.runtime_fallback`` (chain-time), which carry
+          aggregate counts per (capability, error_type) — useful for rate
+          dashboards but blind to per-query detail. Reading both streams
+          gives the full picture; the structured field is the only one
+          that answers "what cascade did *this* query use?".
         """
         if target_date is None:
             target_date = date.today()

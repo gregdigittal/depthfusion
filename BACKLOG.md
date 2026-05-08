@@ -1390,15 +1390,15 @@
 > Today the legacy stream wrote 981 fallback events (505 `backend.fallback` + 476 `backend.runtime_fallback`) over the dogfood window while the structured recall stream wrote `backend_fallback_chain: {}` on every recall. Two emission paths for the same data; only the legacy one produced anything. Migration from legacy → structured is incomplete.
 
 **Acceptance criteria:**
-- [ ] AC-1: One canonical emission path is chosen — either populate `backend_fallback_chain` in the structured stream (and deprecate the legacy events) OR keep the legacy events as the source of truth (and document them as such)
-- [ ] AC-2: The non-canonical path is either removed or explicitly documented as complementary (with the contract: legacy = aggregate count per (capability, error_type); structured = per-query detail)
-- [ ] AC-3: Migration note in CHANGELOG under the next version anchor
-- [ ] AC-4: ≥ 3 tests covering the chosen canonical path's fallback recording
+- [x] AC-1: One canonical emission path is chosen — both kept as complementary; structured `backend_fallback_chain` is now populated in recall events (was empty in 30/30 dogfood-observed events); legacy `backend.fallback*` events remain as the aggregate-count complement
+- [x] AC-2: The non-canonical path is either removed or explicitly documented as complementary — both paths documented as complementary with the contract: legacy = aggregate count per (capability, error_type); structured = per-query detail (cross-references in `chain.py`, `factory.py`, `collector.py`, `aggregator.py`)
+- [x] AC-3: Migration note in CHANGELOG under the next version anchor (CHANGELOG.md `[Unreleased]` section)
+- [x] AC-4: ≥ 3 tests covering the chosen canonical path's fallback recording (4 tests in `tests/test_metrics/test_fallback_canonical.py`)
 
 **Tasks:**
-- [ ] T-277: Decide canonical path (likely the structured one — it carries per-query context); document the decision
-- [ ] T-278: Implement the chosen path; remove or deprecate the other
-- [ ] T-279: Tests in `tests/test_metrics/test_fallback_canonical.py`
+- [x] T-277: Decide canonical path — Option B chosen: both paths complementary with distinct contracts; documented in CHANGELOG and code cross-references
+- [x] T-278: Implement — `_detect_current_backends` now populates a per-query `backend_fallback_chain` dict via `_backend_name_to_chain` helper; threaded through `_tool_recall` to `record_recall_query`
+- [x] T-279: Tests in `tests/test_metrics/test_fallback_canonical.py` (4 tests, all green)
 
 ### S-84: As a runbook reader, I want `docs/runbooks/dogfood-telemetry.md` §2 prereqs to actually list the gates flag so that the next operator doesn't repeat my "no env flags needed → empty gates stream" mistake `P3` `XS`
 

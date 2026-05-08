@@ -225,6 +225,12 @@ def _emit_fallback_event(
       metric name : "backend.fallback"
       value       : 1.0  (increment; aggregator sums over windows)
       labels      : requested, capability, reason
+
+    Complementary to the per-query `backend_fallback_chain` field in the
+    recall stream (S-83): this simple-stream event is the aggregate-count
+    side (one row per (capability, requested, reason)); the structured
+    recall field is the per-query-detail side. Both are kept on purpose;
+    they answer different questions.
     """
     raw = os.environ.get("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true").strip().lower()
     if raw in ("0", "false", "no", "off"):

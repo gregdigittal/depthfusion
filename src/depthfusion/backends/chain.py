@@ -105,6 +105,12 @@ def _emit_runtime_fallback_event(
     Distinct metric name (`backend.runtime_fallback`) from the factory's
     construction-time fallback so the two can be counted separately in
     aggregation.
+
+    Complementary to the per-query `backend_fallback_chain` field in the
+    recall stream (S-83): this simple-stream event is the aggregate-count
+    side (one row per (capability, error_type, from→to)); the structured
+    recall field is the per-query-detail side. Both are kept on purpose;
+    they answer different questions.
     """
     raw = os.environ.get("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true").strip().lower()
     if raw in ("0", "false", "no", "off"):

@@ -17,6 +17,34 @@ v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
 
 ### Added
 
+**Per-query `backend_fallback_chain` in recall events (S-83 / T-278):**
+- The MCP server now populates the structured `backend_fallback_chain`
+  field on every successful `_tool_recall` emission. Each capability
+  records its cascade as a list: single-backend resolutions write
+  `[name]`; `FallbackChain` resolutions split `backend.name` on `+`
+  and write the full cascade (e.g. `["gemma", "haiku", "null"]`).
+- Drives the aggregator's `per_capability_fallback` view with real data;
+  prior to this change the field was empty in 100% of dogfood-observed
+  recall events (30/30) because nothing populated it.
+- Migration note for telemetry consumers: **do not assume
+  `backend_fallback_chain` is empty.** It now contains per-query cascade
+  traces. Existing dashboards that aggregated zero values from the
+  field will start seeing populated lists from this version forward.
+- Contract (kept distinct on purpose):
+  - **Legacy `backend.fallback`** (factory-time, in `factory.py`) and
+    **`backend.runtime_fallback`** (chain-time, in `chain.py`) are
+    *aggregate-count* simple-stream events — one row per
+    (capability, error_type, transition). Useful for rate dashboards.
+  - **Structured `backend_fallback_chain`** field in the recall stream
+    is the *per-query-detail* trace — answers "what cascade did *this*
+    specific query use?". The simple stream cannot answer that.
+  - Both paths are kept as complementary. Neither is being removed.
+- 4 new tests in `tests/test_metrics/test_fallback_canonical.py` cover:
+  single-backend resolution writes `[name]`, `FallbackChain` resolution
+  writes the split cascade, the legacy `backend.fallback*` simple-stream
+  events still fire (no regression), and `backend_summary()` reads the
+  structured field correctly into its `per_capability_fallback` view.
+
 **Two-mode CIQS comparison (`scripts/ciqs_compare.py`):**
 - Unpaired-bootstrap delta CI between baseline and candidate CIQS runs
   (e.g. vps-cpu pre-migration vs vps-gpu post-migration). Classifies each

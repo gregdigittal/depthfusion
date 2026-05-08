@@ -78,11 +78,15 @@ class TestHappyPathAllSixCapabilities:
 
         # Patch _detect_current_backends to return all six caps with probe
         # times written into perf_ms (simulates the S-80 implementation).
-        def fake_detect(perf_ms=None):
+        # S-83 added a `fallback_chain` kwarg; accept it for forward-compat.
+        def fake_detect(perf_ms=None, fallback_chain=None):
             backends = {c: "null" for c in SIX_CAPS}
             if perf_ms is not None:
                 for cap in SIX_CAPS:
                     perf_ms[cap] = 0.1  # tiny probe time
+            if fallback_chain is not None:
+                for cap in SIX_CAPS:
+                    fallback_chain[cap] = ["null"]
             return backends
 
         monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
@@ -120,11 +124,14 @@ class TestSingleCapabilityFallback:
         from depthfusion.mcp import server as srv_mod
         from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
 
-        # Stub _detect_current_backends
-        def fake_detect(perf_ms=None):
+        # Stub _detect_current_backends (S-83 added fallback_chain kwarg)
+        def fake_detect(perf_ms=None, fallback_chain=None):
             if perf_ms is not None:
                 for cap in SIX_CAPS:
                     perf_ms[cap] = 0.05
+            if fallback_chain is not None:
+                for cap in SIX_CAPS:
+                    fallback_chain[cap] = ["null"]
             return {c: "null" for c in SIX_CAPS}
 
         monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
@@ -173,11 +180,14 @@ class TestErrorPathLatencyCapture:
         from depthfusion.mcp import server as srv_mod
         from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
 
-        # Stub _detect_current_backends
-        def fake_detect(perf_ms=None):
+        # Stub _detect_current_backends (S-83 added fallback_chain kwarg)
+        def fake_detect(perf_ms=None, fallback_chain=None):
             if perf_ms is not None:
                 for cap in SIX_CAPS:
                     perf_ms[cap] = 0.05
+            if fallback_chain is not None:
+                for cap in SIX_CAPS:
+                    fallback_chain[cap] = ["null"]
             return {c: "null" for c in SIX_CAPS}
 
         monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
@@ -233,10 +243,13 @@ class TestDictShapeContract:
 
         from depthfusion.mcp import server as srv_mod
 
-        def fake_detect(perf_ms=None):
+        def fake_detect(perf_ms=None, fallback_chain=None):
             if perf_ms is not None:
                 for cap in SIX_CAPS:
                     perf_ms[cap] = 0.25
+            if fallback_chain is not None:
+                for cap in SIX_CAPS:
+                    fallback_chain[cap] = ["null"]
             return {c: "null" for c in SIX_CAPS}
 
         monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
@@ -281,11 +294,14 @@ class TestDictShapeContract:
         PROBE_STUB = 999.0  # deliberately large so the merge is visible
         PIPELINE_RERANKER = 0.0  # pipeline records a distinct value
 
-        def fake_detect(perf_ms=None):
+        def fake_detect(perf_ms=None, fallback_chain=None):
             if perf_ms is not None:
                 for cap in SIX_CAPS:
                     # Seed everything with the probe stub
                     perf_ms[cap] = PROBE_STUB
+            if fallback_chain is not None:
+                for cap in SIX_CAPS:
+                    fallback_chain[cap] = ["null"]
             return {c: "null" for c in SIX_CAPS}
 
         monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
