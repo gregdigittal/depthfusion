@@ -1360,15 +1360,15 @@
 > Empty string `""` in **987/987 observed events** (957 capture + 30 recall). The field is structurally present but never populated in non-gate code paths. The only caller that sets it is `record_gate_log()` (`src/depthfusion/retrieval/hybrid.py:198`) — which never executed during the dogfood window because `DEPTHFUSION_FUSION_GATES_ENABLED` defaults to `false` (see S-84). DR-018 §4 ratification declares this field mandatory; today it's a placeholder.
 
 **Acceptance criteria:**
-- [ ] AC-1: `MetricsCollector.record_capture_event()` and `record_recall_query()` both populate `config_version_id` from the active `GateConfig` hash (or a documented fallback for non-gate callers)
-- [ ] AC-2: For non-gate code paths where a `GateConfig` is not in scope, the field is populated with a deterministic hash of the active runtime config (mode, backend mix, env-var snapshot) so different runtime configurations produce different ids
-- [ ] AC-3: A documented "non-applicable" sentinel (e.g., `"none"`) is emitted for genuinely config-invariant events — empty string is no longer valid output
-- [ ] AC-4: ≥ 3 tests covering capture-path population, recall-path population, and the non-applicable sentinel case
+- [x] AC-1: `MetricsCollector.record_capture_event()` and `record_recall_query()` both populate `config_version_id` from the active `GateConfig` hash (or a documented fallback for non-gate callers)
+- [x] AC-2: For non-gate code paths where a `GateConfig` is not in scope, the field is populated with a deterministic hash of the active runtime config (mode, backend mix, env-var snapshot) so different runtime configurations produce different ids
+- [x] AC-3: A documented "non-applicable" sentinel (e.g., `"none"`) is emitted for genuinely config-invariant events — empty string is no longer valid output
+- [x] AC-4: ≥ 3 tests covering capture-path population, recall-path population, and the non-applicable sentinel case
 
 **Tasks:**
-- [ ] T-271: Plumb `GateConfig.version_id()` (or runtime-config hash) into `MetricsCollector` constructor or per-event call args
-- [ ] T-272: Update `record_capture_event` and `record_recall_query` to populate the field at emit time
-- [ ] T-273: Tests in `tests/test_metrics/test_config_version_id.py`
+- [x] T-271: Plumb `GateConfig.version_id()` (or runtime-config hash) into `MetricsCollector` constructor or per-event call args
+- [x] T-272: Update `record_capture_event` and `record_recall_query` to populate the field at emit time
+- [x] T-273: Tests in `tests/test_metrics/test_config_version_id.py`
 
 ### S-82: As a maintainer, I want test-fixture telemetry routed to a separate directory so that `~/.claude/depthfusion-metrics/` reflects only production-path activity `P1` `S`
 

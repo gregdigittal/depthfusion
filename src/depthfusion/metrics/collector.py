@@ -20,12 +20,28 @@ and capture mechanisms. Four separate daily streams now exist:
 Every structured record carries:
   * `event_subtype` — per DR-018 I-19 ratification. Values:
       "ok" | "error" | "timeout" | "sla_expiry_deny" | "user_deny" | "acs_reject"
-  * `config_version_id` — per amended I-11. Empty string is the sentinel
-    for "no config snapshot tracking wired yet" (same contract as gate
-    logs). Callers that track config versions override it.
+  * `config_version_id` — per amended I-11 / DR-018 §4. Auditor
+    reproducibility invariant: every emitted event carries a deterministic
+    snapshot pointer. Resolution order (S-81 / T-271..T-273):
+      1. caller-supplied non-empty value (preserved verbatim)
+      2. caller-supplied `CONFIG_VERSION_NONE` ("none") sentinel for
+         genuinely config-invariant events (preserved verbatim)
+      3. fall back to the collector's `config_version_resolver` — by
+         default a deterministic hash of the active runtime config
+         (mode, backend mix, and salient env-var snapshot)
+      4. if the resolver returns "" or None, coerce to
+         `CONFIG_VERSION_NONE` — empty string is no longer a valid
+         output of any structured event emitter
+    The same value is therefore stable across processes for identical
+    runtime configurations, and different runtime configurations
+    produce different ids.
 
 Gate-log records carry a `config_version_id` field per I-8 ratification
-(see docs/plans/v0.5/03-skillforge-integration.md §3.3.5 action 2).
+(see docs/plans/v0.5/03-skillforge-integration.md §3.3.5 action 2). The
+gate path resolves the id from `GateConfig.version_id()` directly at
+the call site (`retrieval.hybrid`); `record_gate_log` does not run it
+through the resolver — gate-log id is always specific to the gate
+config, not the broader runtime.
 
 Concurrency: every structured-stream append acquires `fcntl.flock(LOCK_EX)`
 on a fresh `open(path, "a")` file descriptor. Because each caller opens
@@ -49,14 +65,91 @@ that stream to `_append_jsonl` too.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import logging
+import os
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
+
+
+# v0.5 S-81 / T-271..T-273 — config_version_id is mandatory on every
+# structured event per DR-018 §4. "none" is the documented sentinel for
+# genuinely config-invariant events (e.g., system.startup) where pinning
+# to a runtime config snapshot would be misleading. Empty string is no
+# longer a valid output — `record_capture_event` and `record_recall_query`
+# coerce empty/None to this sentinel at emit time.
+CONFIG_VERSION_NONE = "none"
+
+# Env-var keys that materially affect recall/capture behaviour. Hashing
+# their resolved values into the runtime config_version_id ensures that
+# operators flipping any of these (e.g., switching reranker backend, mode,
+# or fusion alpha) produce a distinct id without a code change. Missing
+# vars hash as the empty string — distinct from "explicitly set to ''".
+_RUNTIME_CONFIG_ENV_KEYS: tuple[str, ...] = (
+    # Mode + global feature switches
+    "DEPTHFUSION_MODE",
+    "DEPTHFUSION_FUSION_ENABLED",
+    "DEPTHFUSION_FUSION_GATES_ENABLED",
+    "DEPTHFUSION_SESSION_ENABLED",
+    "DEPTHFUSION_RLM_ENABLED",
+    "DEPTHFUSION_ROUTER_ENABLED",
+    "DEPTHFUSION_GRAPH_ENABLED",
+    "DEPTHFUSION_HAIKU_ENABLED",
+    # Backend mix — different reranker / embedding / extractor backends
+    # produce materially different recall results and need distinct ids.
+    "DEPTHFUSION_RERANKER_BACKEND",
+    "DEPTHFUSION_EXTRACTOR_BACKEND",
+    "DEPTHFUSION_LINKER_BACKEND",
+    "DEPTHFUSION_SUMMARISER_BACKEND",
+    "DEPTHFUSION_EMBEDDING_BACKEND",
+    "DEPTHFUSION_DECISION_EXTRACTOR_BACKEND",
+    # Fusion gate parameters (when fusion gates are enabled, these
+    # affect every recall result; a single id should differ if any change)
+    "DEPTHFUSION_FUSION_GATES_ALPHA",
+    "DEPTHFUSION_FUSION_GATES_B_THRESHOLD",
+    "DEPTHFUSION_FUSION_GATES_C_THRESHOLD",
+    "DEPTHFUSION_FUSION_GATES_DELTA_THRESHOLD",
+    # RRF + RLM tuning that affects recall ordering / cost
+    "DEPTHFUSION_RRF_K",
+    "DEPTHFUSION_RLM_COST_CEILING",
+)
+
+
+def _runtime_config_version_id() -> str:
+    """Deterministic 12-char hex ID of the active runtime config (S-81 / T-271).
+
+    Used as the default fallback for `record_recall_query` and
+    `record_capture_event` when no explicit `config_version_id` is
+    supplied — non-gate code paths don't have a `GateConfig` in scope but
+    still need a reproducibility token per DR-018 §4.
+
+    Stable across processes for the same env snapshot (so two
+    independent recall calls with identical config produce the same id).
+    Changes when any tracked env var changes value (so operators
+    flipping a backend, mode, or threshold produce a distinct id without
+    a code change).
+
+    Errors are swallowed: returns `CONFIG_VERSION_NONE` on any failure
+    rather than raising into the metrics emit path. Observability must
+    never block serving.
+    """
+    try:
+        # Format `KEY=value` for each tracked env var in fixed order.
+        # An unset var contributes `KEY=` (empty value), which is
+        # distinct from `KEY=""` only by intent — we treat them as the
+        # same since `os.environ.get("FOO", "")` collapses both forms.
+        parts = tuple(
+            f"{k}={os.environ.get(k, '')}" for k in _RUNTIME_CONFIG_ENV_KEYS
+        )
+        raw = "|".join(parts).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()[:12]
+    except Exception:  # noqa: BLE001 — observability must not raise
+        return CONFIG_VERSION_NONE
 
 
 def _json_default(o: Any) -> Any:
@@ -113,11 +206,61 @@ class MetricsCollector:
       * `YYYY-MM-DD-capture.jsonl`  — capture-mechanism write events
     """
 
-    def __init__(self, metrics_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        metrics_dir: Path | None = None,
+        *,
+        config_version_resolver: Callable[[], str] | None = None,
+    ) -> None:
+        """Construct a collector rooted at `metrics_dir`.
+
+        `config_version_resolver` (S-81): a zero-arg callable returning
+        the current `config_version_id` for structured events. Defaults
+        to `_runtime_config_version_id`, which hashes the active env
+        snapshot. Tests inject a deterministic stub (e.g. `lambda: "x"`)
+        and gate-specific callers override the value per call. Returning
+        `""` or `None` is equivalent to returning `CONFIG_VERSION_NONE`
+        — the structured emitters coerce both at emit time so empty
+        string is never written to disk for capture/recall events.
+        """
         if metrics_dir is None:
             metrics_dir = Path.home() / ".claude" / "depthfusion-metrics"
         self.metrics_dir = metrics_dir
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
+        self._config_version_resolver: Callable[[], str] = (
+            config_version_resolver
+            if config_version_resolver is not None
+            else _runtime_config_version_id
+        )
+
+    # ------------------------------------------------------------------
+    # Internal: config_version_id resolution (S-81)
+    # ------------------------------------------------------------------
+
+    def _resolve_config_version_id(self, supplied: str | None) -> str:
+        """Resolve the `config_version_id` for a structured event (S-81).
+
+        Resolution order:
+          1. caller-supplied non-empty, non-None value → used verbatim
+             (this preserves both real ids like a gate-config hash AND
+             the explicit `CONFIG_VERSION_NONE` sentinel for genuinely
+             config-invariant events)
+          2. `""` or `None` → invoke `config_version_resolver`
+          3. resolver returned `""` or `None` (or raised) → coerce to
+             `CONFIG_VERSION_NONE` so empty string never reaches disk
+
+        Empty string is no longer a valid output of any structured
+        event emitter per DR-018 §4 ratification.
+        """
+        if supplied is not None and supplied != "":
+            return supplied
+        try:
+            resolved = self._config_version_resolver()
+        except Exception:  # noqa: BLE001 — observability must not raise
+            return CONFIG_VERSION_NONE
+        if not resolved:
+            return CONFIG_VERSION_NONE
+        return resolved
 
     # ------------------------------------------------------------------
     # Internal: locked JSONL append
@@ -239,7 +382,7 @@ class MetricsCollector:
         total_latency_ms: float | None = None,
         result_count: int | None = None,
         event_subtype: str = "ok",
-        config_version_id: str = "",
+        config_version_id: str | None = None,
     ) -> None:
         """Append a structured recall-query record to `YYYY-MM-DD-recall.jsonl`.
 
@@ -258,8 +401,11 @@ class MetricsCollector:
           - `result_count`: number of blocks returned to the caller
           - `event_subtype`: "ok" | "error" | "timeout" | "sla_expiry_deny"
             | "user_deny" | "acs_reject". Unknown values coerce to "ok".
-          - `config_version_id`: snapshot pointer (I-11 amended); "" sentinel
-            when config tracking isn't wired
+          - `config_version_id`: snapshot pointer per DR-018 §4 (S-81).
+            `None` (default) or `""` invokes the collector's
+            `config_version_resolver`. Pass `CONFIG_VERSION_NONE` ("none")
+            to mark a genuinely config-invariant emission. Empty string
+            is never written to disk — it coerces to `CONFIG_VERSION_NONE`.
 
         Errors are swallowed.
         """
@@ -274,7 +420,7 @@ class MetricsCollector:
             "latency_ms_per_capability": latency_ms_per_capability or {},
             "total_latency_ms": total_latency_ms,
             "result_count": result_count,
-            "config_version_id": config_version_id,
+            "config_version_id": self._resolve_config_version_id(config_version_id),
         }
         self._append_jsonl(self.today_recall_path(), entry)
 
@@ -288,7 +434,7 @@ class MetricsCollector:
         entries_written: int = 0,
         file_path: str = "",
         event_subtype: str = "ok",
-        config_version_id: str = "",
+        config_version_id: str | None = None,
     ) -> None:
         """Append a capture-mechanism event to `YYYY-MM-DD-capture.jsonl`.
 
@@ -303,6 +449,12 @@ class MetricsCollector:
         mechanisms — unknown values are preserved on disk (for
         forensics) but the aggregator won't bucket them as known streams.
 
+        `config_version_id` follows the same resolution contract as
+        `record_recall_query` (S-81 / DR-018 §4). `None` or `""` invokes
+        the collector's runtime-config resolver; pass
+        `CONFIG_VERSION_NONE` for genuinely config-invariant emissions.
+        Empty string is never written to disk.
+
         Errors are swallowed.
         """
         entry = {
@@ -316,7 +468,7 @@ class MetricsCollector:
             "write_success": write_success,
             "entries_written": entries_written,
             "file_path": file_path,
-            "config_version_id": config_version_id,
+            "config_version_id": self._resolve_config_version_id(config_version_id),
         }
         self._append_jsonl(self.today_capture_path(), entry)
 

@@ -64,7 +64,15 @@ def _guard_metrics_production_path(tmp_path_factory: pytest.TempPathFactory) -> 
 
     original_init = MetricsCollector.__init__
 
-    def _safe_init(self: MetricsCollector, metrics_dir: Path | None = None) -> None:
+    def _safe_init(
+        self: MetricsCollector,
+        metrics_dir: Path | None = None,
+        **kwargs,
+    ) -> None:
+        # S-81 added the `config_version_resolver` keyword on
+        # MetricsCollector.__init__; forward all extra kwargs through to
+        # the original init so injected resolvers (and any future
+        # additions) keep working under this guard.
         if metrics_dir is None:
             resolved_home = Path.home()
             if resolved_home == _REAL_HOME:
@@ -74,7 +82,7 @@ def _guard_metrics_production_path(tmp_path_factory: pytest.TempPathFactory) -> 
                 # A test has redirected Path.home() — let that test's isolation
                 # mechanism work as intended.
                 metrics_dir = resolved_home / ".claude" / "depthfusion-metrics"
-        original_init(self, metrics_dir=metrics_dir)
+        original_init(self, metrics_dir=metrics_dir, **kwargs)
 
     with patch.object(MetricsCollector, "__init__", _safe_init):
         yield

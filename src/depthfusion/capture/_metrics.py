@@ -12,6 +12,11 @@ emissions go through `emit_capture_event()` so:
     the metrics collector (test stubs, minimal deploys) still work.
   * The `event_subtype` default of "ok" is consistent with the
     collector's validation contract.
+
+S-81 / T-272: `config_version_id` defaults to `None` so the underlying
+`record_capture_event` invokes its runtime-config resolver and writes a
+deterministic id rather than the empty-string sentinel that was emitted
+in 100% of capture events during the week-1 dogfood window.
 """
 from __future__ import annotations
 
@@ -29,7 +34,7 @@ def emit_capture_event(
     entries_written: int = 0,
     file_path: str = "",
     event_subtype: str = "ok",
-    config_version_id: str = "",
+    config_version_id: str | None = None,
 ) -> None:
     """Emit a structured capture-event JSONL record. Never raises.
 
