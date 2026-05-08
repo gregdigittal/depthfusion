@@ -1405,13 +1405,13 @@
 > §2 says "**No env flags need setting.** All four streams emit by default as of v0.5.2." §4d (analysis checklist) admits "Should emit when `DEPTHFUSION_FUSION_GATES_ENABLED` is on." The contradiction misled the 2026-05-04 dogfood operator (me); same contradiction will mislead future operators. Three other doc improvements identified in the 2026-05-04 report §"What to change in the runbook" should land in the same edit pass.
 
 **Acceptance criteria:**
-- [ ] AC-1: §2 either lists `DEPTHFUSION_FUSION_GATES_ENABLED=true` as a prereq for the gates stream OR removes the gates stream from the §1 table (and explains it's an opt-in side channel)
-- [ ] AC-2: §3 daily protocol gains a day-1 verification step ("check that `<today>-capture.jsonl` contains at least one event with a `file_path` outside `/tmp/`")
-- [ ] AC-3: §6 triage table gains a sixth row: "Substrate gap" (instrumentation works but isn't being invoked; default P0; blocks all other findings)
-- [ ] AC-4: §7 report template adds a "Headline finding" section above "Stream health"
+- [x] AC-1: §2 either lists `DEPTHFUSION_FUSION_GATES_ENABLED=true` as a prereq for the gates stream OR removes the gates stream from the §1 table (and explains it's an opt-in side channel)
+- [x] AC-2: §3 daily protocol gains a day-1 verification step ("check that `<today>-capture.jsonl` contains at least one event with a `file_path` outside `/tmp/`")
+- [x] AC-3: §6 triage table gains a sixth row: "Substrate gap" (instrumentation works but isn't being invoked; default P0; blocks all other findings)
+- [x] AC-4: §7 report template adds a "Headline finding" section above "Stream health"
 
 **Tasks:**
-- [ ] T-280: Apply the four corrections to `docs/runbooks/dogfood-telemetry.md` in a single docs commit
+- [x] T-280: Apply the four corrections to `docs/runbooks/dogfood-telemetry.md` in a single docs commit (f0fa3a0)
 
 ---
 
