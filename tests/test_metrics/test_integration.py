@@ -382,14 +382,21 @@ class TestReviewGateRegressions:
 
 
 class TestLatencyPerCapability:
-    """S-61: `latency_ms_per_capability` must be populated for phases
-    that actually run (reranker, fusion_gates), absent for phases that
-    didn't execute.
+    """S-61 / S-80: `latency_ms_per_capability` must be populated.
+
+    S-61 (original): phases that actually ran (reranker, fusion_gates)
+    must appear; absent phases must not.
+    S-80 (extended): ALL six backend capabilities must appear as keys
+    (populated via backend probe in `_detect_current_backends`).
+    `fusion_gates` is a pipeline phase, NOT a backend capability —
+    it is EXCLUDED from the S-80 guarantee.
     """
 
     def test_local_mode_no_phase_latencies(self, tmp_path, monkeypatch):
-        """LOCAL mode: reranker is a pass-through slice, gates disabled →
-        neither capability appears in the latency dict.
+        """LOCAL mode: reranker is a pass-through slice, gates disabled.
+
+        S-61: `fusion_gates` must NOT appear (pipeline phase, not invoked).
+        S-80: `reranker` MUST appear (backend probe runs for all 6 caps).
         """
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         monkeypatch.setenv("DEPTHFUSION_MODE", "local")
@@ -407,8 +414,10 @@ class TestLatencyPerCapability:
         events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
         assert len(events) == 1
         lat = events[0]["latency_ms_per_capability"]
-        assert "reranker" not in lat
+        # S-61: fusion_gates (pipeline phase) must never appear
         assert "fusion_gates" not in lat
+        # S-80: reranker must appear (backend probe seeds all 6 caps)
+        assert "reranker" in lat
 
     def test_fusion_gates_phase_timed_when_enabled(self, tmp_path, monkeypatch):
         """When DEPTHFUSION_FUSION_GATES_ENABLED=true AND the input pool
@@ -433,8 +442,11 @@ class TestLatencyPerCapability:
         assert "fusion_gates" in lat
         assert isinstance(lat["fusion_gates"], (int, float))
         assert lat["fusion_gates"] >= 0.0
-        # In local mode the reranker is still a slice — no reranker key
-        assert "reranker" not in lat
+        # S-80: reranker now appears (backend probe seeds all 6 caps even
+        # in local mode where the pipeline does not invoke the reranker).
+        assert "reranker" in lat
+        assert isinstance(lat["reranker"], (int, float))
+        assert lat["reranker"] >= 0.0
 
     def test_reranker_phase_timed_in_non_local_mode(self, tmp_path, monkeypatch):
         """In VPS_TIER1+ modes where the reranker invokes a backend,
@@ -479,7 +491,11 @@ class TestLatencyPerCapability:
     def test_empty_pool_skips_fusion_gates_timing(self, tmp_path, monkeypatch):
         """When the query pool is empty (no raw_blocks at all), the
         fusion_gates phase is skipped — recall returns early before
-        reaching the pipeline. No capability entries emitted.
+        reaching the pipeline.
+
+        S-61: `fusion_gates` must NOT appear (pipeline phase, not invoked).
+        S-80: the backend probe still runs (event_subtype is "ok" even on
+        empty results), so all six capability keys are present.
         """
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "true")
@@ -491,7 +507,14 @@ class TestLatencyPerCapability:
 
         events = _read_jsonl(next(_metrics_dir(tmp_path).glob("*-recall.jsonl")))
         lat = events[0]["latency_ms_per_capability"]
-        assert lat == {}  # empty — no phases ran
+        # S-61: fusion_gates (pipeline phase) must not appear — pool was empty
+        assert "fusion_gates" not in lat
+        # S-80: backend probe seeds all six capability keys even on empty pool
+        for cap in ("reranker", "extractor", "linker", "summariser",
+                    "embedding", "decision_extractor"):
+            assert cap in lat, f"Expected probe latency for {cap!r}, got: {lat}"
+            assert isinstance(lat[cap], (int, float))
+            assert lat[cap] >= 0.0
 
     def test_latency_values_are_numeric_not_strings(self, tmp_path, monkeypatch):
         """Review-gate belt-and-braces: the timing values round-trip as

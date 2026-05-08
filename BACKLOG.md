@@ -1344,16 +1344,16 @@
 > Today only `reranker` latency is recorded, and only on 10/30 observed events. The other five capabilities (`extractor`, `linker`, `summariser`, `embedding`, `decision_extractor`) appear in `backend_used` on every event but never appear in the latency dict. **S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) cannot close** until per-capability latency is captured. Same gap blocks S-64 AC-2 (p95 latency per capability in the Phase 4 GPU migration runbook).
 
 **Acceptance criteria:**
-- [ ] AC-1: All six capabilities present in `backend_used` for a recall event also appear as keys in `latency_ms_per_capability` for that same event
-- [ ] AC-2: Latency value is the per-capability wall-clock in milliseconds (not cumulative); units match the existing `reranker` value
-- [ ] AC-3: When a capability is invoked but the backend returns an error, the latency is still recorded (with the `event_subtype: "error"` marker on the parent event)
+- [x] AC-1: All six capabilities present in `backend_used` for a recall event also appear as keys in `latency_ms_per_capability` for that same event
+- [x] AC-2: Latency value is the per-capability wall-clock in milliseconds (not cumulative); units match the existing `reranker` value
+- [x] AC-3: When a capability is invoked but the backend returns an error, the latency is still recorded (with the `event_subtype: "error"` marker on the parent event)
 - [ ] AC-4: S-43 AC-3 and S-64 AC-2 are unblocked — re-run the relevant scoring/measurement after S-79 lands and tick those ACs
-- [ ] AC-5: ≥ 4 tests covering happy-path multi-capability recall, single-capability fallback, error-path latency capture, and the dict-shape contract
+- [x] AC-5: ≥ 4 tests covering happy-path multi-capability recall, single-capability fallback, error-path latency capture, and the dict-shape contract
 
 **Tasks:**
-- [ ] T-268: Identify the recording site for `reranker` latency and replicate the pattern for the other five capabilities
-- [ ] T-269: Wire latency capture into `extractor`, `linker`, `summariser`, `embedding`, `decision_extractor` invocation sites (likely a single decorator or context manager)
-- [ ] T-270: Tests in `tests/test_metrics/test_per_capability_latency.py`
+- [x] T-268: Identify the recording site for `reranker` latency and replicate the pattern for the other five capabilities
+- [x] T-269: Wire latency capture into `extractor`, `linker`, `summariser`, `embedding`, `decision_extractor` invocation sites (likely a single decorator or context manager)
+- [x] T-270: Tests in `tests/test_metrics/test_per_capability_latency.py`
 
 ### S-81: As an auditor, I want `config_version_id` populated in every emitted capture and recall event so that the D-3 invariant per DR-018 §4 (auditor reproducibility) is enforced, not just declared `P1` `S`
 

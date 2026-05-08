@@ -400,7 +400,21 @@ def _tool_recall(arguments: dict) -> str:
         # so each query reflects the CURRENT routing, not a stale cache.
         # Skip the 6× probe on the error path (the path is already
         # degraded; adding probe overhead doesn't add observability value).
-        backend_used = _detect_current_backends() if event_subtype == "ok" else {}
+        # S-80 / T-268: pass perf_ms so probe latencies seed all six
+        # capability keys; pipeline-level measurements (reranker, embedding)
+        # already in perf_ms take precedence — they were recorded before
+        # this point, so they are NOT overwritten here.  Probe-time entries
+        # are written to a copy so we can selectively fill only capabilities
+        # that don't already have a pipeline measurement.
+        if event_subtype == "ok":
+            _probe_ms: dict[str, float] = {}
+            backend_used = _detect_current_backends(perf_ms=_probe_ms)
+            # Merge: pipeline measurements win; probe times fill any gap.
+            for _cap, _t in _probe_ms.items():
+                if _cap not in perf_ms:
+                    perf_ms[_cap] = _t
+        else:
+            backend_used = {}
         total_latency_ms = (time.monotonic() - t0) * 1000.0
 
         MetricsCollector().record_recall_query(
@@ -418,21 +432,40 @@ def _tool_recall(arguments: dict) -> str:
     return response_json
 
 
-def _detect_current_backends() -> dict[str, str]:
+def _detect_current_backends(
+    perf_ms: "dict[str, float] | None" = None,
+) -> dict[str, str]:
     """Return {capability: backend_name} for all 6 LLM capabilities.
 
     Resolves via `get_backend(...)` so the routing reflects the live env
     (including any DEPTHFUSION_*_BACKEND overrides). Fails-closed to an
     empty dict on any error — the record still emits, just without
     routing detail for the failed probe.
+
+    S-80 / T-268: when `perf_ms` is supplied, each backend probe is timed
+    and the wall-clock duration (ms) is written into `perf_ms[cap]`.
+    This seeds latency entries for all six capabilities; capabilities that
+    the recall pipeline actually invokes (``reranker``, ``embedding``)
+    will have their probe-time entry overwritten by the more precise
+    in-pipeline measurement recorded in ``_tool_recall_impl``.
+    Capabilities not invoked during recall (``extractor``, ``linker``,
+    ``summariser``, ``decision_extractor``) retain the probe-time latency
+    — it is the only real backend interaction for those capabilities within
+    the scope of a recall event.
     """
+    import time as _time  # shadow-free local import for timing
+
     result: dict[str, str] = {}
     try:
         from depthfusion.backends.factory import get_backend
         for cap in ("reranker", "extractor", "linker", "summariser",
                     "embedding", "decision_extractor"):
             try:
-                result[cap] = get_backend(cap).name
+                _t = _time.monotonic()
+                backend = get_backend(cap)
+                result[cap] = backend.name
+                if perf_ms is not None:
+                    perf_ms[cap] = round((_time.monotonic() - _t) * 1000.0, 3)
             except Exception:  # noqa: BLE001 — per-cap failure → skip
                 continue
     except Exception:  # noqa: BLE001
@@ -659,15 +692,23 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         and reranker_input
     ):
         _t_vec = time.monotonic()
-        vector_results = pipeline.apply_vector_search(
-            query, reranker_input, top_k=max(top_k * 2, 10),
-        )
-        if vector_results:
-            # RRF-fuse BM25 (reranker_input, already ranked) with the
-            # vector-search ordering. Output is the fused list — replace
-            # the reranker input so downstream phases see the fused pool.
-            reranker_input = pipeline.rrf_fuse(reranker_input, vector_results)
-        perf_ms["vector_search"] = round((time.monotonic() - _t_vec) * 1000.0, 3)
+        try:
+            vector_results = pipeline.apply_vector_search(
+                query, reranker_input, top_k=max(top_k * 2, 10),
+            )
+            if vector_results:
+                # RRF-fuse BM25 (reranker_input, already ranked) with the
+                # vector-search ordering. Output is the fused list — replace
+                # the reranker input so downstream phases see the fused pool.
+                reranker_input = pipeline.rrf_fuse(reranker_input, vector_results)
+        finally:
+            # S-80 AC-3: record latency even when apply_vector_search raises.
+            # Also record under the canonical capability key ("embedding") so
+            # latency_ms_per_capability always uses backend capability names,
+            # not pipeline-phase names.
+            _vec_elapsed = round((time.monotonic() - _t_vec) * 1000.0, 3)
+            perf_ms["vector_search"] = _vec_elapsed
+            perf_ms["embedding"] = _vec_elapsed
 
     # S-61: apply fusion gates BEFORE reranking when enabled. The
     # gates (Mamba B/C/Δ) filter the candidate pool by query similarity
@@ -687,10 +728,15 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # Apply reranker (no-op in local mode, haiku in vps-tier1+2).
     # Time this phase only in non-LOCAL modes where the reranker actually
     # calls an LLM backend — in LOCAL mode `apply_reranker` is a list slice.
+    # S-80 AC-3: record latency even when the reranker backend returns an
+    # error — wrap in try/finally so the elapsed time is captured before
+    # the exception propagates to the outer try/except in `_tool_recall`.
     _t_rerank = time.monotonic()
-    blocks_out = pipeline.apply_reranker(reranker_input, query, top_k=top_k)
-    if pipeline.mode.value != "local":
-        perf_ms["reranker"] = round((time.monotonic() - _t_rerank) * 1000.0, 3)
+    try:
+        blocks_out = pipeline.apply_reranker(reranker_input, query, top_k=top_k)
+    finally:
+        if pipeline.mode.value != "local":
+            perf_ms["reranker"] = round((time.monotonic() - _t_rerank) * 1000.0, 3)
     # Ensure output blocks have consistent fields
     for b in blocks_out:
         if "snippet" not in b:
