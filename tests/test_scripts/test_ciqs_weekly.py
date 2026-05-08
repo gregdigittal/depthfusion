@@ -380,7 +380,7 @@ class TestMainExitCodes:
 
         monkeypatch.setattr(
             "depthfusion.metrics.aggregator.MetricsAggregator",
-            lambda *_args, **_kw: _Empty(MetricsCollector()),
+            lambda *_args, **_kw: _Empty(MetricsCollector(tmp_path / "metrics")),
         )
         out = tmp_path / "report.md"
         rc = weekly.main([

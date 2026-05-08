@@ -1375,15 +1375,15 @@
 > Today pytest invocations of `MetricsCollector()` (default constructor with no `tmp_path`) write to the user-home production directory. Over the 13-day dogfood window this caused 100% of observed telemetry to be test data. Without separation, future dogfood passes will continue to see polluted signal regardless of S-79's outcome.
 
 **Acceptance criteria:**
-- [ ] AC-1: Tests routed to `tmp_path` by default (pytest fixture) OR the production path is guarded against test invocation (e.g., abort if `PYTEST_CURRENT_TEST` is set without an explicit override)
-- [ ] AC-2: Existing test files updated to use the new fixture / guard pattern; no test writes to `~/.claude/depthfusion-metrics/` after this story lands
-- [ ] AC-3: Documentation in `tests/README.md` (or equivalent) explains the test-vs-production separation
-- [ ] AC-4: ≥ 2 tests verifying the guard fires when expected and is bypassable for legitimate integration tests
+- [x] AC-1: Tests routed to `tmp_path` by default (pytest fixture) OR the production path is guarded against test invocation (e.g., abort if `PYTEST_CURRENT_TEST` is set without an explicit override)
+- [x] AC-2: Existing test files updated to use the new fixture / guard pattern; no test writes to `~/.claude/depthfusion-metrics/` after this story lands
+- [x] AC-3: Documentation in `tests/README.md` (or equivalent) explains the test-vs-production separation
+- [x] AC-4: ≥ 2 tests verifying the guard fires when expected and is bypassable for legitimate integration tests
 
 **Tasks:**
-- [ ] T-274: Audit all `MetricsCollector()` instantiations in test files; identify which use `tmp_path` and which use the default
-- [ ] T-275: Implement the guard or pytest fixture; update offending test files
-- [ ] T-276: Tests in `tests/test_metrics/test_path_isolation.py`
+- [x] T-274: Audit all `MetricsCollector()` instantiations in test files; identify which use `tmp_path` and which use the default
+- [x] T-275: Implement the guard or pytest fixture; update offending test files
+- [x] T-276: Tests in `tests/test_metrics/test_path_isolation.py`
 
 ### S-83: As an operator, I want a single source of truth for fallback events so that I'm not reconciling legacy `backend.fallback*` metric tuples against an empty structured `backend_fallback_chain` field `P2` `S`
 
