@@ -14,7 +14,7 @@ E-27 (Memory Policy Layer) is ready. The handoff doc is at:
 
 ## Pin SHA
 
-**Pin SHA:** `0b61132` (latest on `main` as of 2026-05-08).
+**Pin SHA:** `2f6b212` (latest on `main` as of 2026-05-08).
 
 Do **not** use the `v0.6.0a1` tag — E-27 landed after that tag was cut, and additional E-29 polish improvements have landed since the original handoff. The E-27 contract surface (the four MCP tool response shapes) is **unchanged** since the original handoff doc — see "What changed since the handoff" below for the full picture.
 
@@ -57,6 +57,7 @@ The E-27 contract surface (the four MCP tool response shapes documented in §2) 
 | S-80 | All six retrieval capabilities now appear in `latency_ms_per_capability` (was reranker-only) | None — JSONL stream only, not MCP response |
 | S-81 | `config_version_id` now populated in capture/recall events (was empty string) | None — JSONL stream only, not MCP response |
 | S-82 | Test telemetry routed to tmp dirs, no longer pollutes `~/.claude/depthfusion-metrics/` | None — test-only |
+| S-83 | `backend_fallback_chain` now populated in recall events with per-query cascade trace | None — JSONL stream only, not MCP response |
 | S-84 | Runbook docs corrections | None — docs only |
 
 Plus three documentation corrections to the handoff doc itself (commits `1fca21c` and `54d8e6d`):

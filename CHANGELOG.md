@@ -12,12 +12,73 @@ Conventions:
 
 ## [Unreleased]
 
-Accumulating post-v0.6.0a1. No release cut yet; items target v0.6.0 or
+Accumulating post-v0.6.0a2. No release cut yet; items target v0.6.0 or
 v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
+
+---
+
+## [v0.6.0a2] — 2026-05-08
+
+**Theme:** v0.5.3 polish (E-29) — observability gaps surfaced by the week-1 dogfood report. No retrieval-quality or MCP-surface changes; this release closes the substrate gap (S-79) and populates four previously-empty fields in the structured streams.
 
 ### Added
 
-**Per-query `backend_fallback_chain` in recall events (S-83 / T-278):**
+**Startup self-check + `system.startup` event (S-79 AC-3 / T-265, T-267):**
+- `_emit_startup_event()` in `mcp/server.py` writes a `metric="system.startup"` record to the legacy `.jsonl` stream on every MCP server init.
+- Includes `tools_enabled` count and `server_version` in labels.
+- Logs WARNING (never raises) when the metrics directory is unwritable.
+- An empty metrics directory at end-of-day now distinguishes "server never ran" from "ran but emitted nothing" — absence of `system.startup` is the signal. Catches future environment drift before it causes another 13-day silent gap.
+
+**Per-capability latency for all six retrieval capabilities (S-80 / T-268, T-269, T-270):**
+- `_detect_current_backends()` now records probe latency per capability into `latency_ms_per_capability`. Pipeline measurements (reranker, embedding/vector_search) win over probe times via merge-with-priority. Error paths use try/finally so latency is captured even when a backend raises.
+- All six capability keys (`extractor`, `linker`, `summariser`, `embedding`, `decision_extractor`, `reranker`) now appear in every recall event. **Unblocks S-43 AC-3** (p95 recall latency per capability) and **S-64 AC-2** (GPU migration phase 4 latency table).
+
+**`config_version_id` plumbing via runtime resolver (S-81 / T-271, T-272, T-273):**
+- `CONFIG_VERSION_NONE = "none"` sentinel replaces the empty-string emission. `MetricsCollector` gains a `config_version_resolver` kwarg defaulting to a 12-char sha256 hash of 19 tracked env-var keys (mode, all 6 backends, fusion gate params, RRF/RLM tuning).
+- `record_capture_event` and `record_recall_query` route the field through the resolver: explicit non-empty values pass through verbatim, empty/None falls through to runtime resolution, resolver failures coerce to `"none"`.
+- Empty string is no longer a valid output for capture/recall events. The DR-018 §4 D-3 invariant (auditor reproducibility) is now structurally enforced rather than declared.
+
+**`backend_fallback_chain` populated in recall events (S-83 / T-278, T-279):**
+- The MCP server now populates the structured `backend_fallback_chain` field on every successful `_tool_recall` emission. Each capability records its cascade as a list: single-backend resolutions write `[name]`; `FallbackChain` resolutions split `backend.name` on `+` and write the full cascade (e.g. `["gemma", "haiku", "null"]`).
+- Documented as **complementary** to the legacy simple-stream events:
+  - Legacy `backend.fallback` / `backend.runtime_fallback` = aggregate count per (capability, error_type), useful for rate dashboards
+  - Structured `backend_fallback_chain` = per-query cascade trace, useful for debugging "what cascade did query X use?"
+- Migration note: consumers of `~/.claude/depthfusion-metrics/*-recall.jsonl` must NOT assume `backend_fallback_chain` is empty — it now contains per-query cascade traces.
+
+**Test/prod telemetry separation (S-82 / T-274, T-275, T-276):**
+- New `tests/conftest.py` autouse session fixture intercepts bare `MetricsCollector()` calls during pytest runs and redirects writes to a per-session tmp dir. Explicit `metrics_dir` args always win — escape hatch for legitimate integration tests.
+- After this lands, `~/.claude/depthfusion-metrics/` reflects only production-path activity. The next dogfood pass will distinguish real usage from test noise without manual filtering.
+- Documented in new `tests/README.md`.
+
+**Runbook self-correction (S-84 / T-280):**
+- `docs/runbooks/dogfood-telemetry.md` §2 prereqs now correctly document `DEPTHFUSION_FUSION_GATES_ENABLED=true` as the gates-stream prereq (was: incorrectly stated "no env flags need setting").
+- §3 daily protocol gains a day-1 verification step.
+- §6 triage table gains a "Substrate gap" row (P0; blocks all other findings).
+- §7 report template gains a "Headline finding" section above "Stream health".
+
+### Changed
+
+**Handoff doc corrections (commits 1fca21c, 54d8e6d):**
+- `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.3 corrected three response-shape errors caught by independent review:
+  - `recall_relevant.source` field is a label (`"session"` / `"discovery"` / `"memory"`), not a path
+  - Empty-result shape: `total_sources_scanned` is **absent** on empty paths, not `0`
+  - Per-block caveat: `gate_b_score` / `gate_c_score` / `gate_fused_score` appear when `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+
+### Fixed
+
+**Hook chain venv path drift (S-79 AC-1 / T-263, T-264):**
+- The week-1 dogfood report's headline finding ("100% test fixtures, zero production-path emissions over 13 days") was traced to `~/.claude-shared/hooks/*.sh` referencing a stale capitalised venv path (`/home/gregmorris/Development/Projects/...`) that no longer existed. Real checkout was at `/home/gregmorris/projects/depthfusion/`. Fix applied via sed across 6 files. Recall portion validated 2026-05-07 (4 production-path recall events across 2 fresh sessions).
+
+### Verification
+
+**Test totals as of v0.6.0a2:**
+- 1430 tests collected
+- `tests/test_metrics/`: 83 pass (was 50 pre-E-29)
+- `tests/test_backends/`: 225 pass
+- `tests/test_mcp/`: 23 pass
+- No regressions of S-80, S-81, S-82, S-83 cross-checked at each commit.
+
+---
 - The MCP server now populates the structured `backend_fallback_chain`
   field on every successful `_tool_recall` emission. Each capability
   records its cascade as a list: single-backend resolutions write
