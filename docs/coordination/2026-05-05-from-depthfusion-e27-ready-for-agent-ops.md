@@ -110,7 +110,7 @@ Authoritative source: `src/depthfusion/mcp/server.py`. All four MCP tools return
   "blocks": [
     {
       "chunk_id": "2026-05-04-foo#0",         // ← this is what goes into used/ignored
-      "source": "discoveries/myproj/2026-05-04-foo.md",
+      "source": "discovery",                   // label: "session" | "discovery" | "memory"
       "score": 0.847,
       "snippet": "…up to snippet_len chars of body (default 1500)…"
     }
@@ -122,12 +122,13 @@ Authoritative source: `src/depthfusion/mcp/server.py`. All four MCP tools return
   "message": "Retrieved 5 relevant blocks (BM25+RRF)"
 }
 
-// On empty-result paths, recall_id is null and engaged_layers is omitted:
-{ "query": "...", "blocks": [], "recall_id": null, "total_sources_scanned": 0,
-  "message": "No discovery files indexed yet for this scope" }
+// On empty-result paths, recall_id is null, engaged_layers is omitted,
+// and total_sources_scanned is absent (not 0 — the field is not included):
+{ "query": "...", "blocks": [], "recall_id": null,
+  "message": "No session context available" }
 ```
 
-**Per-block fields:** only `chunk_id`, `source`, `score`, `snippet`. The handoff originally documented `tier`, `tags`, and `metadata` per-block — those do **not** exist in the response. The `tier` and `backend_used` info is recorded into the metrics JSONL stream (`MetricsCollector.record_recall_query`) but is **not** returned to the MCP caller. If you need per-call backend telemetry on the consumer side, file an agent-ops story; for now read the metrics JSONL out-of-band.
+**Per-block fields:** `chunk_id`, `source` (label, not path), `score`, `snippet`. The handoff originally documented `tier`, `tags`, and `metadata` per-block — those do **not** exist in the response. **Exception:** if `DEPTHFUSION_FUSION_GATES_ENABLED=true` (off by default), blocks additionally include `gate_b_score`, `gate_c_score`, and `gate_fused_score` float fields (`gates.py:365`). Treat these as optional/additive — do not depend on their absence. The `tier` and `backend_used` info is recorded into the metrics JSONL stream (`MetricsCollector.record_recall_query`) but is **not** returned to the MCP caller. If you need per-call backend telemetry on the consumer side, file an agent-ops story; for now read the metrics JSONL out-of-band.
 
 **Threading `recall_id → chunk_id` into feedback:**
 
