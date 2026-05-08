@@ -42,13 +42,31 @@ python -c "import depthfusion; print(depthfusion.__version__)"
 ls -la ~/.claude/depthfusion-metrics/ 2>/dev/null || mkdir -p ~/.claude/depthfusion-metrics
 ```
 
-**No env flags need setting.** All four streams emit by default as of v0.5.2. The earlier dual-gate pattern (S-60 integration) is already on.
+**Three streams emit by default.** The simple metrics, recall, and capture streams require no env flags. The fourth stream — **gates** — is opt-in:
+
+```bash
+# To enable the gates stream (Mamba B/C/Δ audit):
+export DEPTHFUSION_FUSION_GATES_ENABLED=true
+```
+
+Leave it unset if you only want the three default streams. An empty `*-gates.jsonl` at end-of-day when the flag is unset is **expected**, not a bug.
 
 ---
 
 ## 3. Daily usage protocol
 
-**Do nothing special.** Use Claude Code normally for a week. The instrumentation rides along.
+**Day-1 verification (do this once before the observation window begins):**
+
+```bash
+# After starting a fresh Claude Code session, confirm capture emitted:
+ls ~/.claude/depthfusion-metrics/$(date +%Y-%m-%d)-capture.jsonl 2>/dev/null \
+  && echo "OK — production path active" \
+  || echo "MISSING — check hooks and venv path in ~/.claude-shared/hooks/"
+```
+
+If the file is missing after a real session, stop and fix the emission path before continuing. See `docs/runbooks/dogfood-reports/` for the S-79 investigation that found this class of failure.
+
+**Do nothing special for the rest of the week.** Use Claude Code normally. The instrumentation rides along.
 
 Sessions to favour during the observation window:
 
@@ -189,6 +207,7 @@ For each finding, pick a category:
 
 | Category | Example | Action |
 |---|---|---|
+| **Substrate gap** | Metrics dir empty or contains only test fixtures after ≥ 1 week of real usage | **P0 — stop and fix before reading any other findings.** The instrumentation never engaged. Check hooks, venv paths, and MCP registration. See S-79 investigation in `dogfood-reports/`. |
 | **Empty-field-when-shouldn't** | `backends_invoked: []` on a query that clearly used Haiku | New v0.5.3 story: "instrument $X in $location" |
 | **Lying field** | `event_subtype: "ok"` on an entry with stack trace in `error_message` | v0.5.3 bug fix: classification logic wrong |
 | **Wish-we-had-it** | Can't tell from `recall` entries which tier served which block | New v0.5.3 or v0.6 story: add `per_block_source` field |
@@ -210,6 +229,12 @@ Committed to `docs/runbooks/dogfood-reports/{YYYY-MM-DD}-week1.md`:
 > Sessions: N (types: /goal x N, ad-hoc x N, ...)
 > DepthFusion version at start: v0.5.2
 > DepthFusion version at end: v0.5.2 (unchanged) or v0.5.x
+
+## Headline finding
+
+> One sentence: what was the single most important or surprising result?
+> Example: "100% of observed events are test fixtures — zero production-path emissions (substrate gap, see §3)."
+> Example: "Recall latency p95 = 423 ms across 30 queries — within S-43 AC-3 budget."
 
 ## Stream health
 
