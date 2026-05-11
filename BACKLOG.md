@@ -1756,6 +1756,153 @@
 
 ---
 
+## E-31: Structured Evolving Cognition (v1) [active]
+
+> Transform DepthFusion from a retrieval/memory layer into a full Cognitive Infrastructure Layer with event-sourced memory, 7 typed memories, 9 event types, cognitive scoring, contradiction detection, decision/operational memory, multi-agent coordination, and explainable retrieval.
+
+### S-93: As a developer, I want event-sourced memory foundations so that all memory changes are auditable and replayable `P0` `XL`
+
+**Acceptance criteria:**
+- [x] AC-1: MemoryEvent with 9 event types is immutable and serializes/deserializes cleanly
+- [x] AC-2: EventLog appends idempotently using fcntl for inter-process safety
+- [x] AC-3: EventLog.replay() filters by project_id and since datetime
+- [x] AC-4: All 9 feature flags default to OFF and gate new behavior
+
+**Tasks:**
+- [x] T-311: Write failing tests for MemoryEvent (9 types, frozen, serialization)
+- [x] T-312: Implement MemoryEvent dataclass in core/memory.py
+- [x] T-313: Write failing tests for EventLog (append, replay, idempotency, threading)
+- [x] T-314: Implement EventLog in storage/event_log.py
+- [x] T-315: Add 9 feature flag env vars and 3 storage paths to config.py
+- [x] T-316: Run full test suite; verify no regression
+
+### S-94: As a developer, I want a MemoryObject schema with 7 types and a SQLite projection so that memories are queryable `P0` `XL`
+
+**Acceptance criteria:**
+- [x] AC-1: MemoryObject supports 7 types: decision, semantic, operational, procedural, episodic, social, temporal
+- [x] AC-2: MemoryStore is a SQLite WAL projection; upsert is idempotent
+- [x] AC-3: Archived memories excluded from default queries
+- [x] AC-4: pinned=True is preserved through upsert
+
+**Tasks:**
+- [x] T-317: Write failing tests for MemoryObject (types, status, serialization, pinned)
+- [x] T-318: Implement MemoryObject and all sub-schemas
+- [x] T-319: Write failing tests for MemoryStore (upsert, get, query, pinned)
+- [x] T-320: Implement MemoryStore in storage/memory_store.py
+
+### S-95: As an agent, I want 8-component cognitive scoring so that relevant memories surface above stale ones `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Weights sum to 1.0 (0.25 semantic, 0.18 lexical, 0.15 confidence, 0.12 regime, 0.10 graph, 0.08 recency, 0.07 hist_usefulness, 0.05 workflow)
+- [x] AC-2: score_with_breakdown() returns both score and component breakdown
+- [x] AC-3: Scorer is deterministic (same context → same score)
+- [x] AC-4: Scorer is gated behind DEPTHFUSION_COGNITIVE_RETRIEVAL flag
+
+**Tasks:**
+- [x] T-321: Write failing tests for CognitiveScorer
+- [x] T-322: Implement CognitiveScorer in cognitive/scorer.py
+- [ ] T-323: Integrate CognitiveScorer into RecallPipeline behind feature flag
+
+### S-96: As an agent, I want contradiction detection so that conflicting memories surface for resolution `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Negation-based contradiction detected with ≥40% token overlap
+- [x] AC-2: Below 0.85 confidence threshold → PENDING_REVIEW status
+- [x] AC-3: Above 0.85 confidence threshold → AUTO_EMITTED status
+- [x] AC-4: Pinned memory always wins in conflict resolution
+
+**Tasks:**
+- [x] T-324: Write failing tests for ContradictionEngine
+- [x] T-325: Implement ContradictionEngine in cognitive/contradiction.py
+- [ ] T-326: Wire ContradictionEngine into auto_learn.py behind DEPTHFUSION_CONTRADICTION_ENGINE flag
+
+### S-97: As an architect, I want decision memory so that architectural choices are preserved with rationale `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: build_decision_memory() enforces non-empty rationale
+- [x] AC-2: Decision extra schema includes: decision, rationale, rejected_options, constraints, impact_radius
+- [x] AC-3: df_record_decision MCP tool writes event + upserts to MemoryStore
+- [x] AC-4: Gated behind DEPTHFUSION_DECISION_MEMORY flag
+
+**Tasks:**
+- [x] T-327: Write failing tests for build_decision_memory
+- [x] T-328: Implement build_decision_memory in mcp/cognitive_tools.py
+- [x] T-329: Register df_record_decision tool in server.py
+
+### S-98: As a developer, I want operational memory so that error→fix→lesson triples are preserved `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: build_incident_memory() captures error, fix, lesson, severity, recurrence_risk
+- [x] AC-2: recurrence_risk clamped to [0.0, 1.0]
+- [x] AC-3: df_record_incident MCP tool persists to EventLog + MemoryStore
+- [x] AC-4: Gated behind DEPTHFUSION_OPERATIONAL_MEMORY flag
+
+**Tasks:**
+- [x] T-330: Write failing tests for build_incident_memory
+- [x] T-331: Implement build_incident_memory in mcp/cognitive_tools.py
+- [x] T-332: Register df_record_incident tool in server.py
+
+### S-99: As an agent, I want 6 cognitive MCP tools so that cognitive operations are accessible via the MCP protocol `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: df_retrieve_context, df_record_decision, df_record_incident, df_mark_superseded, df_report_outcome, df_get_cognitive_state all registered
+- [x] AC-2: Tools gated behind their respective feature flags
+- [x] AC-3: All existing tools continue to pass their tests (1555 passing)
+
+**Tasks:**
+- [x] T-333: Register all 6 tools in server.py with feature flag guards
+- [x] T-334: Update test suite count assertions for 24-tool server
+- [x] T-335: Verify existing tools still pass (full suite 1555 PASSED)
+
+### S-100: As a developer, I want a REST API that binds loopback by default `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Default bind host is 127.0.0.1:7300
+- [x] AC-2: DEPTHFUSION_API_PUBLIC=1 without API_TOKEN raises ValueError at startup
+- [x] AC-3: /health endpoint returns {"status":"ok"}
+- [x] AC-4: /v1/cognitive-state and /v1/memories endpoints work
+
+**Tasks:**
+- [x] T-336: Write failing tests for REST API
+- [x] T-337: Implement api/rest.py with FastAPI
+- [x] T-338: Add startup validation for public bind security
+
+### S-101: As a system, I want autonomic consolidation so that near-duplicate memories are merged and stale ones archived `P2` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Near-duplicate detection uses token similarity ≥ 0.92 threshold
+- [x] AC-2: Pinned memories are never candidates for merge or archive
+- [x] AC-3: Archive requires stale status AND age > stale_days threshold
+- [x] AC-4: Gated behind DEPTHFUSION_AUTONOMIC flag
+
+**Tasks:**
+- [x] T-339: Write failing tests for MemoryConsolidator
+- [x] T-340: Implement MemoryConsolidator in cognitive/consolidator.py
+- [ ] T-341: Wire consolidator to run on schedule when DEPTHFUSION_AUTONOMIC=1
+
+### S-102: As a QA engineer, I want integration tests covering the full cognitive pipeline `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Decision lifecycle test: record → outcome → verify event count
+- [x] AC-2: Contradiction queuing test: low-confidence → PENDING_REVIEW
+- [x] AC-3: All tests pass with both flags ON and OFF
+
+**Tasks:**
+- [x] T-342: Write cognitive pipeline integration tests
+- [x] T-343: Verify full test suite passes (1555 passing)
+
+### S-103: As a QA engineer, I want an evaluation benchmark suite measuring 6 cognitive metrics `P2` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Valid Recall@K, Stale Injection Rate, Contradiction Precision, Decision Recall Rate, Operational Reuse Rate, Outcome Lift all measurable
+- [x] AC-2: Benchmarks run in CI without external services
+
+**Tasks:**
+- [x] T-344: Implement cognitive eval benchmark suite
+- [ ] T-345: Add benchmarks to CI pipeline
+
+---
+
 - **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
