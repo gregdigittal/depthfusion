@@ -1803,6 +1803,67 @@ def _emit_startup_event(tools_enabled: int, metrics_dir: "Path | None" = None) -
         )
 
 
+def _check_backend_health(mode: str) -> None:
+    """Warn loudly when vps-cpu/vps-gpu mode has backends falling back to NullBackend.
+
+    Users on vps-cpu/vps-gpu expect Haiku/Gemma reranking. If those backends are
+    unhealthy (missing API key, SDK not installed, Gemma URL unconfigured), the
+    factory silently returns NullBackend and all LLM capabilities degrade to
+    no-ops without any visible error. This function surfaces that failure at
+    startup so the user sees it in MCP server stderr output.
+
+    Never raises — observability must not block server startup.
+    """
+    if mode == "local":
+        return
+
+    try:
+        from depthfusion.backends.factory import get_backend
+        from depthfusion.backends.null import NullBackend
+
+        _CAPABILITIES = ("reranker", "extractor", "linker", "summariser", "decision_extractor")
+        degraded = []
+        for cap in _CAPABILITIES:
+            backend = get_backend(cap, mode=mode)
+            # A FallbackChain whose first member is NullBackend, or a bare
+            # NullBackend, indicates full degradation for this capability.
+            if isinstance(backend, NullBackend):
+                degraded.append(cap)
+
+        if degraded:
+            caps_str = ", ".join(degraded)
+            if mode == "vps-cpu":
+                diagnosis = (
+                    "DEPTHFUSION_API_KEY is unset or the 'anthropic' SDK is not installed. "
+                    "Run: pip install 'depthfusion[vps-cpu]'  and set DEPTHFUSION_API_KEY."
+                )
+            else:  # vps-gpu
+                diagnosis = (
+                    "DEPTHFUSION_GEMMA_URL or DEPTHFUSION_GEMMA_MODEL is unset, "
+                    "or the Gemma sidecar is not running."
+                )
+            logger.warning(
+                "\n"
+                "╔══════════════════════════════════════════════════════════════╗\n"
+                "║  DepthFusion SILENT DEGRADATION DETECTED                     ║\n"
+                "╠══════════════════════════════════════════════════════════════╣\n"
+                "║  Mode   : %s                                                 \n"
+                "║  Affected capabilities: %s\n"
+                "║                                                              ║\n"
+                "║  These capabilities are falling back to NullBackend          ║\n"
+                "║  (no-op). LLM-assisted reranking, extraction, and linking    ║\n"
+                "║  are DISABLED. You are getting BM25-only retrieval.          ║\n"
+                "║                                                              ║\n"
+                "║  Fix: %s\n"
+                "╚══════════════════════════════════════════════════════════════╝",
+                mode,
+                caps_str,
+                diagnosis,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("_check_backend_health: could not complete check: %s", exc)
+
+
 def main() -> None:
     """MCP server entry point.
 
@@ -1814,6 +1875,10 @@ def main() -> None:
     enabled = get_enabled_tools(config)
     logger.info(f"DepthFusion MCP server starting — {len(enabled)} tools enabled")
     _emit_startup_event(len(enabled))
+
+    import os as _os
+    from depthfusion.utils.mode import normalise_mode
+    _check_backend_health(normalise_mode(_os.environ.get("DEPTHFUSION_MODE")))
 
     for line in sys.stdin:
         line = line.strip()
