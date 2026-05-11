@@ -455,7 +455,7 @@
 
 <!-- HERO -->
 <div class="hero">
-  <div class="badge">v0.5.0 · Claude Code Extension</div>
+  <div class="badge">v0.6.0 · Claude Code Extension</div>
   <h1>Depth<span>Fusion</span></h1>
   <p class="lead">Persistent, query-aware memory across all your Claude Code sessions — so you never re-explain your architecture twice.</p>
   <div class="stat-row">
@@ -474,6 +474,7 @@
   <button class="tab-btn" onclick="showTab('tiers')">Memory Tiers</button>
   <button class="tab-btn" onclick="showTab('tokens')">Token Efficiency</button>
   <button class="tab-btn" onclick="showTab('salience')">Salience &amp; Decay</button>
+  <button class="tab-btn" onclick="showTab('release')">v0.6.0 Release</button>
 </nav>
 
 <!-- ─────────── PROBLEM ─────────── -->
@@ -1152,7 +1153,7 @@ function showTab(id) {
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  const idx = ['problem','recall','pipeline','tiers','tokens','salience'].indexOf(id);
+  const idx = ['problem','recall','pipeline','tiers','tokens','salience','release'].indexOf(id);
   if (idx>=0) document.querySelectorAll('.tab-btn')[idx].classList.add('active');
 }
 
@@ -1249,5 +1250,87 @@ function resetSalience() {
 
 renderDiscoveries();
 </script>
+
+<!-- ─────────── v0.6.0 RELEASE ─────────── -->
+<section id="tab-release" class="section">
+<div class="container">
+  <h2>What's New in v0.6.0</h2>
+  <p>First stable release of the 0.6 series. Two P0 correctness fixes make advertised modes functional for the first time, plus the full E-30 build-plan alignment (8 stories, +89 tests).</p>
+
+  <div class="card" style="border-color:rgba(220,53,69,0.5);background:rgba(220,53,69,0.06);margin-bottom:20px">
+    <h3 style="color:#ef5350">🔴 P0 Fixes — Upgrade Immediately If on vps-cpu or vps-gpu</h3>
+    <p style="font-size:0.9rem;margin-bottom:14px">Both bugs caused silent degradation to BM25-only retrieval with no error message.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px">
+        <div style="font-weight:700;color:#ef5350;margin-bottom:6px">S-86 · Mode Resolution</div>
+        <p style="font-size:0.83rem;margin:0"><code>DEPTHFUSION_MODE=vps-cpu</code> silently fell through to local BM25-only retrieval. <code>utils/mode.py::normalise_mode()</code> now correctly routes to the Haiku reranker chain.</p>
+      </div>
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px">
+        <div style="font-weight:700;color:#ef5350;margin-bottom:6px">S-87 · Missing Anthropic SDK</div>
+        <p style="font-size:0.83rem;margin:0"><code>pip install depthfusion[vps-cpu]</code> did not install <code>anthropic&gt;=0.40</code>. The Haiku reranker silently degraded to NullBackend on every clean install. Fixed in <code>pyproject.toml</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:8px">
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-88 · MCP Tool Schemas</h3>
+      <p style="font-size:0.85rem">All 18 MCP tools now return typed JSON schemas with <code>required</code> arrays, documented parameter bounds, and enum constraints. Enables type-safe client generation.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-89 · Vector Consistency</h3>
+      <p style="font-size:0.85rem">ChromaDB <code>add_document()</code> and <code>query()</code> both explicitly call <code>get_backend("embedding")</code>, eliminating silent vector-space mismatch between index and query embeddings.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-90 · Benchmark Harness</h3>
+      <p style="font-size:0.85rem"><code>scripts/benchmark.py</code> + <code>tests/fixtures/recall_goldset.jsonl</code> (8 entries). Measure recall precision/MRR with no API key required. Portable across all three modes.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-91 · SQLite Metadata Cache</h3>
+      <p style="font-size:0.85rem"><code>storage/file_index.py::FileMetadataIndex</code> — WAL-mode SQLite cache skips unchanged files on warm recall. Reduces re-hashing overhead on large project corpora.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-92 · Recall Explainability</h3>
+      <p style="font-size:0.85rem"><code>explain: true</code> on <code>depthfusion_recall_relevant</code> returns <code>bm25_score</code>, <code>rrf_score</code>, <code>source_weight</code>, and <code>reranker_rank</code> per result block.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--cyan)">S-35 AC-4 · RLM HTTP Sidecar</h3>
+      <p style="font-size:0.85rem">FastAPI sidecar at <code>127.0.0.1:8771</code> (loopback-only). Exposes <code>GET /health</code>, <code>POST /run</code>, <code>GET /schema</code> for recursive learning module calls.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <h3>Test Coverage</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:12px;text-align:center">
+      <div>
+        <div style="font-size:2rem;font-weight:700;color:var(--cyan)">1519</div>
+        <div style="font-size:0.8rem;color:var(--text-dim)">Tests passing (v0.6.0)</div>
+      </div>
+      <div>
+        <div style="font-size:2rem;font-weight:700;color:var(--accent)">+89</div>
+        <div style="font-size:0.8rem;color:var(--text-dim)">New tests since v0.6.0a2</div>
+      </div>
+      <div>
+        <div style="font-size:2rem;font-weight:700;color:#4caf82">0</div>
+        <div style="font-size:0.8rem;color:var(--text-dim)">Ruff / mypy violations</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Quick Upgrade</h3>
+    <div style="background:#111;border-radius:6px;padding:14px;font-family:monospace;font-size:0.83rem;margin-top:10px">
+      <div style="color:#666;margin-bottom:6px"># Pull and upgrade</div>
+      <div>git pull origin main &amp;&amp; git checkout v0.6.0</div>
+      <div style="margin-top:8px;color:#666"># Reinstall extras (required — P0 deps fix)</div>
+      <div>pip install --upgrade 'depthfusion[vps-cpu]'  # or vps-gpu / local</div>
+      <div style="margin-top:8px;color:#666"># Verify</div>
+      <div>python -m depthfusion.install.smoke --mode vps-cpu</div>
+    </div>
+    <p style="font-size:0.82rem;margin-top:10px;color:var(--text-dim)">Full idiot-proof instructions: <code>docs/install/upgrade-to-v0.6.0.html</code></p>
+  </div>
+</div>
+</section>
+
 </body>
 </html>

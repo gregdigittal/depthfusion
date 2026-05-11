@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion v0.6.0 — Install / Upgrade Guide</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3347;
+    --accent: #6c8fef;
+    --accent-dim: #3a4a8a;
+    --green: #4caf82;
+    --yellow: #f0c040;
+    --red: #e05c5c;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #131620;
+    --skip-bg: #1a2a1a;
+    --skip-border: #2d5a2d;
+    --warn-bg: #2a2010;
+    --warn-border: #6a4a00;
+    --crit-bg: #2a1010;
+    --crit-border: #6a2020;
+    --p0-bg: #2a0808;
+    --p0-border: #8a1010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  .page-header {
+    background: linear-gradient(135deg, #111830 0%, #1a2040 100%);
+    border-bottom: 1px solid var(--accent-dim);
+    padding: 24px 40px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .page-header h1 { font-size: 1.4rem; color: #fff; font-weight: 700; }
+  .page-header h1 span { color: var(--accent); }
+
+  .version-badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 40px 32px 80px; }
+
+  /* ── PATH SELECTOR ── */
+  .path-selector {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .path-selector h2 {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .path-selector p { font-size: 0.88rem; color: var(--muted); margin-bottom: 14px; }
+  .path-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .path-btn {
+    flex: 1;
+    min-width: 200px;
+    padding: 14px 20px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .path-btn:hover { border-color: var(--accent-dim); background: #1e2240; }
+  .path-btn.active { border-color: var(--accent); background: #1e2448; color: #fff; }
+  .path-btn .path-label { display: block; font-size: 1rem; margin-bottom: 4px; }
+  .path-btn .path-desc { display: block; font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+  .path-btn.active .path-desc { color: #a0b0e0; }
+
+  /* ── MODE SELECTOR ── */
+  .mode-selector {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 36px;
+  }
+  .mode-selector h2 {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .mode-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .mode-btn {
+    flex: 1;
+    min-width: 160px;
+    padding: 14px 20px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .mode-btn:hover { border-color: var(--accent-dim); background: #1e2240; }
+  .mode-btn.active { border-color: var(--accent); background: #1e2448; color: #fff; }
+  .mode-btn .mode-label { display: block; font-size: 1rem; margin-bottom: 4px; }
+  .mode-btn .mode-desc  { display: block; font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+  .mode-btn.active .mode-desc { color: #a0b0e0; }
+
+  /* ── WHAT'S NEW / P0 BANNER ── */
+  .p0-banner {
+    background: var(--p0-bg);
+    border: 2px solid var(--p0-border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .p0-banner h3 {
+    color: var(--red);
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .p0-banner ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .p0-banner li { font-size: 0.9rem; color: #e0b0b0; padding-left: 18px; position: relative; }
+  .p0-banner li::before { content: "✕ "; color: var(--red); position: absolute; left: 0; }
+
+  .whats-new {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 36px;
+  }
+  .whats-new h3 {
+    color: var(--accent);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .whats-new ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .whats-new li { font-size: 0.9rem; color: var(--text); }
+  .whats-new li::before { content: "▸ "; color: var(--accent); }
+  .whats-new .p0 { color: var(--red); font-weight: 600; }
+  .whats-new .p0::before { content: "🔴 P0 "; color: var(--red); }
+  .whats-new .added::before { content: "✦ "; color: var(--green); }
+
+  /* ── STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 24px; }
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .step-header {
+    display: flex;
+    align-items: flex-start;
+    padding: 18px 22px;
+    gap: 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: rgba(108,143,239,0.05); }
+  .step-num {
+    min-width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-num.normal { background: var(--accent-dim);   color: var(--accent); border: 2px solid var(--accent); }
+  .step-num.skip   { background: var(--skip-bg);       color: #4a9a4a;       border: 2px solid var(--skip-border); }
+  .step-num.done   { background: var(--skip-bg);       color: var(--green);  border: 2px solid var(--green); }
+  .step-num.warn   { background: var(--warn-bg);       color: var(--yellow); border: 2px solid var(--warn-border); }
+  .step-num.crit   { background: var(--crit-bg);       color: var(--red);    border: 2px solid var(--crit-border); }
+  .step-num.p0     { background: var(--p0-bg);         color: var(--red);    border: 2px solid var(--p0-border); }
+
+  .step-meta { flex: 1; }
+  .step-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .step-subtitle { font-size: 0.88rem; color: var(--muted); margin-top: 3px; }
+  .step-chevron { color: var(--muted); font-size: 0.85rem; padding-top: 6px; transition: transform 0.2s ease; }
+  .step.open .step-chevron { transform: rotate(90deg); }
+  .step-body { display: none; padding: 0 22px 22px; border-top: 1px solid var(--border); }
+  .step.open .step-body { display: block; }
+  .step.skipped .step-header { opacity: 0.55; }
+  .step.skipped .step-body { background: rgba(30,60,30,0.15); }
+
+  /* ── BADGES ── */
+  .skip-badge {
+    display: inline-block; background: var(--skip-bg); color: var(--green);
+    border: 1px solid var(--skip-border); border-radius: 4px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .crit-badge {
+    display: inline-block; background: var(--crit-bg); color: var(--red);
+    border: 1px solid var(--crit-border); border-radius: 4px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .p0-badge {
+    display: inline-block; background: var(--p0-bg); color: var(--red);
+    border: 1px solid var(--p0-border); border-radius: 4px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .new-badge {
+    display: inline-block; background: #1a3020; color: var(--green);
+    border: 1px solid #2a5030; border-radius: 4px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* ── BOX STYLES ── */
+  .skip-box {
+    background: var(--skip-bg); border: 1px solid var(--skip-border);
+    border-radius: 6px; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.9rem; color: #a0d0a0;
+  }
+  .skip-box strong { color: var(--green); }
+  .warn-box {
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: 6px; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.9rem; color: #e0c080;
+  }
+  .warn-box strong { color: var(--yellow); }
+  .crit-box {
+    background: var(--crit-bg); border: 1px solid var(--crit-border);
+    border-radius: 6px; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.9rem; color: #e0a0a0;
+  }
+  .crit-box strong { color: var(--red); }
+  .p0-box {
+    background: var(--p0-bg); border: 2px solid var(--p0-border);
+    border-radius: 6px; padding: 16px 20px; margin: 16px 0;
+    font-size: 0.9rem; color: #f0b0b0;
+  }
+  .p0-box strong { color: var(--red); display: block; margin-bottom: 6px; font-size: 0.95rem; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 6px; margin: 12px 0; overflow: hidden;
+  }
+  .code-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 14px; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--muted);
+  }
+  .copy-btn {
+    background: var(--accent-dim); color: var(--accent); border: none;
+    border-radius: 4px; padding: 3px 10px; font-size: 0.75rem; cursor: pointer;
+    font-weight: 600; transition: background 0.15s;
+  }
+  .copy-btn:hover  { background: #4a5a9a; }
+  .copy-btn.copied { background: #2a5030; color: var(--green); }
+  pre {
+    padding: 14px 16px; overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+    font-size: 0.85rem; line-height: 1.55; color: #c8d0f0;
+  }
+  .comment { color: #506080; }
+  .cmd     { color: #8ab4e8; }
+  .str     { color: #98c88a; }
+  .key     { color: #d8b060; }
+  pre .hl  { color: #e8c060; font-weight: bold; }
+
+  /* ── PROSE ── */
+  .step-body p  { margin: 12px 0; color: var(--text); font-size: 0.93rem; }
+  .step-body h4 { margin: 20px 0 8px; font-size: 0.95rem; color: #a0b8f0; letter-spacing: 0.03em; }
+  .step-body ul { margin: 8px 0 8px 20px; font-size: 0.9rem; color: var(--text); }
+  .step-body ul li { margin-bottom: 5px; }
+  code {
+    background: rgba(108,143,239,0.15); color: #a8c0f8;
+    padding: 1px 6px; border-radius: 3px; font-family: monospace; font-size: 0.9em;
+  }
+
+  /* ── VERIFY CHECKLIST ── */
+  .check-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 14px; background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.88rem; cursor: pointer; transition: border-color 0.15s; user-select: none;
+  }
+  .check-item:hover { border-color: var(--accent-dim); }
+  .check-item.checked { border-color: var(--green); background: rgba(76,175,130,0.05); opacity: 0.7; }
+  .check-item .tick {
+    min-width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; flex-shrink: 0; margin-top: 1px; transition: all 0.15s;
+  }
+  .check-item.checked .tick { background: var(--green); border-color: var(--green); color: #fff; }
+  .check-item .check-text { flex: 1; }
+  .check-item .check-text .check-cmd {
+    font-family: monospace; font-size: 0.82rem; color: var(--muted); margin-top: 2px;
+  }
+
+  /* ── SECTION HEADING ── */
+  .section-heading {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted); margin: 36px 0 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── PROGRESS ── */
+  .progress-bar {
+    height: 4px; background: var(--border); border-radius: 2px;
+    margin-bottom: 36px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 2px; width: 0%; transition: width 0.3s ease;
+  }
+
+  /* ── DONE SCREEN ── */
+  .done-banner {
+    display: none; background: linear-gradient(135deg, #0a2010, #0a3020);
+    border: 1px solid var(--green); border-radius: 10px;
+    padding: 28px 32px; text-align: center; margin-top: 32px;
+  }
+  .done-banner h2 { font-size: 1.4rem; color: var(--green); margin-bottom: 8px; }
+  .done-banner p  { color: #90c090; font-size: 0.95rem; }
+
+  /* ── MODE / PATH VISIBILITY ── */
+  [data-mode]          { display: none; }
+  [data-path]          { display: none; }
+  body[data-mode="local"]   [data-mode~="local"]    { display: block; }
+  body[data-mode="vps-cpu"] [data-mode~="vps-cpu"]  { display: block; }
+  body[data-mode="vps-gpu"] [data-mode~="vps-gpu"]  { display: block; }
+  body[data-mode="local"]   [data-mode~="all"]      { display: block; }
+  body[data-mode="vps-cpu"] [data-mode~="all"]      { display: block; }
+  body[data-mode="vps-gpu"] [data-mode~="all"]      { display: block; }
+
+  body[data-path="from-a2"]    [data-path~="from-a2"]    { display: block; }
+  body[data-path="from-a2"]    [data-path~="all"]        { display: block; }
+  body[data-path="from-older"] [data-path~="from-older"] { display: block; }
+  body[data-path="from-older"] [data-path~="all"]        { display: block; }
+
+  /* ── FEATURE TABLE ── */
+  .feat-table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.88rem; }
+  .feat-table th {
+    background: var(--surface2); color: var(--muted); text-transform: uppercase;
+    font-size: 0.75rem; letter-spacing: 0.06em; padding: 8px 12px;
+    text-align: left; border: 1px solid var(--border);
+  }
+  .feat-table td { padding: 9px 12px; border: 1px solid var(--border); color: var(--text); vertical-align: top; }
+  .feat-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .feat-table .tag-p0   { color: var(--red);    font-weight: 700; font-size: 0.78rem; }
+  .feat-table .tag-fix  { color: var(--yellow);  font-size: 0.78rem; }
+  .feat-table .tag-new  { color: var(--green);   font-size: 0.78rem; }
+
+  /* ── NEW FEATURE CALLOUTS ── */
+  .feature-box {
+    background: #0d1a10; border: 1px solid #1e4020; border-left: 3px solid var(--green);
+    border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 0.88rem;
+  }
+  .feature-box .feature-title { color: var(--green); font-weight: 700; margin-bottom: 6px; }
+  .feature-box p { color: #a0c8a0; margin: 0; }
+</style>
+</head>
+<body data-mode="vps-cpu" data-path="from-a2">
+
+<div class="page-header">
+  <h1>DepthFusion <span>v0.6.0</span> — Install &amp; Upgrade</h1>
+  <span class="version-badge">Stable · 2026-05-11 · ffda2bd</span>
+</div>
+
+<div class="container">
+
+  <!-- ── P0 ALERT ── -->
+  <div class="p0-banner">
+    <h3>🔴 Two P0 silent failures fixed in v0.6.0</h3>
+    <ul>
+      <li><strong>Mode resolution bug (S-86):</strong> <code>DEPTHFUSION_MODE=vps-cpu</code> or <code>vps-gpu</code> silently fell through to BM25-only local retrieval — Haiku reranker and Gemma backend never loaded. <em>Every vps-cpu/vps-gpu install was affected.</em></li>
+      <li><strong>Missing Anthropic SDK (S-87):</strong> <code>pip install depthfusion[vps-cpu]</code> did not install <code>anthropic</code> — Haiku silently degraded to <code>NullBackend</code> on every clean install.</li>
+    </ul>
+    <p style="margin-top:12px; font-size:0.85rem; color:#c08080;">If you have been running <code>vps-cpu</code> or <code>vps-gpu</code> on any version before v0.6.0, you were running BM25-only retrieval with no error message. This upgrade restores the full pipeline.</p>
+  </div>
+
+  <!-- ── UPGRADE PATH SELECTOR ── -->
+  <div class="path-selector">
+    <h2>Step 0a — Which version are you upgrading from?</h2>
+    <p>Select your starting point to see only the steps you need.</p>
+    <div class="path-buttons">
+      <button class="path-btn active" onclick="setPath('from-a2')">
+        <span class="path-label">From v0.6.0a2</span>
+        <span class="path-desc">Already on the last alpha (2026-05-08)<br>Short path — ~5 minutes</span>
+      </button>
+      <button class="path-btn" onclick="setPath('from-older')">
+        <span class="path-label">From v0.5.x or older</span>
+        <span class="path-desc">On any release before v0.6.0a1<br>Full path — ~15 minutes</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── MODE SELECTOR ── -->
+  <div class="mode-selector">
+    <h2>Step 0b — Select your install mode</h2>
+    <div class="mode-buttons">
+      <button class="mode-btn" onclick="setMode('local')">
+        <span class="mode-label">💻 local</span>
+        <span class="mode-desc">Laptop / zero API cost<br>BM25 only, no reranker</span>
+      </button>
+      <button class="mode-btn active" onclick="setMode('vps-cpu')">
+        <span class="mode-label">☁️ vps-cpu</span>
+        <span class="mode-desc">Cloud VPS, no GPU<br>Haiku reranker via API</span>
+      </button>
+      <button class="mode-btn" onclick="setMode('vps-gpu')">
+        <span class="mode-label">⚡ vps-gpu</span>
+        <span class="mode-desc">CUDA host ≥ 20 GB VRAM<br>Local Gemma via vLLM</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── WHAT'S NEW ── -->
+  <div class="whats-new">
+    <h3>What's new in v0.6.0 (stable)</h3>
+    <ul>
+      <li class="p0">Mode resolution: <code>DEPTHFUSION_MODE=vps-cpu/vps-gpu</code> now actually activates those modes</li>
+      <li class="p0">Missing SDK: <code>anthropic&gt;=0.40</code> added to <code>[vps-cpu]</code> extras — Haiku reranker works on clean installs</li>
+      <li class="added">New extras deps: <code>fastapi&gt;=0.100</code>, <code>uvicorn&gt;=0.23</code> in <code>[vps-cpu]</code> and <code>[vps-gpu]</code> (required for RLM sidecar)</li>
+      <li class="added">All 18 MCP tools now return typed JSON schemas — invalid calls produce actionable 422 errors</li>
+      <li class="added">Recall explainability: <code>explain: true</code> on <code>depthfusion_recall_relevant</code> returns per-stage scores</li>
+      <li class="added">SQLite metadata cache: warm recall skips unchanged files — significant cold-start improvement</li>
+      <li class="added">Benchmark harness: <code>scripts/benchmark.py</code> with 8-entry goldset fixture</li>
+      <li class="added">SkillForge RLM HTTP sidecar at port 8771 (loopback-only, FastAPI)</li>
+      <li>Vector embedding consistency: Chroma upsert and query now use the same embedding backend</li>
+      <li>1519 tests passing (was 1430 at v0.6.0a2)</li>
+    </ul>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       STEPS
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="steps" id="steps">
+
+    <!-- ── STEP: PREREQUISITES (from-older only) ── -->
+    <div class="step skipped" id="step-prereqs" data-path="from-older">
+      <div class="step-header" onclick="toggleStep('step-prereqs')">
+        <div class="step-num skip">✓</div>
+        <div class="step-meta">
+          <div class="step-title">Prerequisites <span class="skip-badge">Skip if upgrading</span></div>
+          <div class="step-subtitle">Python ≥ 3.10, git, Claude Code — only needed on a fresh machine</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="skip-box"><strong>SKIP THIS STEP</strong> — If you have any previous DepthFusion install, prerequisites are already present. Expand only if setting up on a brand-new machine.</div>
+        <div class="code-block">
+          <div class="code-header"><span>bash — fresh machine only</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><span class="comment"># Python check — needs 3.10 or newer</span>
+python3 --version
+
+<span class="comment"># Build tools (Ubuntu 24.04)</span>
+sudo apt update && sudo apt install -y python3-full python3-venv build-essential python3-dev
+
+<span class="comment"># Claude Code (official CLI)</span>
+npm install -g @anthropic-ai/claude-code 2>/dev/null || \
+  curl -fsSL https://claude.ai/install.sh | sh</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 1: PULL LATEST CODE ── -->
+    <div class="step" id="step-pull" data-path="all">
+      <div class="step-header" onclick="toggleStep('step-pull')">
+        <div class="step-num normal">1</div>
+        <div class="step-meta">
+          <div class="step-title">Pull v0.6.0 and check out the release</div>
+          <div class="step-subtitle">git fetch + checkout the stable tag (SHA: ffda2bd)</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <p>The repo is cloned at <code>~/projects/depthfusion</code>. Fetch and pin to the verified stable release.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>cd ~/projects/depthfusion
+git fetch origin --tags
+git checkout <span class="hl">v0.6.0</span>   <span class="comment"># stable release tag — SHA ffda2bd</span></pre>
+        </div>
+        <p>Expected output:</p>
+        <div class="code-block">
+          <div class="code-header"><span>expected output</span></div>
+          <pre>HEAD is now at ffda2bd release(v0.6.0): cut stable release...</pre>
+        </div>
+        <div class="warn-box">
+          <strong>⚠ If git complains about local modifications:</strong> run <code>git stash</code> first, then retry the checkout. Your stashed changes can be recovered with <code>git stash pop</code> afterwards (though they may conflict with the new code).
+        </div>
+        <p>Confirm you are on the right commit:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash — verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>git log --oneline -1
+<span class="comment"># Expected: ffda2bd release(v0.6.0): cut stable release...</span>
+
+python3 -c "import depthfusion; print(depthfusion.__version__)"
+<span class="comment"># Expected: 0.6.0</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: VENV SETUP (from-older only) ── -->
+    <div class="step skipped" id="step-venv-create" data-path="from-older">
+      <div class="step-header" onclick="toggleStep('step-venv-create')">
+        <div class="step-num skip">✓</div>
+        <div class="step-meta">
+          <div class="step-title">Create / locate the venv <span class="skip-badge">Skip if upgrading</span></div>
+          <div class="step-subtitle">Your existing venv at ~/venvs/depthfusion is reused</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="skip-box"><strong>SKIP THIS STEP</strong> — Upgrading users already have a venv. It is reused. Only expand this if you are setting up for the first time.</div>
+        <div class="code-block">
+          <div class="code-header"><span>bash — first install only</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>mkdir -p ~/venvs
+python3 -m venv ~/venvs/depthfusion
+source ~/venvs/depthfusion/bin/activate</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: PIP INSTALL ── -->
+    <div class="step" id="step-pip" data-path="all">
+      <div class="step-header" onclick="toggleStep('step-pip')">
+        <div class="step-num p0">!</div>
+        <div class="step-meta">
+          <div class="step-title">
+            Install / upgrade the Python package
+            <span class="p0-badge">Do not skip — new deps in v0.6.0</span>
+          </div>
+          <div class="step-subtitle">v0.6.0 adds fastapi, uvicorn, and anthropic to the extras — pip must run</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="p0-box">
+          <strong>⛔ Do not skip this step, even on upgrades from v0.6.0a2.</strong>
+          v0.6.0 adds three new package requirements to the extras:
+          <ul style="margin-top:8px; padding-left:18px; color:#e0b0b0;">
+            <li><code>fastapi&gt;=0.100</code> — required by the new RLM HTTP sidecar</li>
+            <li><code>uvicorn&gt;=0.23</code> — required by the new RLM HTTP sidecar</li>
+            <li><code>anthropic&gt;=0.40</code> — was missing from <code>[vps-cpu]</code>; now present (P0 fix)</li>
+          </ul>
+          Skipping pip means the Haiku reranker will continue to degrade silently.
+        </div>
+
+        <div data-mode="local">
+          <h4>local mode</h4>
+          <div class="code-block">
+            <div class="code-header"><span>bash — local mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>source ~/venvs/depthfusion/bin/activate
+pip install --upgrade pip
+pip install -e '.[local,dev]'</pre>
+          </div>
+          <p>No API key needed. BM25 only. Confirm with:</p>
+          <div class="code-block">
+            <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>python3 -c "import depthfusion; print('ok')"   <span class="comment"># expect: ok</span></pre>
+          </div>
+        </div>
+
+        <div data-mode="vps-cpu">
+          <h4>vps-cpu mode</h4>
+          <div class="code-block">
+            <div class="code-header"><span>bash — vps-cpu mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>source ~/venvs/depthfusion/bin/activate
+pip install --upgrade pip
+pip install -e '.[vps-cpu,dev]'
+<span class="comment"># This now installs: anthropic, chromadb, fastapi, uvicorn</span>
+<span class="comment"># (anthropic was missing before — that was the P0 bug)</span></pre>
+          </div>
+          <p>Verify that <code>anthropic</code> is now present:</p>
+          <div class="code-block">
+            <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>pip show anthropic | grep Version   <span class="comment"># expect: Version: 0.40.x or newer</span></pre>
+          </div>
+        </div>
+
+        <div data-mode="vps-gpu">
+          <h4>vps-gpu mode</h4>
+          <div class="code-block">
+            <div class="code-header"><span>bash — vps-gpu mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>source ~/venvs/depthfusion/bin/activate
+pip install --upgrade pip
+pip install -e '.[vps-gpu,dev]'
+<span class="comment"># This now installs: sentence-transformers, chromadb, fastapi, uvicorn</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 4: RE-RUN INSTALLER ── -->
+    <div class="step" id="step-installer" data-path="all">
+      <div class="step-header" onclick="toggleStep('step-installer')">
+        <div class="step-num warn">!</div>
+        <div class="step-meta">
+          <div class="step-title">
+            Re-run the installer
+            <span class="crit-badge">Do not skip — mode fix is in installer</span>
+          </div>
+          <div class="step-subtitle">Updates hooks and config; preserves your API key; idempotent</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="warn-box">
+          <strong>⚠ Do not skip on upgrades.</strong> The installer writes updated hook scripts that include the mode-resolution fix. Skipping means old hooks may still use the broken mode-detection path — vps-cpu and vps-gpu would continue routing to BM25-only retrieval even after the pip install.
+        </div>
+        <div class="warn-box">
+          <strong>⚠ Your API key and existing discoveries are safe.</strong> The installer is idempotent — it reads your existing <code>~/.claude/depthfusion.env</code> and merges without overwriting your <code>DEPTHFUSION_API_KEY</code> or memory store.
+        </div>
+
+        <div data-mode="local">
+          <div class="code-block">
+            <div class="code-header"><span>bash — local mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>python3 -m depthfusion.install.install --mode=local</pre>
+          </div>
+        </div>
+        <div data-mode="vps-cpu">
+          <div class="code-block">
+            <div class="code-header"><span>bash — vps-cpu mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>python3 -m depthfusion.install.install --mode=vps-cpu</pre>
+          </div>
+          <p>The installer may warn that Haiku is disabled if <code>DEPTHFUSION_API_KEY</code> is not yet in the current shell env. This is expected — your key is still safely in <code>~/.claude/depthfusion.env</code>; the next step loads it.</p>
+        </div>
+        <div data-mode="vps-gpu">
+          <div class="code-block">
+            <div class="code-header"><span>bash — vps-gpu mode</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>python3 -m depthfusion.install.install --mode=vps-gpu</pre>
+          </div>
+        </div>
+
+        <p>You should see the installer confirm hooks and MCP registration:</p>
+        <div class="code-block">
+          <div class="code-header"><span>expected output (excerpt)</span></div>
+          <pre><span class="str">✓</span> Mode written to ~/.claude/depthfusion.env: <span class="hl">vps-cpu</span>
+<span class="str">✓</span> PreCompact / PostCompact hooks registered
+<span class="str">✓</span> MCP server registered: depthfusion</pre>
+        </div>
+        <p>The mode shown must match what you selected above (<code>local</code>, <code>vps-cpu</code>, or <code>vps-gpu</code>). If it says something else, re-run with the correct <code>--mode</code> flag.</p>
+      </div>
+    </div>
+
+    <!-- ── STEP 5: HOOK PATH CHECK (vps-cpu / vps-gpu) ── -->
+    <div class="step skipped" id="step-hooks" data-path="from-older" data-mode="vps-cpu vps-gpu">
+      <div class="step-header" onclick="toggleStep('step-hooks')">
+        <div class="step-num crit">!</div>
+        <div class="step-meta">
+          <div class="step-title">
+            Verify hook venv paths
+            <span class="crit-badge">Caused 13-day silent failure in v0.5.x</span>
+          </div>
+          <div class="step-subtitle">Hooks pointing at a stale venv path → zero telemetry silently</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="crit-box">
+          <strong>This is the substrate-gap bug from v0.5.x.</strong> If upgrading from v0.5.x or older, old hooks may still reference a stale/capitalised venv path. Everything appears to work but no telemetry is emitted. Run this check now.
+        </div>
+        <h4>1. Check what path the hooks currently reference</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>grep -r "PYTHON\|python" ~/.claude-shared/hooks/depthfusion-*.sh 2>/dev/null | head -20</pre>
+        </div>
+        <h4>2. Check your actual venv path</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>which python3     <span class="comment"># with venv active — should show ~/venvs/depthfusion/bin/python3</span>
+echo $VIRTUAL_ENV</pre>
+        </div>
+        <h4>3. Fix mismatches with sed</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash — replace OLD_PATH with what grep showed above</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>OLD_PATH="/home/gregmorris/Development/Projects/depthfusion/.venv"  <span class="comment"># ← change this</span>
+NEW_PATH="/home/gregmorris/venvs/depthfusion"                          <span class="comment"># ← and this</span>
+
+for f in ~/.claude-shared/hooks/depthfusion-*.sh; do
+    sed -i "s|$OLD_PATH|$NEW_PATH|g" "$f" && echo "Fixed: $f"
+done</pre>
+        </div>
+        <h4>4. Confirm the fix</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>grep PYTHON ~/.claude-shared/hooks/depthfusion-session-init.sh
+<span class="comment"># Must match your actual venv path exactly</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 6: ENV / API KEY (from-older, vps only) ── -->
+    <div class="step skipped" id="step-envkey" data-path="from-older" data-mode="vps-cpu vps-gpu">
+      <div class="step-header" onclick="toggleStep('step-envkey')">
+        <div class="step-num skip">✓</div>
+        <div class="step-meta">
+          <div class="step-title">API key &amp; env vars <span class="skip-badge">Carried forward</span></div>
+          <div class="step-subtitle">Your DEPTHFUSION_API_KEY survives upgrades — verify it's still there</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="skip-box"><strong>SKIP THIS STEP</strong> — The installer does not overwrite existing keys. Your <code>DEPTHFUSION_API_KEY</code> is preserved across upgrades.</div>
+        <p>Verify your key is still present:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>grep -E "^(DEPTHFUSION_API_KEY|DEPTHFUSION_HAIKU_ENABLED)=" ~/.claude/depthfusion.env</pre>
+        </div>
+        <p>If either line is missing, restore it:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash — only if missing</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>cat >> ~/.claude/depthfusion.env &lt;&lt;'EOF'
+DEPTHFUSION_API_KEY=sk-ant-api03-your-real-key-here
+DEPTHFUSION_HAIKU_ENABLED=true
+EOF
+chmod 600 ~/.claude/depthfusion.env</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 7: RELOAD SHELL ── -->
+    <div class="step" id="step-reload" data-path="all">
+      <div class="step-header" onclick="toggleStep('step-reload')">
+        <div class="step-num normal">2</div>
+        <div class="step-meta">
+          <div class="step-title">Reload the shell</div>
+          <div class="step-subtitle">Picks up updated env vars and hook paths — use exec bash not source .bashrc</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="warn-box">
+          <strong>⚠ Don't run <code>source ~/.bashrc</code> while the venv is active.</strong> It clobbers <code>$PATH</code> and leaves the shell in a half-activated state. Always use <code>exec bash</code> for a clean reload.
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>deactivate 2>/dev/null; exec bash</pre>
+        </div>
+        <p>After reload, confirm your mode is correct:</p>
+        <div class="code-block" data-mode="vps-cpu">
+          <div class="code-header"><span>bash — vps-cpu</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>echo "mode:  $DEPTHFUSION_MODE"            <span class="comment"># expect: vps-cpu</span>
+echo "haiku: $DEPTHFUSION_HAIKU_ENABLED"    <span class="comment"># expect: true</span>
+echo "key:   ${DEPTHFUSION_API_KEY:0:16}..."<span class="comment"># expect: sk-ant-api03-xxx...</span></pre>
+        </div>
+        <div class="code-block" data-mode="vps-gpu">
+          <div class="code-header"><span>bash — vps-gpu</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>echo "mode: $DEPTHFUSION_MODE"   <span class="comment"># expect: vps-gpu</span>
+which python3                   <span class="comment"># expect: ~/venvs/depthfusion/bin/python3</span></pre>
+        </div>
+        <div class="code-block" data-mode="local">
+          <div class="code-header"><span>bash — local</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>echo "mode: $DEPTHFUSION_MODE"   <span class="comment"># expect: local</span>
+which python3                   <span class="comment"># expect: ~/venvs/depthfusion/bin/python3</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 8: VERIFY ── -->
+    <div class="step" id="step-verify" data-path="all">
+      <div class="step-header" onclick="toggleStep('step-verify')">
+        <div class="step-num normal">3</div>
+        <div class="step-meta">
+          <div class="step-title">Verify the install</div>
+          <div class="step-subtitle">MCP connectivity, mode routing, P0 backend check, new feature smoke test</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+
+        <h4>A. Version check</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python3 -c "import depthfusion; print(depthfusion.__version__)"
+<span class="comment"># Expected: 0.6.0</span></pre>
+        </div>
+
+        <h4>B. MCP server connectivity</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>claude mcp list | grep depthfusion
+<span class="comment"># Expected: ✓ Connected (with 18 tools listed)</span></pre>
+        </div>
+
+        <div data-mode="vps-cpu vps-gpu">
+          <h4>C. 🔴 P0 check — confirm mode routes to the right backend (not null)</h4>
+          <div class="p0-box">
+            <strong>This is the most important check.</strong> If this shows <code>null</code>, the P0 mode-resolution bug is still present — re-run Steps 3 and 4.
+          </div>
+          <div class="code-block">
+            <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+            <pre>python3 -c "
+from depthfusion.backends.factory import get_backend
+for cap in ('reranker', 'extractor', 'linker', 'summariser', 'decision_extractor'):
+    b = get_backend(cap)
+    print(f'{cap:22} -> {b.name:12} healthy={b.healthy()}')
+"</pre>
+          </div>
+          <div data-mode="vps-cpu">
+            <p><strong>Expected:</strong> every row shows <code>haiku</code> with <code>healthy=True</code>. If you see <code>null</code>, either the anthropic package isn't installed (re-run Step 3) or the API key isn't loaded (check Step 4 and reload the shell).</p>
+          </div>
+          <div data-mode="vps-gpu">
+            <p><strong>Expected:</strong> every row shows <code>gemma</code> with <code>healthy=True</code>. If you see <code>haiku</code> or <code>null</code>, the vLLM service may not be running — check <code>systemctl status vllm-gemma</code>.</p>
+          </div>
+        </div>
+
+        <h4>D. Compatibility check (C1–C11)</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python -m depthfusion.analyzer.compatibility</pre>
+        </div>
+        <p>Expected: <strong>10 GREEN · 1 YELLOW</strong>. The 1 YELLOW (C4) is benign — a CLaRa indicator in PostCSS <code>node_modules</code>.</p>
+
+        <h4>E. New feature: recall explainability (S-92)</h4>
+        <div class="feature-box">
+          <div class="feature-title">✦ New in v0.6.0 — explain=true parameter</div>
+          <p>Pass <code>explain: true</code> to <code>depthfusion_recall_relevant</code> and each result now includes BM25 score, RRF score, source weight, reranker rank, and (when applicable) vector score. Useful for diagnosing why a specific block ranked where it did.</p>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span>bash — smoke test recall + explain</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python3 -c "
+from depthfusion.mcp.server import _tool_recall
+import json
+result = json.loads(_tool_recall({'query': 'install verification', 'top_k': 3, 'explain': True}))
+blocks = result.get('blocks', [])
+print(f'blocks returned: {len(blocks)}')
+print(f'error:           {result.get(\"error\", \"none\")}')
+if blocks:
+    explain = blocks[0].get('explain', {})
+    print(f'explain keys:    {list(explain.keys())}')
+    print(f'rrf_score:       {explain.get(\"rrf_score\", \"absent\")}')
+"</pre>
+        </div>
+        <p>Expected: <code>error: none</code>, <code>rrf_score</code> is a numeric value in the explain dict. A blocks count of 0 is fine on a fresh host.</p>
+
+        <h4>F. New feature: benchmark harness (S-90)</h4>
+        <div class="feature-box">
+          <div class="feature-title">✦ New in v0.6.0 — benchmark.py</div>
+          <p>Runs precision and latency benchmarks against the bundled 8-entry goldset. No API key required — works in local mode too.</p>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span>bash — run benchmark</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python3 scripts/benchmark.py --quiet
+<span class="comment"># Output: JSON with precision_at_1, hit_rate_at_5, p50_latency_ms, etc.</span></pre>
+        </div>
+
+        <h4>G. system.startup event — confirm telemetry pipeline is healthy</h4>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python3 -m depthfusion.mcp.server &lt;&lt;&lt; \
+  '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"depthfusion_status","arguments":{}}}' \
+  2>/dev/null | python3 -c "import sys,json; r=json.load(sys.stdin); print('ok' if 'result' in r else 'FAIL')"
+
+<span class="comment"># Then check that the startup event appeared</span>
+grep "system.startup" ~/.claude/depthfusion-metrics/$(date -u +%Y-%m-%d).jsonl 2>/dev/null | tail -1 | \
+  python3 -c "import sys,json; e=json.loads(sys.stdin.read()); print('version:', e['labels']['server_version'])"
+<span class="comment"># Expected: version: 0.6.0</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 9: SIDECAR (vps-cpu / vps-gpu only) ── -->
+    <div class="step skipped" id="step-sidecar" data-path="all" data-mode="vps-cpu vps-gpu">
+      <div class="step-header" onclick="toggleStep('step-sidecar')">
+        <div class="step-num skip">✓</div>
+        <div class="step-meta">
+          <div class="step-title">
+            RLM HTTP sidecar (optional)
+            <span class="new-badge">New in v0.6.0</span>
+          </div>
+          <div class="step-subtitle">Port 8771 loopback — only needed if integrating with SkillForge</div>
+        </div>
+        <div class="step-chevron">▶</div>
+      </div>
+      <div class="step-body">
+        <div class="skip-box"><strong>SKIP IF NOT USING SKILLFORGE.</strong> The RLM sidecar is a FastAPI service that exposes the Python recursive backend over HTTP so SkillForge TypeScript can call it. It is optional and starts manually — it does not auto-start on boot.</div>
+        <div class="feature-box">
+          <div class="feature-title">✦ New in v0.6.0 — SkillForge RLM HTTP sidecar (S-35 AC-4)</div>
+          <p>FastAPI at port 8771 (loopback-only, 127.0.0.1). Endpoints: <code>GET /health</code>, <code>POST /run</code>, <code>GET /schema</code>. Port configurable via <code>DEPTHFUSION_RLM_PORT</code>.</p>
+        </div>
+        <p>Start manually when needed:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash — start the sidecar</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>python3 -m depthfusion.recursive.sidecar
+<span class="comment"># Starts on 127.0.0.1:8771 by default</span>
+<span class="comment"># Override port: DEPTHFUSION_RLM_PORT=9000 python3 -m depthfusion.recursive.sidecar</span></pre>
+        </div>
+        <p>Health check (in another terminal):</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s http://127.0.0.1:8771/health | python3 -m json.tool
+<span class="comment"># Expected: {"available": true, "status": "ok"}</span>
+<span class="comment"># If available=false: RLM package not installed (rlms extra missing)</span></pre>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /steps -->
+
+  <!-- ── VERIFICATION CHECKLIST ── -->
+  <div class="section-heading">✅ Final Verification Checklist</div>
+  <p style="color:var(--muted); font-size:0.88rem; margin-bottom:16px;">Click each item to mark it done. The progress bar fills as you go.</p>
+
+  <div class="check-list">
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>Checked out <code>v0.6.0</code> — <code>git log --oneline -1</code> shows SHA <code>ffda2bd</code></div>
+        <div class="check-cmd">git log --oneline -1</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div><code>python3 -c "import depthfusion; print(depthfusion.__version__)"</code> prints <code>0.6.0</code></div>
+        <div class="check-cmd">python3 -c "import depthfusion; print(depthfusion.__version__)"</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>pip install ran — <code>anthropic</code>, <code>fastapi</code>, <code>uvicorn</code> are present</div>
+        <div class="check-cmd">pip show anthropic fastapi uvicorn | grep "^Name:"</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>Installer ran without errors — mode confirmed in output</div>
+        <div class="check-cmd">python3 -m depthfusion.install.install --mode=&lt;your-mode&gt;</div>
+      </div>
+    </div>
+    <div class="check-item" data-mode="vps-cpu vps-gpu" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>🔴 P0 check passed: backend factory routes to <code>haiku</code>/<code>gemma</code>, not <code>null</code></div>
+        <div class="check-cmd">python3 -c "from depthfusion.backends.factory import get_backend; print(get_backend('reranker').name)"</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div><code>claude mcp list</code> shows depthfusion as ✓ Connected</div>
+        <div class="check-cmd">claude mcp list | grep depthfusion</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>Compatibility check shows 10 GREEN · 1 YELLOW</div>
+        <div class="check-cmd">python -m depthfusion.analyzer.compatibility</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div>Recall smoke test returns <code>error: none</code> with <code>rrf_score</code> in explain dict</div>
+        <div class="check-cmd">python3 -c "from depthfusion.mcp.server import _tool_recall; ..."</div>
+      </div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="tick"></div>
+      <div class="check-text">
+        <div><code>system.startup</code> event shows <code>server_version: 0.6.0</code> in today's metrics file</div>
+        <div class="check-cmd">grep "system.startup" ~/.claude/depthfusion-metrics/$(date -u +%Y-%m-%d).jsonl</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="done-banner" id="done-banner">
+    <h2>✓ Upgrade complete</h2>
+    <p>DepthFusion v0.6.0 is running. Both P0 silent failures are resolved.<br>
+    Start a Claude Code session to confirm full-pipeline telemetry in <code>~/.claude/depthfusion-metrics/</code>.<br>
+    <br>
+    <strong>What's next:</strong> Try <code>explain: true</code> on any recall to see per-stage scoring.</p>
+  </div>
+
+  <!-- ── ROLLBACK ── -->
+  <div class="section-heading">🔄 Rollback to v0.6.0a2</div>
+  <p style="color:var(--muted); font-size:0.88rem; margin-bottom:16px;">If something goes wrong, rolling back is non-destructive. Your memory store and telemetry files are unaffected.</p>
+  <div class="step" id="step-rollback">
+    <div class="step-header" onclick="toggleStep('step-rollback')">
+      <div class="step-num warn">↩</div>
+      <div class="step-meta">
+        <div class="step-title">Rollback procedure</div>
+        <div class="step-subtitle">Return to v0.6.0a2 in under 2 minutes</div>
+      </div>
+      <div class="step-chevron">▶</div>
+    </div>
+    <div class="step-body">
+      <div class="code-block">
+        <div class="code-header"><span>bash — full rollback</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>cd ~/projects/depthfusion
+git checkout v0.6.0a2        <span class="comment"># return to last alpha</span>
+
+<span class="comment"># Re-run installer to restore previous hook scripts</span>
+source ~/venvs/depthfusion/bin/activate
+python3 -m depthfusion.install.install --mode=<span class="hl">&lt;your-mode&gt;</span>
+
+deactivate; exec bash        <span class="comment"># reload shell</span>
+
+<span class="comment"># Confirm rollback</span>
+python3 -c "import depthfusion; print(depthfusion.__version__)"
+<span class="comment"># Expected: 0.6.0a2</span></pre>
+      </div>
+      <div class="skip-box">
+        <strong>Rollback is safe because:</strong> no data migrations occurred, no file format changes (JSONL streams are append-only), no installed-dependency removals. Memory store and all discovery files are unaffected by version rollback.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  // ── Path selector ──────────────────────────────────────────────
+  function setPath(path) {
+    document.body.setAttribute('data-path', path);
+    document.querySelectorAll('.path-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+
+  // ── Mode selector ──────────────────────────────────────────────
+  function setMode(mode) {
+    document.body.setAttribute('data-mode', mode);
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+
+  // ── Step toggle ────────────────────────────────────────────────
+  function toggleStep(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+  }
+
+  // ── Copy code ──────────────────────────────────────────────────
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    navigator.clipboard.writeText(pre.innerText.trim()).then(() => {
+      btn.textContent = '✓ Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+    });
+  }
+
+  // ── Check items ────────────────────────────────────────────────
+  function toggleCheck(el) {
+    el.classList.toggle('checked');
+    el.querySelector('.tick').textContent = el.classList.contains('checked') ? '✓' : '';
+    updateProgress();
+    checkAllDone();
+  }
+
+  function updateProgress() {
+    const all     = document.querySelectorAll('.check-item');
+    const checked = document.querySelectorAll('.check-item.checked');
+    const pct = all.length ? (checked.length / all.length) * 100 : 0;
+    document.getElementById('progress').style.width = pct + '%';
+  }
+
+  function checkAllDone() {
+    const all     = document.querySelectorAll('.check-item');
+    const checked = document.querySelectorAll('.check-item.checked');
+    const banner  = document.getElementById('done-banner');
+    banner.style.display = (all.length > 0 && checked.length === all.length) ? 'block' : 'none';
+  }
+
+  // ── Auto-open first required step ──────────────────────────────
+  document.getElementById('step-pull').classList.add('open');
+</script>
+
+</body>
+</html>
