@@ -89,6 +89,10 @@ class HaikuBackend:
         self._client: Any = None
 
         if not _ANTHROPIC_IMPORTABLE:
+            logger.warning(
+                "HaikuBackend: anthropic package not installed — "
+                "install depthfusion[vps-cpu] to enable Haiku reranking"
+            )
             return
 
         # C2 fix: DEPTHFUSION_API_KEY only — never ANTHROPIC_API_KEY.
@@ -96,6 +100,10 @@ class HaikuBackend:
         # (e.g. testing with a mock client).
         resolved_key = api_key if api_key is not None else os.environ.get("DEPTHFUSION_API_KEY")
         if not resolved_key:
+            logger.warning(
+                "HaikuBackend: DEPTHFUSION_API_KEY not set — "
+                "Haiku reranking disabled; set the key to enable it"
+            )
             return
 
         # Explicit api_key= to the SDK — does not rely on env default.
