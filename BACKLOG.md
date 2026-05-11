@@ -541,14 +541,14 @@
 - [x] AC-1: `recursive_llm_call` + `weighted_retrieval` step types added to Zod discriminatedUnion
 - [x] AC-2: Retrieval quality validator implemented
 - [x] AC-3: `routeSubCall()` method on `CapabilityRouter`
-- [ ] AC-4: `recursive/client.py` wrapped as HTTP sidecar service
+- [x] AC-4: `recursive/client.py` wrapped as HTTP sidecar service
 - [ ] AC-5: Blocked until SF-2 is stable (ordering constraint from plan)
 
 **Tasks:**
 - [x] T-103: Extend Skill IR schema (E1, E2)
 - [x] T-104: Retrieval quality validator (E3)
 - [x] T-105: Implement `routeSubCall()` (E4)
-- [ ] T-106: HTTP sidecar for `recursive/client.py`
+- [x] T-106: HTTP sidecar for `recursive/client.py`
 
 ### S-36: As SkillForge's RL router, I want trajectory-level feedback + configurable budget allocation so that reward accumulates beyond step-level `P3` `L`
 
