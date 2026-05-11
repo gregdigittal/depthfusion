@@ -113,6 +113,18 @@ class DepthFusionConfig:
     # S-77 Auto-compress cadence (None = manual-only)
     auto_compress_hours: Optional[float] = None
 
+    # E-31 Cognitive feature flags (all default OFF)
+    cognitive_retrieval: bool = False
+    llm_classifier: bool = False
+    contradiction_engine: bool = False
+    decision_memory: bool = False
+    operational_memory: bool = False
+    multi_agent_wm: bool = False
+    autonomic: bool = False
+    rest_api_enabled: bool = False
+    api_public: bool = False
+    api_token: str = ""
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -163,4 +175,30 @@ class DepthFusionConfig:
                 "DEPTHFUSION_EVENT_LOG", "~/.claude/shared/depthfusion-events.jsonl"
             ),
             auto_compress_hours=_env_float_opt("DEPTHFUSION_AUTO_COMPRESS_HOURS"),
+            cognitive_retrieval=_env_bool("DEPTHFUSION_COGNITIVE_RETRIEVAL", False),
+            llm_classifier=_env_bool("DEPTHFUSION_LLM_CLASSIFIER", False),
+            contradiction_engine=_env_bool("DEPTHFUSION_CONTRADICTION_ENGINE", False),
+            decision_memory=_env_bool("DEPTHFUSION_DECISION_MEMORY", False),
+            operational_memory=_env_bool("DEPTHFUSION_OPERATIONAL_MEMORY", False),
+            multi_agent_wm=_env_bool("DEPTHFUSION_MULTI_AGENT_WM", False),
+            autonomic=_env_bool("DEPTHFUSION_AUTONOMIC", False),
+            rest_api_enabled=_env_bool("DEPTHFUSION_REST_API", False),
+            api_public=_env_bool("DEPTHFUSION_API_PUBLIC", False),
+            api_token=os.environ.get("DEPTHFUSION_API_TOKEN", ""),
         )
+
+    @property
+    def event_log_path(self) -> Path:
+        base = os.environ.get(
+            "DEPTHFUSION_EVENT_LOG",
+            str(Path.home() / ".claude" / "depthfusion_events.jsonl"),
+        )
+        return Path(base).expanduser()
+
+    @property
+    def memory_store_path(self) -> Path:
+        return Path.home() / ".claude" / ".depthfusion_memories.db"
+
+    @property
+    def working_memory_path(self) -> Path:
+        return Path.home() / ".claude" / ".depthfusion_working_memory.db"
