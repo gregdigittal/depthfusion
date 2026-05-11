@@ -36,20 +36,62 @@ class ChromaDBStore:
             metadata={"hnsw:space": "cosine"},
         )
 
+    def _get_embedding(self, texts: list[str]) -> list[list[float]] | None:
+        """Return embeddings from DepthFusion's embedding backend, or None on failure.
+
+        Uses a lazy import of ``get_backend`` to avoid circular dependencies at
+        module load time.  Returns ``None`` when the backend is unavailable,
+        returns an empty result, or raises any exception.
+        """
+        try:
+            from depthfusion.backends import get_backend  # lazy — avoids circular deps
+            backend = get_backend("embedding")
+            embeddings = backend.embed(texts)
+            if embeddings:
+                return embeddings
+            return None
+        except Exception:
+            logger.warning(
+                "DepthFusion embedding backend unavailable; falling back to Chroma auto-embed",
+                exc_info=True,
+            )
+            return None
+
     def add_document(self, doc_id: str, content: str, metadata: dict) -> None:
-        """Add or update a document (upsert)."""
-        self._collection.upsert(
-            ids=[doc_id],
-            documents=[content],
-            metadatas=[metadata],
-        )
+        """Add or update a document (upsert).
+
+        Uses the DepthFusion embedding backend when healthy; falls back to
+        Chroma's built-in auto-embedding when the backend is unavailable.
+        """
+        embedding = self._get_embedding([content])
+        if embedding is not None:
+            self._collection.upsert(
+                ids=[doc_id],
+                embeddings=[embedding[0]],
+                documents=[content],
+                metadatas=[metadata],
+            )
+        else:
+            self._collection.upsert(
+                ids=[doc_id],
+                documents=[content],
+                metadatas=[metadata],
+            )
 
     def query(self, query_text: str, top_k: int = 20) -> list[dict]:
-        """Return top_k most similar documents."""
+        """Return top_k most similar documents.
+
+        Uses the DepthFusion embedding backend for the query vector when
+        healthy; falls back to Chroma's built-in auto-embedding otherwise.
+        """
         n = min(top_k, self.count())
         if n == 0:
             return []
-        results = self._collection.query(query_texts=[query_text], n_results=n)
+        embedding = self._get_embedding([query_text])
+        if embedding is not None:
+            results = self._collection.query(query_embeddings=[embedding[0]], n_results=n)
+        else:
+            results = self._collection.query(query_texts=[query_text], n_results=n)
         # The Chroma return types for distances/documents/metadatas are
         # `list[...] | None` — narrow once so mypy + runtime both treat
         # the subscripted access below as safe.
