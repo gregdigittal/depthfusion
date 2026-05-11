@@ -1597,8 +1597,9 @@ def _emit_startup_event(tools_enabled: int, metrics_dir: "Path | None" = None) -
     the server from serving tools.  `metrics_dir` is injectable for tests.
     """
     try:
-        from depthfusion.metrics.collector import MetricsCollector
         import importlib.metadata as _meta
+
+        from depthfusion.metrics.collector import MetricsCollector
         try:
             _version = _meta.version("depthfusion")
         except _meta.PackageNotFoundError:

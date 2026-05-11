@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 SIX_CAPS = frozenset(
     {"reranker", "extractor", "linker", "summariser", "embedding", "decision_extractor"}
@@ -122,7 +120,7 @@ class TestSingleCapabilityFallback:
         monkeypatch.setenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", "true")
 
         from depthfusion.mcp import server as srv_mod
-        from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+        from depthfusion.retrieval.hybrid import RecallPipeline
 
         # Stub _detect_current_backends (S-83 added fallback_chain kwarg)
         def fake_detect(perf_ms=None, fallback_chain=None):
@@ -178,7 +176,7 @@ class TestErrorPathLatencyCapture:
         _minimal_corpus(tmp_path)
 
         from depthfusion.mcp import server as srv_mod
-        from depthfusion.retrieval.hybrid import RecallPipeline, PipelineMode
+        from depthfusion.retrieval.hybrid import RecallPipeline
 
         # Stub _detect_current_backends (S-83 added fallback_chain kwarg)
         def fake_detect(perf_ms=None, fallback_chain=None):
@@ -292,7 +290,6 @@ class TestDictShapeContract:
         from depthfusion.retrieval.hybrid import RecallPipeline
 
         PROBE_STUB = 999.0  # deliberately large so the merge is visible
-        PIPELINE_RERANKER = 0.0  # pipeline records a distinct value
 
         def fake_detect(perf_ms=None, fallback_chain=None):
             if perf_ms is not None:

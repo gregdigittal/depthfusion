@@ -19,13 +19,11 @@ All tests in this file are hermetic: no writes to ~/.claude/.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 
 from depthfusion.metrics.collector import MetricsCollector
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -185,7 +183,6 @@ class TestGuardBypassable:
         collector.record("test.home.redirect.compat", 1.0)
 
         # The write must NOT have gone to the real production dir.
-        real_prod_dir = _REAL_HOME / ".claude" / "depthfusion-metrics"
         assert not str(collector.metrics_dir).startswith(str(_REAL_HOME)), (
             f"Collector wrote to {collector.metrics_dir!r} which is under the "
             f"real home {_REAL_HOME!r}.  The autouse fixture must redirect "
