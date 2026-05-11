@@ -23,6 +23,8 @@ local = []
 vps-cpu = [
     "anthropic>=0.40",
     "chromadb>=0.4",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
 ]
 
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
@@ -32,6 +34,8 @@ vps-cpu = [
 vps-gpu = [
     "sentence-transformers>=2.2",
     "chromadb>=0.4",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
 ]
 
 rlm = ["rlms"]
