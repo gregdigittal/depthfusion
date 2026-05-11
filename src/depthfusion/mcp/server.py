@@ -152,6 +152,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "snippet_len": {"type": "integer", "minimum": 200, "maximum": 8000, "default": 1500},
             "cross_project": {"type": "boolean", "default": False},
             "project": {"type": "string"},
+            "explain": {
+                "type": "boolean",
+                "default": False,
+                "description": "When true, include a structured explain block for each result showing individual scores used to rank it",
+            },
         },
         "required": ["query"],
     },
@@ -685,6 +690,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     query = arguments.get("query", "")
     top_k = int(arguments.get("top_k", 5))
     snippet_len = int(arguments.get("snippet_len", 1500))
+    explain = bool(arguments.get("explain", False))
     # T-161 / S-52: project scoping. When cross_project=False (the default),
     # results are filtered to the current project (auto-detected via git
     # remote or DEPTHFUSION_PROJECT env var). cross_project=True restores
@@ -755,6 +761,10 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # S-52 T-161: apply project-scoped filter before scoring so BM25 IDF
     # weights are computed against the filtered corpus, not the full
     # cross-project corpus.
+    # S-92: initialise current_project=None here so it's always in scope when
+    # explain data is assembled (the variable is only populated inside the
+    # cross_project branch below, but the explain loop runs outside of it).
+    current_project: str | None = None
     if not cross_project:
         current_project = explicit_project
         if current_project is None:
@@ -826,6 +836,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     bm25_ranked = bm25.rank_all(query_tokens)  # list of (idx, raw_bm25_score)
 
     # Apply source-type weight to BM25 scores
+    # S-92: per-block explain data (only populated when explain=True)
+    _explain_data: dict[int, dict] = {}
     weighted: list[tuple[int, float]] = []
     for idx, raw_score in bm25_ranked:
         source = raw_blocks[idx]["source"]
@@ -838,7 +850,20 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             else len(recency_list)
         )
         recency_boost = 1.0 / (1 + recency_rank * 0.01)  # max 1%, fades quickly
-        weighted.append((idx, raw_score * weight * recency_boost))
+        final_score = raw_score * weight * recency_boost
+        weighted.append((idx, final_score))
+        if explain:
+            _block = raw_blocks[idx]
+            _proj_match: bool | None = (
+                (_block.get("project") == current_project)
+                if (not cross_project and current_project is not None)
+                else None
+            )
+            _explain_data[idx] = {
+                "bm25_score": round(raw_score, 4),
+                "source_weight": weight,
+                "project_match": _proj_match,
+            }
 
     weighted.sort(key=lambda x: -x[1])
 
@@ -853,13 +878,18 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             continue
         seen_files.add(b["file_stem"])
         snippet = _trim_to_sentence(b["content"].strip(), snippet_len)
-        reranker_input.append({
+        entry: dict = {
             "chunk_id": b["chunk_id"],
             "file_stem": b["file_stem"],
             "source": b["source"],
             "score": round(final_score, 4),
             "snippet": snippet,
-        })
+        }
+        # S-92: stash BM25-phase explain data internally so it survives into
+        # the post-reranker loop. This field is stripped before output.
+        if explain and idx in _explain_data:
+            entry["_explain"] = _explain_data[idx]
+        reranker_input.append(entry)
 
     # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
     from depthfusion.retrieval.hybrid import RecallPipeline
@@ -923,12 +953,25 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     finally:
         if pipeline.mode.value != "local":
             perf_ms["reranker"] = round((time.monotonic() - _t_rerank) * 1000.0, 3)
-    # Ensure output blocks have consistent fields
-    for b in blocks_out:
+    # Ensure output blocks have consistent fields; attach explain block when requested.
+    for rank_idx, b in enumerate(blocks_out):
         if "snippet" not in b:
             b["snippet"] = _trim_to_sentence(b.get("content", "").strip(), snippet_len)
         b.pop("file_stem", None)
         b.pop("content", None)
+        # S-92: build the public explain block from internal _explain plus pipeline scores.
+        # Security constraint (AC-4): only numeric scores, booleans, and rank integer —
+        # no env values, no extended path components, no cross-project names.
+        if explain:
+            ex: dict = {}
+            if "_explain" in b:
+                ex.update(b["_explain"])
+            ex["rrf_score"] = b.get("score")
+            if "vector_score" in b:
+                ex["vector_score"] = b["vector_score"]
+            ex["reranker_rank"] = rank_idx
+            b["explain"] = {k: v for k, v in ex.items() if v is not None}
+        b.pop("_explain", None)  # always strip internal field
 
     # S-76: build engaged_layers from what actually ran this call
     engaged_layers = ["bm25"]

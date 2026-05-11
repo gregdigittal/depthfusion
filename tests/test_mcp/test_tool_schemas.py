@@ -60,3 +60,14 @@ def test_snippet_len_bounds():
     props = schema["inputSchema"]["properties"]
     assert props["snippet_len"]["minimum"] == 200
     assert props["snippet_len"]["maximum"] == 8000
+
+
+def test_recall_relevant_has_explain_param():
+    """S-92: explain boolean with default=False must appear in schema."""
+    schema = _make_tool_schema("depthfusion_recall_relevant", "desc")
+    props = schema["inputSchema"]["properties"]
+    assert "explain" in props
+    assert props["explain"]["type"] == "boolean"
+    assert props["explain"]["default"] is False
+    # explain is optional — must not be in required list
+    assert "explain" not in schema["inputSchema"]["required"]
