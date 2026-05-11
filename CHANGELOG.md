@@ -12,8 +12,58 @@ Conventions:
 
 ## [Unreleased]
 
-Accumulating post-v0.6.0a2. No release cut yet; items target v0.6.0 or
-v0.7.0 depending on scenario (see `docs/plans/v0.7/roadmap.md`).
+---
+
+## [v0.6.0] — 2026-05-11
+
+**Theme:** Build-plan alignment (E-30) — two P0 correctness fixes that made advertised modes non-functional, plus MCP schema completeness, vector embedding consistency, benchmark harness, SQLite metadata cache, recall explainability, and the SkillForge RLM HTTP sidecar. Promotes from `0.6.0a2`.
+
+### Fixed
+
+**P0: `DEPTHFUSION_MODE=vps-cpu` / `vps-gpu` silently fell through to local BM25 (S-86):**
+- `RecallPipeline.from_env()` checked for the legacy `"vps"` string as the non-local gate. Setting either advertised mode (`vps-cpu`, `vps-gpu`) caused silent degradation to local-only retrieval.
+- New `utils/mode.py::normalise_mode()` maps `vps-cpu` and `vps-gpu` to canonical mode strings; `vps` is a deprecated alias for `vps-cpu` with a `DeprecationWarning`; unknown values fall back to `local` with a log warning.
+- `hybrid.py::from_env()` updated to consume `normalise_mode()`; behavior for `local` is unchanged.
+
+**P0: `pip install depthfusion[vps-cpu]` did not install the Anthropic SDK (S-87):**
+- Haiku reranking silently degraded to `NullBackend` on every `vps-cpu` install because `anthropic>=0.40` was missing from the `[vps-cpu]` extra.
+- `anthropic>=0.40` added to `[vps-cpu]`; `anthropic>=0.40`, `sentence-transformers>=2.2`, `chromadb>=0.4` confirmed present in `[vps-gpu]`.
+- `fastapi>=0.100` and `uvicorn>=0.23` also added to both extras (required by new RLM sidecar).
+
+**Vector embedding space consistency (S-89):**
+- `ChromaDBStore.add_document()` and `query()` now both explicitly call `get_backend("embedding")` via a lazy import and pass the embedding vectors to Chroma rather than letting Chroma pick its own embedding function. Eliminates silent vector-space mismatch between index and query.
+- When the embedding backend is null or raises, both paths fall back to Chroma auto-embedding and log a warning — BM25 recall continues unaffected.
+
+### Added
+
+**MCP tool schemas — all 18 tools (S-88):**
+- `_make_tool_schema()` replaced by `TOOL_SCHEMAS` lookup dict. Every enabled MCP tool now returns a non-empty JSON schema with typed properties, `required` arrays, and documented bounds. Invalid payloads produce actionable 422 errors.
+
+**Benchmark harness (S-90):**
+- `scripts/benchmark.py` runs without API keys against `tests/fixtures/recall_goldset.jsonl` (8 representative query+corpus+relevant-chunk entries).
+- Metrics: `precision_at_1`, `precision_at_5`, `hit_rate_at_5`, `fallback_rate`, `p50_latency_ms`, `p95_latency_ms`, `cost_estimate_usd`. Each metric carries a `basis` label: `measured | estimated | projected`.
+- Flags: `--goldset`, `--top-k`, `--output`, `--mode`, `--quiet`.
+
+**SQLite metadata cache (S-91):**
+- `storage/file_index.py::FileMetadataIndex` — WAL-mode SQLite index storing `(file_path, mtime, size, content_hash, project, importance, salience, pinned, indexed_at)`.
+- `is_stale()` lets callers skip full file reads for unchanged files; `update()` / `get()` / `remove()` / `list_project()` / `purge_missing()` provide the CRUD surface.
+- Default path: `~/.claude/.depthfusion_file_index.db`. Thread-safe via per-instance `threading.Lock`. Exported from `storage/__init__.py`.
+
+**Recall explainability (S-92):**
+- `depthfusion_recall_relevant` accepts `explain: bool` (default `false`).
+- When `explain=true`, each result block includes `{"bm25_score", "source_weight", "rrf_score", "reranker_rank"}` plus `"vector_score"` and `"project_match"` when those stages ran.
+- Default response unchanged — no size regression.
+
+**SkillForge HTTP sidecar (S-35 AC-4 / T-106):**
+- `recursive/sidecar.py` — FastAPI service exposing `RLMClient` over HTTP. Endpoints: `GET /health`, `POST /run`, `GET /schema`. Default port 8771 (`DEPTHFUSION_RLM_PORT`), loopback-only (`127.0.0.1`).
+- SkillForge TypeScript callers can reach the Python recursive backend without a Python import dependency.
+
+### Verification
+
+**Test totals as of v0.6.0:**
+- 1519 tests collected and passing (was 1430 at v0.6.0a2; +89 from E-30 + S-35 AC-4)
+- `ruff check src tests`: all checks passed
+- New test modules: `test_mode.py`, `test_mode_resolution.py`, `test_tool_schemas.py`, `test_recall_explain.py`, `test_benchmark.py`, `test_file_index.py`, `test_vector_store.py` (extended), `test_sidecar.py`
 
 ---
 
