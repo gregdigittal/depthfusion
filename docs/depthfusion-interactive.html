@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Persistent Memory for Claude Code</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #1c2331;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --cyan: #39d0d4;
+    --cyan-dim: #1a4a4c;
+    --purple: #a78bfa;
+    --purple-dim: #2d1f5e;
+    --green: #3fb950;
+    --green-dim: #1a3a1f;
+    --orange: #f0883e;
+    --orange-dim: #3a2210;
+    --red: #f85149;
+    --red-dim: #3a1010;
+    --yellow: #d29922;
+    --r: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.5px; }
+  h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.75rem; }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; }
+  p  { color: var(--muted); line-height: 1.7; }
+  code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85em; background: var(--bg3); padding: 0.15em 0.4em; border-radius: 4px; color: var(--cyan); }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(160deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 64px 24px 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(57,208,212,0.06) 0%, transparent 70%);
+    top: -200px; left: 50%; transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    border: 1px solid rgba(57,208,212,0.3);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 4px 14px;
+    margin-bottom: 18px;
+    text-transform: uppercase;
+  }
+  .hero h1 { margin-bottom: 16px; }
+  .hero h1 span { color: var(--cyan); }
+  .hero p.lead { font-size: 1.1rem; max-width: 560px; margin: 0 auto 32px; color: var(--muted); }
+  .stat-row {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-top: 40px;
+  }
+  .stat-item { text-align: center; }
+  .stat-value { font-size: 2rem; font-weight: 700; color: var(--cyan); display: block; }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Nav Tabs ── */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 14px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+  .section { display: none; padding: 48px 24px; }
+  .section.active { display: block; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-sm {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 16px 20px;
+  }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+  /* ── Problem Section ── */
+  .session-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .session-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .session-box .session-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .session-box .chat-line {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+  .chat-user { background: var(--purple-dim); color: var(--purple); }
+  .chat-ai   { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .session-box.forgotten { opacity: 0.35; }
+  .forgotten-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--red-dim); color: var(--red);
+    font-size: 0.6rem; padding: 2px 6px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .with-df-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--green-dim); color: var(--green);
+    font-size: 0.6rem; padding: 2px 6px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .divider-label {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Retrieval Demo ── */
+  .retrieval-demo { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; }
+  .query-input-row { display: flex; gap: 12px; margin-bottom: 24px; }
+  .query-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+    padding: 10px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .query-input:focus { border-color: var(--cyan); }
+  .query-input::placeholder { color: var(--muted); }
+  .btn-recall {
+    background: var(--cyan);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-recall:hover { opacity: 0.85; }
+  .btn-recall:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .pipeline-stages {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding: 2px 0;
+  }
+  .stage {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    text-align: center;
+    min-width: 90px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .stage.active-stage { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+  .stage.done-stage { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .stage-arrow { color: var(--border); padding: 0 6px; font-size: 1.1rem; flex-shrink: 0; }
+  .stage-name { font-weight: 600; display: block; }
+  .stage-sub { color: var(--muted); font-size: 0.7rem; display: block; margin-top: 2px; }
+  .stage.active-stage .stage-sub { color: rgba(57,208,212,0.7); }
+  .stage.done-stage .stage-sub { color: rgba(63,185,80,0.7); }
+
+  .results-panel { display: none; }
+  .results-panel.visible { display: block; }
+  .result-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: all 0.3s;
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  .result-item.appeared { opacity: 1; transform: translateY(0); }
+  .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .result-rank { font-size: 1.1rem; font-weight: 700; color: var(--cyan); min-width: 28px; }
+  .result-file { font-size: 0.85rem; font-weight: 600; color: var(--text); font-family: monospace; }
+  .result-score-bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .result-score-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--purple)); border-radius: 3px; transition: width 0.6s ease; }
+  .result-score-val { font-size: 0.78rem; color: var(--cyan); font-family: monospace; min-width: 40px; text-align: right; }
+  .source-badge {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .src-memory    { background: var(--purple-dim); color: var(--purple); }
+  .src-discovery { background: var(--orange-dim); color: var(--orange); }
+  .src-session   { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .result-snippet { font-size: 0.82rem; color: var(--muted); line-height: 1.5; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+  .result-snippet .hi { color: var(--cyan); background: rgba(57,208,212,0.1); border-radius: 2px; padding: 0 2px; }
+
+  .stats-bar { display: flex; gap: 20px; font-size: 0.78rem; color: var(--muted); padding: 10px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .stats-bar span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); display: inline-block; }
+  .dot-g { background: var(--green); }
+  .dot-o { background: var(--orange); }
+
+  /* ── Tiers ── */
+  .tier-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .tier-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .tier-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .tier-card.t1::before { background: linear-gradient(135deg, rgba(57,208,212,0.05), transparent); }
+  .tier-card.t2::before { background: linear-gradient(135deg, rgba(167,139,250,0.05), transparent); }
+  .tier-card.t3::before { background: linear-gradient(135deg, rgba(240,136,62,0.05), transparent); }
+  .tier-card.selected { border-color: var(--cyan); }
+  .tier-card.selected.t2 { border-color: var(--purple); }
+  .tier-card.selected.t3 { border-color: var(--orange); }
+  .tier-card.selected::before { opacity: 1; }
+  .tier-icon { font-size: 1.6rem; margin-bottom: 10px; }
+  .tier-name { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+  .tier-sub { font-size: 0.8rem; color: var(--muted); }
+  .tier-detail { display: none; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; }
+  .tier-detail.visible { display: block; }
+  .feature-list { list-style: none; }
+  .feature-list li { padding: 6px 0; font-size: 0.88rem; display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--border); }
+  .feature-list li:last-child { border-bottom: none; }
+  .feature-list li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .feature-list li.x-feat::before { content: '○'; color: var(--border); }
+
+  /* ── Token Efficiency ── */
+  .comparison-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .compare-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+  }
+  .compare-panel.highlight { border-color: var(--green); }
+  .compare-title { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 16px; }
+  .token-bar-row { margin-bottom: 14px; }
+  .token-bar-label { font-size: 0.82rem; color: var(--text); margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .token-bar-track { height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+  .token-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+  .bar-bad  { background: var(--red); }
+  .bar-ok   { background: var(--yellow); }
+  .bar-good { background: var(--green); }
+  .total-row { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .total-val { font-size: 1.2rem; font-weight: 700; }
+  .val-bad  { color: var(--red); }
+  .val-good { color: var(--green); }
+  .savings-badge {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  /* ── Salience ── */
+  .discovery-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    transition: all 0.4s;
+  }
+  .discovery-item.archived { opacity: 0.3; border-style: dashed; }
+  .disc-name { font-size: 0.88rem; font-weight: 600; font-family: monospace; margin-bottom: 4px; }
+  .disc-meta { font-size: 0.75rem; color: var(--muted); }
+  .disc-meta-archived { font-size: 0.75rem; color: var(--red); }
+  .salience-track { width: 140px; }
+  .sal-row { display: flex; align-items: center; gap: 8px; }
+  .sal-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .sal-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease, background-color 0.5s; }
+  .sal-val { font-size: 0.8rem; font-family: monospace; min-width: 28px; text-align: right; }
+  .sal-label { font-size: 0.68rem; color: var(--muted); text-align: right; margin-top: 2px; }
+  .feedback-controls { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; }
+  .feedback-controls button {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .feedback-controls .btn-used { border-color: rgba(63,185,80,0.4); color: var(--green); }
+  .feedback-controls .btn-used:hover { background: var(--green-dim); }
+  .feedback-controls .btn-decay:hover { background: var(--bg2); }
+
+  /* ── Flow ── */
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-num {
+    background: var(--cyan);
+    color: var(--bg);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85rem;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .flow-content h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+  .flow-content p { font-size: 0.85rem; }
+  .flow-code {
+    font-family: monospace;
+    font-size: 0.78rem;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 8px;
+    color: var(--text);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .ck { color: var(--cyan); }
+  .cv { color: var(--green); }
+  .cs { color: var(--orange); }
+  .cc { color: var(--muted); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .pulse { animation: pulse 1.5s ease infinite; }
+
+  .footer {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 24px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 1.7rem; }
+    .session-grid, .tier-row, .comparison-row { grid-template-columns: 1fr; }
+    .stat-row { gap: 20px; }
+    .stat-value { font-size: 1.6rem; }
+    .pipeline-stages { gap: 4px; }
+    .stage { min-width: 70px; padding: 6px 8px; font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">v0.5.0 · Claude Code Extension</div>
+  <h1>Depth<span>Fusion</span></h1>
+  <p class="lead">Persistent, query-aware memory across all your Claude Code sessions — so you never re-explain your architecture twice.</p>
+  <div class="stat-row">
+    <div class="stat-item"><span class="stat-value">+20%</span><span class="stat-label">Session Continuity (CIQS D)</span></div>
+    <div class="stat-item"><span class="stat-value">+8%</span><span class="stat-label">Retrieval Accuracy (CIQS A)</span></div>
+    <div class="stat-item"><span class="stat-value">~3ms</span><span class="stat-label">Local Recall Latency</span></div>
+    <div class="stat-item"><span class="stat-value">18</span><span class="stat-label">MCP Tools</span></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="tab-btn active" onclick="showTab('problem')">The Problem</button>
+  <button class="tab-btn" onclick="showTab('recall')">Live Recall Demo</button>
+  <button class="tab-btn" onclick="showTab('pipeline')">How It Works</button>
+  <button class="tab-btn" onclick="showTab('tiers')">Memory Tiers</button>
+  <button class="tab-btn" onclick="showTab('tokens')">Token Efficiency</button>
+  <button class="tab-btn" onclick="showTab('salience')">Salience &amp; Decay</button>
+</nav>
+
+<!-- ─────────── PROBLEM ─────────── -->
+<section id="tab-problem" class="section active">
+<div class="container">
+  <h2>Claude Code sessions are isolated islands</h2>
+  <p>Every new conversation starts from zero. Architectural decisions, VPS configs, and hard-won debugging insights established in previous sessions simply vanish.</p>
+
+  <div class="divider-label" style="margin-top:28px">WITHOUT DEPTHFUSION</div>
+  <div class="session-grid">
+    <div class="session-box">
+      <div class="session-label">Session 1 · Mon</div>
+      <div class="chat-line chat-user">What Redis port should I use?</div>
+      <div class="chat-line chat-ai">Use 127.0.0.1:6379 — bind to loopback only per infra-exposure rules.</div>
+      <div class="chat-line chat-user">Noted. Auth required too.</div>
+      <div class="chat-line chat-ai">Agreed — requirepass set in compose.</div>
+    </div>
+    <div class="session-box forgotten">
+      <div class="forgotten-badge">forgotten</div>
+      <div class="session-label">Session 2 · Tue</div>
+      <div class="chat-line chat-user">Add Redis to the new service</div>
+      <div class="chat-line chat-ai">I'll expose port 6379…</div>
+      <div class="chat-line chat-user">Wait — what binding? Auth?</div>
+      <div class="chat-line chat-ai">Sorry, I don't recall our config.</div>
+    </div>
+    <div class="session-box forgotten">
+      <div class="forgotten-badge">forgotten</div>
+      <div class="session-label">Session 3 · Wed</div>
+      <div class="chat-line chat-user">What VPS setup did we decide on?</div>
+      <div class="chat-line chat-ai">I have no memory of previous sessions — could you re-explain?</div>
+    </div>
+  </div>
+
+  <div class="divider-label">WITH DEPTHFUSION</div>
+  <div class="session-grid">
+    <div class="session-box">
+      <div class="session-label">Session 1 · Mon</div>
+      <div class="chat-line chat-user">What Redis port should I use?</div>
+      <div class="chat-line chat-ai">Use 127.0.0.1:6379 — bind to loopback only per infra-exposure rules.</div>
+      <div class="chat-line chat-user">Noted. Auth required too.</div>
+      <div class="chat-line chat-ai">Agreed — requirepass set in compose.</div>
+    </div>
+    <div class="session-box" style="border-color:rgba(57,208,212,0.3)">
+      <div class="with-df-badge">recalled ✓</div>
+      <div class="session-label">Session 2 · Tue</div>
+      <div class="chat-line chat-user">Add Redis to the new service</div>
+      <div class="chat-line chat-ai" style="border-color:rgba(57,208,212,0.4);color:var(--cyan)">From memory: 127.0.0.1:6379, requirepass enabled. Applying same config.</div>
+    </div>
+    <div class="session-box" style="border-color:rgba(57,208,212,0.3)">
+      <div class="with-df-badge">recalled ✓</div>
+      <div class="session-label">Session 3 · Wed</div>
+      <div class="chat-line chat-user">What VPS setup did we decide on?</div>
+      <div class="chat-line chat-ai" style="border-color:rgba(57,208,212,0.4);color:var(--cyan)">Hetzner GPU node, 20GB VRAM, CUDA 12.1 — found in your memory files.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:8px;border-color:var(--cyan-dim)">
+    <h3 style="color:var(--cyan)">How DepthFusion bridges sessions</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px">
+      <div><div style="font-weight:600;margin-bottom:4px">📥 Capture</div>
+        <p style="font-size:0.85rem">Hooks auto-extract decisions, facts, and patterns from every session into <code>discovery</code> files.</p></div>
+      <div><div style="font-weight:600;margin-bottom:4px">🔍 Retrieve</div>
+        <p style="font-size:0.85rem">BM25 + optional semantic search ranks your stored knowledge by relevance to the current query.</p></div>
+      <div><div style="font-weight:600;margin-bottom:4px">💡 Inject</div>
+        <p style="font-size:0.85rem">Only the highest-scoring blocks enter Claude's context — no token waste on irrelevant history.</p></div>
+      <div><div style="font-weight:600;margin-bottom:4px">📈 Learn</div>
+        <p style="font-size:0.85rem">Salience scores adjust each time a block is used or ignored, making future recall smarter.</p></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────── RECALL DEMO ─────────── -->
+<section id="tab-recall" class="section">
+<div class="container">
+  <h2>Interactive Recall Demo</h2>
+  <p>Type any query and watch the retrieval pipeline score, rank, and return the most relevant blocks from a simulated project corpus.</p>
+
+  <div class="retrieval-demo" style="margin-top:24px">
+    <div class="query-input-row">
+      <input class="query-input" id="queryInput" type="text"
+             placeholder="e.g. Redis config, VPS setup, authentication pattern…"
+             value="Redis configuration and port binding"
+             maxlength="200" />
+      <button class="btn-recall" id="recallBtn" onclick="runRecall()">Recall →</button>
+    </div>
+
+    <div class="pipeline-stages" id="pipelineStages">
+      <div class="stage" id="stage-load"><span class="stage-name">Load</span><span class="stage-sub">blocks</span></div>
+      <span class="stage-arrow">›</span>
+      <div class="stage" id="stage-bm25"><span class="stage-name">BM25</span><span class="stage-sub">score</span></div>
+      <span class="stage-arrow">›</span>
+      <div class="stage" id="stage-weight"><span class="stage-name">Weight</span><span class="stage-sub">by source</span></div>
+      <span class="stage-arrow">›</span>
+      <div class="stage" id="stage-dedup"><span class="stage-name">Dedup</span><span class="stage-sub">1 per file</span></div>
+      <span class="stage-arrow">›</span>
+      <div class="stage" id="stage-rerank"><span class="stage-name">Rerank</span><span class="stage-sub">semantic</span></div>
+      <span class="stage-arrow">›</span>
+      <div class="stage" id="stage-return"><span class="stage-name">Top-K</span><span class="stage-sub">results</span></div>
+    </div>
+
+    <div class="results-panel" id="resultsPanel">
+      <div class="stats-bar" id="statsBar"></div>
+      <div id="resultsList"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <h3>Try these sample queries</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px" id="sampleBtns"></div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────── PIPELINE ─────────── -->
+<section id="tab-pipeline" class="section">
+<div class="container">
+  <h2>How DepthFusion works end-to-end</h2>
+  <p>From session end to future recall — the full data lifecycle.</p>
+
+  <div class="card" style="margin-top:24px">
+
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-content">
+        <h4>Session ends → hooks fire automatically</h4>
+        <p>Claude Code's PreCompact and PostCompact lifecycle hooks trigger DepthFusion. The pre-compact hook snapshots current state; the post-compact hook extracts knowledge using heuristic regex or optional Haiku summarization.</p>
+        <div class="flow-code"><span class="cc"># ~/.claude-shared/hooks/depthfusion-post-compact.sh</span>
+<span class="ck">capture</span>: decisions, warnings, facts → <span class="cs">~/.claude/shared/discoveries/</span>
+<span class="ck">extract</span>: entities, relationships → <span class="cs">~/.claude/depthfusion-graph.json</span></div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-content">
+        <h4>Knowledge stored as discovery files with frontmatter</h4>
+        <p>Each extracted fact becomes a markdown file with YAML frontmatter encoding metadata. These files persist across all future sessions.</p>
+        <div class="flow-code"><span class="cc">---</span>
+<span class="ck">project</span>: <span class="cv">depthfusion</span>
+<span class="ck">importance</span>: <span class="cv">0.9</span>
+<span class="ck">salience</span>: <span class="cv">2.4</span>
+<span class="ck">tags</span>: [<span class="cs">infra</span>, <span class="cs">redis</span>, <span class="cs">security</span>]
+<span class="ck">pinned</span>: <span class="cv">false</span>
+<span class="cc">---</span>
+Redis must bind to 127.0.0.1:6379. requirepass is mandatory...</div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-content">
+        <h4>New session → recall query issued via MCP</h4>
+        <p>DepthFusion's session-start hook injects project context. When you or Claude issues a recall query, the MCP server executes the retrieval pipeline.</p>
+        <div class="flow-code"><span class="cc"># MCP tool call</span>
+<span class="ck">depthfusion_recall_relevant</span>({
+  <span class="cs">"query"</span>: <span class="cv">"Redis config and port binding"</span>,
+  <span class="cs">"top_k"</span>: <span class="cv">5</span>,
+  <span class="cs">"project"</span>: <span class="cv">"depthfusion"</span>
+})</div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-content">
+        <h4>BM25 scoring with source weighting</h4>
+        <p>Every block from sessions, discoveries, and memory files is scored using BM25 (k1=1.5, b=0.75). Scores are multiplied by source trust weights — user-written memory is most reliable, machine-generated sessions are least.</p>
+        <div class="flow-code"><span class="ck">source weights</span>:
+  memory    <span class="cv">× 1.00</span>  <span class="cc"># user-written, most reliable</span>
+  discovery <span class="cv">× 0.85</span>  <span class="cc"># extracted facts</span>
+  session   <span class="cv">× 0.70</span>  <span class="cc"># machine-generated</span></div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-content">
+        <h4>Deduplication → optional semantic reranking</h4>
+        <p>Only the highest-scoring chunk per file is kept before reranking — preventing redundant content. On VPS tiers, Haiku evaluates the top candidates for semantic relevance beyond keyword overlap.</p>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">6</div>
+      <div class="flow-content">
+        <h4>Top-K results injected into Claude's context</h4>
+        <p>Only the most relevant blocks enter context — not your entire history. Each result carries a <code>recall_id</code> enabling the feedback loop.</p>
+        <div class="flow-code"><span class="cc"># Response</span>
+{ <span class="cs">"blocks"</span>: [ ... <span class="cv">5</span> results ],
+  <span class="cs">"recall_id"</span>: <span class="cv">"uuid-for-feedback"</span>,
+  <span class="cs">"total_sources_scanned"</span>: <span class="cv">70</span>,
+  <span class="cs">"engaged_layers"</span>: [<span class="cv">"bm25"</span>, <span class="cv">"reranker"</span>] }</div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num">7</div>
+      <div class="flow-content">
+        <h4>Feedback loop adjusts salience scores</h4>
+        <p>When you confirm which results were useful, salience updates. Used blocks become more likely to surface again; ignored blocks gently decay. Retrieval improves with every session.</p>
+        <div class="flow-code"><span class="ck">depthfusion_recall_feedback</span>({
+  <span class="cs">"recall_id"</span>: <span class="cv">"uuid"</span>,
+  <span class="cs">"used"</span>: [<span class="cv">"redis-config.md"</span>],   <span class="cc"># salience += 0.1</span>
+  <span class="cs">"ignored"</span>: [<span class="cv">"old-session.tmp"</span>]  <span class="cc"># salience -= 0.05</span>
+})</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ─────────── TIERS ─────────── -->
+<section id="tab-tiers" class="section">
+<div class="container">
+  <h2>Three Memory Tiers</h2>
+  <p>DepthFusion scales from a zero-dependency local install to a full vector-fusion setup. Auto-promotes as your corpus grows.</p>
+
+  <div class="tier-row" style="margin-top:24px">
+    <div class="tier-card t1 selected" onclick="selectTier(1)">
+      <div class="tier-icon">💻</div>
+      <div class="tier-name">Tier 1 · Local</div>
+      <div class="tier-sub">Laptop — zero external deps</div>
+    </div>
+    <div class="tier-card t2" onclick="selectTier(2)">
+      <div class="tier-icon">☁️</div>
+      <div class="tier-name">Tier 2 · VPS+Haiku</div>
+      <div class="tier-sub">Semantic reranking via API</div>
+    </div>
+    <div class="tier-card t3" onclick="selectTier(3)">
+      <div class="tier-icon">🔮</div>
+      <div class="tier-name">Tier 3 · VPS+Vectors</div>
+      <div class="tier-sub">ChromaDB fusion, large corpora</div>
+    </div>
+  </div>
+
+  <div class="tier-detail visible" id="tier-detail-1">
+    <h3 style="color:var(--cyan);margin-bottom:16px">Tier 1 — Local BM25 Only</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <ul class="feature-list">
+        <li>BM25 keyword scoring (k1=1.5, b=0.75)</li>
+        <li>Source weighting: memory &gt; discovery &gt; session</li>
+        <li>Block-level chunking on H2 headers</li>
+        <li>Project scoping via frontmatter filter</li>
+        <li>Auto-extraction via heuristic regex patterns</li>
+        <li>~2–5ms recall latency, full corpus</li>
+        <li class="x-feat">Semantic reranking (no API calls)</li>
+        <li class="x-feat">Vector embeddings</li>
+        <li class="x-feat">Knowledge graph entity mining</li>
+      </ul>
+      <div>
+        <div class="card-sm" style="margin-bottom:12px">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">ACTIVATION</div>
+          <code>DEPTHFUSION_MODE=local</code>
+        </div>
+        <div class="card-sm">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">STORAGE</div>
+          <div style="font-size:0.82rem">JSON flat files + YAML frontmatter sidecars.<br><br>No database, no API key required. Works completely offline.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier-detail" id="tier-detail-2">
+    <h3 style="color:var(--purple);margin-bottom:16px">Tier 2 — VPS + Haiku Reranker</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <ul class="feature-list">
+        <li>Everything in Tier 1</li>
+        <li>Haiku API semantic reranking of top-10 BM25 results</li>
+        <li>Haiku-powered extraction (richer summaries)</li>
+        <li>SQLite metadata index for faster corpus scans</li>
+        <li>Recall latency: ~200–400ms (network call)</li>
+        <li class="x-feat">ChromaDB vector embeddings</li>
+        <li class="x-feat">Reciprocal Rank Fusion</li>
+      </ul>
+      <div>
+        <div class="card-sm" style="margin-bottom:12px">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">ACTIVATION</div>
+          <code>DEPTHFUSION_MODE=vps</code><br>
+          <code>DEPTHFUSION_HAIKU_ENABLED=true</code>
+        </div>
+        <div class="card-sm">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">AUTO-PROMOTION</div>
+          <div style="font-size:0.82rem">When corpus reaches 500 sessions, auto-promotes to Tier 3. Notified via <code>depthfusion_tier_status</code>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier-detail" id="tier-detail-3">
+    <h3 style="color:var(--orange);margin-bottom:16px">Tier 3 — VPS + ChromaDB Vector Fusion</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <ul class="feature-list">
+        <li>Everything in Tier 2</li>
+        <li>ChromaDB vector embeddings of all discovery files</li>
+        <li>Reciprocal Rank Fusion: BM25 + vector scores combined</li>
+        <li>Mamba fusion gates filter candidates pre-reranking</li>
+        <li>Entity/relationship knowledge graph (SQLite or ChromaDB)</li>
+        <li>Graph traversal: <code>depthfusion_graph_traverse</code></li>
+        <li>Salience-based decay with hard archival at &lt;0.05</li>
+        <li>Handles 500+ session corpora efficiently</li>
+      </ul>
+      <div>
+        <div class="card-sm" style="margin-bottom:12px">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">RETRIEVAL PIPELINE</div>
+          <div style="font-size:0.82rem;line-height:1.8">ChromaDB top-20 ⟶ BM25 top-10 ⟶ RRF fusion ⟶ Haiku rerank ⟶ top-K</div>
+        </div>
+        <div class="card-sm">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">GRAPH FEATURES</div>
+          <div style="font-size:0.82rem">Entity extraction, relationship mining, cross-session knowledge graphs accessible via MCP.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────── TOKEN EFFICIENCY ─────────── -->
+<section id="tab-tokens" class="section">
+<div class="container">
+  <h2>Token Efficiency</h2>
+  <p>Naive approaches flood your context with irrelevant history. DepthFusion retrieves only what's relevant — measured per-query.</p>
+
+  <div class="comparison-row" style="margin-top:24px">
+    <div class="compare-panel">
+      <div class="compare-title">Naive approach — dump all context</div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>Full MEMORY.md file</span><span>~4,200 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-bad" style="width:84%"></div></div>
+      </div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>Recent session dumps (3×)</span><span>~6,800 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-bad" style="width:100%"></div></div>
+      </div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>All discovery files</span><span>~3,100 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-ok" style="width:62%"></div></div>
+      </div>
+      <div class="total-row">
+        <span style="color:var(--muted);font-size:0.85rem">Context used per query</span>
+        <span class="total-val val-bad">~14,100 tokens</span>
+      </div>
+    </div>
+
+    <div class="compare-panel highlight">
+      <div class="compare-title" style="color:var(--green)">DepthFusion — query-aware retrieval</div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>Relevant memory blocks (top-3)</span><span>~680 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-good" style="width:34%"></div></div>
+      </div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>Relevant discovery snippets (2)</span><span>~420 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-good" style="width:21%"></div></div>
+      </div>
+      <div class="token-bar-row">
+        <div class="token-bar-label"><span>Session context (session-init)</span><span>~340 tok</span></div>
+        <div class="token-bar-track"><div class="token-bar-fill bar-good" style="width:17%"></div></div>
+      </div>
+      <div class="total-row">
+        <span style="color:var(--muted);font-size:0.85rem">Context used per query</span>
+        <span class="total-val val-good">~1,440 tokens</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:32px">
+    <span style="color:var(--muted);font-size:0.9rem">Typical token reduction per recall query:</span>
+    <span class="savings-badge">~90% fewer tokens</span>
+  </div>
+
+  <div class="card-grid">
+    <div class="card-sm">
+      <h3>Block-level chunking</h3>
+      <p style="font-size:0.85rem;margin-top:8px">Files are split on <code>## </code> headers. A 50KB BACKLOG.md with 20 sections → 20 independently-scored blocks. Only the highest-scoring section enters context.</p>
+    </div>
+    <div class="card-sm">
+      <h3>Deduplication gate</h3>
+      <p style="font-size:0.85rem;margin-top:8px">Before reranking, only the top-scoring chunk per file is kept. The Haiku reranker never sees semantically similar content twice — reducing API cost by up to 90%.</p>
+    </div>
+    <div class="card-sm">
+      <h3>Salience-based pruning</h3>
+      <p style="font-size:0.85rem;margin-top:8px">Old discoveries with low usage scores decay gradually and archive automatically at salience &lt; 0.05. BM25 runs on a leaner, higher-quality corpus over time.</p>
+    </div>
+    <div class="card-sm">
+      <h3>Snippet truncation</h3>
+      <p style="font-size:0.85rem;margin-top:8px">Results are truncated at configurable <code>snippet_len</code> (default 1,500 chars), cut at sentence boundaries. Signal without padding token waste.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────── SALIENCE ─────────── -->
+<section id="tab-salience" class="section">
+<div class="container">
+  <h2>Salience, Decay &amp; the Feedback Loop</h2>
+  <p>DepthFusion's memory isn't static — it learns which knowledge matters. Salience scores shift with every recall, making future retrieval more accurate.</p>
+
+  <div class="card" style="margin-top:24px;margin-bottom:24px">
+    <h3 style="margin-bottom:16px">Live Salience Simulation</h3>
+    <p style="font-size:0.85rem;margin-bottom:16px">These discovery files represent a real project corpus. Use the controls to simulate user feedback and daily decay.</p>
+    <div class="feedback-controls">
+      <button class="btn-used" onclick="simulateUsed()">✓ Mark top-3 as Used (+0.1)</button>
+      <button class="btn-decay" onclick="simulateDecay()">⏱ Advance 1 Day (decay)</button>
+      <button onclick="resetSalience()" style="color:var(--muted)">↺ Reset</button>
+    </div>
+    <div id="discoveryList"></div>
+    <p id="salience-note" style="font-size:0.78rem;color:var(--muted);margin-top:12px;min-height:18px"></p>
+  </div>
+
+  <div class="card-grid">
+    <div class="card-sm">
+      <h3>Decay rates by importance</h3>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>High importance (≥0.8)</span><span style="color:var(--green)">−1% / day</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>Mid importance (≥0.5)</span><span style="color:var(--yellow)">−2% / day</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>Low importance (&lt;0.5)</span><span style="color:var(--orange)">−5% / day</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0">
+          <span style="color:var(--red)">Archived (salience &lt; 0.05)</span><span style="color:var(--muted)">→ .archive/</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-sm">
+      <h3>Feedback adjustments</h3>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>Block marked as <strong>used</strong></span><span style="color:var(--green)">salience +0.1</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>Block marked as <strong>ignored</strong></span><span style="color:var(--orange)">salience −0.05</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0">
+          <span>Item is <strong>pinned</strong></span><span style="color:var(--cyan)">decay exempt</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<div class="footer">
+  <strong style="color:var(--text)">DepthFusion</strong> · Persistent memory layer for Claude Code
+</div>
+
+<script>
+/* ── Corpus data (all hardcoded — no user data reaches innerHTML) ── */
+const CORPUS = [
+  { id:'redis-infra.md', src:'memory', imp:0.9,
+    text:'Redis must bind to 127.0.0.1:6379. requirepass is mandatory on all environments. Never publish Redis to 0.0.0.0. AUTH token rotated quarterly.',
+    keys:['redis','port','bind','loopback','infra','require','auth','6379','exposure','config','security','network'] },
+  { id:'vps-instance.md', src:'memory', imp:0.95,
+    text:'Hetzner GPU node: 20GB VRAM, CUDA 12.1, PyTorch 2.2. Hostname: hetzner-gpu. pip upgrade scheduled for T-262. PYTHONPATH workaround retired in v0.6.0a2.',
+    keys:['vps','gpu','cuda','pytorch','hetzner','python','vram','deployment','setup','instance','server'] },
+  { id:'auth-middleware.md', src:'discovery', imp:0.85,
+    text:'JWT tokens verified in middleware using RS256 signing. Access token TTL 15min, refresh 7 days. Missing rate-limit on /auth/reset flagged High in review gate.',
+    keys:['auth','jwt','token','middleware','rate','limit','authentication','refresh','access','rs256','signing','security'] },
+  { id:'postgres-schema.md', src:'discovery', imp:0.8,
+    text:'PostgreSQL 15 on port 5432 (loopback only). Primary tables: sessions, discoveries, feedback_events. Backup via pg_dump nightly.',
+    keys:['postgres','database','schema','migration','sql','backup','table','pg_dump','5432','postgresql','db'] },
+  { id:'api-rate-limiting.md', src:'discovery', imp:0.75,
+    text:'All external API calls wrapped with exponential backoff: base 1s, max 32s, jitter 20%. Rate limit errors (429) caught and surfaced. Max 3 retries.',
+    keys:['api','rate','limit','retry','backoff','exponential','haiku','429','timeout','external','calls'] },
+  { id:'docker-compose-dev.md', src:'session', imp:0.7,
+    text:'docker-compose.yml: all ports bound to 127.0.0.1. Services: postgres, redis, temporal, minio. Internal networking via Docker DNS. Admin UIs loopback-only.',
+    keys:['docker','compose','port','service','network','container','redis','postgres','minio','temporal','pgadmin'] },
+  { id:'bm25-scoring.md', src:'memory', imp:0.9,
+    text:'BM25 parameters: k1=1.5, b=0.75. Robertson IDF for smoothing. Source weights: memory=1.0, discovery=0.85, session=0.70. Block chunking on H2 headers. Dedup: one chunk per file.',
+    keys:['bm25','scoring','retrieval','ranking','weight','memory','discovery','session','block','chunk','dedup','idf'] },
+  { id:'session-compaction.md', src:'session', imp:0.65,
+    text:'Pre-compact hook snapshots git state and active plan. Post-compact runs auto_learn extraction. Heuristic patterns: DECISION:, NOTE:, WARNING:, IMPORTANT:, CONSTRAINT:',
+    keys:['session','compact','hook','extract','decision','note','warning','auto','learn','lifecycle','compaction'] },
+  { id:'graph-entities.md', src:'discovery', imp:0.8,
+    text:'Knowledge graph v0.4.0: entities (functions, classes, decisions), edges (calls, implements, depends_on). Entity extraction via Haiku. Stored in depthfusion-graph.json or ChromaDB.',
+    keys:['graph','entity','knowledge','relationship','extraction','chroma','node','edge','chromadb','vector'] },
+];
+
+const SRC_WEIGHT = { memory: 1.0, discovery: 0.85, session: 0.70 };
+
+/* ── Safe text helpers — no user content ever goes into innerHTML ── */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+/* Build a snippet span element using safe DOM APIs only */
+function buildSnippetEl(rawText, terms) {
+  const container = document.createElement('div');
+  container.className = 'result-snippet';
+  /* Split text into alternating plain/highlight segments */
+  const lower = rawText.toLowerCase();
+  let pos = 0;
+  const matches = [];
+  for (const t of terms) {
+    if (t.length < 3) continue;
+    let idx = 0;
+    while ((idx = lower.indexOf(t, idx)) !== -1) {
+      matches.push({ start: idx, end: idx + t.length });
+      idx += t.length;
+    }
+  }
+  /* Merge overlapping ranges */
+  matches.sort((a,b) => a.start - b.start);
+  const merged = [];
+  for (const m of matches) {
+    if (merged.length && m.start <= merged[merged.length-1].end) {
+      merged[merged.length-1].end = Math.max(merged[merged.length-1].end, m.end);
+    } else { merged.push({...m}); }
+  }
+  for (const seg of merged) {
+    if (pos < seg.start) {
+      container.appendChild(document.createTextNode(rawText.slice(pos, seg.start)));
+    }
+    const hi = document.createElement('span');
+    hi.className = 'hi';
+    hi.textContent = rawText.slice(seg.start, seg.end);
+    container.appendChild(hi);
+    pos = seg.end;
+  }
+  if (pos < rawText.length) {
+    container.appendChild(document.createTextNode(rawText.slice(pos)));
+  }
+  return container;
+}
+
+function bm25Score(query, doc) {
+  const k1=1.5, b=0.75;
+  const terms = query.toLowerCase().split(/\s+/).filter(t=>t.length>2);
+  const N = CORPUS.length;
+  let score = 0;
+  const dl = doc.keys.length, avgdl = 9;
+  for (const t of terms) {
+    const tf = doc.keys.filter(k=>k.includes(t)||t.includes(k)).length;
+    if (!tf) continue;
+    const df = CORPUS.filter(d=>d.keys.some(k=>k.includes(t)||t.includes(k))).length;
+    const idf = Math.log((N-df+0.5)/(df+0.5)+1);
+    score += idf * (tf*(k1+1))/(tf+k1*(1-b+b*(dl/avgdl)));
+  }
+  return score;
+}
+
+function runRecall() {
+  const input = document.getElementById('queryInput');
+  const query = input.value.trim().slice(0,200); /* enforce max length */
+  if (!query) return;
+  const btn = document.getElementById('recallBtn');
+  btn.disabled = true; btn.textContent = '…';
+
+  const ids = ['stage-load','stage-bm25','stage-weight','stage-dedup','stage-rerank','stage-return'];
+  ids.forEach(id => { document.getElementById(id).className='stage'; });
+  let i=0;
+  const next = ()=>{
+    if (i>0) document.getElementById(ids[i-1]).className='stage done-stage';
+    if (i<ids.length) { document.getElementById(ids[i]).className='stage active-stage pulse'; i++; setTimeout(next,260); }
+    else { showResults(query); btn.disabled=false; btn.textContent='Recall →'; }
+  };
+  next();
+}
+
+function showResults(query) {
+  const terms = query.toLowerCase().split(/\s+/).filter(t=>t.length>2);
+  const scored = CORPUS
+    .map(d=>({...d, ws: bm25Score(query,d)*SRC_WEIGHT[d.src]}))
+    .filter(d=>d.ws>0)
+    .sort((a,b)=>b.ws-a.ws)
+    .slice(0,5);
+
+  const maxScore = scored[0]?.ws || 1;
+  const panel = document.getElementById('resultsPanel');
+  const statBar = document.getElementById('statsBar');
+  const list = document.getElementById('resultsList');
+  panel.classList.add('visible');
+
+  const relevant = CORPUS.filter(d=>bm25Score(query,d)>0).length;
+  statBar.textContent='';
+  [
+    ['dot', `Scanned: ${CORPUS.length} blocks`],
+    ['dot dot-g', `Relevant: ${relevant}`],
+    ['dot dot-o', `Returned: ${scored.length}`],
+    ['dot', 'Layers: BM25 + source-weight + dedup'],
+  ].forEach(([cls,txt])=>{
+    const sp = document.createElement('span');
+    const dot = document.createElement('span'); dot.className=cls;
+    sp.appendChild(dot);
+    sp.appendChild(document.createTextNode(' '+txt));
+    statBar.appendChild(sp);
+  });
+
+  list.textContent='';
+  const srcClass = {memory:'src-memory',discovery:'src-discovery',session:'src-session'};
+  const medals = ['🥇','🥈','🥉','4.','5.'];
+
+  if (!scored.length) {
+    const msg = document.createElement('div');
+    msg.style.cssText='color:var(--muted);font-size:0.85rem;padding:16px 0';
+    msg.textContent='No relevant blocks found for this query. Try different keywords.';
+    list.appendChild(msg); return;
+  }
+
+  scored.forEach((r,idx)=>{
+    const pct = Math.round((r.ws/maxScore)*100);
+    const item = document.createElement('div');
+    item.className='result-item';
+
+    /* Header row — built entirely with DOM APIs */
+    const header = document.createElement('div'); header.className='result-header';
+
+    const rank = document.createElement('span'); rank.className='result-rank';
+    rank.textContent = medals[idx]||String(idx+1)+'.';
+
+    const fname = document.createElement('span'); fname.className='result-file';
+    fname.textContent = r.id;
+
+    const badge = document.createElement('span');
+    badge.className='source-badge '+(srcClass[r.src]||'');
+    badge.textContent = r.src;
+
+    const barWrap = document.createElement('div'); barWrap.className='result-score-bar';
+    const barFill = document.createElement('div');
+    barFill.className='result-score-fill';
+    barFill.style.width='0%';
+    barFill.dataset.pct = pct;
+    barWrap.appendChild(barFill);
+
+    const scoreVal = document.createElement('span'); scoreVal.className='result-score-val';
+    scoreVal.textContent = r.ws.toFixed(1);
+
+    header.append(rank, fname, badge, barWrap, scoreVal);
+    item.appendChild(header);
+    item.appendChild(buildSnippetEl(r.text, terms));
+    list.appendChild(item);
+
+    requestAnimationFrame(()=>setTimeout(()=>{
+      item.classList.add('appeared');
+      barFill.style.width = pct+'%';
+    }, idx*80));
+  });
+}
+
+function setQuery(q) {
+  document.getElementById('queryInput').value = q;
+  showTab('recall');
+  setTimeout(runRecall,100);
+}
+
+/* Build sample query buttons safely */
+const SAMPLES = [
+  'Redis configuration and port binding',
+  'authentication JWT tokens middleware',
+  'VPS GPU setup CUDA deployment',
+  'database PostgreSQL migration schema',
+  'API rate limiting backoff retry',
+  'docker compose service networking',
+];
+(function buildSamples(){
+  const wrap = document.getElementById('sampleBtns');
+  SAMPLES.forEach(q=>{
+    const b = document.createElement('button');
+    b.textContent = q.length>30 ? q.slice(0,28)+'…' : q;
+    b.style.cssText='background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:20px;cursor:pointer;font-size:0.82rem';
+    b.addEventListener('click',()=>setQuery(q));
+    wrap.appendChild(b);
+  });
+})();
+
+/* ── Tabs ── */
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  const idx = ['problem','recall','pipeline','tiers','tokens','salience'].indexOf(id);
+  if (idx>=0) document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+}
+
+/* ── Tiers ── */
+function selectTier(n) {
+  document.querySelectorAll('.tier-card').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('.tier-detail').forEach(d=>d.classList.remove('visible'));
+  document.querySelectorAll('.tier-card')[n-1].classList.add('selected');
+  document.getElementById('tier-detail-'+n).classList.add('visible');
+}
+
+/* ── Salience simulation (DOM-safe) ── */
+const DISCOVERIES_INIT = [
+  { id:'vps-instance.md',      imp:0.95, sal:2.8, pinned:true,  desc:'Hetzner GPU node config (CUDA 12.1, 20GB VRAM)' },
+  { id:'redis-infra.md',       imp:0.9,  sal:2.4, pinned:false, desc:'Redis binding + requirepass policy' },
+  { id:'auth-middleware.md',   imp:0.85, sal:1.9, pinned:false, desc:'JWT RS256 middleware, TTL config' },
+  { id:'bm25-scoring.md',      imp:0.9,  sal:1.5, pinned:false, desc:'BM25 parameters, source weights' },
+  { id:'postgres-schema.md',   imp:0.8,  sal:1.2, pinned:false, desc:'PostgreSQL 15 schema + backup plan' },
+  { id:'docker-compose-dev.md',imp:0.7,  sal:0.6, pinned:false, desc:'Docker port binding, service network' },
+  { id:'old-debug-session.tmp',imp:0.4,  sal:0.12,pinned:false, desc:'Debug trace from April 10 session' },
+];
+let discState = DISCOVERIES_INIT.map(d=>({...d}));
+
+function salColor(s) {
+  if (s>=2) return 'var(--green)';
+  if (s>=1) return 'var(--yellow)';
+  if (s>=0.2) return 'var(--orange)';
+  return 'var(--red)';
+}
+
+function renderDiscoveries() {
+  const list = document.getElementById('discoveryList');
+  list.textContent='';
+  discState.forEach((d,i)=>{
+    const pct = Math.min(100,(d.sal/3)*100);
+    const archived = d.sal<0.05;
+    const item = document.createElement('div');
+    item.className='discovery-item'+(archived?' archived':'');
+
+    const left = document.createElement('div');
+    const nm = document.createElement('div'); nm.className='disc-name';
+    nm.textContent = d.id+(d.pinned?' 📌':'');
+    const meta = document.createElement('div');
+    if (archived) {
+      meta.className='disc-meta-archived';
+      meta.textContent='ARCHIVED → .archive/';
+    } else {
+      meta.className='disc-meta';
+      meta.textContent=`importance: ${d.imp.toFixed(2)} · ${d.desc}`;
+    }
+    left.append(nm, meta);
+
+    const track = document.createElement('div'); track.className='salience-track';
+    const row = document.createElement('div'); row.className='sal-row';
+    const barT = document.createElement('div'); barT.className='sal-bar-track';
+    const barF = document.createElement('div'); barF.className='sal-bar-fill';
+    barF.style.width=pct+'%'; barF.style.backgroundColor=salColor(d.sal);
+    barT.appendChild(barF);
+    const val = document.createElement('span'); val.className='sal-val';
+    val.style.color=salColor(d.sal); val.textContent=d.sal.toFixed(2);
+    row.append(barT,val);
+    const lbl = document.createElement('div'); lbl.className='sal-label';
+    lbl.textContent=archived?'archived':'salience / 3.0';
+    track.append(row,lbl);
+
+    item.append(left, track);
+    list.appendChild(item);
+  });
+}
+
+function simulateUsed() {
+  discState.slice(0,3).forEach(d=>{ if(!d.pinned&&d.sal>=0.05) d.sal=Math.min(3.0,d.sal+0.1); });
+  renderDiscoveries();
+  const n = document.getElementById('salience-note');
+  n.textContent='Top 3 blocks marked as used — salience +0.1 each. These will rank higher in future recalls.';
+}
+
+function simulateDecay() {
+  discState.forEach(d=>{
+    if(d.pinned) return;
+    const rate=d.imp>=0.8?0.01:d.imp>=0.5?0.02:0.05;
+    d.sal=Math.max(0,d.sal-d.sal*rate);
+  });
+  renderDiscoveries();
+  const n = document.getElementById('salience-note');
+  n.textContent='One day passed. Low-importance items decayed faster. Items below 0.05 are auto-archived to .archive/.';
+}
+
+function resetSalience() {
+  discState=DISCOVERIES_INIT.map(d=>({...d}));
+  renderDiscoveries();
+  document.getElementById('salience-note').textContent='Reset to initial state.';
+}
+
+renderDiscoveries();
+</script>
+</body>
+</html>
