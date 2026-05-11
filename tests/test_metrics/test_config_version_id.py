@@ -23,12 +23,11 @@ from pathlib import Path
 import pytest
 
 from depthfusion.metrics.collector import (
+    _RUNTIME_CONFIG_ENV_KEYS,
     CONFIG_VERSION_NONE,
     MetricsCollector,
-    _RUNTIME_CONFIG_ENV_KEYS,
     _runtime_config_version_id,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

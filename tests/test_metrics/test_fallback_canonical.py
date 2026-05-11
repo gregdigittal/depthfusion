@@ -33,15 +33,12 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from depthfusion.backends.base import (
     BackendOverloadError,
-    LLMBackend,
 )
-
 
 SIX_CAPS = (
     "reranker",
@@ -195,8 +192,8 @@ class TestFallbackChainResolution:
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         _minimal_corpus(tmp_path)
 
-        from depthfusion.mcp import server as srv_mod
         from depthfusion.backends.chain import FallbackChain
+        from depthfusion.mcp import server as srv_mod
 
         # Build a real FallbackChain so the test exercises the actual
         # name-joining logic, not just a stubbed string.

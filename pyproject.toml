@@ -18,11 +18,14 @@ dependencies = [
 # `local` mode: BM25-only, no extra dependencies beyond the core.
 local = []
 
-# `vps-cpu` mode: Haiku reranker + optional ChromaDB for Tier 2. The
-# anthropic SDK is optional — when absent, the Haiku backend reports
-# unhealthy and the factory falls back to NullBackend. ChromaDB is
-# pulled in so the Tier 2 vector-store path works end-to-end.
-vps-cpu = ["chromadb>=0.4"]
+# `vps-cpu` mode: Haiku reranker + ChromaDB. anthropic SDK is required
+# for Haiku reranking; chromadb is used for optional Tier 2 vector search.
+vps-cpu = [
+    "anthropic>=0.40",
+    "chromadb>=0.4",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+]
 
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
 # plus sentence-transformers for local embeddings. ChromaDB still
@@ -31,6 +34,8 @@ vps-cpu = ["chromadb>=0.4"]
 vps-gpu = [
     "sentence-transformers>=2.2",
     "chromadb>=0.4",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
 ]
 
 rlm = ["rlms"]
