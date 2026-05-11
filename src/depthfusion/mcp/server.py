@@ -144,15 +144,157 @@ def get_enabled_tools(config: Any) -> list[str]:
     return enabled
 
 
+TOOL_SCHEMAS: dict[str, dict] = {
+    "depthfusion_recall_relevant": {
+        "properties": {
+            "query": {"type": "string", "description": "The recall query"},
+            "top_k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+            "snippet_len": {"type": "integer", "minimum": 200, "maximum": 8000, "default": 1500},
+            "cross_project": {"type": "boolean", "default": False},
+            "project": {"type": "string"},
+        },
+        "required": ["query"],
+    },
+    "depthfusion_confirm_discovery": {
+        "properties": {
+            "content": {"type": "string", "description": "The decision or fact to confirm"},
+            "project": {"type": "string"},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "source": {"type": "string"},
+        },
+        "required": ["content"],
+    },
+    "depthfusion_set_memory_score": {
+        "properties": {
+            "filename": {
+                "type": "string",
+                "description": "Absolute path to a discovery markdown file",
+            },
+            "importance": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "salience": {"type": "number", "minimum": 0.0, "maximum": 5.0},
+        },
+        "required": ["filename"],
+    },
+    "depthfusion_recall_feedback": {
+        "properties": {
+            "recall_id": {
+                "type": "string",
+                "description": "UUID from a prior recall_relevant response",
+            },
+            "used": {"type": "array", "items": {"type": "string"}, "default": []},
+            "ignored": {"type": "array", "items": {"type": "string"}, "default": []},
+        },
+        "required": ["recall_id"],
+    },
+    "depthfusion_pin_discovery": {
+        "properties": {
+            "filename": {
+                "type": "string",
+                "description": "Absolute path to a discovery markdown file",
+            },
+            "pinned": {"type": "boolean", "default": True},
+        },
+        "required": ["filename"],
+    },
+    "depthfusion_prune_discoveries": {
+        "properties": {
+            "age_days": {"type": "integer", "minimum": 1, "default": 90},
+            "confirm": {"type": "boolean", "default": False},
+        },
+        "required": [],
+    },
+    "depthfusion_publish_context": {
+        "properties": {
+            "item": {
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "content": {"type": "string"},
+                    "source_agent": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "priority": {"type": "integer"},
+                    "ttl_seconds": {"type": "integer"},
+                    "metadata": {"type": "object"},
+                },
+                "required": ["item_id", "content", "source_agent"],
+            },
+        },
+        "required": ["item"],
+    },
+    "depthfusion_status": {
+        "properties": {},
+        "required": [],
+    },
+    "depthfusion_tag_session": {
+        "properties": {
+            "session_id": {"type": "string"},
+            "tags": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["session_id", "tags"],
+    },
+    "depthfusion_run_recursive": {
+        "properties": {
+            "content": {"type": "string"},
+            "strategy": {"type": "string"},
+        },
+        "required": ["content"],
+    },
+    "depthfusion_tier_status": {
+        "properties": {},
+        "required": [],
+    },
+    "depthfusion_auto_learn": {
+        "properties": {
+            "max_files": {"type": "integer", "minimum": 1, "default": 10},
+        },
+        "required": [],
+    },
+    "depthfusion_compress_session": {
+        "properties": {
+            "session_file": {"type": "string", "description": "Path to .tmp session file"},
+        },
+        "required": ["session_file"],
+    },
+    "depthfusion_graph_traverse": {
+        "properties": {
+            "entity": {"type": "string"},
+            "depth": {"type": "integer", "minimum": 1, "maximum": 5, "default": 2},
+        },
+        "required": ["entity"],
+    },
+    "depthfusion_graph_status": {
+        "properties": {},
+        "required": [],
+    },
+    "depthfusion_set_scope": {
+        "properties": {
+            "scope": {"type": "string", "enum": ["project", "cross_project", "global"]},
+        },
+        "required": ["scope"],
+    },
+    "depthfusion_inspect_discovery": {
+        "properties": {
+            "filename": {"type": "string"},
+        },
+        "required": ["filename"],
+    },
+    "depthfusion_describe_capabilities": {
+        "properties": {},
+        "required": [],
+    },
+}
+
+
 def _make_tool_schema(name: str, description: str) -> dict:
-    """Build a minimal MCP tool schema."""
+    """Build an MCP tool schema with explicit JSON Schema properties."""
+    schema = TOOL_SCHEMAS.get(name, {"properties": {}, "required": []})
     return {
         "name": name,
         "description": description,
         "inputSchema": {
             "type": "object",
-            "properties": {},
-            "required": [],
+            "properties": schema.get("properties", {}),
+            "required": schema.get("required", []),
         },
     }
 
