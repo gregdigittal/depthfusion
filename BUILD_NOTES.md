@@ -33,10 +33,19 @@ None. All 1430 tests pass on baseline.
 | Story | Status | Notes |
 |-------|--------|-------|
 | S-85 | ✅ done | Baseline recorded above |
-| S-86 | pending | Mode resolution fix |
-| S-87 | pending | Package extras |
-| S-88 | pending | MCP tool schemas |
-| S-89 | pending | Vector embedding consistency |
-| S-90 | pending | Benchmark harness |
-| S-91 | pending | SQLite metadata cache |
-| S-92 | pending | Recall explainability |
+| S-86 | ✅ done | `utils/mode.py` normalise_mode(); hybrid.py from_env() updated |
+| S-87 | ✅ done | `anthropic>=0.40` added to vps-cpu/vps-gpu extras in pyproject.toml |
+| S-88 | ✅ done | TOOL_SCHEMAS dict in mcp/server.py; all 18 tools with typed properties |
+| S-89 | ✅ done | vector_store.py uses get_backend("embedding") for upsert + query |
+| S-90 | ✅ done | scripts/benchmark.py + tests/fixtures/recall_goldset.jsonl (8 entries) |
+| S-91 | ✅ done | storage/file_index.py FileMetadataIndex; WAL SQLite, thread-safe |
+| S-92 | ✅ done | explain=true on depthfusion_recall_relevant; bm25/rrf/vector/reranker_rank |
+
+### Final test count after E-30
+
+```
+pytest -q --tb=no
+1511 passed, 3 warnings
+```
+
+(baseline 1430 + 81 new tests from E-30 implementation)

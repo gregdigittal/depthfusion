@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-04 (added T-262 under S-43: pip upgrade on hetzner-gpu to retire PYTHONPATH workaround)
+> Last updated: 2026-05-11 (added E-30, S-85–S-92, T-281–T-310 from build plan handoff review)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1412,6 +1412,151 @@
 
 **Tasks:**
 - [x] T-280: Apply the four corrections to `docs/runbooks/dogfood-telemetry.md` in a single docs commit (f0fa3a0)
+
+---
+
+## E-30: Implementation & Performance Improvements — Build Plan 2026-05-11 [done]
+
+> Executable work packages derived from the build plan at `docs/plans/depthfusion_buildplan_handoff.html` (generated 2026-05-11). Primary goal: make claims match implementation. Phases ordered by priority; P0 stories block downstream usage of advertised modes.
+
+### S-85: As a maintainer, I want a clean baseline before any build-plan changes so that pre-existing failures are clearly distinguished from newly introduced ones `P1` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: Feature branch `feature/depthfusion-buildplan-improvements` created from current `main`
+- [x] AC-2: Baseline `pytest -q`, `ruff check`, and `mypy src` results recorded in `BUILD_NOTES.md` before any implementation changes
+- [x] AC-3: Any pre-existing failures are explicitly listed as "known-pre-existing" in `BUILD_NOTES.md`
+
+**Tasks:**
+- [x] T-281: Create feature branch `feature/depthfusion-buildplan-improvements` and install dev extras (`pip install -e ".[dev]"`)
+- [x] T-282: Run `pytest -q`, `ruff check src tests`, `mypy src`; record all results in `BUILD_NOTES.md`
+
+---
+
+### S-86: As an operator, I want `DEPTHFUSION_MODE=vps-cpu` and `DEPTHFUSION_MODE=vps-gpu` to engage the advertised retrieval pipeline so that I'm not silently running local BM25-only mode when I've configured VPS mode `P0` `M`
+
+> `RecallPipeline.from_env()` checks for legacy `vps` as the non-local gate, while product docs and package naming use `vps-cpu` and `vps-gpu`. Setting either advertised mode currently falls through to local-only behavior. This is a silent correctness bug.
+
+**Acceptance criteria:**
+- [x] AC-1: `DEPTHFUSION_MODE=vps-cpu` routes to `PipelineMode.VPS_TIER1` (Haiku/null fallback chain), not local
+- [x] AC-2: `DEPTHFUSION_MODE=vps-gpu` routes to `PipelineMode.VPS_TIER2` where vector store is healthy
+- [x] AC-3: Legacy `DEPTHFUSION_MODE=vps` remains supported as a deprecated alias for `vps-cpu` with a logged deprecation warning
+- [x] AC-4: `DEPTHFUSION_MODE=local` behavior is unchanged
+- [x] AC-5: Tests cover all four mode strings including alias behavior
+
+**Tasks:**
+- [x] T-283: Create `normalise_mode(raw: str | None) -> str` utility (e.g. in `utils/mode.py`) with canonical outputs `local`, `vps-cpu`, `vps-gpu`; `vps` alias maps to `vps-cpu` with `DeprecationWarning`
+- [x] T-284: Update `RecallPipeline.from_env()` and `backends/factory.py` backend chain selection to consume canonical mode from `normalise_mode()`
+- [x] T-285: Verify `vps-cpu` engages Tier 1 (Haiku reranker path); `vps-gpu` engages Tier 2 (vector/embedding path) when dependencies and config are healthy
+- [x] T-286: Tests covering `local`, `vps`, `vps-cpu`, `vps-gpu` — assert correct `PipelineMode` and backend chain for each
+
+---
+
+### S-87: As an operator, I want `pip install -e ".[vps-cpu]"` to install the Anthropic SDK so that Haiku reranking actually works rather than silently degrading to NullBackend `P0` `S`
+
+> `vps-cpu` advertises Haiku-backed reranking but does not declare `anthropic` as a dependency in `pyproject.toml`. The backend health check degrades gracefully to NullBackend, which is safe but silently undermines the product claim.
+
+**Acceptance criteria:**
+- [x] AC-1: `pip install -e ".[vps-cpu]"` installs `anthropic>=0.40`
+- [x] AC-2: `pip install -e ".[vps-gpu]"` installs `anthropic>=0.40`, `sentence-transformers>=2.2`, and `chromadb>=0.4`
+- [x] AC-3: Install documentation reflects actual extras
+- [x] AC-4: Backend health messages clearly distinguish "missing API key" from "missing SDK" in startup logs
+
+**Tasks:**
+- [x] T-287: Add `anthropic>=0.40` and `chromadb>=0.4` to `[vps-cpu]` extras in `pyproject.toml`
+- [x] T-288: Add `anthropic>=0.40`, `sentence-transformers>=2.2`, and `chromadb>=0.4` to `[vps-gpu]` extras in `pyproject.toml`
+- [x] T-289: Update install docs (`README.md`, any `docs/install/` pages) to match actual extras; annotate what each extra enables
+- [x] T-290: Audit backend health-check log messages; ensure missing SDK (ImportError) and missing API key (config gap) produce distinct, actionable messages
+
+---
+
+### S-88: As an MCP client, I want every DepthFusion tool to return an explicit JSON schema so that I can validate arguments before sending and know the contract without reading source `P1` `M`
+
+> `_make_tool_schema()` emits empty `properties` for all tools. The argument contracts exist only as prose in description strings — not an API contract.
+
+**Acceptance criteria:**
+- [x] AC-1: Every enabled MCP tool returns a non-empty JSON schema with typed properties
+- [x] AC-2: Required fields are declared in `required` arrays
+- [x] AC-3: Schema bounds (min, max, default) match runtime coercion/clamping behavior
+- [x] AC-4: Invalid payloads fail with actionable error messages rather than silent misuse
+- [x] AC-5: Tests assert required fields and schema structure for at least 6 tools
+
+**Tasks:**
+- [x] T-291: Replace `_make_tool_schema(name, description)` in `mcp/server.py` with a lookup-backed `TOOL_SCHEMAS` dict keyed by tool name
+- [x] T-292: Define explicit JSON schemas for the 6 minimum tools: `depthfusion_recall_relevant` (required: `query`; optional: `top_k`, `snippet_len`, `cross_project`, `project`), `depthfusion_confirm_discovery`, `depthfusion_set_memory_score`, `depthfusion_recall_feedback`, `depthfusion_pin_discovery`, `depthfusion_prune_discoveries`
+- [x] T-293: Create `tests/mcp/test_tool_schemas.py`; assert required fields, property types, and schema bounds for each tool; assert invalid payloads produce schema validation errors
+
+---
+
+### S-89: As a developer, I want vector indexing and querying to use the same embedding backend so that Chroma index and query vectors are always in the same embedding space `P1` `M`
+
+> `storage/vector_store.py` may allow ChromaDB to use its own default embedding function during upsert while `retrieval/hybrid.py` uses DepthFusion's local embedding backend for the query — creating a silent vector space mismatch.
+
+**Acceptance criteria:**
+- [x] AC-1: Document embeddings during upsert come explicitly from `get_backend("embedding")`, not ChromaDB's default
+- [x] AC-2: Query embeddings come from the same backend path
+- [x] AC-3: When embedding backend is null or unhealthy, vector search returns empty results and recall falls back to BM25 alone
+- [x] AC-4: Tests cover healthy embedding path, null backend, and malformed embedding input using a fake backend
+
+**Tasks:**
+- [x] T-294: Audit `storage/vector_store.py` — document current upsert and query embedding paths; confirm whether Chroma's default embedding function is engaged
+- [x] T-295: Modify document upsert to call `get_backend("embedding")` explicitly and pass `embeddings=[...]` to Chroma `collection.add()`
+- [x] T-296: Modify query path to call the same backend and pass `query_embeddings=[...]` to Chroma `collection.query()`
+- [x] T-297: Implement graceful degradation: when embedding backend returns None or raises, log the failure and return empty vector results so BM25 still runs
+- [x] T-298: Tests in `tests/test_storage/test_vector_store.py` using a fake embedding backend; cover healthy, null, and malformed embedding cases
+
+---
+
+### S-90: As a maintainer, I want a repeatable benchmark command so that README and product-page claims can be backed by a reproducible, machine-readable report `P2` `L`
+
+> Benchmark claims currently depend on manually interpreted results and projections. There is no goldset, no repeatable harness, and no tooling to distinguish measured from estimated values.
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion benchmark` (CLI or standalone script) runs without API keys against a local goldset
+- [x] AC-2: Output is machine-readable JSON with p50/p95 latency, precision@1, precision@5, hit_rate@5, fallback_rate, cost_estimate_usd
+- [x] AC-3: Benchmark can optionally run with Haiku/Gemma backends when configured
+- [x] AC-4: Report clearly labels each metric as `measured`, `estimated`, or `projected`
+- [x] AC-5: README claim table is regenerated or manually synced with benchmark date and git hash
+
+**Tasks:**
+- [x] T-299: Create goldset fixture at `tests/fixtures/recall_goldset.jsonl` — representative queries with expected relevant chunk IDs drawn from existing sessions/discoveries
+- [x] T-300: Implement `depthfusion benchmark` CLI subcommand (or standalone `scripts/benchmark.py`) accepting `--goldset`, `--mode`, `--top-k`, `--output` flags
+- [x] T-301: Produce metrics: `p50_latency_ms`, `p95_latency_ms`, `precision_at_1`, `precision_at_5`, `hit_rate_at_5`, `fallback_rate`, `cost_estimate_usd`
+- [x] T-302: Update README claim table — add `basis` column (`measured | estimated | projected`) with benchmark date and git hash for measured values
+
+---
+
+### S-91: As an operator, I want warm recalls to avoid repeated filesystem scans so that recall latency stays low as session/discovery/memory files accumulate `P2` `L`
+
+> Recall currently scans all session, discovery, and memory files on demand. Acceptable at alpha scale; degrades as file count grows. No caching layer exists for metadata or embeddings.
+
+**Acceptance criteria:**
+- [x] AC-1: Cold start builds a SQLite metadata index (path, mtime, content hash, project, source, title, chunk count, importance, salience, pinned)
+- [x] AC-2: Warm recall skips full file reads for unchanged files (mtime + hash unchanged)
+- [x] AC-3: Index invalidates per-file on mtime or content-hash change
+- [x] AC-4: Embedding cache stores vectors keyed by text hash; rerank cache keyed by query hash + candidate IDs + backend version
+- [x] AC-5: Cache hit rate is exposed in recall metrics
+
+**Tasks:**
+- [x] T-303: Design SQLite schema for metadata index; implement cold-start builder that safely populates from existing files
+- [x] T-304: Wire warm-recall path to consult index before full file reads; skip unchanged files
+- [x] T-305: Implement per-file invalidation on mtime/content-hash change; handle concurrent access safely
+- [x] T-306: Implement embedding cache keyed by text hash; implement rerank cache keyed by query hash + candidate chunk IDs + backend version string
+- [x] T-307: Expose `cache_hit_rate` (metadata + embedding) in recall response metadata and in metrics; add tests for cache invalidation and hit-rate accounting
+
+---
+
+### S-92: As an operator, I want `depthfusion_recall_relevant` to optionally explain why each block was retrieved so that I can audit recall quality without reading source `P3` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_recall_relevant` accepts an `explain` boolean parameter (default: `false`)
+- [x] AC-2: When `explain=true`, each result includes a structured `explain` block: `bm25_score`, `vector_score`, `rrf_score`, `source_weight`, `salience`, `project_match`, `reranker_rank`
+- [x] AC-3: Default response (`explain=false`) remains compact — no size regression
+- [x] AC-4: Explain output never leaks API keys, hidden env vars, or cross-project content
+
+**Tasks:**
+- [x] T-308: Add `explain` boolean to `depthfusion_recall_relevant` MCP tool schema (AC-1) and wire it through the recall pipeline result builder
+- [x] T-309: Populate `explain` block fields from scores already computed in BM25, RRF, and reranker stages; fields absent from inactive stages are omitted rather than null
+- [x] T-310: Tests for explain output structure, security (no credential/env leaks), and compact default mode
 
 ---
 
