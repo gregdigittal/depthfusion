@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "grpc-migration-attempt-2026-02",
+  "input_text": "Attempted to migrate inter-service communication from REST to gRPC for the performance benefits (binary protocol, multiplexing, streaming).\n\nSpent a week on the migration. Then discovered our infrastructure uses HAProxy in TCP mode as the load balancer between services. HAProxy in TCP mode doesn't understand HTTP/2, which gRPC requires. It terminates HTTP/2 connections because it expects HTTP/1.1.\n\nReverting the entire migration back to REST/JSON.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "gRPC for internal inter-service communication",
+      "why": "Our HAProxy load balancer runs in TCP mode and doesn't speak HTTP/2 \u2014 it terminates HTTP/2 connections expecting HTTP/1.1, which gRPC can't tolerate. Reverted the migration back to REST/JSON."
+    }
+  ],
+  "reviewer_notes": "Same pattern as the gRPC entry in DE \u2014 captured here as institutional negative knowledge.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

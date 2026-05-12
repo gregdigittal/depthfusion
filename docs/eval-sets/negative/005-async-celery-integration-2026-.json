@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "async-celery-integration-2026-03",
+  "input_text": "Tried using aioredis (async Redis client) inside Celery task handlers so we could share async code between our FastAPI app and our Celery workers.\n\nThe problem: Celery runs a synchronous event loop (it predates Python async). When aioredis tries to create an event loop inside a Celery worker, it conflicts with the loop Celery uses internally. Getting \"There is no current event loop in thread\" errors constantly.\n\nReverted to sync redis-py inside Celery workers. Kept aioredis only in the FastAPI async context where it belongs.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Using aioredis (async Redis client) inside Celery task handlers",
+      "why": "Celery runs its own synchronous event loop; aioredis trying to create its own loop conflicted with Celery's, producing 'There is no current event loop in thread' errors. Reverted to sync redis-py inside Celery; kept aioredis only inside FastAPI's async context."
+    }
+  ],
+  "reviewer_notes": "Tried, broke, reverted, with a clear runtime-conflict reason.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

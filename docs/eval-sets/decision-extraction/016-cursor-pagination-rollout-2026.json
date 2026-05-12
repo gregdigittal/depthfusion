@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "cursor-pagination-rollout-2026-02",
+  "input_text": "Added cursor-based pagination to the /orders endpoint. Used the same CursorPaginator class we introduced for /users last sprint.\n\nThe /orders endpoint was the last major endpoint still using OFFSET-based pagination. This completes the migration we've been doing progressively across the API. No new architecture decisions here \u2014 just applying the established pattern to the remaining endpoint.\n\nTests pass.",
+  "expected": [],
+  "reviewer_notes": "Pure rollout work \u2014 applying the previously-established CursorPaginator pattern to /orders. Author explicitly says 'no new architecture decisions here'.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "auth-revocation-2026-03",
+  "input_text": "The original authentication design used JWTs with no server-side state \u2014 completely stateless. This seemed like an architectural win.\n\nProblem: if a user's account is compromised, we can't revoke their token. The token stays valid until it naturally expires (we had 24-hour expiry at the time). An attacker with a stolen token has 24 hours of access even after the user reports the compromise and resets their password.\n\nChanged to: short-lived access tokens (15 minutes) + Redis-backed revocation list. On password reset or explicit logout, add the user's token family to the revocation list.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Pure stateless JWT authentication with no server-side state and long (24h) expiry",
+      "why": "Tokens can't be revoked before they naturally expire \u2014 an attacker with a stolen token has 24 hours of access even after the user reports the compromise and changes their password. Changed to short-lived (15m) access tokens + Redis-backed revocation list."
+    }
+  ],
+  "reviewer_notes": "Captures the rationale behind the current hybrid stateful approach.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

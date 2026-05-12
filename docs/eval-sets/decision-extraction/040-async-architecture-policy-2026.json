@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "async-architecture-policy-2026-02",
+  "input_text": "Establishing the architecture rule for our new Python microservices: async/await throughout, no mixing of sync and async code within a service.\n\nThe reason: mixing sync and async code is a common source of bugs. Calling a sync blocking function from an async context blocks the entire event loop. It also makes the codebase harder to reason about \u2014 you have to track which functions are async-safe.\n\nThe rule: new Python services use asyncio throughout. All I/O (database, HTTP, Redis) uses async libraries (asyncpg, httpx, aioredis). If a library is sync-only, it goes behind a thread pool executor.",
+  "expected": [
+    {
+      "text": "New Python microservices use async/await throughout (asyncpg, httpx, aioredis). Sync-only libraries must be wrapped in a thread pool executor \u2014 no mixing sync and async in the same service",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Architecture rule for new Python services.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

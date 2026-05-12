@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "multitenancy-isolation-2026-02",
+  "input_text": "Evaluated three approaches to multi-tenancy isolation:\n\nDatabase-per-tenant: Complete isolation, easy to comply with data residency requirements. But: N databases to manage, connection pooling complexity, expensive for small tenants.\n\nSchema-per-tenant: Good isolation, single database instance. But: PostgreSQL handles schema proliferation poorly at scale (vacuum costs, migration complexity across hundreds of schemas).\n\nRow-level security (RLS): Single schema, single database. Tenant isolation enforced at the database layer \u2014 PostgreSQL literally prevents queries from returning rows belonging to other tenants. Migration scripts run once. Connection pooling is simple.\n\nGoing with RLS. The isolation is enforced by the database itself, not by application code that could have bugs. This is the most robust option.",
+  "expected": [
+    {
+      "text": "Use PostgreSQL Row-Level Security (RLS) for multi-tenant isolation \u2014 single DB, isolation enforced by the database rather than application code",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural decision evaluated against DB-per-tenant and schema-per-tenant alternatives.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "notification-service-extract-2026-02",
+  "input_text": "Extracting the notification sending logic out of the main application service. Currently, the 1,200-line AppService class handles everything from business logic to sending emails, Slack messages, and webhooks \u2014 it's become unmanageable.\n\nThe new NotificationService owns all outbound notification delivery. It exposes one method: send(channel, recipient, template, data). The channel can be 'email', 'slack', or 'webhook'. The caller doesn't need to know how delivery works.\n\nThe main service will call NotificationService.send(...) instead of directly calling the email library or Slack SDK. This follows the same pattern we used when we extracted PaymentService last quarter.",
+  "expected": [
+    {
+      "text": "Extract notification sending out of AppService into a dedicated NotificationService exposing send(channel, recipient, template, data) \u2014 following the same pattern used for PaymentService",
+      "category": "refactor"
+    }
+  ],
+  "reviewer_notes": "Refactor direction: pulling cross-cutting concern out of a god-class into a focused service.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

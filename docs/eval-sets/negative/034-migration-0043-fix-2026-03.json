@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "migration-0043-fix-2026-03",
+  "input_text": "Migration 0043 (adding a not-null status column to orders) was broken. It tried to add the column and set a default value in one transaction, but existing rows were still null after the migration because the UPDATE statement was missing a WHERE clause.\n\nFixed the migration: added a correct WHERE clause (WHERE status IS NULL). Wrote a separate data repair migration to fix the rows affected by the broken run in staging.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Migration bug (missing WHERE clause) fixed with a data-repair migration. Resolved.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

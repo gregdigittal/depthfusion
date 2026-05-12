@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "error-handling-standardization-2026-01",
+  "input_text": "Establishing a standard error handling pattern for external API calls across the codebase.\n\nCurrently, errors from external services (payment processor, email provider, analytics API) bubble up as raw exceptions from the SDKs \u2014 sometimes a requests.HTTPError, sometimes a custom exception class from the SDK, sometimes a JSON decode error. This makes them hard to handle consistently.\n\nNew pattern: all external API calls are wrapped in try/except blocks. Errors are caught and re-raised as our own ExternalCallError class. The class includes three fields: service (which external service), operation (what we were trying to do), and original_error (the raw exception for debugging). This means the rest of the codebase only needs to handle one error type for all external failures.",
+  "expected": [
+    {
+      "text": "Wrap all external API calls in try/except and re-raise as ExternalCallError {service, operation, original_error} \u2014 one error type for all external failures",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Codebase-wide error-handling convention.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

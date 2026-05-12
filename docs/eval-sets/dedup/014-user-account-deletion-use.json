@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "User account deletion uses soft-delete: set deleted_at timestamp, scrub PII fields (email, name, address) immediately for GDPR compliance. Keep the record shell for referential integrity.",
+  "b": "GDPR deletion implementation: mark user as deleted (deleted_at = now()), overwrite personal data fields with placeholders immediately, but preserve the row. Hard deletion would break foreign key constraints on orders, reviews, and activity logs.",
+  "reviewer_notes": "Both describe the same soft-delete with immediate PII scrub for GDPR while keeping the row for FK integrity.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

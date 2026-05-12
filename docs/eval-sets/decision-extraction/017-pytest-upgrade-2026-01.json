@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "pytest-upgrade-2026-01",
+  "input_text": "Upgraded from pytest 7.2 to pytest 8.1. The main motivation was getting access to the improved diff output for failed assertions \u2014 8.x gives much more readable failure messages.\n\nUpdated about a dozen deprecated fixture usages (the @pytest.fixture syntax for yield fixtures changed slightly). Ran the full test suite: 487 tests pass, 0 failures. No logic changes to any test or application code, pure tooling upgrade.",
+  "expected": [],
+  "reviewer_notes": "Pure tooling upgrade (pytest 7.2 \u2192 8.1). No design or policy decisions.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

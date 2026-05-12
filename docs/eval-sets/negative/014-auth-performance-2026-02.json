@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "auth-performance-2026-02",
+  "input_text": "Added a Bloom filter to the authentication middleware for fast \"is this token revoked?\" checks. Bloom filters give probabilistic membership tests in O(1) with very small memory footprint.\n\nThe problem: Bloom filters have false positives. Our configuration had a 1% false positive rate. This meant 1% of valid login requests were being rejected as \"revoked\" \u2014 legitimate users getting \"invalid session\" errors on 1 in 100 requests.\n\nRemoved the Bloom filter from the auth flow. Reverted to a direct Redis lookup (still fast). The false positive rate is unacceptable in an auth context \u2014 any false positive is a user incorrectly locked out.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Bloom filter in the authentication middleware to do fast 'is this token revoked?' checks",
+      "why": "Bloom filters have inherent false positives; the configured 1% false-positive rate meant ~1 in 100 legitimate users got 'invalid session' errors. False positives are unacceptable in an auth path \u2014 removed from the auth flow entirely, reverted to direct Redis lookup."
+    }
+  ],
+  "reviewer_notes": "Domain-fit problem (false positives + auth) drove the rejection.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

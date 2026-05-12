@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "dns-workaround-2026-02",
+  "input_text": "The staging environment has been broken for two days because DNS is misconfigured \u2014 the database hostname in the staging config isn't resolving. The infrastructure team is working on it but it's blocking the whole dev team.\n\nTemporary workaround: I hardcoded the database IP address (10.0.1.45) directly in the staging.env config file so the team can unblock. Left a clear TODO comment: \"REMOVE THIS \u2014 hardcoded IP, waiting for DNS fix from infra team.\" The infrastructure ticket is INFRA-2847.\n\nThis is explicitly a temporary workaround, not a permanent solution.",
+  "expected": [],
+  "reviewer_notes": "Author explicitly labels this a temporary workaround (hardcoded IP) waiting on INFRA-2847. Not a permanent decision.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

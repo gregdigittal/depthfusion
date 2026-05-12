@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Added a B-tree index on users(email) to speed up the login query (SELECT id, password_hash FROM users WHERE email = ?). Login is a high-frequency operation.",
+  "b": "Added a composite index on users(created_at, status) for the admin dashboard user listing query, which filters by status and sorts by registration date. Different from the login index \u2014 this one supports range queries.",
+  "reviewer_notes": "Two different indexes on the same users table for two different queries (login lookup vs admin listing). Different columns, different use cases.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "sqlalchemy-async-migration-2026-03",
+  "input_text": "Proposed migrating from sync SQLAlchemy to async SQLAlchemy (SQLAlchemy 2.0+ async extension) to fit our async FastAPI codebase.\n\nAfter 2 weeks of partial migration work: the async SQLAlchemy API is significantly different from the sync API. Every query pattern needs to be rewritten. Lazy loading doesn't work in async context. We hit three bugs in edge cases.\n\nEstimated completion: 3 more weeks plus significant regression testing. Risk of introducing subtle data integrity bugs is high. Decided to stay with sync SQLAlchemy called via thread pool executor.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Migrating from sync SQLAlchemy to async SQLAlchemy 2.0",
+      "why": "The async API is significantly different from sync \u2014 every query pattern needs rewriting, lazy loading doesn't work in async context, and we hit 3 bugs in edge cases. Estimated 3 more weeks plus heavy regression testing risk. Staying with sync SQLAlchemy called via thread pool executor."
+    }
+  ],
+  "reviewer_notes": "Tried for 2 weeks then abandoned; cost/risk explicitly given.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

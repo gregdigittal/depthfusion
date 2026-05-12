@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "All service logs must be structured JSON with these required fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (from SERVICE_NAME env var), trace_id (propagated from request headers), user_id (when authenticated, omitted otherwise), message.",
+  "b": "Standardized log format: every log entry is a JSON object. Mandatory fields are timestamp, level, service, trace_id, user_id (optional), and message. Free-form text logs are rejected by the log aggregator pipeline. This format enables structured queries across all services in Loki.",
+  "reviewer_notes": "Both describe the same JSON log schema with the same mandatory field set.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

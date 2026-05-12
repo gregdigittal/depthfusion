@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "cookie-security-fix-2026-02",
+  "input_text": "Discovered and fixed a CSRF (Cross-Site Request Forgery) exposure in our login cookies.\n\nThe problem: our session cookies didn't have SameSite set. This means a malicious website could embed a form that POSTs to our API and the browser would include the session cookie with the request \u2014 the user's browser sends their credentials to our server on behalf of an attacker.\n\nFix: Added SameSite=Lax to all session cookies. Lax blocks the dangerous case (cross-site form POSTs, iframe requests) while allowing normal navigation (clicking a link to our site from another page still works).\n\nI also took the opportunity to add Secure (HTTPS-only) and HttpOnly (no JavaScript access) to the cookie attributes.",
+  "expected": [
+    {
+      "text": "Set SameSite=Lax, Secure, and HttpOnly on all session cookies \u2014 standing requirement to mitigate CSRF, MITM over HTTP, and XSS-based token theft",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "The immediate CSRF fix is a bug fix, but locking in the cookie attribute requirements going forward is a policy decision.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

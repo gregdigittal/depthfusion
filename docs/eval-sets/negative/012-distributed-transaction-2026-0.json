@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "distributed-transaction-2026-02",
+  "input_text": "Tried implementing the Saga pattern for distributed transactions across the order, inventory, and payment services. Each service has a compensating transaction (undo action) that gets called if a later step fails.\n\nAfter 3 weeks of implementation, the compensating transaction logic became extremely complex. We built compensation chains for compensating transactions.\n\nFor our current scale (500 orders/day), this is massive over-engineering. Replaced with a sequential flow with retry logic: step 1 \u2192 step 2 \u2192 step 3, with idempotent retries on failure. Much simpler and handles 99% of failure scenarios.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Saga pattern with compensating transactions for distributed transactions across order, inventory, and payment services",
+      "why": "Compensation chains grew recursive (compensations for compensations) and complexity exploded after 3 weeks. Massive over-engineering for 500 orders/day. Replaced with a sequential flow + idempotent retries."
+    }
+  ],
+  "reviewer_notes": "Explicitly abandoned and replaced after 3 weeks of work.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

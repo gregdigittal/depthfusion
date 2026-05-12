@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "caching-architecture-2026-03",
+  "input_text": "Added an in-process LRU cache to the user service \u2014 a Python dictionary with a max size. Seemed efficient since it avoids a Redis network roundtrip on every request.\n\nProblem: we run 8 Gunicorn worker processes. Each process has its own in-process cache, so we effectively have 8 separate caches. When a user updates their profile, we invalidate the cache in the worker that handled the update \u2014 but the other 7 workers still have stale data.\n\nWe had an incident where a user changed their email address and kept seeing the old email for 20 minutes because 7 of 8 workers were serving stale cached data.\n\nMoved to Redis as the shared cache.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "In-process Python LRU cache in a multi-worker Gunicorn setup",
+      "why": "Each of 8 worker processes had its own cache \u2014 invalidation in one worker didn't propagate to the others. An email-change incident left 7 of 8 workers serving stale data for ~20 minutes. Moved to Redis as a shared cache."
+    }
+  ],
+  "reviewer_notes": "Real incident makes the rejection concrete.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

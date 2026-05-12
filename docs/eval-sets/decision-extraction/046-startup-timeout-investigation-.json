@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "startup-timeout-investigation-2026-02",
+  "input_text": "Tracked down why the new deployment was taking 45 seconds to start instead of the usual 8 seconds. Suspected the new migrations, but they ran in under 2 seconds.\n\nFound it: the DATABASE_URL in the new service's environment config was pointing to the old database hostname that's been decommissioned. The service was waiting for a connection timeout on each attempt. The URL had a typo \u2014 missing the -prod suffix on the hostname.\n\nFixed the URL. Deployment is back to normal startup time. No code changes.",
+  "expected": [],
+  "reviewer_notes": "Pure config bugfix \u2014 typo in DATABASE_URL. No design decisions.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

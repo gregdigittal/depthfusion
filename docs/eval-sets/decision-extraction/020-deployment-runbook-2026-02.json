@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "deployment-runbook-2026-02",
+  "input_text": "Wrote the deployment runbook for the new database migration process. This documents the steps we've been following informally for the last two months:\n\n1. Run migrations in a transaction\n2. Verify row counts match expectations before committing\n3. Keep a rollback SQL script for each migration\n4. Post to #deployments Slack channel before and after\n\nNo code changes. This is purely documentation of existing practice.",
+  "expected": [],
+  "reviewer_notes": "Author explicitly says this is 'purely documentation of existing practice' \u2014 no new decisions.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

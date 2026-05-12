@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "container-orchestration-choice-2026-01",
+  "input_text": "Choosing between Kubernetes and Docker Swarm for container orchestration.\n\nDocker Swarm: simpler to set up and operate. But ecosystem has stagnated \u2014 Helm charts, GitOps tooling, and most DevOps tooling targets Kubernetes. Finding Swarm expertise is hard.\n\nKubernetes: steeper learning curve, more complex. But it's the industry standard, our DevOps contractor already knows it, and we get access to the Helm, ArgoCD, and Keda ecosystems for free. Long-term, it's easier to hire for.\n\nGoing with Kubernetes.",
+  "expected": [
+    {
+      "text": "Use Kubernetes (over Docker Swarm) for container orchestration \u2014 industry standard, ecosystem (Helm/ArgoCD/Keda), DevOps contractor expertise, easier long-term hiring",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Platform / orchestration technology choice.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

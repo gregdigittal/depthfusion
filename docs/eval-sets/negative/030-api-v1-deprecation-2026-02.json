@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "api-v1-deprecation-2026-02",
+  "input_text": "Completed the v1 to v2 API migration. We announced v1 deprecation 3 months ago, gave all API consumers a 3-month migration window, sent reminder emails at 90/60/30/7 days. Traffic to v1 endpoints dropped from 100% to under 2% over the window.\n\nTurned off v1 endpoints yesterday. The remaining 2% of traffic was from abandoned integrations. No support tickets after the cutover.\n\nThe migration is complete.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Successfully completed v1\u2192v2 API migration. Completed work, not a rejection.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

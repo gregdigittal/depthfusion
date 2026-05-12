@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "compose-service-name-fix-2026-02",
+  "input_text": "The app service was failing to start in Docker Compose with \"could not connect to database\" errors. The DATABASE_URL environment variable was referencing \"postgres\" as the hostname, but the service in docker-compose.yml was named \"db\".\n\nDocker Compose uses service names as hostnames. Fixed the DATABASE_URL to reference \"db\" instead of \"postgres\". Service started correctly.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Compose service-name typo fix. Resolved config bug.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

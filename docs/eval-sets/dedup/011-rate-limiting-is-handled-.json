@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Rate limiting is handled at Kong (our API gateway), not in individual microservices. Centralized rate limiting means consistent enforcement across all services and no duplicate implementation. Rate limit state is stored in Redis behind Kong.",
+  "b": "Moving rate limiting to the Kong layer. Service-level rate limiting creates inconsistency \u2014 each service has different limits and the state is not shared, so a user can circumvent per-service limits by spreading requests. Kong enforces rate limits at the entry point with shared Redis state.",
+  "reviewer_notes": "Both describe centralised rate limiting at Kong backed by Redis.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

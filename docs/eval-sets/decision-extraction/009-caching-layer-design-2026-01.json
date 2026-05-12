@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "caching-layer-design-2026-01",
+  "input_text": "Designed the caching strategy for the application. Two separate concerns, two different solutions:\n\nUser profile data: This changes infrequently but is read on nearly every authenticated request. Using Redis with a 5-minute TTL. Redis is already in our stack. LRU eviction policy so the cache naturally prioritizes frequently-accessed profiles. When a profile is updated, we explicitly delete the cache key rather than waiting for TTL.\n\nStatic assets (product images, icons, CSS, JS): These don't change except on deployment. Pushing these to CloudFront CDN with a 7-day cache. CDN handles geographic distribution and takes the load off our origin servers entirely. We'll use cache-busting via filename hashing in the build pipeline so deploys get fresh assets.",
+  "expected": [
+    {
+      "text": "Use Redis with a 5-minute TTL and LRU eviction for user profile caching; explicit cache delete on profile update",
+      "category": "architecture"
+    },
+    {
+      "text": "Use CloudFront CDN with 7-day cache for static assets, with filename-hash cache-busting on deploy",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Two distinct caching architecture decisions for two different data types.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

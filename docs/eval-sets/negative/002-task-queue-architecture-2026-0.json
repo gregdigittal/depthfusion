@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "task-queue-architecture-2026-03",
+  "input_text": "Used SQLite as the backing store for the background task queue. Seemed convenient \u2014 no infrastructure to set up, file-based, easy to inspect.\n\nProblem: SQLite has file-level locking. Only one writer can hold the lock at a time. With 4 worker processes picking up tasks simultaneously, they're constantly contending for the lock. Task throughput dropped by 60% compared to our previous system, and we're seeing deadlock errors under load.\n\nMigrated to PostgreSQL, which has proper row-level locking. Workers pick up different rows simultaneously without contention.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "SQLite as the backing store for the background task queue",
+      "why": "SQLite uses file-level locking \u2014 with 4 concurrent worker processes, lock contention dropped throughput by 60% and produced deadlocks. Migrated to PostgreSQL for row-level locking."
+    }
+  ],
+  "reviewer_notes": "Classic 'tried X, broke at scale, switched to Y' negative.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

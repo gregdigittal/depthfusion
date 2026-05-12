@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Using Redis sorted sets (ZSETs) for the leaderboard. ZADD updates a user score, ZRANGEBYSCORE fetches the top N, ZRANK returns a specific user position. All O(log n). No database query on the leaderboard read path.",
+  "b": "Leaderboard is backed by a Redis ZSET keyed by season. Score updates call ZADD. Rank queries call ZRANGEBYSCORE. Redis sorted set operations are O(log n), which gives sub-millisecond leaderboard reads for 500k members.",
+  "reviewer_notes": "Both describe Redis ZSETs as the leaderboard backing store with the same operations and O(log n) profile.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "subscription-plan-perf-2026-03",
+  "input_text": "The /billing/subscriptions endpoint was returning in 8-10 seconds for enterprise accounts. Profiled the query: joining users \u2192 subscriptions \u2192 subscription_plans was doing a sequential scan on subscription_plans (50,000 rows).\n\nThe plans table had no index on plan_id \u2014 it was treated as a small lookup table when the service was first built, but it has grown to 50k rows with complex plan hierarchies.\n\nAdded a B-tree index on subscription_plans(plan_id). Query time: 8 seconds \u2192 20 milliseconds. No code changes needed.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Resolved performance bug \u2014 adding a B-tree index on subscription_plans(plan_id) fixed the slow /billing/subscriptions endpoint. Nothing was tried-and-abandoned; this is completed work.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

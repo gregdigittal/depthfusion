@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Policy: all background jobs must be idempotent. Running a job twice with the same payload must produce the same outcome as running it once. This is required because RabbitMQ guarantees at-least-once delivery.",
+  "b": "Background job handlers are required to be idempotent \u2014 executing the same job twice must not cause double-effects. The message queue delivers at-least-once, not exactly-once. Each handler must use one of: idempotency keys checked against the database, unique constraints that reject duplicate inserts, or check-then-skip logic.",
+  "reviewer_notes": "Both state the same idempotent-jobs policy driven by at-least-once delivery.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

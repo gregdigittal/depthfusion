@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Paginated endpoints use cursor-based pagination: the client passes a cursor (encoded last-seen ID) and receives the next page. No OFFSET queries \u2014 all pagination is via index-range lookups.",
+  "b": "Paginated API responses do not include a total count of results. Total count queries (SELECT COUNT(*)) are expensive on large tables and rarely needed by clients who paginate forward. Clients receive has_next_page instead.",
+  "reviewer_notes": "Both about pagination but different facets: A is the pagination mechanism (cursors, no OFFSET); B is the omission of total-count. Either could exist independently.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

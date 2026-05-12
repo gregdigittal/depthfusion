@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "pagination-helper-refactor-2026-02",
+  "input_text": "Extracting the pagination logic into a shared helper module. The same pagination code (parse page/per_page params, apply limits, return metadata) is duplicated across 7 different endpoint files with minor variations. It's drifted \u2014 some handle edge cases, some don't, and the inconsistencies are causing subtle bugs.\n\nNew file: pagination.py with a single paginate(queryset, page, per_page, max_per_page=100) function. All 7 endpoints will use this instead.\n\nThis is a refactor to reduce duplication. No behavior changes.",
+  "expected": [
+    {
+      "text": "Extract duplicated pagination logic from 7 endpoint files into a single pagination.py with paginate(queryset, page, per_page, max_per_page=100) \u2014 all endpoints adopt this helper",
+      "category": "refactor"
+    }
+  ],
+  "reviewer_notes": "Pure refactor to deduplicate drifted code paths.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

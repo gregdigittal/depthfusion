@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "data-retention-policy-2026-03",
+  "input_text": "Establishing data retention policy for log data.\n\nTwo tiers:\n\nOperational logs (application logs, access logs, debug output): retained for 90 days then deleted. These are primarily for debugging and incident response, where anything older than 90 days is rarely useful.\n\nTransactional records (orders, payments, user actions, audit trail): retained for 2 years. This is driven by our financial compliance requirements and by practical needs \u2014 support requests for transactions from 8 months ago are common.\n\nThese retention rules will be enforced by automated cleanup jobs, not manual processes.",
+  "expected": [
+    {
+      "text": "Data retention policy: operational logs retained 90 days then deleted; transactional records (orders, payments, audit trail) retained 2 years. Enforced via automated cleanup jobs",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Compliance-driven data retention rule.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

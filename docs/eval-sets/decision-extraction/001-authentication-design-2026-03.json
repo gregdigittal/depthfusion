@@ -1,0 +1,22 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "authentication-design-2026-03",
+  "input_text": "After a long discussion about session management approaches, I've settled on the following design for our authentication system.\n\nFor the main user-facing application, I'm going with Redis-backed sessions. The key advantage here is instant revocation \u2014 if a user's account is compromised or they click \"sign out all devices,\" we can delete the session from Redis and it's gone immediately. JWTs can't be revoked before they expire, which means a stolen token stays valid for its entire lifetime. For users logging into our main app, that risk is unacceptable.\n\nFor the public API where external partners are integrating, I'm keeping JWTs. Partners build integrations that run autonomously without a user present \u2014 they need a credential they can use without hitting our servers for every request. The stateless nature of JWTs is exactly right here.\n\nOn top of this, I'm establishing a rotation policy: session tokens must rotate on every single request. Each API call invalidates the previous session token and issues a new one. This means a captured token from packet sniffing or logging is useless by the time an attacker tries to use it.",
+  "expected": [
+    {
+      "text": "Use Redis-backed sessions for the main user-facing application (instant revocation; chosen over JWT for revocability)",
+      "category": "stack-choice"
+    },
+    {
+      "text": "Use JWTs for the public partner API (partners need stateless credentials for autonomous integrations)",
+      "category": "stack-choice"
+    },
+    {
+      "text": "Session token rotation policy: rotate session tokens on every request \u2014 each call invalidates the previous token",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Three decisions in one session: stack choice for two audiences (Redis for app, JWT for partners) plus a rotation policy.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

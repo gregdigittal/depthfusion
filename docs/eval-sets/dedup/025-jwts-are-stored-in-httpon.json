@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "JWTs are stored in httpOnly cookies, not localStorage. httpOnly prevents JavaScript from accessing the cookie, protecting against XSS attacks stealing the token.",
+  "b": "Access tokens (JWTs) rotate every 15 minutes. The short lifetime limits exposure if a token is stolen or intercepted.",
+  "reviewer_notes": "Both about JWT security but different mechanisms: A is cookie storage attributes for XSS protection; B is short token lifetime to bound theft. Different defences.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

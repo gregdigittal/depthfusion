@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "All service logs use structured JSON format with standardized fields: timestamp, level, service, trace_id, user_id, message.",
+  "b": "Log retention policy: operational logs (application and access logs) retained 90 days then deleted. Transaction records (orders, payments, audit trail) retained 2 years for compliance.",
+  "reviewer_notes": "Different aspects of logging: A is the log format; B is the retention schedule. Complementary.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

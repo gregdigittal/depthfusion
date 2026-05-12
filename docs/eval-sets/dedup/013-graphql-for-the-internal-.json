@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "GraphQL for the internal frontend (our own team). REST for the external public API. GraphQL flexibility benefits our own frontend but the learning curve is a barrier for external developers who expect REST.",
+  "b": "Dual API strategy: internal-facing API is GraphQL \u2014 the frontend team can request exactly the data shape they need. External public API is REST \u2014 third-party developers have a lower integration barrier and all their existing tooling works without special clients.",
+  "reviewer_notes": "Both describe the same internal-GraphQL / external-REST split with the same rationale.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

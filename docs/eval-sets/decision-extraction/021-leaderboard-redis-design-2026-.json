@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "leaderboard-redis-design-2026-02",
+  "input_text": "Designed the data structure for the real-time leaderboard feature.\n\nThe naive approach would be to query the database sorted by score for every leaderboard view. But our expected scale is 500,000 users, and we want to refresh the leaderboard every 30 seconds. That's a lot of expensive sort operations.\n\nRedis sorted sets (ZSETs) are purpose-built for this. A ZSET stores members with a numeric score, and operations like ZRANGEBYSCORE (get top N) and ZRANK (get a specific user's rank) run in O(log n) time regardless of the dataset size. For 500k users, that's ~19 operations deep \u2014 essentially instant.\n\nLeaderboard writes: when a user's score changes, update the ZSET with ZADD. Leaderboard reads: query the ZSET directly. No database involved in the read path.",
+  "expected": [
+    {
+      "text": "Use Redis ZSETs as the data structure for the real-time leaderboard \u2014 ZADD for writes, ZRANGEBYSCORE/ZRANK for reads, O(log n), no DB on read path",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural choice driven by scale (500k users, 30s refresh).",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Canary deployment stages: new version starts at 5% of live traffic, monitored for 30 minutes. If p99 latency and error rate stay within 10% of baseline, traffic moves to 20%, then another 30-minute window, then 50%, then 100%. Any metric spike during any window triggers automatic rollback to the previous version.",
+  "b": "New releases roll out in four stages: 5% \u2192 20% \u2192 50% \u2192 100%. Each stage has a 30-minute observation window. The system watches p99 response time and error rate. If either climbs more than 10% above the stable baseline for the previous version, Kong automatically shifts all traffic back and alerts the team.",
+  "reviewer_notes": "Both describe the same canary rollout: 5/20/50/100% stages, 30-minute windows, 10% threshold, auto-rollback at Kong.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

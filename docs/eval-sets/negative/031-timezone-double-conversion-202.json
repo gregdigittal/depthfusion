@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "timezone-double-conversion-2026-03",
+  "input_text": "Bug: users in non-UTC timezones were seeing event times that were wrong by their UTC offset \u2014 twice. Traced it: the server was converting UTC timestamps to local time before sending them in the API response, and the frontend was also converting assuming the server sent UTC.\n\nFix: server now sends UTC timestamps only. Frontend always treats received timestamps as UTC before converting to local time for display. The double-conversion is eliminated.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Resolved timezone double-conversion bug. Pure bug fix.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

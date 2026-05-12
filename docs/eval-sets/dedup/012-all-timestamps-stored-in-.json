@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "All timestamps stored in the database are UTC. No exceptions. Timezone conversion from UTC to user local time happens only in the frontend at display time.",
+  "b": "Established the UTC-only storage rule: the backend stores all datetimes in UTC. The API always returns UTC. The frontend is responsible for converting to the user local timezone for display. Mixing timezones in storage is a source of subtle bugs, especially around DST transitions.",
+  "reviewer_notes": "Both state the same UTC-only storage rule with frontend-side display conversion.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

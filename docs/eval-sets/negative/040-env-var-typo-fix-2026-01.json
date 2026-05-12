@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "env-var-typo-fix-2026-01",
+  "input_text": "The user service was failing to connect to the database in the development environment. Error: \"connection refused\" on startup.\n\nFound a typo in the .env file: the variable was named DATABASE_URL in the config file but DATABASE_URI in the application code that reads it. The application was reading undefined, falling back to a default localhost URL that did not exist in the dev setup.\n\nFixed the variable name in .env to match what the application reads.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Resolved env-var name mismatch (DATABASE_URL vs DATABASE_URI). Pure config bug fix.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

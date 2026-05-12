@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "api-versioning-setup-2026-01",
+  "input_text": "Set up the versioning scheme for the new public API. I evaluated two main approaches:\n\nHeader-based versioning (Accept: application/vnd.myapi.v1+json): Cleaner from a REST purist perspective, but URLs aren't self-describing, it's harder to test with a browser or Postman, and it's a pain to share with partners in documentation.\n\nURL path versioning (/api/v1/...): The URL itself tells you everything. Easy to test, easy to document, easy to share. Partners can see immediately which version they're calling.\n\nGoing with URL path versioning. All endpoints will live under /api/v1/ prefix.",
+  "expected": [
+    {
+      "text": "Use URL path versioning (/api/v1/...) over header-based versioning for the public API \u2014 chosen for ease of testing, documentation, and partner-facing clarity",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "API design pattern choice \u2014 architectural decision about how the API is structured.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

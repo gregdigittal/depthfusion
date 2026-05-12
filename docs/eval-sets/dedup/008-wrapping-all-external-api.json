@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Wrapping all external API call failures in a typed ExternalCallError class. Fields: service (e.g. \"stripe\"), operation (e.g. \"charge_card\"), original_error. Instead of catching raw SDK exceptions that differ between providers, the rest of the codebase handles one error type.",
+  "b": "Standardized external API error wrapping: all calls to third-party services (payment processor, email provider, analytics API) are caught at the integration boundary and re-raised as ExternalCallError(service=..., operation=..., cause=...). Callers handle ExternalCallError, not raw SDK exceptions.",
+  "reviewer_notes": "Both describe wrapping external API failures as ExternalCallError with the same {service, operation, cause} fields.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

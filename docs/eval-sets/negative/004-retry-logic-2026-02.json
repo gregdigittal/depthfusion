@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "retry-logic-2026-02",
+  "input_text": "Implemented plain exponential backoff for retrying failed API calls: wait 1 second, then 2, then 4, then 8. This caused a \"retry storm\" when our payment processor had a 90-second outage. All queued retries synchronized and fired at the same time when the processor came back online, immediately overwhelming it again.\n\nSwitched to exponential backoff with random jitter. Now each retry waits a random amount within the window. Retries spread out and the recovering service gets a gradual traffic ramp instead of a sudden spike.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Plain exponential backoff (no jitter) for retrying failed API calls",
+      "why": "Synchronised retries caused a retry storm when the payment processor recovered from a 90s outage \u2014 every queued retry fired at the same instant and re-overwhelmed it. Switched to exponential backoff with random jitter."
+    }
+  ],
+  "reviewer_notes": "Concrete incident makes the rejection unambiguous.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

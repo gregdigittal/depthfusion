@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "api-protocol-split-2026-02",
+  "input_text": "Decided on the API protocol split between internal and external consumers.\n\nInternal frontend (our own team building the dashboard and mobile app): GraphQL. Lets the frontend request exactly the shape of data it needs, reduces over-fetching, and the type system catches mismatches at compile time. The frontend team is comfortable with GraphQL.\n\nExternal public API (third-party developers integrating with our platform): REST. REST is universally understood, has better tooling support across all languages, and is what partners expect. GraphQL is less familiar to external developers and creates a steeper integration learning curve.",
+  "expected": [
+    {
+      "text": "Use GraphQL for the internal frontend (dashboard + mobile) \u2014 flexible shape, type-checked, team familiar",
+      "category": "stack-choice"
+    },
+    {
+      "text": "Use REST for the external public API for third-party developers \u2014 universally understood, better tooling, lower partner onboarding friction",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Two protocol decisions split by audience.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

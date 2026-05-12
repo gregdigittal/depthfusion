@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "redis-as-primary-store-2026-01",
+  "input_text": "Evaluated using Redis as the primary data store for the session management service instead of PostgreSQL. Redis is much faster for the simple key-value lookups that session management requires.\n\nCritical risk: Redis by default stores data in memory with asynchronous persistence. If the server crashes before a write is persisted to disk, that data is lost. With default configuration, you can lose up to the last second of writes.\n\nFor session data this might be acceptable, but we also store important session-adjacent data (rate limit counters, CSRF tokens) in the same store. Keeping PostgreSQL as the primary store. Redis remains a cache layer.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Using Redis as the primary data store for session management",
+      "why": "Redis's default async persistence can lose up to ~1 second of writes on a crash. The same store also holds rate-limit counters and CSRF tokens that we can't afford to drop. Keeping PostgreSQL as primary; Redis stays a cache layer."
+    }
+  ],
+  "reviewer_notes": "Durability requirement ruled out Redis as primary.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

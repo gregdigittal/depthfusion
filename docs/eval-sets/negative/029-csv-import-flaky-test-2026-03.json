@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "csv-import-flaky-test-2026-03",
+  "input_text": "The test_import_products_csv integration test was failing intermittently \u2014 about 1 in 10 runs on CI. The test imports 500 rows, then asserts the database contains 500 products.\n\nRoot cause: the test was running the import (async) and immediately asserting without waiting for all async workers to finish. On slow CI machines, some rows had not been committed when the assertion ran.\n\nFixed: added a polling assertion that waits up to 5 seconds for the count to reach 500, checking every 100ms. Flakiness eliminated across 50 subsequent CI runs.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Flaky test fixed by adding a polling assertion. Resolved infra bug, nothing rejected.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

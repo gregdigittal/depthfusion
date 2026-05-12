@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Feature flags are stored in environment variables, not a database table. Changing a flag requires a deploy, but deploys are fast. Env vars are visible in deployment config, not hidden state in a database.",
+  "b": "Decided against database-backed feature flags. A database flag creates a runtime dependency \u2014 flag reads can fail if the database is slow. Environment variable flags are resolved at startup and do not add runtime overhead. The trade-off (deploy required to change a flag) is acceptable at our deployment frequency.",
+  "reviewer_notes": "Both describe env-var feature flags and the same DB-flag rejection rationale.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

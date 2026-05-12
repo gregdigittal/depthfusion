@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Authenticated endpoints are rate-limited at 100 requests per minute per user_id. Exceeding the limit returns 429 with a Retry-After header.",
+  "b": "Unauthenticated endpoints (login, registration, password reset) are rate-limited at 20 requests per minute per IP address. This prevents credential stuffing on public endpoints where user_id is not available.",
+  "reviewer_notes": "Different rate-limit policies: A is 100/min per user_id on authenticated endpoints; B is 20/min per IP on unauthenticated endpoints. Different limits, different keys, different endpoint classes.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

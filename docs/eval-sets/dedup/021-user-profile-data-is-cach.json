@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "User profile data is cached in Redis with a 5-minute TTL and LRU eviction. Profiles are read on nearly every authenticated request, and profile updates invalidate the cache key immediately.",
+  "b": "Real-time notifications use Redis pub/sub. When a notification event is generated, it is published to a user-specific channel (user:{id}:notifications). Connected clients subscribe to their channel and receive notifications with sub-100ms latency.",
+  "reviewer_notes": "Both use Redis but for different patterns \u2014 A is caching (key/value with TTL); B is pub/sub (channels and subscriptions). Different Redis features, different data flows.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

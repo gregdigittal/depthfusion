@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "null-reference-bugfix-2026-02",
+  "input_text": "Found and fixed a NullPointerException in the authentication middleware chain. The bug was triggered when a request came in with a valid session token but the corresponding user record had been deleted from the database \u2014 an edge case we hadn't handled.\n\nThe middleware was calling user.getProfile() before checking if user was null. Moved the null check to happen before any method calls. Added a test case that exercises this exact scenario.\n\nAll 47 middleware tests now pass. This was a pure bug fix, no design decisions involved.",
+  "expected": [],
+  "reviewer_notes": "Pure bug fix \u2014 NPE in auth middleware. Author explicitly states 'no design decisions involved'.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

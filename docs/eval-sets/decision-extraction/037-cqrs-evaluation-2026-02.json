@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "cqrs-evaluation-2026-02",
+  "input_text": "Started looking at whether CQRS (Command Query Responsibility Segregation) would help with the read/write performance mismatch we're seeing. The idea is to separate the data model for writes from the data model for reads \u2014 writes go into a normalized OLTP schema, a read model is asynchronously derived from events and optimized for queries.\n\nI've read through the documentation and a few blog posts. The concept makes sense for our problem. Haven't decided anything yet \u2014 want to actually benchmark the current approach with the new indexes before deciding whether CQRS is warranted. It's a significant architectural change.",
+  "expected": [],
+  "reviewer_notes": "Author explicitly says 'haven't decided anything yet' \u2014 pure speculation/research phase. No commitment made.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

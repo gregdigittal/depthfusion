@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "All background job handlers must be idempotent \u2014 identical input must produce identical output regardless of how many times the job executes.",
+  "b": "Failed background jobs are retried up to 3 times with exponential backoff: first retry after 30 seconds, second after 2 minutes, third after 10 minutes. After 3 failures, the job moves to a dead-letter queue for manual review.",
+  "reviewer_notes": "Complementary, not the same fact: A is the idempotency requirement; B is the retry schedule + DLQ. You can implement one without the other.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

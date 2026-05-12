@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Added PostgreSQL read replicas. Analytics dashboard queries (10-30 second reporting queries) are routed to replicas, leaving the primary database exclusively for OLTP writes and reads. Replication lag is 1-2 seconds, which the analytics team confirmed is acceptable.",
+  "b": "Introduced read replicas to isolate analytics query load from production OLTP traffic. The primary handles all writes. A replica connection pool is used for reporting queries. The analytics team accepts up to 2 seconds of staleness.",
+  "reviewer_notes": "Both describe routing analytics queries to PG read replicas with the same 1\u20132s lag acceptance.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "grpc-revert-2026-02",
+  "input_text": "We tried switching internal service communication to gRPC. Spent a week on the migration \u2014 updated the service definitions, generated client/server stubs, converted the main inter-service calls.\n\nThen hit a wall: our infrastructure runs Nginx as a reverse proxy, and the standard Nginx build doesn't support gRPC (HTTP/2 framing). Getting gRPC through Nginx requires either a custom Nginx build or upgrading to Nginx 1.13.10+ with the grpc_pass module. Our managed Kubernetes provider doesn't easily support custom Nginx builds, and the upgrade path involves a maintenance window.\n\nReverting everything back to REST/JSON. Keeping the gRPC investigation findings in a decision doc for if/when we revisit.",
+  "expected": [
+    {
+      "text": "Revert internal service communication from gRPC back to REST/JSON \u2014 Nginx reverse proxy doesn't support gRPC framing without custom build/upgrade, which our managed K8s provider can't easily accommodate. Keep gRPC findings for a future revisit",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Stack-choice decision to reverse a previous direction due to infrastructure constraints. The institutional knowledge ('we tried gRPC and it failed because of X') is exactly the kind of thing future devs need.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

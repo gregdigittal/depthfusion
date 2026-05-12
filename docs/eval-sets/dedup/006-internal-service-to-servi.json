@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Internal service-to-service messages use MessagePack serialization. External API responses use JSON. MessagePack is 30-40% smaller than equivalent JSON and faster to serialize/deserialize. Human readability is not needed for internal traffic.",
+  "b": "Two-tier serialization: MessagePack for everything that stays inside the cluster (service mesh traffic, job queue payloads, cache entries). JSON for everything external (public API responses, webhooks, partner integrations). The performance win from MessagePack does not justify the readability cost on the external API.",
+  "reviewer_notes": "Both describe the same MessagePack-internal / JSON-external split with the same rationale.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

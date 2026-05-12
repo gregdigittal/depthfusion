@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "websocket-tls-fix-2026-03",
+  "input_text": "WebSocket connections were failing in production with \"WebSocket is closed before the connection is established.\" Development worked fine.\n\nRoot cause: the frontend was connecting to ws:// (unencrypted) but production is served over HTTPS. Browsers block mixed content \u2014 an HTTPS page cannot open an unencrypted ws:// connection.\n\nFixed: changed ws:// to wss:// (WebSocket Secure) in the production frontend config.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Mixed-content WebSocket fix (ws:// \u2192 wss://). Resolved config bug.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

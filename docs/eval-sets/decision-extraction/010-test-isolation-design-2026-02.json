@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "test-isolation-design-2026-02",
+  "input_text": "Had a long team discussion about how to handle test isolation. The core problem: our integration tests were sharing state \u2014 if test A creates some data and test B reads from the database, B might see A's data and pass or fail for the wrong reason.\n\nOption 1: Wrap each test in a transaction and roll it back at the end. Fast (no actual disk writes), but doesn't work for tests that have side effects spanning multiple transactions.\n\nOption 2: Wipe and re-seed the database before each test. Slower, but completely reliable \u2014 each test starts from a known clean state.\n\nWe went with option 2. The test suite takes about 40 seconds longer to run than option 1 would, but reliability is worth it. The team agreed: debugging phantom test failures caused by shared state costs more time than the extra 40 seconds.",
+  "expected": [
+    {
+      "text": "Test isolation policy: wipe and re-seed the database before every integration test (Option 2) rather than transaction-rollback \u2014 reliability worth the ~40s extra runtime",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Team-agreed policy on how tests must isolate state.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

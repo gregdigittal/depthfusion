@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "orm-evaluation-2026-02",
+  "input_text": "The codebase uses a custom ORM that was built in-house 3 years ago. At the time, it made sense.\n\nProblems now: it's become a maintenance burden. Bugs take 2-3x longer to fix than they would in a standard ORM. New team members spend a week learning its quirks before they can be productive. It's missing features (no connection pooling, no async support) that we now need.\n\nMigrating to SQLAlchemy over the next two releases. The migration is scoped and phased, with the custom ORM running in parallel during transition.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Continuing with the in-house custom ORM (built 3 years ago)",
+      "why": "Maintenance burden: bugs take 2\u20133x longer to fix than in a standard ORM, new engineers need a week to ramp on its quirks, and it lacks features we now need (no connection pooling, no async support). Migrating to SQLAlchemy over the next two releases, phased."
+    }
+  ],
+  "reviewer_notes": "The author is explicitly abandoning the custom ORM with the rationale recorded.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

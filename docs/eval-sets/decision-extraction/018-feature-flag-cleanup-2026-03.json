@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "feature-flag-cleanup-2026-03",
+  "input_text": "Removed the old feature flag infrastructure that was left over from the pre-v0.5 A/B test system.\n\nThe old system had a FeatureFlagRegistry class, a flags table in the database, and middleware that checked flags on every request. It was used for three experiments, all of which have been concluded. The new system just reads directly from environment variables \u2014 no registry, no database table, no middleware.\n\nDeleted approximately 800 lines of code including the registry, the database migration, the middleware, and all associated tests. This is pure dead code removal.",
+  "expected": [],
+  "reviewer_notes": "Pure dead code removal (~800 lines of obsolete feature flag infra). The replacement decision happened previously; this session is just cleanup.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

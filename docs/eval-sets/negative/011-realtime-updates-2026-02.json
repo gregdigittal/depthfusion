@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "realtime-updates-2026-02",
+  "input_text": "Used WebSockets for real-time order status updates to the dashboard. Worked well in development. In production, connections drop after a few minutes.\n\nRoot cause: our HAProxy load balancer has a 60-second timeout on idle TCP connections. WebSockets look like idle TCP to HAProxy if no data is flowing. After 60 seconds of no new order status changes, HAProxy kills the connection.\n\nSwitched to long-polling (client waits up to 30 seconds for a response, reconnects immediately after each response).",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "WebSockets for real-time order status updates to the dashboard",
+      "why": "HAProxy has a 60-second idle TCP timeout, and WebSocket connections look idle to it when no events are flowing \u2014 HAProxy was killing connections after 60 seconds of quiet. Switched to long-polling."
+    }
+  ],
+  "reviewer_notes": "Specific load-balancer behaviour drove the rejection.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

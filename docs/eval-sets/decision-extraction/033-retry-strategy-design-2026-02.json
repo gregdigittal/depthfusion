@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "retry-strategy-design-2026-02",
+  "input_text": "Implementing the retry strategy for failed external API calls.\n\nPlain exponential backoff (retry after 1s, 2s, 4s, 8s...) has a problem: if a service goes down and comes back up, all the queued retries fire at exactly the same time and immediately overload the recovering service. This is a \"retry storm.\"\n\nExponential backoff with jitter: add a random component to the wait time. Instead of exactly 4 seconds, wait somewhere between 2 and 6 seconds. This spreads the retry load across a time window. For the recovering service, it sees a gradual ramp of traffic rather than a sudden spike.\n\nThis is now the standard retry pattern for all external API calls.",
+  "expected": [
+    {
+      "text": "Standard retry pattern for external API calls: exponential backoff with jitter (random component on each backoff window) to avoid retry storms",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Codebase-wide retry convention.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

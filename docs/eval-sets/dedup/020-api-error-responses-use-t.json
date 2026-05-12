@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "API error responses use the format: {\"error\": {\"code\": \"VALIDATION_ERROR\", \"message\": \"...\", \"fields\": {\"email\": \"required\"}}}. The code field is a machine-readable enum for programmatic handling.",
+  "b": "Backend error logging format: when an unhandled exception occurs, log {\"level\": \"ERROR\", \"correlation_id\": \"...\", \"service\": \"...\", \"error\": {\"type\": \"...\", \"message\": \"...\", \"stack\": \"...\"}}. The correlation_id links the error log to the request that triggered it.",
+  "reviewer_notes": "Different schemas for different audiences: A is the client-facing API error envelope; B is the server-side error log shape.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

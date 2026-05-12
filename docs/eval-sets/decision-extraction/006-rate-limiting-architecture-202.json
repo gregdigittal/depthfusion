@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "rate-limiting-architecture-2026-03",
+  "input_text": "Decision on where rate limiting lives in the stack.\n\nThe option was between implementing it in each microservice individually versus putting it at the API gateway layer (we're using Kong). Service-level rate limiting would mean each team maintains their own, with different implementations and no shared state \u2014 a request could get rate-limited by service A but not service B even if the underlying user is hammering the API.\n\nCentralized at Kong, all services automatically get rate limiting protection. The rate limit state is stored in Redis behind Kong and is consistent across the entire cluster. New services get protection for free as soon as they're registered.\n\nGoing with Kong-level rate limiting.",
+  "expected": [
+    {
+      "text": "Implement rate limiting centrally at the Kong API gateway with Redis-backed state, rather than per-microservice",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural decision about where a cross-cutting concern lives.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

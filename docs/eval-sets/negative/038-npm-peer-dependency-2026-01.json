@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "npm-peer-dependency-2026-01",
+  "input_text": "Running npm install was failing with \"ERESOLVE unable to resolve dependency tree\" because two packages both required react as a peer dependency but specified different version ranges that did not overlap.\n\nFixed by adding a resolutions field to package.json pinning the shared react version to the range that satisfies both packages. npm install now completes cleanly.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "npm peer-dependency conflict resolved via package.json resolutions. Resolved dependency issue.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

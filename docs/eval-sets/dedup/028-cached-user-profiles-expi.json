@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Cached user profiles expire after 5 minutes (time-based TTL). After 5 minutes, the next read fetches fresh data from the database and repopulates the cache.",
+  "b": "Cache entries for user profiles are immediately invalidated (deleted from Redis) on any profile update. The next read after an update always goes to the database. This is write-through invalidation, separate from the TTL policy.",
+  "reviewer_notes": "Two cache invalidation mechanisms layered together: A is time-based TTL; B is write-through invalidation on update. Complementary, not the same fact.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

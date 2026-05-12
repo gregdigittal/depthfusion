@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "push-notification-architecture-2026-02",
+  "input_text": "Investigated using WebRTC data channels for push notifications. WebRTC can punch through NAT and firewalls better than WebSockets, which was attractive given that some corporate users are behind strict firewalls.\n\nThe operational complexity was prohibitive: WebRTC requires STUN and TURN servers for NAT traversal. Setting up and maintaining TURN infrastructure is significant.\n\nAbout 30% of our corporate users are behind firewalls that block WebRTC. SSE (Server-Sent Events) works through those firewalls because it's just long-lived HTTP. Switched to SSE for push notifications.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "WebRTC data channels for push notifications",
+      "why": "WebRTC requires STUN/TURN infrastructure (significant operational complexity), and ~30% of our corporate users are behind firewalls that block WebRTC outright. SSE works through those firewalls because it's just long-lived HTTP. Switched to SSE."
+    }
+  ],
+  "reviewer_notes": "Operational and reach concerns combined to defeat the use case.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

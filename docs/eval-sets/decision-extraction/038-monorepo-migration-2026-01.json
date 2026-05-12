@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "monorepo-migration-2026-01",
+  "input_text": "Migrating from our current multi-repo setup (separate Git repos for frontend, backend, shared-types, infrastructure) to an Nx monorepo.\n\nThe multi-repo problem: shared code lives in shared-types, but every time we update it we have to version-bump, publish to npm, and update each consuming repo separately. A single cross-cutting change touches 4 PRs. In the monorepo, the shared code is just an import. One commit touches everything atomically.\n\nTool: Nx, because it handles caching (only rebuilds what changed), dependency graph analysis, and has good support for our stack (React frontend, Node.js backend, TypeScript throughout).",
+  "expected": [
+    {
+      "text": "Migrate from multi-repo to a single monorepo so shared code is a direct import rather than versioned/published per repo",
+      "category": "refactor"
+    },
+    {
+      "text": "Use Nx as the monorepo tooling \u2014 caching, dependency graph, good React/Node.js/TypeScript support",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Two decisions: the structural shift (refactor) and the specific tool to enable it (stack-choice).",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

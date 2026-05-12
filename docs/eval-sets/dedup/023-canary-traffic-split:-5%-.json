@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Canary traffic split: 5% \u2192 20% \u2192 50% \u2192 100%, with 30-minute observation windows between stages.",
+  "b": "Canary rollback criteria: automatic rollback triggers if p99 latency increases more than 10% above baseline OR if error rate increases more than 10% above baseline during any canary stage observation window.",
+  "reviewer_notes": "Both describe canary deploys but A is the traffic-split schedule and B is the rollback criteria/thresholds. Different facets of the same policy \u2014 keeping both is informative.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

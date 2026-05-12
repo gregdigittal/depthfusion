@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "primary-key-design-2026-01",
+  "input_text": "Switched all primary keys from auto-increment integers to ULIDs (Universally Unique Lexicographically Sortable Identifiers). ULIDs are sortable by time, URL-safe, and don't expose sequence information.\n\nIntegration test with our payment processor revealed the problem: their API requires a numeric-only merchant reference ID. ULIDs contain letters. Sending a ULID as the merchant reference ID caused their API to return a 400 error.\n\nReverted to auto-increment integers. The payment processor integration is too important to work around.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "ULIDs as primary keys across the system",
+      "why": "Our payment processor's API requires numeric-only merchant reference IDs; ULIDs contain letters and were rejected with 400 errors at integration test time. Reverted to auto-increment integers \u2014 payment integration is too important to work around."
+    }
+  ],
+  "reviewer_notes": "External dependency constraint forced the rollback.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

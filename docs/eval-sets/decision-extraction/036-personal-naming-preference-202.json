@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "personal-naming-preference-2026-01",
+  "input_text": "I've been thinking about variable naming conventions and I personally prefer to use 'should' as a prefix for boolean variables rather than 'is' \u2014 shouldShowModal feels more imperative than isModalVisible to me.\n\nChanged a few files in my local branch to use this convention. Haven't discussed with the team yet, just experimenting with the style.",
+  "expected": [],
+  "reviewer_notes": "Personal preference / experimentation in a local branch. Author has not discussed with the team, so it is not a team convention or policy.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

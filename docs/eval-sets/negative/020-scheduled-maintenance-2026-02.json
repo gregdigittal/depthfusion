@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "scheduled-maintenance-2026-02",
+  "input_text": "Tried using pg_cron (PostgreSQL cron extension) to schedule database cleanup tasks \u2014 delete expired sessions, archive old logs, vacuum large tables.\n\nProblem: pg_cron uses PostgreSQL advisory locks to prevent duplicate runs. Our application has transaction patterns that hold advisory locks for extended periods. pg_cron jobs were consistently failing because the advisory locks were already held, causing maintenance to be skipped entirely for days at a time.\n\nMoved scheduled maintenance to a separate Python service that runs as a Kubernetes CronJob.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "pg_cron (the PostgreSQL cron extension) for scheduled DB maintenance",
+      "why": "pg_cron uses PostgreSQL advisory locks for at-most-once execution. Application transactions in our codebase hold those advisory locks for extended periods, so pg_cron jobs were silently skipped for days at a time. Moved to a Python service running as a Kubernetes CronJob."
+    }
+  ],
+  "reviewer_notes": "Lock-contention failure mode is specific and the replacement is concrete.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

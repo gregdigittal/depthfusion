@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "analytics-query-engine-2026-02",
+  "input_text": "For the analytics query service, I'm bypassing SQLAlchemy and using raw psycopg2 queries directly.\n\nThe analytics queries are genuinely complex: multi-level GROUP BYs, window functions, CTEs with lateral joins. Writing these through SQLAlchemy's ORM layer produces ugly, hard-to-debug SQL that often doesn't match what you wrote in Python. You spend as much time reading EXPLAIN output and translating back to the ORM as you would just writing the SQL directly.\n\nFor the analytics service specifically, the queries are written by engineers who are comfortable with SQL, and they're complex enough that the ORM is getting in the way rather than helping. Raw psycopg2 it is.",
+  "expected": [
+    {
+      "text": "In the analytics query service, bypass SQLAlchemy and use raw psycopg2 \u2014 ORM gets in the way for complex multi-level GROUP BY / window function / CTE queries",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Targeted exception to the default ORM stack, scoped to the analytics service.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "depthfusion-recall-tuning-2026-04",
+  "input_text": "Tried increasing the recall top_k to 100 to improve coverage. The problem: we're using Haiku as the reranker, and with 100 candidates it hits the Haiku API rate limit consistently during busy sessions. Requests start queuing, the MCP server times out, and the whole recall operation fails.\n\nPulled back to top_k=20. That keeps us well under the rate limit. We're trading some recall coverage for reliability.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Recall top_k of 100 for the Haiku reranker",
+      "why": "Consistently hit the Haiku API rate limit during busy sessions \u2014 requests queued, MCP server timed out, and recall failed. Pulled back to top_k=20."
+    }
+  ],
+  "reviewer_notes": "Explicit try \u2192 fail \u2192 rollback with the rate-limit reason recorded.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

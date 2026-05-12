@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "read-replica-scaling-2026-03",
+  "input_text": "Adding PostgreSQL read replicas to handle the analytics query load.\n\nThe analytics dashboard is running complex reporting queries (often 10-30 second queries) against the production database. These queries compete for I/O with regular OLTP operations and we're seeing latency spikes in the main application as a result.\n\nRead replicas: changes from the primary are asynchronously replicated to replicas. Analytics queries route to replicas via a read-only connection string. The write path (primary database) is completely unaffected.\n\nTrade-off: replication lag means analytics queries might see data that's up to 1-2 seconds stale. The analytics team confirmed this is acceptable for their reporting use case.",
+  "expected": [
+    {
+      "text": "Add PostgreSQL read replicas; route analytics queries to replicas via a read-only connection string. Accept 1-2s replication lag (confirmed acceptable with analytics team)",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Scaling architecture decision with a documented trade-off.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

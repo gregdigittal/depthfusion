@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "JWT refresh tokens are now single-use. Once a client uses a refresh token to get a new access token, the refresh token is immediately invalidated in Redis. A fresh refresh token is issued alongside the new access token. If someone steals a refresh token and tries to use it after the legitimate client has already used it, the invalidated token is rejected.",
+  "b": "Established the rule that each refresh token can only be used once. When the client sends a refresh token to get a new access token, two things happen atomically: the old refresh token is added to a Redis revocation set, and a new refresh token is generated and returned to the client. A revoked token is refused on any subsequent use.",
+  "reviewer_notes": "Both describe single-use refresh tokens with atomic revocation+reissue in Redis.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

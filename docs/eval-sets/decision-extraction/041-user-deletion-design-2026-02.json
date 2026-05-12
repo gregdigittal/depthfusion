@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "user-deletion-design-2026-02",
+  "input_text": "Decided how to handle user account deletion. Two decisions:\n\nFirst, how to delete: soft-delete rather than hard-delete. When a user deletes their account, we set a deleted_at timestamp on the user record rather than removing the row. This preserves referential integrity (foreign keys from orders, comments, etc. still resolve). For GDPR, we separately scrub the PII fields (email, name, address) immediately while keeping the record shell for the foreign keys.\n\nSecond, audit trail: every deletion event writes a record to an append-only audit_log table with the user_id and timestamp. This satisfies compliance requirements for demonstrating that a deletion request was honored, even though the original user record is anonymized.",
+  "expected": [
+    {
+      "text": "User deletion uses soft-delete (set deleted_at) with PII fields scrubbed immediately \u2014 preserves FK integrity while satisfying GDPR",
+      "category": "architecture"
+    },
+    {
+      "text": "Every deletion writes a record to an append-only audit_log table with user_id and timestamp \u2014 compliance evidence that the deletion request was honored",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Two related compliance/architecture decisions.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

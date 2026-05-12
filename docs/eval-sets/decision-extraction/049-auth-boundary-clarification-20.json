@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "auth-boundary-clarification-2026-02",
+  "input_text": "Clarified the ownership boundary for token validation: the AuthCore service is the single owner of all JWT validation \u2014 including tokens issued for partner API access, not just internal user sessions.\n\nThe question came up when we were designing the partner integration flow. The API gateway team wanted to handle partner token validation directly in Kong (the gateway), avoiding the network hop to AuthCore. We considered it but rejected it: if validation logic lives in two places, they can drift. A bug fix in AuthCore doesn't automatically fix Kong. Having one authority for token validation makes auditing straightforward.",
+  "expected": [
+    {
+      "text": "AuthCore is the single owner of JWT validation for ALL token types, including partner API tokens \u2014 explicitly rejected duplicating validation in Kong to avoid drift between the two implementations",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Ownership / boundary architecture decision with the rejected alternative recorded.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

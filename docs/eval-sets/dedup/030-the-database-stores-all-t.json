@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "The database stores all timestamps in UTC. The backend always writes UTC and always reads UTC.",
+  "b": "Timezone conversion from UTC to user local time happens exclusively in the frontend. The API always returns UTC. The frontend uses the browser Intl API to format dates in the user local timezone.",
+  "reviewer_notes": "Two halves of the UTC policy stated separately: A is backend/DB storage rule; B is frontend display conversion. Same overall policy but distinctly different obligations on different layers.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

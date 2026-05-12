@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "cqrs-evaluation-2026-03",
+  "input_text": "Evaluated CQRS (Command Query Responsibility Segregation) for handling the read/write performance mismatch in the reporting service. The idea: maintain a separate read model optimized for queries, updated asynchronously from the write model via events.\n\nAfter a week of design work, concluded it's premature optimization. Our write throughput is 500 orders/day and peak read load is 200 concurrent dashboard users. Adding CQRS means maintaining two data models, an event bus, and eventual consistency semantics.\n\nThe current PostgreSQL setup with proper indexes handles our actual load fine. Shelving CQRS for if/when we're 10x bigger.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "CQRS (separate read/write models with async event-based projection) for the reporting service",
+      "why": "Premature optimization at current scale (500 writes/day, 200 concurrent dashboard users) \u2014 the cost of maintaining two data models, an event bus, and eventual consistency outweighs the benefit. Shelved until ~10x larger."
+    }
+  ],
+  "reviewer_notes": "Explicit rejection with a re-evaluation trigger recorded.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

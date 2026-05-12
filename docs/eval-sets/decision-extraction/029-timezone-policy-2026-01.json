@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "timezone-policy-2026-01",
+  "input_text": "Establishing the project-wide timezone handling rule.\n\nRule: all timestamps stored in the database are UTC. Period. No timezone conversions happen on the write path. When data is read and displayed to a user, the frontend is responsible for converting UTC to the user's local timezone.\n\nWhy: if you store timestamps in local timezones (or mix timezones), you end up with ambiguous data when users travel, when you expand to new markets, or when daylight saving time creates duplicate hours. UTC is unambiguous.\n\nThis is a standing rule. Any code that stores a non-UTC timestamp is a bug.",
+  "expected": [
+    {
+      "text": "Project-wide rule: all timestamps stored in the database are UTC. No timezone conversion on the write path; frontend handles display-time conversion to local TZ",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Standing engineering rule \u2014 author explicitly calls it out as 'any code that stores a non-UTC timestamp is a bug'.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

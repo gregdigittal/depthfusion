@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "analytics-db-evaluation-2026-03",
+  "input_text": "Evaluated ClickHouse as the database for our analytics service. ClickHouse is a column-oriented database purpose-built for analytical queries \u2014 aggregations over large datasets are extremely fast.\n\nProblem: our analytics data also has OLTP requirements. When an order is placed, we need to update several analytics tables atomically. ClickHouse is optimized for append-only workloads and doesn't support traditional ACID transactions or foreign key relationships.\n\nKeeping PostgreSQL for the analytics tables. ClickHouse would be appropriate if we needed sub-second queries across billions of rows.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "ClickHouse as the database for the analytics service",
+      "why": "Analytics tables also have OLTP requirements (atomic updates with order placement, foreign keys to orders/users). ClickHouse is optimised for append-only workloads and lacks traditional ACID transactions and FK relationships. Keeping PostgreSQL."
+    }
+  ],
+  "reviewer_notes": "Specific workload mismatch ruled out ClickHouse for this service.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

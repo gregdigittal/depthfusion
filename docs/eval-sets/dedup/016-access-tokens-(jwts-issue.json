@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Access tokens (JWTs issued for API authentication) expire after 15 minutes. Short expiry limits the window of exposure if a token is stolen.",
+  "b": "Refresh tokens rotate on every use. When a client uses a refresh token, the old token is invalidated and a new one is issued. If a refresh token is used twice (old token used after rotation), both the old and new token are immediately revoked \u2014 this detects token theft.",
+  "reviewer_notes": "Both are about JWT lifecycle, but A is access-token expiry (15 min) and B is refresh-token rotation + theft detection. Different aspects \u2014 the tricky-case example in the guide.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

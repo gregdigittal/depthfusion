@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Integration tests clean up database state by running inside a transaction that is rolled back at the end of each test. Each test starts with a clean slate.",
+  "b": "Unit tests mock all service interfaces and external dependencies. No real database connections, no real HTTP calls. Fast execution, complete isolation. Integration tests (a separate suite) use real dependencies.",
+  "reviewer_notes": "Different test classes: A is integration tests using transaction rollback; B is unit tests with mocked dependencies. Different isolation strategies.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "search-scaling-2026-03",
+  "input_text": "Hit the limits of PostgreSQL full-text search at production scale. With 10 million products, search queries are consistently taking 800ms to 2 seconds \u2014 well above the 200ms target.\n\nPostgreSQL FTS works well at moderate scale but doesn't have the tuning knobs needed for fast faceted search (filtering by category + brand + price range + availability simultaneously) at this data size.\n\nEvaluating Elasticsearch and Typesense as dedicated search solutions. Haven't migrated yet \u2014 this is a finding from load testing, not a completed migration.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "A limitation was noted (PG FTS slow at 10M products) but the team explicitly says 'Haven't migrated yet \u2014 this is a finding from load testing, not a completed migration.' Per the guide's 'limitation noted without abandoning anything' rule, this is NOT a genuine negative yet.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

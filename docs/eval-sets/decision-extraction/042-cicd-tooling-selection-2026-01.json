@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "cicd-tooling-selection-2026-01",
+  "input_text": "Settled on the CI/CD toolchain.\n\nFor CI (running tests, linting, building): GitHub Actions. We're already on GitHub, it's tightly integrated, the workflow YAML is straightforward, and the marketplace has actions for everything we need. The free tier covers our current usage.\n\nFor CD (deploying to Kubernetes): ArgoCD implementing GitOps. The concept: the desired state of our Kubernetes cluster is defined in a Git repo. ArgoCD watches that repo and makes the live cluster match. Deployments become Git commits. Every change is auditable, reversible, and visible.",
+  "expected": [
+    {
+      "text": "CI tool: GitHub Actions \u2014 already on GitHub, tight integration, marketplace coverage, free tier sufficient",
+      "category": "stack-choice"
+    },
+    {
+      "text": "CD tool: ArgoCD using GitOps \u2014 Git is the source of truth for cluster state; deployments are commits; changes are auditable and reversible",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Two tooling decisions for the CI/CD toolchain.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

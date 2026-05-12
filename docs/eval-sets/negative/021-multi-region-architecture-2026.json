@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "multi-region-architecture-2026-03",
+  "input_text": "Evaluated multi-region active-active write deployment \u2014 having multiple geographic regions each accept writes independently for lower latency.\n\nThe core problem: we have global invariants that can't be violated. Account balances can't go negative. Inventory quantities can't go below zero. With active-active writes, two users in different regions can both try to use the last item in stock simultaneously.\n\nThese invariants require coordination between regions for writes, which eliminates the latency advantage. Staying with active-passive (one write region, read replicas in other regions).",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Multi-region active-active write deployment",
+      "why": "Global invariants (account balances \u2265 0, inventory \u2265 0) can't be honoured when two regions accept writes independently \u2014 coordinating the cross-region locking required to enforce them eliminates the latency advantage that motivated active-active in the first place. Staying active-passive."
+    }
+  ],
+  "reviewer_notes": "Invariant-driven rejection with the latency rationale specifically nullified.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

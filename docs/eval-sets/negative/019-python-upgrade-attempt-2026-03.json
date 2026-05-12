@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "python-upgrade-attempt-2026-03",
+  "input_text": "Attempted to upgrade from Python 3.10 to 3.12 to get the performance improvements and new language features.\n\nBlocker: one of our core dependencies uses greenlet, a C extension for coroutine switching. The greenlet build for Python 3.12 had a C API incompatibility with the version of gevent our code depends on. The gevent team was aware but hadn't released a fix yet.\n\nReverting to Python 3.10. Will re-evaluate in 3-6 months when the ecosystem catches up.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Upgrading from Python 3.10 to 3.12",
+      "why": "One of our core dependencies uses greenlet (C extension), whose 3.12 build has a C-API incompatibility with our pinned gevent version. The gevent team is aware but hasn't released a fix. Reverted to 3.10; will re-evaluate in 3\u20136 months."
+    }
+  ],
+  "reviewer_notes": "Ecosystem readiness blocked the upgrade \u2014 explicit re-evaluation window.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

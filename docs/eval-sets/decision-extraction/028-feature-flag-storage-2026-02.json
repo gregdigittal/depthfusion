@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "feature-flag-storage-2026-02",
+  "input_text": "Decided where to store feature flags.\n\nThe database approach (storing flags in a database table) is attractive because you can change flags without deploying. But it means your application has a runtime dependency on a database query to decide whether a feature is enabled. If the database is slow or unreachable, feature flag reads can fail. It also creates a hidden config state that's not visible in code review.\n\nEnvironment variables: simple, explicit, visible in your deployment config, no runtime dependency. To change a flag, you change an env var and redeploy. For our deployment velocity (3-4 deploys per day), this is fast enough.\n\nGoing with environment variables.",
+  "expected": [
+    {
+      "text": "Store feature flags in environment variables, not a database table \u2014 avoids runtime DB dependency and hidden config state; deploy velocity (3-4/day) makes redeploy-to-flip acceptable",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural choice for where dynamic configuration lives.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

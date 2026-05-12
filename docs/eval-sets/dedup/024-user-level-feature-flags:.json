@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "User-level feature flags: specific users can be enrolled in a feature independently. Used for beta testing with specific customers.",
+  "b": "Organization-level feature flags: enabling a flag for an organization enables it for all users in that organization. Used for staged rollout to enterprise customers.",
+  "reviewer_notes": "Different flag scopes: A is user-level enrollment (per individual); B is organization-level enrollment (whole tenant). Different rollout patterns.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

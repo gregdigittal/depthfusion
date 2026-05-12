@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "network-security-policy-2026-03",
+  "input_text": "Adding an outbound HTTP allowlist to our services following a security audit.\n\nThe audit flagged that our services can make outbound HTTP requests to any URL \u2014 there's nothing preventing a service from being exploited to make requests to internal infrastructure (Server-Side Request Forgery) or to exfiltrate data to external servers.\n\nNew policy: services can only make outbound HTTP requests to hosts on an explicit allow-list. The list is maintained in the security config and is reviewed quarterly. Any new external integration requires adding the host to the list, which creates a review checkpoint.",
+  "expected": [
+    {
+      "text": "Outbound HTTP allowlist for services \u2014 services can only call hosts on an explicit list; new integrations require adding hosts (quarterly review)",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Security policy from audit, with a review cadence.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

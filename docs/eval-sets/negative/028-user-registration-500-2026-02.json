@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "user-registration-500-2026-02",
+  "input_text": "Users were getting 500 errors when registering with a phone number that does not include a country code. The phone validation middleware was calling phone.strip('+') before checking if it is null, throwing a NullPointerException on null inputs.\n\nFixed: moved the null check before any method calls. Added test cases for null, empty string, and various phone formats.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Pure NullPointerException bug fix in phone validation. No design rejection.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

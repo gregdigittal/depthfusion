@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "repository-pattern-adoption-2026-01",
+  "input_text": "Adding the new ProductRepository to the codebase. Looking at the existing code, the repository pattern (a class that abstracts all database access for a given model) has clearly become the standard here \u2014 UserRepository, OrderRepository, PaymentRepository are all implemented this way.\n\nThere's no explicit decision document anywhere recording when this became the standard, but the code is consistent. Following the existing pattern for the new Product data model.",
+  "expected": [],
+  "reviewer_notes": "Author is following the existing repository pattern for a new model \u2014 no new decision, just adherence to an undocumented but established convention.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

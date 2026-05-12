@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Fixed the BM25 score normalisation bug \u2014 I was dividing each score by the maximum score in the result set. The problem: if all documents score equally (e.g. all have score 1.0), you get 1.0/1.0=1.0 for everyone, which is technically correct but the \"neutral\" value when there's no meaningful ranking should be 0.5, not 1.0. Changed to min-max normalisation: (score - min_score) / (max_score - min_score), which gracefully falls back to 0.5 when max equals min.",
+  "b": "The BM25 ranking normalisation was using max-only division: raw_score / max_score. This fails when all scores in the result set are equal \u2014 you get 1.0 for every result when the semantically correct \"no meaningful signal\" value is 0.5. Replaced with min-max: (raw - min) / (max - min). Added a zero-range guard that returns 0.5 when max equals min.",
+  "reviewer_notes": "Both describe the same BM25 normalisation bug and fix: switching from max-only to min-max normalisation, with the same zero-range fallback to 0.5.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

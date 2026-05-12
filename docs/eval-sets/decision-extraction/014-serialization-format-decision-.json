@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "serialization-format-decision-2026-01",
+  "input_text": "Choosing the serialization format for internal service-to-service communication.\n\nJSON is the default but it has overhead: it's text-based, verbose, and parsing is slower than binary formats. For the high-volume internal events that flow between our services (roughly 10,000/second at peak), this adds up.\n\nEvaluated MessagePack: it's a binary format that maps exactly to the same types as JSON (strings, numbers, arrays, maps), but is typically 30-40% smaller and significantly faster to serialize/deserialize. Libraries exist for all our languages (Python, Node.js). The downside is you can't read it with a text editor, but internal service communication doesn't need to be human-readable.\n\nDecision: MessagePack for internal service-to-service traffic. Keep JSON for the external public API where human readability matters.",
+  "expected": [
+    {
+      "text": "Use MessagePack for internal service-to-service communication (smaller, faster); keep JSON for the external public API where human readability matters",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Serialization format choice with a clear internal/external split.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

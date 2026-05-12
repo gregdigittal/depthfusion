@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "jwt-algorithm-migration-2026-02",
+  "input_text": "Changing our JWT signing algorithm from HS256 to RS256. Here's the problem we're solving:\n\nHS256 uses a shared secret key \u2014 the same key is used to both sign tokens (auth service) and verify them (API gateway, three microservices). That means all five services need access to the same secret. If any one of those five is compromised, the attacker can forge tokens for any user.\n\nRS256 uses a public/private key pair. Only the auth service holds the private key and signs tokens. Everyone else just needs the public key to verify. Sharing a public key is fine \u2014 you can publish it openly. The private key stays in one place.\n\nThis change doesn't affect what's inside the tokens, just how they're signed and verified.",
+  "expected": [
+    {
+      "text": "Migrate JWT signing from HS256 (shared secret) to RS256 (public/private key pair) \u2014 only auth service holds private key, others verify with public key",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural decision about trust boundaries and key distribution.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

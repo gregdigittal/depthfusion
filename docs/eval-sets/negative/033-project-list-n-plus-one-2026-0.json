@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "project-list-n-plus-one-2026-02",
+  "input_text": "The GET /api/projects endpoint was taking 1.2 seconds for users with many projects. Database profiling showed 1 query to load the project list + 1 additional query per project to load the owner information \u2014 51 queries for a page of 50 projects.\n\nFixed: changed the query to JOIN users ON users.id = projects.owner_id in the initial query, loading the owner data in one roundtrip. Response time: 1.2s to 85ms.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Resolved N+1 query by adding a JOIN. Pure performance bug fix.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "react-query-v5-upgrade-2026-02",
+  "input_text": "Upgraded from react-query v4 to v5. The API changed significantly \u2014 useQuery and useMutation hook signatures changed, QueryClient instantiation changed, and several types were renamed or restructured.\n\nWent through all 40+ hook usages in the codebase and updated the type signatures and hook options to match v5 API. TypeScript was helpful here \u2014 every error was a compile-time type error pointing to the exact change needed. All type errors resolved.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Successfully completed react-query v4\u2192v5 upgrade. Completed migration, nothing rejected.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

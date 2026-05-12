@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "false-dup",
+  "a": "Every database migration must include a down() method that reverses the migration. Migrations without a rollback path are not permitted.",
+  "b": "Migrations run sequentially in the order of their timestamp prefix. Parallel migration execution is not permitted \u2014 concurrent schema changes can cause deadlocks and unpredictable results.",
+  "reviewer_notes": "Both rules about migrations but different concerns: A is reversibility (down()); B is ordering/concurrency (sequential, no parallel).",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

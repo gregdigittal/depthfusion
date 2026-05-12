@@ -1,0 +1,18 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "observability-stack-2026-01",
+  "input_text": "Chose the observability stack for the new platform.\n\nMetrics and dashboards: Prometheus + Grafana. Prometheus is the de facto standard for Kubernetes metrics collection. Grafana for dashboards. Both integrate with Kubernetes natively. The team has experience with both.\n\nDistributed tracing: OpenTelemetry SDK in all services, sending traces to a Tempo backend. OpenTelemetry is vendor-neutral \u2014 if we want to switch from Tempo to Jaeger or a hosted solution later, we change the exporter, not the instrumentation code. Tempo is free, runs in our cluster.\n\nBoth decisions were also driven by the existing expertise of our DevOps contractor who set up the initial cluster.",
+  "expected": [
+    {
+      "text": "Metrics and dashboards: Prometheus + Grafana \u2014 de facto K8s standard, native integration, team experience",
+      "category": "stack-choice"
+    },
+    {
+      "text": "Distributed tracing: OpenTelemetry SDK in all services exporting to Tempo \u2014 vendor-neutral instrumentation, free, runs in-cluster",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Two observability stack decisions.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

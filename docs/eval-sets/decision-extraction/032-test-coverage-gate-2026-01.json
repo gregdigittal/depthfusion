@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "test-coverage-gate-2026-01",
+  "input_text": "Setting a minimum code coverage requirement as a CI gate.\n\nAfter three incidents where untested code paths caused production regressions, the team agreed we need an enforced floor. CI builds will now fail if overall line coverage drops below 80%.\n\nThis doesn't mean 80% is the goal \u2014 it's the minimum. Critical paths (authentication, payment processing, data mutations) should be close to 100%. The 80% gate exists to prevent coverage from silently eroding over time.",
+  "expected": [
+    {
+      "text": "Enforce minimum 80% line coverage as a CI gate \u2014 builds fail below this threshold. Floor, not target; critical paths should approach 100%",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Team-agreed CI policy following three regressions caused by untested code.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "logging-standardization-2026-01",
+  "input_text": "Switching all our logging to structured JSON format. The current state is a mess \u2014 some services log plain text, some log semi-structured messages, some add fields inconsistently. Feeding this into our log aggregator (Loki) for querying is painful.\n\nNew standard: all log entries will be JSON objects with these fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (service name from env), trace_id (from request context when available), user_id (when applicable, omitted for unauthenticated requests), message (human-readable description).\n\nThis will let us do structured queries like \"show me all ERROR logs for trace_id X across all services\" instead of grep-based text search.",
+  "expected": [
+    {
+      "text": "All service logs must be structured JSON with required fields: timestamp (ISO 8601), level, service, trace_id, user_id (when applicable), message",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Logging standard / team policy \u2014 required field schema.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

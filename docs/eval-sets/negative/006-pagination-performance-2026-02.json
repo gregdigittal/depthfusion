@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "pagination-performance-2026-02",
+  "input_text": "Had OFFSET-based pagination on the products table. Page 1 was fast. Page 200 (items 3,981-4,000 in a sorted list of 2 million products) was taking 15 seconds \u2014 the database fetches rows 1 through 4,000 and discards the first 3,980 every time.\n\nReplaced with keyset pagination: WHERE id > {last_seen_id} ORDER BY id LIMIT 20. The index lookup is instant regardless of which \"page\" you're on. Page 1 and page 50,000 are equally fast.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "OFFSET-based pagination on the products table",
+      "why": "At deep pages, the DB has to fetch-and-discard the leading rows on every request \u2014 page 200 of 20 took 15s on a 2M-row table. Replaced with keyset pagination (WHERE id > last_seen_id ORDER BY id LIMIT 20), constant cost regardless of page."
+    }
+  ],
+  "reviewer_notes": "System is explicitly no longer using OFFSET pagination because of this experience.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

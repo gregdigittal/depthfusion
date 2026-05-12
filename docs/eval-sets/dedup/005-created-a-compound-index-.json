@@ -1,0 +1,9 @@
+{
+  "schema": "dedup/v1",
+  "label": "true-dup",
+  "a": "Created a compound index on events(tenant_id, created_at DESC). The slow queries were all in the pattern SELECT * FROM events WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 100. The compound index satisfies both the filter and the sort without a separate sort step.",
+  "b": "Added index idx_events_tenant_time on events(tenant_id, created_at DESC). This was the missing index for the tenant-scoped time-ordered event fetches. Before: 4.2 seconds (full table scan + sort on 40M rows). After: 18 ms (index-only scan).",
+  "reviewer_notes": "Both describe the same compound index events(tenant_id, created_at DESC) for the same slow-query pattern.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

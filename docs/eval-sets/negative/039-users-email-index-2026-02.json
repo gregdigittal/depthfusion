@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "users-email-index-2026-02",
+  "input_text": "Users were reporting slow login times (3+ seconds). Database profiling showed the login query (SELECT id, password_hash FROM users WHERE email = ?) was doing a sequential scan on 2 million user rows.\n\nAdded a unique B-tree index on users(email). Login query time: 3 seconds to under 10 milliseconds.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Resolved slow-login bug by adding a unique index on users(email). Pure performance bug fix.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

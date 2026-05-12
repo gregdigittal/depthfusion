@@ -1,0 +1,10 @@
+{
+  "schema": "negative/v1",
+  "source_session": "mongodb-odm-evaluation-2026-03",
+  "input_text": "Started using Mongoose as the ODM (Object Document Mapper) for our MongoDB-backed product catalog service. Mongoose adds schema validation and a familiar ActiveRecord-style API.\n\nProblem: our reporting queries are relational \u2014 \"give me all products in category X that have had at least 3 orders in the last 30 days, grouped by supplier.\" In MongoDB + Mongoose, this requires complex $lookup aggregation pipelines.\n\nConsidering moving to the native MongoDB Node.js driver directly, which at least makes the aggregation pipeline code more legible without the ODM abstraction pretending the data is not a document store.",
+  "expected_type": "positive",
+  "expected_negatives": [],
+  "reviewer_notes": "Borderline, but per the guide's strict test: the system is currently STILL using Mongoose \u2014 the author writes 'Considering moving' rather than committing to abandon it. Limitation noted without abandoning anything \u2192 NOT a genuine negative.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

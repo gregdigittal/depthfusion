@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "file-upload-progress-2026-03",
+  "input_text": "Implemented server-sent events (SSE) to stream file upload progress to the browser. Worked perfectly locally. Broke completely in staging.\n\nThe issue: our Nginx proxy has a proxy_request_buffering directive that buffers the entire request body before forwarding it to the application. The upload is complete before we even see the first byte. SSE for upload progress is pointless when the proxy is buffering the upload.\n\nAlso, Nginx has a 60-second proxy timeout. Large uploads were being killed mid-transfer.\n\nSwitched to a polling approach: the client sends the file, gets a task ID back, then polls /tasks/{id}/status every second.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Server-Sent Events (SSE) for streaming file upload progress to the browser",
+      "why": "Nginx's proxy_request_buffering buffers the full request body before forwarding, so the upload is complete before the application sees the first byte \u2014 progress streaming is pointless. The 60s proxy timeout also killed large uploads. Switched to polling (/tasks/{id}/status)."
+    }
+  ],
+  "reviewer_notes": "Two concrete Nginx behaviours killed the approach.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

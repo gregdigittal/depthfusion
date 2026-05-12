@@ -1,0 +1,15 @@
+{
+  "schema": "negative/v1",
+  "source_session": "jwt-payload-design-2026-02",
+  "input_text": "Stored all user permissions and role memberships in the JWT payload so the API gateway could validate authorization without hitting a backend service. An enterprise user with many roles had a JWT payload that expanded to 6-8KB.\n\nThis caused two problems: the 4KB limit on cookie storage (browsers refuse to set the cookie), and the 8KB HTTP header limit (nginx was returning 400 errors).\n\nSwitched to minimal JWT claims (user_id, issued_at, expiry). Permissions are cached in Redis with a 5-minute TTL, keyed by user_id.",
+  "expected_type": "negative",
+  "expected_negatives": [
+    {
+      "what": "Storing the full user permission/role set inside the JWT payload",
+      "why": "Enterprise users with many roles produced 6\u20138 KB JWTs, which broke the 4 KB cookie storage limit (browsers refuse to set them) and the 8 KB HTTP header limit (Nginx returned 400). Switched to minimal JWT claims + Redis-cached permissions with a 5-min TTL keyed by user_id."
+    }
+  ],
+  "reviewer_notes": "Two concrete byte limits drove the rejection.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

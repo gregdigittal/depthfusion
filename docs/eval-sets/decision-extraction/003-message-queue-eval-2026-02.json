@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "message-queue-eval-2026-02",
+  "input_text": "Evaluated RabbitMQ vs Kafka for the order processing pipeline. Here's my conclusion:\n\nKafka is clearly more powerful for high-throughput event streaming at scale \u2014 it's designed for millions of messages per second with long-term replay capability. But that power comes with significant operational complexity: we'd need to manage partitions, consumer groups, offset tracking, and a ZooKeeper or KRaft cluster.\n\nOur current load is roughly 2,000 orders per day. Kafka is seriously overengineered for this. RabbitMQ is simpler to operate, the team already has experience with it, and it handles our throughput easily. We're going with RabbitMQ for the order processing pipeline.",
+  "expected": [
+    {
+      "text": "RabbitMQ chosen over Kafka for the order processing pipeline (Kafka overengineered for ~2k orders/day; team has RabbitMQ experience)",
+      "category": "stack-choice"
+    }
+  ],
+  "reviewer_notes": "Classic technology choice between two alternatives with clear rationale.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

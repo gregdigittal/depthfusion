@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "pagination-migration-2026-01",
+  "input_text": "Replacing OFFSET-based pagination with keyset (cursor) pagination across the API.\n\nThe problem with OFFSET: to return page 50 with 20 items per page, the database fetches 1,020 rows and discards the first 1,000. At page 50 that's wasteful. At page 5,000, it's unusable \u2014 we were seeing 15+ second queries on large tables.\n\nKeyset pagination uses WHERE id > last_seen_id (or a similar condition on an indexed column). The database does a single index lookup to find the starting position, then reads forward. Cost is constant regardless of which page you're on.\n\nTrade-off: you lose the ability to jump to an arbitrary page number (page 47 of search results). Our API consumers have told us they don't need this \u2014 they paginate forward through results sequentially.",
+  "expected": [
+    {
+      "text": "Replace OFFSET-based pagination with keyset (cursor) pagination across the API \u2014 accept the loss of arbitrary-page jump (confirmed acceptable with API consumers)",
+      "category": "refactor"
+    }
+  ],
+  "reviewer_notes": "Codebase-wide refactor direction with an explicit trade-off acknowledged.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

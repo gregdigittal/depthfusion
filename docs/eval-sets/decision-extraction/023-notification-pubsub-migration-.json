@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "notification-pubsub-migration-2026-03",
+  "input_text": "Moving the notification system from polling to event-driven pub/sub.\n\nThe current system: the frontend polls /api/notifications every 5 seconds for new notifications. This means each of our 10,000 active users is hitting our API 720 times per hour for notification checks, whether or not anything has changed. That's 7.2 million polling requests per hour, most of which return empty.\n\nNew system: Redis pub/sub. When an event occurs that generates a notification (order status change, new message, etc.), the backend publishes to a user-specific Redis channel. Users have a persistent connection that subscribes to their channel. Notifications arrive in under 100ms and we eliminate 99%+ of polling traffic.",
+  "expected": [
+    {
+      "text": "Replace 5s frontend polling of /api/notifications with Redis pub/sub over a persistent connection per user \u2014 eliminates ~99% of polling traffic",
+      "category": "architecture"
+    }
+  ],
+  "reviewer_notes": "Architectural shift from polling to event-driven delivery.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

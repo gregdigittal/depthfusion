@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "job-idempotency-policy-2026-02",
+  "input_text": "Establishing a policy for background jobs: all jobs must be idempotent.\n\nIdempotent means: running a job twice with the same input produces the same result as running it once. No double-charges, no duplicate emails, no double-counting.\n\nThis matters because our job queue (RabbitMQ with manual acknowledgment) guarantees at-least-once delivery. Under some failure conditions (network partition between the worker and RabbitMQ, worker crash after processing but before acknowledgment), a job can be delivered more than once.\n\nImplementation requirement: every job handler must have a mechanism to detect and safely handle duplicate deliveries. Options include idempotency keys in the database, checking for existing results before executing, or using database unique constraints to reject duplicate inserts.",
+  "expected": [
+    {
+      "text": "All background jobs must be idempotent \u2014 handlers must safely tolerate at-least-once delivery (idempotency keys, existence checks, or DB unique constraints)",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Mandatory engineering rule driven by RabbitMQ at-least-once delivery semantics.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

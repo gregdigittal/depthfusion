@@ -1,0 +1,9 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "database-index-optimization-2026-03",
+  "input_text": "Added a compound index on (tenant_id, created_at DESC) to the events table.\n\nThe slow queries were all doing tenant-scoped event fetches ordered by time \u2014 something like \"give me the last 100 events for tenant X.\" Without the index, PostgreSQL was doing a full table scan and sort. The table has 40M rows.\n\nWith the compound index, PostgreSQL can use a single index scan to both filter by tenant and return results in order. Query time dropped from 4.2 seconds to 18 milliseconds in our test environment.",
+  "expected": [],
+  "reviewer_notes": "Pure performance optimization \u2014 adding an index for an obvious slow query pattern. No architectural choice between alternatives is recorded.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}

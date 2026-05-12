@@ -1,0 +1,14 @@
+{
+  "schema": "decision-extraction/v1",
+  "source_session": "canary-deployment-design-2026-01",
+  "input_text": "Setting up the canary deployment process for production releases.\n\nNew deployments will follow this traffic split progression: 5% \u2192 20% \u2192 50% \u2192 100%. We wait 30 minutes at each stage and monitor error rate and p99 latency. If either metric spikes more than 10% above the baseline during any stage, the load balancer automatically shifts 100% of traffic back to the previous version.\n\nThe routing is implemented at the Kong load balancer level using weighted upstream targets. We're not using feature flags or user-segment routing \u2014 it's pure traffic splitting.",
+  "expected": [
+    {
+      "text": "Canary deployment process: 5% \u2192 20% \u2192 50% \u2192 100% with 30-minute observation windows; auto-rollback at Kong if error rate or p99 latency rises >10% above baseline",
+      "category": "policy"
+    }
+  ],
+  "reviewer_notes": "Deployment process / release policy.",
+  "labelled_by": "human",
+  "labelled_at": "2026-05-12T10:34:01.470Z"
+}
