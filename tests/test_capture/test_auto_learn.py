@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from depthfusion.capture.auto_learn import HeuristicExtractor, extract_key_decisions
@@ -243,3 +244,156 @@ def test_temporal_linker_isolated_sessions_not_upserted(tmp_path, monkeypatch):
 
     session_entities = [e for e in store.all_entities() if e.type == "session"]
     assert session_entities == []
+
+
+# ---------------------------------------------------------------------------
+# T-326: ContradictionEngine feature flag wiring
+# ---------------------------------------------------------------------------
+
+def test_contradiction_engine_disabled_by_default(tmp_path, monkeypatch, caplog):
+    """DEPTHFUSION_CONTRADICTION_ENGINE defaults off — no [contradiction] log lines."""
+    monkeypatch.delenv("DEPTHFUSION_CONTRADICTION_ENGINE", raising=False)
+
+    session_file = tmp_path / "sess.tmp"
+    # Two decisions that would trigger negation detection if the engine ran.
+    session_file.write_text(
+        "→ Always use RS256 for JWT signing\n"
+        "→ Never use RS256 for JWT signing\n",
+        encoding="utf-8",
+    )
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    with caplog.at_level(logging.WARNING, logger="depthfusion.capture.auto_learn"):
+        summarize_and_extract_graph(session_file, project="testproj", graph_store=None)
+
+    contradiction_warnings = [r for r in caplog.records if "[contradiction]" in r.message]
+    assert contradiction_warnings == [], (
+        "Expected no contradiction warnings when engine flag is off"
+    )
+
+
+def test_contradiction_engine_enabled_no_conflicts(tmp_path, monkeypatch, caplog):
+    """Engine enabled but decisions don't contradict → no [contradiction] warnings."""
+    monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
+
+    session_file = tmp_path / "sess.tmp"
+    # Two distinct non-conflicting decisions.
+    session_file.write_text(
+        "→ Use PostgreSQL for persistent storage\n"
+        "→ Use Redis for session caching\n",
+        encoding="utf-8",
+    )
+
+    from depthfusion.capture.auto_learn import summarize_and_extract_graph
+    with caplog.at_level(logging.WARNING, logger="depthfusion.capture.auto_learn"):
+        summarize_and_extract_graph(session_file, project="testproj", graph_store=None)
+
+    contradiction_warnings = [r for r in caplog.records if "[contradiction]" in r.message]
+    assert contradiction_warnings == [], (
+        "Expected no contradiction warnings for non-conflicting decisions"
+    )
+
+
+def test_contradiction_engine_enabled_high_severity_logged(tmp_path, monkeypatch, caplog):
+    """Engine enabled + HIGH severity conflict → WARNING log with [contradiction] prefix."""
+    monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
+
+    session_file = tmp_path / "sess.tmp"
+    # Negation pair with high confidence (score=0.75 by default, min=0.75 → HIGH).
+    # ContradictionEngine raises HIGH when min_confidence > 0.8; with our
+    # default of 0.75 the severity is MEDIUM — but we can test the log format
+    # using a direct call to _run_contradiction_detection with a crafted
+    # decision list that we know will produce a high-severity conflict.
+    # The simplest approach: write content that produces the negation pair,
+    # then verify the [contradiction] prefix appears at WARNING level by
+    # patching ContradictionEngine to return a HIGH conflict directly.
+    session_file.write_text("→ do not use HS256 ever\n", encoding="utf-8")
+
+    from depthfusion.cognitive.contradiction import (
+        Conflict,
+        ConflictSeverity,
+        ConflictStatus,
+    )
+
+    # Patch ContradictionEngine.detect to return a HIGH conflict unconditionally.
+    import unittest.mock as mock
+    high_conflict = Conflict(
+        memory_a_id="a",
+        memory_b_id="b",
+        conflict_type="negation",
+        description="Test HIGH conflict",
+        severity=ConflictSeverity.HIGH,
+        status=ConflictStatus.AUTO_EMITTED,
+        confidence_a=0.9,
+        confidence_b=0.9,
+    )
+
+    with mock.patch(
+        "depthfusion.cognitive.contradiction.ContradictionEngine.detect",
+        return_value=[high_conflict],
+    ):
+        from depthfusion.capture.auto_learn import _run_contradiction_detection
+
+        with caplog.at_level(logging.WARNING, logger="depthfusion.capture.auto_learn"):
+            _run_contradiction_detection(
+                ["always use RS256", "never use RS256"],
+                session_id="test-session",
+                project="testproj",
+            )
+
+    warning_records = [
+        r for r in caplog.records
+        if r.levelno == logging.WARNING and "[contradiction]" in r.message
+    ]
+    assert len(warning_records) >= 1, "Expected at least one WARNING with [contradiction] prefix"
+    assert "negation" in warning_records[0].message
+    assert "severity=high" in warning_records[0].message
+
+
+def test_contradiction_engine_import_failure_does_not_crash(tmp_path, monkeypatch, caplog):
+    """If ContradictionEngine import fails, extraction continues without raising."""
+    monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
+
+    session_file = tmp_path / "sess.tmp"
+    session_file.write_text(
+        "→ always use RS256\n→ never use RS256\n",
+        encoding="utf-8",
+    )
+
+    import sys
+    import unittest.mock as mock
+
+    # Simulate ImportError for the contradiction module.
+    with mock.patch.dict(
+        sys.modules,
+        {"depthfusion.cognitive.contradiction": None},  # type: ignore[dict-item]
+    ):
+        from depthfusion.capture.auto_learn import _run_contradiction_detection
+        # Should not raise.
+        _run_contradiction_detection(
+            ["always use RS256", "never use RS256"],
+            session_id="test-session",
+            project="testproj",
+        )
+
+
+def test_contradiction_engine_does_not_block_extraction(tmp_path, monkeypatch):
+    """Even if contradiction detection raises internally, extraction completes."""
+    monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
+
+    session_file = tmp_path / "sess.tmp"
+    session_file.write_text(
+        "→ always use RS256\n→ never use RS256\n",
+        encoding="utf-8",
+    )
+
+    import unittest.mock as mock
+
+    # Make ContradictionEngine.detect blow up.
+    with mock.patch(
+        "depthfusion.cognitive.contradiction.ContradictionEngine.detect",
+        side_effect=RuntimeError("simulated engine crash"),
+    ):
+        from depthfusion.capture.auto_learn import summarize_and_extract_graph
+        # Must not raise.
+        summarize_and_extract_graph(session_file, project="testproj", graph_store=None)

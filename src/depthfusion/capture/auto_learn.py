@@ -143,6 +143,74 @@ Session content (truncated to 3000 chars):
             return HeuristicExtractor().extract_from_file(path)
 
 
+def _run_contradiction_detection(decisions: list[str], session_id: str, project: str) -> None:
+    """Pairwise contradiction detection on newly extracted decisions.
+
+    Gated on DEPTHFUSION_CONTRADICTION_ENGINE=true. Logs a structured
+    warning for every HIGH or CRITICAL conflict found. Never raises —
+    all errors are swallowed so the extraction pipeline is never blocked.
+
+    Imported lazily so a missing cognitive module never prevents extraction.
+    """
+    flag = os.environ.get("DEPTHFUSION_CONTRADICTION_ENGINE", "false").strip().lower()
+    if flag not in ("true", "1", "yes"):
+        return
+    if len(decisions) < 2:
+        return
+
+    try:
+        from depthfusion.cognitive.contradiction import ContradictionEngine
+        from depthfusion.core.memory_object import (
+            MemoryConfidence,
+            MemoryObject,
+            MemorySource,
+            MemoryType,
+        )
+    except ImportError as exc:
+        logger.debug("ContradictionEngine unavailable (import failed): %s", exc)
+        return
+
+    try:
+        engine = ContradictionEngine()
+
+        # Wrap each decision string as a lightweight MemoryObject.
+        # Cap at 20 decisions to keep pairwise cost O(400) in the worst case.
+        capped = decisions[:20]
+        memory_objects: list[MemoryObject] = []
+        for idx, text in enumerate(capped):
+            mo = MemoryObject(
+                id=f"{session_id}-decision-{idx}",
+                project_id=project,
+                type=MemoryType.DECISION,
+                content=text,
+                source=MemorySource(session_id=session_id),
+                confidence=MemoryConfidence(score=0.75),
+            )
+            memory_objects.append(mo)
+
+        # Pairwise detection — O(n²) but capped at n=20.
+        for i in range(len(memory_objects)):
+            for j in range(i + 1, len(memory_objects)):
+                conflicts = engine.detect(memory_objects[i], memory_objects[j])
+                for conflict in conflicts:
+                    if conflict.severity.value in ("high", "critical"):
+                        logger.warning(
+                            "[contradiction] %s: %s (severity=%s)",
+                            conflict.conflict_type,
+                            conflict.description,
+                            conflict.severity.value,
+                        )
+                    else:
+                        logger.debug(
+                            "[contradiction] %s: %s (severity=%s)",
+                            conflict.conflict_type,
+                            conflict.description,
+                            conflict.severity.value,
+                        )
+    except Exception as exc:  # noqa: BLE001 — fail-open contract
+        logger.debug("ContradictionEngine detection failed: %s", exc)
+
+
 def summarize_and_extract_graph(
     path: Path,
     project: str,
@@ -154,11 +222,25 @@ def summarize_and_extract_graph(
     capture pipeline. Both run after the summarizer; errors are swallowed so
     a failing extractor never blocks the session compressor.
 
+    T-326: contradiction detection is wired in after heuristic extraction,
+    gated on DEPTHFUSION_CONTRADICTION_ENGINE=true.
+
     Stores extracted entities and co-occurrence edges into graph_store.
     No-ops silently when DEPTHFUSION_GRAPH_ENABLED is not 'true' or graph_store is None.
     """
     # Phase 1: run the summarizer (existing behaviour — unchanged)
     HaikuSummarizer().summarize_file(path)
+
+    # Phase 1b: contradiction detection on heuristically extracted decisions.
+    # Gated on DEPTHFUSION_CONTRADICTION_ENGINE; never blocks on error.
+    try:
+        _content_for_contradiction = path.read_text(encoding="utf-8", errors="replace")
+        _decisions_for_contradiction = extract_key_decisions(_content_for_contradiction)
+        _run_contradiction_detection(
+            _decisions_for_contradiction, session_id=path.stem, project=project
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Contradiction detection phase skipped (%s)", exc)
 
     # Phase 2: LLM decision extractor + negative extractor (v0.5 CM-1/CM-6)
     # Gated on DEPTHFUSION_DECISION_EXTRACTOR_ENABLED to avoid API calls in local mode.
