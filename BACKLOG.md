@@ -1086,8 +1086,9 @@
 - [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%) — **execution blocked on AC-1/2/3 population**
 
 **Tasks:**
-- [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) is the remaining labour.
+- [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) pending T-346 labelling session.
 - [x] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow) — 175-line methodology doc + per-set READMEs covering schema, edge cases, running the measurements
+- [x] T-346: Build interactive labelling tool — `docs/eval-sets/labeller.html` (single self-contained HTML; 50 DE + 30 DD + 40 NEG examples pre-loaded; localStorage persistence; exports de-gold.json / dd-gold.json / neg-gold.json in schema-compliant format)
 
 ### S-66: As a post-migration operator, I want a vps-gpu CIQS baseline so that the S-43/S-44 latency and quality ACs can be validated on the real GPU hardware `P1` `S` [done]
 

@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion Eval Labeller</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#c9d1d9;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button{cursor:pointer;font-size:14px;border:none;border-radius:6px;padding:8px 16px;transition:opacity .15s}
+button:hover{opacity:.85}
+button:disabled{opacity:.4;cursor:not-allowed}
+textarea{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical;font-family:inherit}
+textarea:focus{outline:none;border-color:#388bfd}
+select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 8px;font-size:13px}
+select:focus{outline:none;border-color:#388bfd}
+input[type=checkbox]{accent-color:#388bfd;width:16px;height:16px}
+input[type=text]{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 8px;font-size:13px;width:100%}
+input[type=text]:focus{outline:none;border-color:#388bfd}
+#tabbar{display:flex;background:#161b22;border-bottom:1px solid #30363d;padding:0 16px;flex-shrink:0}
+.tab{padding:12px 20px;cursor:pointer;color:#8b949e;font-size:14px;font-weight:500;border-bottom:2px solid transparent;transition:color .15s;white-space:nowrap}
+.tab:hover{color:#c9d1d9}
+.tab.active{color:#388bfd;border-bottom-color:#388bfd}
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:260px;flex-shrink:0;background:#161b22;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden}
+#guide{padding:14px;border-bottom:1px solid #30363d;font-size:12px;line-height:1.6;color:#8b949e;overflow-y:auto;flex-shrink:0;max-height:220px}
+#guide h3{color:#c9d1d9;font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
+#guide .yes{color:#3fb950;font-weight:600}
+#guide .no{color:#f85149;font-weight:600}
+#guide p{margin-bottom:6px}
+#guide strong{color:#c9d1d9}
+#progress-section{padding:14px;overflow-y:auto;flex:1}
+#progress-section h3{color:#8b949e;font-size:11px;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+#dot-grid{display:flex;flex-wrap:wrap;gap:5px}
+.dot{width:18px;height:18px;border-radius:4px;background:#21262d;cursor:pointer;transition:background .15s}
+.dot:hover{background:#30363d}
+.dot.done{background:#1a4a1a;border:1px solid #3fb950}
+.dot.skipped{background:#4a3a00;border:1px solid #9e6a03}
+.dot.current{outline:2px solid #388bfd;outline-offset:1px}
+.dot.done-current{background:#1a4a1a;border:1px solid #3fb950;outline:2px solid #388bfd;outline-offset:1px}
+.dot.skipped-current{background:#4a3a00;border:1px solid #9e6a03;outline:2px solid #388bfd;outline-offset:1px}
+#content{flex:1;overflow-y:auto;padding:20px}
+#item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+#item-id{font-size:12px;color:#8b949e;font-family:monospace}
+#item-count{font-size:12px;color:#8b949e}
+#session-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:280px;overflow-y:auto;color:#e6edf3}
+.session-label{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.no-decision-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:6px}
+.no-decision-row label{font-size:13px;color:#c9d1d9;cursor:pointer}
+#decision-list{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.decision-row{display:flex;gap:8px;align-items:flex-start;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px}
+.dec-num{font-size:12px;color:#8b949e;min-width:24px;padding-top:7px;font-weight:600;flex-shrink:0}
+.dec-text{flex:1}
+.dec-cat{width:150px;flex-shrink:0}
+.remove-btn{background:#21262d;color:#f85149;border:1px solid #30363d;padding:6px 10px;font-size:12px;border-radius:4px;flex-shrink:0}
+.remove-btn:hover{background:#2d1a1a}
+#add-decision-btn{background:#21262d;color:#388bfd;border:1px solid #30363d;font-size:13px;padding:7px 14px;border-radius:6px}
+.pair-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.pair-panel{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;font-size:13px;line-height:1.6;white-space:pre-wrap;color:#e6edf3;min-height:140px}
+.pair-panel-label{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.dd-buttons{display:flex;gap:12px;margin-bottom:16px}
+.dd-btn{flex:1;padding:14px;font-size:15px;font-weight:600;border-radius:8px}
+.dd-btn-dup{background:#1a3a1a;color:#3fb950;border:2px solid #3fb950}
+.dd-btn-dup.selected{background:#2a5a2a}
+.dd-btn-notdup{background:#3a1a1a;color:#f85149;border:2px solid #f85149}
+.dd-btn-notdup.selected{background:#5a2a2a}
+.neg-buttons{display:flex;gap:12px;margin-bottom:16px}
+.neg-btn{flex:1;padding:14px;font-size:15px;font-weight:600;border-radius:8px}
+.neg-btn-yes{background:#1a3a1a;color:#3fb950;border:2px solid #3fb950}
+.neg-btn-yes.selected{background:#2a5a2a}
+.neg-btn-no{background:#3a1a1a;color:#f85149;border:2px solid #f85149}
+.neg-btn-no.selected{background:#5a2a2a}
+#neg-list{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.neg-row{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.neg-row-header{display:flex;align-items:center;justify-content:space-between}
+.neg-row-num{font-size:12px;font-weight:600;color:#8b949e}
+.neg-row-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.neg-field label{font-size:11px;color:#8b949e;display:block;margin-bottom:4px}
+#add-neg-btn{background:#21262d;color:#388bfd;border:1px solid #30363d;font-size:13px;padding:7px 14px;border-radius:6px;margin-bottom:12px}
+.notes-label{font-size:12px;color:#8b949e;margin-bottom:6px;font-weight:600}
+#notes-area{width:100%;height:72px;margin-bottom:16px}
+#action-bar{display:flex;gap:10px;align-items:center;padding:14px 20px;background:#161b22;border-top:1px solid #30363d;flex-shrink:0}
+#btn-prev{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+#btn-next{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+#btn-skip{background:#21262d;color:#9e6a03;border:1px solid #9e6a03}
+#btn-save{background:#388bfd;color:#fff;font-weight:600;padding:8px 24px}
+#btn-export{background:#21262d;color:#3fb950;border:1px solid #3fb950;margin-left:auto}
+#save-status{font-size:12px;color:#3fb950;opacity:0;transition:opacity .5s}
+.neg-hint{margin-bottom:8px;font-size:13px;color:#8b949e}
+</style>
+</head>
+<body>
+
+<div id="tabbar">
+  <div class="tab active" data-tab="de" onclick="switchTab('de')">Decision Extraction (<span id="de-count">0</span>/50)</div>
+  <div class="tab" data-tab="dd" onclick="switchTab('dd')">Dedup (<span id="dd-count">0</span>/30)</div>
+  <div class="tab" data-tab="neg" onclick="switchTab('neg')">Negative Signal (<span id="neg-count">0</span>/40)</div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="guide"></div>
+    <div id="progress-section">
+      <h3>Progress</h3>
+      <div id="dot-grid"></div>
+    </div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <div id="content">
+      <div id="item-header">
+        <span id="item-id"></span>
+        <span id="item-count"></span>
+      </div>
+      <div class="session-label" id="session-label">Session text</div>
+      <div id="session-box"></div>
+      <div id="form-area"></div>
+      <div class="notes-label">Notes (optional)</div>
+      <textarea id="notes-area" placeholder="Any notes about this example..."></textarea>
+    </div>
+    <div id="action-bar">
+      <button id="btn-prev" onclick="navigate(-1)">← Prev</button>
+      <button id="btn-next" onclick="navigate(1)">Next →</button>
+      <button id="btn-skip" onclick="skipItem()">Skip</button>
+      <button id="btn-save" onclick="saveItem()">Save</button>
+      <span id="save-status">Saved ✓</span>
+      <button id="btn-export" onclick="exportAll()">Export JSON</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const DE_DATA = [
+{id:'de-001',session:'authentication-design-2026-03',text:`After a long discussion about session management approaches, I've settled on the following design for our authentication system.
+
+For the main user-facing application, I'm going with Redis-backed sessions. The key advantage here is instant revocation — if a user's account is compromised or they click "sign out all devices," we can delete the session from Redis and it's gone immediately. JWTs can't be revoked before they expire, which means a stolen token stays valid for its entire lifetime. For users logging into our main app, that risk is unacceptable.
+
+For the public API where external partners are integrating, I'm keeping JWTs. Partners build integrations that run autonomously without a user present — they need a credential they can use without hitting our servers for every request. The stateless nature of JWTs is exactly right here.
+
+On top of this, I'm establishing a rotation policy: session tokens must rotate on every single request. Each API call invalidates the previous session token and issues a new one. This means a captured token from packet sniffing or logging is useless by the time an attacker tries to use it.`},
+{id:'de-002',session:'search-endpoint-2026-03',text:`Added the full-text search endpoint for product listings. It takes a query string, applies the existing BM25 ranking we use everywhere else in the codebase, filters out products with inactive status, and returns paginated results.
+
+I used the same cursor pagination pattern as the /users and /orders endpoints — there's no new pagination logic here, just plugging the existing CursorPaginator class into the search results. The query parsing and sanitization follows the same approach as the admin search endpoint introduced last month.
+
+Tests pass, nothing new to document architecturally.`},
+{id:'de-003',session:'message-queue-eval-2026-02',text:`Evaluated RabbitMQ vs Kafka for the order processing pipeline. Here's my conclusion:
+
+Kafka is clearly more powerful for high-throughput event streaming at scale — it's designed for millions of messages per second with long-term replay capability. But that power comes with significant operational complexity: we'd need to manage partitions, consumer groups, offset tracking, and a ZooKeeper or KRaft cluster.
+
+Our current load is roughly 2,000 orders per day. Kafka is seriously overengineered for this. RabbitMQ is simpler to operate, the team already has experience with it, and it handles our throughput easily. We're going with RabbitMQ for the order processing pipeline.`},
+{id:'de-004',session:'api-versioning-setup-2026-01',text:`Set up the versioning scheme for the new public API. I evaluated two main approaches:
+
+Header-based versioning (Accept: application/vnd.myapi.v1+json): Cleaner from a REST purist perspective, but URLs aren't self-describing, it's harder to test with a browser or Postman, and it's a pain to share with partners in documentation.
+
+URL path versioning (/api/v1/...): The URL itself tells you everything. Easy to test, easy to document, easy to share. Partners can see immediately which version they're calling.
+
+Going with URL path versioning. All endpoints will live under /api/v1/ prefix.`},
+{id:'de-005',session:'jwt-algorithm-migration-2026-02',text:`Changing our JWT signing algorithm from HS256 to RS256. Here's the problem we're solving:
+
+HS256 uses a shared secret key — the same key is used to both sign tokens (auth service) and verify them (API gateway, three microservices). That means all five services need access to the same secret. If any one of those five is compromised, the attacker can forge tokens for any user.
+
+RS256 uses a public/private key pair. Only the auth service holds the private key and signs tokens. Everyone else just needs the public key to verify. Sharing a public key is fine — you can publish it openly. The private key stays in one place.
+
+This change doesn't affect what's inside the tokens, just how they're signed and verified.`},
+{id:'de-006',session:'rate-limiting-architecture-2026-03',text:`Decision on where rate limiting lives in the stack.
+
+The option was between implementing it in each microservice individually versus putting it at the API gateway layer (we're using Kong). Service-level rate limiting would mean each team maintains their own, with different implementations and no shared state — a request could get rate-limited by service A but not service B even if the underlying user is hammering the API.
+
+Centralized at Kong, all services automatically get rate limiting protection. The rate limit state is stored in Redis behind Kong and is consistent across the entire cluster. New services get protection for free as soon as they're registered.
+
+Going with Kong-level rate limiting.`},
+{id:'de-007',session:'null-reference-bugfix-2026-02',text:`Found and fixed a NullPointerException in the authentication middleware chain. The bug was triggered when a request came in with a valid session token but the corresponding user record had been deleted from the database — an edge case we hadn't handled.
+
+The middleware was calling user.getProfile() before checking if user was null. Moved the null check to happen before any method calls. Added a test case that exercises this exact scenario.
+
+All 47 middleware tests now pass. This was a pure bug fix, no design decisions involved.`},
+{id:'de-008',session:'database-index-optimization-2026-03',text:`Added a compound index on (tenant_id, created_at DESC) to the events table.
+
+The slow queries were all doing tenant-scoped event fetches ordered by time — something like "give me the last 100 events for tenant X." Without the index, PostgreSQL was doing a full table scan and sort. The table has 40M rows.
+
+With the compound index, PostgreSQL can use a single index scan to both filter by tenant and return results in order. Query time dropped from 4.2 seconds to 18 milliseconds in our test environment.`},
+{id:'de-009',session:'caching-layer-design-2026-01',text:`Designed the caching strategy for the application. Two separate concerns, two different solutions:
+
+User profile data: This changes infrequently but is read on nearly every authenticated request. Using Redis with a 5-minute TTL. Redis is already in our stack. LRU eviction policy so the cache naturally prioritizes frequently-accessed profiles. When a profile is updated, we explicitly delete the cache key rather than waiting for TTL.
+
+Static assets (product images, icons, CSS, JS): These don't change except on deployment. Pushing these to CloudFront CDN with a 7-day cache. CDN handles geographic distribution and takes the load off our origin servers entirely. We'll use cache-busting via filename hashing in the build pipeline so deploys get fresh assets.`},
+{id:'de-010',session:'test-isolation-design-2026-02',text:`Had a long team discussion about how to handle test isolation. The core problem: our integration tests were sharing state — if test A creates some data and test B reads from the database, B might see A's data and pass or fail for the wrong reason.
+
+Option 1: Wrap each test in a transaction and roll it back at the end. Fast (no actual disk writes), but doesn't work for tests that have side effects spanning multiple transactions.
+
+Option 2: Wipe and re-seed the database before each test. Slower, but completely reliable — each test starts from a known clean state.
+
+We went with option 2. The test suite takes about 40 seconds longer to run than option 1 would, but reliability is worth it. The team agreed: debugging phantom test failures caused by shared state costs more time than the extra 40 seconds.`},
+{id:'de-011',session:'logging-standardization-2026-01',text:`Switching all our logging to structured JSON format. The current state is a mess — some services log plain text, some log semi-structured messages, some add fields inconsistently. Feeding this into our log aggregator (Loki) for querying is painful.
+
+New standard: all log entries will be JSON objects with these fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (service name from env), trace_id (from request context when available), user_id (when applicable, omitted for unauthenticated requests), message (human-readable description).
+
+This will let us do structured queries like "show me all ERROR logs for trace_id X across all services" instead of grep-based text search.`},
+{id:'de-012',session:'notification-service-extract-2026-02',text:`Extracting the notification sending logic out of the main application service. Currently, the 1,200-line AppService class handles everything from business logic to sending emails, Slack messages, and webhooks — it's become unmanageable.
+
+The new NotificationService owns all outbound notification delivery. It exposes one method: send(channel, recipient, template, data). The channel can be 'email', 'slack', or 'webhook'. The caller doesn't need to know how delivery works.
+
+The main service will call NotificationService.send(...) instead of directly calling the email library or Slack SDK. This follows the same pattern we used when we extracted PaymentService last quarter.`},
+{id:'de-013',session:'error-handling-standardization-2026-01',text:`Establishing a standard error handling pattern for external API calls across the codebase.
+
+Currently, errors from external services (payment processor, email provider, analytics API) bubble up as raw exceptions from the SDKs — sometimes a requests.HTTPError, sometimes a custom exception class from the SDK, sometimes a JSON decode error. This makes them hard to handle consistently.
+
+New pattern: all external API calls are wrapped in try/except blocks. Errors are caught and re-raised as our own ExternalCallError class. The class includes three fields: service (which external service), operation (what we were trying to do), and original_error (the raw exception for debugging). This means the rest of the codebase only needs to handle one error type for all external failures.`},
+{id:'de-014',session:'serialization-format-decision-2026-01',text:`Choosing the serialization format for internal service-to-service communication.
+
+JSON is the default but it has overhead: it's text-based, verbose, and parsing is slower than binary formats. For the high-volume internal events that flow between our services (roughly 10,000/second at peak), this adds up.
+
+Evaluated MessagePack: it's a binary format that maps exactly to the same types as JSON (strings, numbers, arrays, maps), but is typically 30-40% smaller and significantly faster to serialize/deserialize. Libraries exist for all our languages (Python, Node.js). The downside is you can't read it with a text editor, but internal service communication doesn't need to be human-readable.
+
+Decision: MessagePack for internal service-to-service traffic. Keep JSON for the external public API where human readability matters.`},
+{id:'de-015',session:'job-idempotency-policy-2026-02',text:`Establishing a policy for background jobs: all jobs must be idempotent.
+
+Idempotent means: running a job twice with the same input produces the same result as running it once. No double-charges, no duplicate emails, no double-counting.
+
+This matters because our job queue (RabbitMQ with manual acknowledgment) guarantees at-least-once delivery. Under some failure conditions (network partition between the worker and RabbitMQ, worker crash after processing but before acknowledgment), a job can be delivered more than once.
+
+Implementation requirement: every job handler must have a mechanism to detect and safely handle duplicate deliveries. Options include idempotency keys in the database, checking for existing results before executing, or using database unique constraints to reject duplicate inserts.`},
+{id:'de-016',session:'cursor-pagination-rollout-2026-02',text:`Added cursor-based pagination to the /orders endpoint. Used the same CursorPaginator class we introduced for /users last sprint.
+
+The /orders endpoint was the last major endpoint still using OFFSET-based pagination. This completes the migration we've been doing progressively across the API. No new architecture decisions here — just applying the established pattern to the remaining endpoint.
+
+Tests pass.`},
+{id:'de-017',session:'pytest-upgrade-2026-01',text:`Upgraded from pytest 7.2 to pytest 8.1. The main motivation was getting access to the improved diff output for failed assertions — 8.x gives much more readable failure messages.
+
+Updated about a dozen deprecated fixture usages (the @pytest.fixture syntax for yield fixtures changed slightly). Ran the full test suite: 487 tests pass, 0 failures. No logic changes to any test or application code, pure tooling upgrade.`},
+{id:'de-018',session:'feature-flag-cleanup-2026-03',text:`Removed the old feature flag infrastructure that was left over from the pre-v0.5 A/B test system.
+
+The old system had a FeatureFlagRegistry class, a flags table in the database, and middleware that checked flags on every request. It was used for three experiments, all of which have been concluded. The new system just reads directly from environment variables — no registry, no database table, no middleware.
+
+Deleted approximately 800 lines of code including the registry, the database migration, the middleware, and all associated tests. This is pure dead code removal.`},
+{id:'de-019',session:'search-perf-investigation-2026-03',text:`Investigated the /search endpoint timeout issues. Users are reporting the search taking 10-15 seconds, sometimes timing out entirely.
+
+Profiled the endpoint with a typical query: found an N+1 query pattern where we load the base product list in one query, then for each product we issue a separate query to load its category, brand, and variant information. For a page of 20 results, that's 60+ database roundtrips per request.
+
+I've identified the problem but haven't fixed it yet. The options are: (1) eager load with JOINs in the initial query, or (2) batch load the related objects in a few IN queries. Need to map out exactly which data is actually used in the search results before choosing, otherwise we risk over-fetching.`},
+{id:'de-020',session:'deployment-runbook-2026-02',text:`Wrote the deployment runbook for the new database migration process. This documents the steps we've been following informally for the last two months:
+
+1. Run migrations in a transaction
+2. Verify row counts match expectations before committing
+3. Keep a rollback SQL script for each migration
+4. Post to #deployments Slack channel before and after
+
+No code changes. This is purely documentation of existing practice.`},
+{id:'de-021',session:'leaderboard-redis-design-2026-02',text:`Designed the data structure for the real-time leaderboard feature.
+
+The naive approach would be to query the database sorted by score for every leaderboard view. But our expected scale is 500,000 users, and we want to refresh the leaderboard every 30 seconds. That's a lot of expensive sort operations.
+
+Redis sorted sets (ZSETs) are purpose-built for this. A ZSET stores members with a numeric score, and operations like ZRANGEBYSCORE (get top N) and ZRANK (get a specific user's rank) run in O(log n) time regardless of the dataset size. For 500k users, that's ~19 operations deep — essentially instant.
+
+Leaderboard writes: when a user's score changes, update the ZSET with ZADD. Leaderboard reads: query the ZSET directly. No database involved in the read path.`},
+{id:'de-022',session:'password-hashing-upgrade-2026-01',text:`Switching the password hashing algorithm for new accounts from bcrypt to argon2id.
+
+Why argon2id: It won the Password Hashing Competition in 2015, it's the current OWASP recommendation, and it has better resistance to GPU-based brute force attacks (bcrypt's memory requirements are fixed; argon2 lets you dial up memory usage, which is what makes GPU cracking expensive).
+
+Existing bcrypt hashes will continue to work — we're not re-hashing on login. We're only applying argon2id to new passwords and password changes going forward.`},
+{id:'de-023',session:'notification-pubsub-migration-2026-03',text:`Moving the notification system from polling to event-driven pub/sub.
+
+The current system: the frontend polls /api/notifications every 5 seconds for new notifications. This means each of our 10,000 active users is hitting our API 720 times per hour for notification checks, whether or not anything has changed. That's 7.2 million polling requests per hour, most of which return empty.
+
+New system: Redis pub/sub. When an event occurs that generates a notification (order status change, new message, etc.), the backend publishes to a user-specific Redis channel. Users have a persistent connection that subscribes to their channel. Notifications arrive in under 100ms and we eliminate 99%+ of polling traffic.`},
+{id:'de-024',session:'analytics-query-engine-2026-02',text:`For the analytics query service, I'm bypassing SQLAlchemy and using raw psycopg2 queries directly.
+
+The analytics queries are genuinely complex: multi-level GROUP BYs, window functions, CTEs with lateral joins. Writing these through SQLAlchemy's ORM layer produces ugly, hard-to-debug SQL that often doesn't match what you wrote in Python. You spend as much time reading EXPLAIN output and translating back to the ORM as you would just writing the SQL directly.
+
+For the analytics service specifically, the queries are written by engineers who are comfortable with SQL, and they're complex enough that the ORM is getting in the way rather than helping. Raw psycopg2 it is.`},
+{id:'de-025',session:'multitenancy-isolation-2026-02',text:`Evaluated three approaches to multi-tenancy isolation:
+
+Database-per-tenant: Complete isolation, easy to comply with data residency requirements. But: N databases to manage, connection pooling complexity, expensive for small tenants.
+
+Schema-per-tenant: Good isolation, single database instance. But: PostgreSQL handles schema proliferation poorly at scale (vacuum costs, migration complexity across hundreds of schemas).
+
+Row-level security (RLS): Single schema, single database. Tenant isolation enforced at the database layer — PostgreSQL literally prevents queries from returning rows belonging to other tenants. Migration scripts run once. Connection pooling is simple.
+
+Going with RLS. The isolation is enforced by the database itself, not by application code that could have bugs. This is the most robust option.`},
+{id:'de-026',session:'canary-deployment-design-2026-01',text:`Setting up the canary deployment process for production releases.
+
+New deployments will follow this traffic split progression: 5% → 20% → 50% → 100%. We wait 30 minutes at each stage and monitor error rate and p99 latency. If either metric spikes more than 10% above the baseline during any stage, the load balancer automatically shifts 100% of traffic back to the previous version.
+
+The routing is implemented at the Kong load balancer level using weighted upstream targets. We're not using feature flags or user-segment routing — it's pure traffic splitting.`},
+{id:'de-027',session:'pagination-migration-2026-01',text:`Replacing OFFSET-based pagination with keyset (cursor) pagination across the API.
+
+The problem with OFFSET: to return page 50 with 20 items per page, the database fetches 1,020 rows and discards the first 1,000. At page 50 that's wasteful. At page 5,000, it's unusable — we were seeing 15+ second queries on large tables.
+
+Keyset pagination uses WHERE id > last_seen_id (or a similar condition on an indexed column). The database does a single index lookup to find the starting position, then reads forward. Cost is constant regardless of which page you're on.
+
+Trade-off: you lose the ability to jump to an arbitrary page number (page 47 of search results). Our API consumers have told us they don't need this — they paginate forward through results sequentially.`},
+{id:'de-028',session:'feature-flag-storage-2026-02',text:`Decided where to store feature flags.
+
+The database approach (storing flags in a database table) is attractive because you can change flags without deploying. But it means your application has a runtime dependency on a database query to decide whether a feature is enabled. If the database is slow or unreachable, feature flag reads can fail. It also creates a hidden config state that's not visible in code review.
+
+Environment variables: simple, explicit, visible in your deployment config, no runtime dependency. To change a flag, you change an env var and redeploy. For our deployment velocity (3-4 deploys per day), this is fast enough.
+
+Going with environment variables.`},
+{id:'de-029',session:'timezone-policy-2026-01',text:`Establishing the project-wide timezone handling rule.
+
+Rule: all timestamps stored in the database are UTC. Period. No timezone conversions happen on the write path. When data is read and displayed to a user, the frontend is responsible for converting UTC to the user's local timezone.
+
+Why: if you store timestamps in local timezones (or mix timezones), you end up with ambiguous data when users travel, when you expand to new markets, or when daylight saving time creates duplicate hours. UTC is unambiguous.
+
+This is a standing rule. Any code that stores a non-UTC timestamp is a bug.`},
+{id:'de-030',session:'api-protocol-split-2026-02',text:`Decided on the API protocol split between internal and external consumers.
+
+Internal frontend (our own team building the dashboard and mobile app): GraphQL. Lets the frontend request exactly the shape of data it needs, reduces over-fetching, and the type system catches mismatches at compile time. The frontend team is comfortable with GraphQL.
+
+External public API (third-party developers integrating with our platform): REST. REST is universally understood, has better tooling support across all languages, and is what partners expect. GraphQL is less familiar to external developers and creates a steeper integration learning curve.`},
+{id:'de-031',session:'cookie-security-fix-2026-02',text:`Discovered and fixed a CSRF (Cross-Site Request Forgery) exposure in our login cookies.
+
+The problem: our session cookies didn't have SameSite set. This means a malicious website could embed a form that POSTs to our API and the browser would include the session cookie with the request — the user's browser sends their credentials to our server on behalf of an attacker.
+
+Fix: Added SameSite=Lax to all session cookies. Lax blocks the dangerous case (cross-site form POSTs, iframe requests) while allowing normal navigation (clicking a link to our site from another page still works).
+
+I also took the opportunity to add Secure (HTTPS-only) and HttpOnly (no JavaScript access) to the cookie attributes.`},
+{id:'de-032',session:'test-coverage-gate-2026-01',text:`Setting a minimum code coverage requirement as a CI gate.
+
+After three incidents where untested code paths caused production regressions, the team agreed we need an enforced floor. CI builds will now fail if overall line coverage drops below 80%.
+
+This doesn't mean 80% is the goal — it's the minimum. Critical paths (authentication, payment processing, data mutations) should be close to 100%. The 80% gate exists to prevent coverage from silently eroding over time.`},
+{id:'de-033',session:'retry-strategy-design-2026-02',text:`Implementing the retry strategy for failed external API calls.
+
+Plain exponential backoff (retry after 1s, 2s, 4s, 8s...) has a problem: if a service goes down and comes back up, all the queued retries fire at exactly the same time and immediately overload the recovering service. This is a "retry storm."
+
+Exponential backoff with jitter: add a random component to the wait time. Instead of exactly 4 seconds, wait somewhere between 2 and 6 seconds. This spreads the retry load across a time window. For the recovering service, it sees a gradual ramp of traffic rather than a sudden spike.
+
+This is now the standard retry pattern for all external API calls.`},
+{id:'de-034',session:'data-retention-policy-2026-03',text:`Establishing data retention policy for log data.
+
+Two tiers:
+
+Operational logs (application logs, access logs, debug output): retained for 90 days then deleted. These are primarily for debugging and incident response, where anything older than 90 days is rarely useful.
+
+Transactional records (orders, payments, user actions, audit trail): retained for 2 years. This is driven by our financial compliance requirements and by practical needs — support requests for transactions from 8 months ago are common.
+
+These retention rules will be enforced by automated cleanup jobs, not manual processes.`},
+{id:'de-035',session:'dns-workaround-2026-02',text:`The staging environment has been broken for two days because DNS is misconfigured — the database hostname in the staging config isn't resolving. The infrastructure team is working on it but it's blocking the whole dev team.
+
+Temporary workaround: I hardcoded the database IP address (10.0.1.45) directly in the staging.env config file so the team can unblock. Left a clear TODO comment: "REMOVE THIS — hardcoded IP, waiting for DNS fix from infra team." The infrastructure ticket is INFRA-2847.
+
+This is explicitly a temporary workaround, not a permanent solution.`},
+{id:'de-036',session:'personal-naming-preference-2026-01',text:`I've been thinking about variable naming conventions and I personally prefer to use 'should' as a prefix for boolean variables rather than 'is' — shouldShowModal feels more imperative than isModalVisible to me.
+
+Changed a few files in my local branch to use this convention. Haven't discussed with the team yet, just experimenting with the style.`},
+{id:'de-037',session:'cqrs-evaluation-2026-02',text:`Started looking at whether CQRS (Command Query Responsibility Segregation) would help with the read/write performance mismatch we're seeing. The idea is to separate the data model for writes from the data model for reads — writes go into a normalized OLTP schema, a read model is asynchronously derived from events and optimized for queries.
+
+I've read through the documentation and a few blog posts. The concept makes sense for our problem. Haven't decided anything yet — want to actually benchmark the current approach with the new indexes before deciding whether CQRS is warranted. It's a significant architectural change.`},
+{id:'de-038',session:'monorepo-migration-2026-01',text:`Migrating from our current multi-repo setup (separate Git repos for frontend, backend, shared-types, infrastructure) to an Nx monorepo.
+
+The multi-repo problem: shared code lives in shared-types, but every time we update it we have to version-bump, publish to npm, and update each consuming repo separately. A single cross-cutting change touches 4 PRs. In the monorepo, the shared code is just an import. One commit touches everything atomically.
+
+Tool: Nx, because it handles caching (only rebuilds what changed), dependency graph analysis, and has good support for our stack (React frontend, Node.js backend, TypeScript throughout).`},
+{id:'de-039',session:'container-orchestration-choice-2026-01',text:`Choosing between Kubernetes and Docker Swarm for container orchestration.
+
+Docker Swarm: simpler to set up and operate. But ecosystem has stagnated — Helm charts, GitOps tooling, and most DevOps tooling targets Kubernetes. Finding Swarm expertise is hard.
+
+Kubernetes: steeper learning curve, more complex. But it's the industry standard, our DevOps contractor already knows it, and we get access to the Helm, ArgoCD, and Keda ecosystems for free. Long-term, it's easier to hire for.
+
+Going with Kubernetes.`},
+{id:'de-040',session:'async-architecture-policy-2026-02',text:`Establishing the architecture rule for our new Python microservices: async/await throughout, no mixing of sync and async code within a service.
+
+The reason: mixing sync and async code is a common source of bugs. Calling a sync blocking function from an async context blocks the entire event loop. It also makes the codebase harder to reason about — you have to track which functions are async-safe.
+
+The rule: new Python services use asyncio throughout. All I/O (database, HTTP, Redis) uses async libraries (asyncpg, httpx, aioredis). If a library is sync-only, it goes behind a thread pool executor.`},
+{id:'de-041',session:'user-deletion-design-2026-02',text:`Decided how to handle user account deletion. Two decisions:
+
+First, how to delete: soft-delete rather than hard-delete. When a user deletes their account, we set a deleted_at timestamp on the user record rather than removing the row. This preserves referential integrity (foreign keys from orders, comments, etc. still resolve). For GDPR, we separately scrub the PII fields (email, name, address) immediately while keeping the record shell for the foreign keys.
+
+Second, audit trail: every deletion event writes a record to an append-only audit_log table with the user_id and timestamp. This satisfies compliance requirements for demonstrating that a deletion request was honored, even though the original user record is anonymized.`},
+{id:'de-042',session:'cicd-tooling-selection-2026-01',text:`Settled on the CI/CD toolchain.
+
+For CI (running tests, linting, building): GitHub Actions. We're already on GitHub, it's tightly integrated, the workflow YAML is straightforward, and the marketplace has actions for everything we need. The free tier covers our current usage.
+
+For CD (deploying to Kubernetes): ArgoCD implementing GitOps. The concept: the desired state of our Kubernetes cluster is defined in a Git repo. ArgoCD watches that repo and makes the live cluster match. Deployments become Git commits. Every change is auditable, reversible, and visible.`},
+{id:'de-043',session:'network-security-policy-2026-03',text:`Adding an outbound HTTP allowlist to our services following a security audit.
+
+The audit flagged that our services can make outbound HTTP requests to any URL — there's nothing preventing a service from being exploited to make requests to internal infrastructure (Server-Side Request Forgery) or to exfiltrate data to external servers.
+
+New policy: services can only make outbound HTTP requests to hosts on an explicit allow-list. The list is maintained in the security config and is reviewed quarterly. Any new external integration requires adding the host to the list, which creates a review checkpoint.`},
+{id:'de-044',session:'pagination-helper-refactor-2026-02',text:`Extracting the pagination logic into a shared helper module. The same pagination code (parse page/per_page params, apply limits, return metadata) is duplicated across 7 different endpoint files with minor variations. It's drifted — some handle edge cases, some don't, and the inconsistencies are causing subtle bugs.
+
+New file: pagination.py with a single paginate(queryset, page, per_page, max_per_page=100) function. All 7 endpoints will use this instead.
+
+This is a refactor to reduce duplication. No behavior changes.`},
+{id:'de-045',session:'read-replica-scaling-2026-03',text:`Adding PostgreSQL read replicas to handle the analytics query load.
+
+The analytics dashboard is running complex reporting queries (often 10-30 second queries) against the production database. These queries compete for I/O with regular OLTP operations and we're seeing latency spikes in the main application as a result.
+
+Read replicas: changes from the primary are asynchronously replicated to replicas. Analytics queries route to replicas via a read-only connection string. The write path (primary database) is completely unaffected.
+
+Trade-off: replication lag means analytics queries might see data that's up to 1-2 seconds stale. The analytics team confirmed this is acceptable for their reporting use case.`},
+{id:'de-046',session:'startup-timeout-investigation-2026-02',text:`Tracked down why the new deployment was taking 45 seconds to start instead of the usual 8 seconds. Suspected the new migrations, but they ran in under 2 seconds.
+
+Found it: the DATABASE_URL in the new service's environment config was pointing to the old database hostname that's been decommissioned. The service was waiting for a connection timeout on each attempt. The URL had a typo — missing the -prod suffix on the hostname.
+
+Fixed the URL. Deployment is back to normal startup time. No code changes.`},
+{id:'de-047',session:'grpc-revert-2026-02',text:`We tried switching internal service communication to gRPC. Spent a week on the migration — updated the service definitions, generated client/server stubs, converted the main inter-service calls.
+
+Then hit a wall: our infrastructure runs Nginx as a reverse proxy, and the standard Nginx build doesn't support gRPC (HTTP/2 framing). Getting gRPC through Nginx requires either a custom Nginx build or upgrading to Nginx 1.13.10+ with the grpc_pass module. Our managed Kubernetes provider doesn't easily support custom Nginx builds, and the upgrade path involves a maintenance window.
+
+Reverting everything back to REST/JSON. Keeping the gRPC investigation findings in a decision doc for if/when we revisit.`},
+{id:'de-048',session:'repository-pattern-adoption-2026-01',text:`Adding the new ProductRepository to the codebase. Looking at the existing code, the repository pattern (a class that abstracts all database access for a given model) has clearly become the standard here — UserRepository, OrderRepository, PaymentRepository are all implemented this way.
+
+There's no explicit decision document anywhere recording when this became the standard, but the code is consistent. Following the existing pattern for the new Product data model.`},
+{id:'de-049',session:'auth-boundary-clarification-2026-02',text:`Clarified the ownership boundary for token validation: the AuthCore service is the single owner of all JWT validation — including tokens issued for partner API access, not just internal user sessions.
+
+The question came up when we were designing the partner integration flow. The API gateway team wanted to handle partner token validation directly in Kong (the gateway), avoiding the network hop to AuthCore. We considered it but rejected it: if validation logic lives in two places, they can drift. A bug fix in AuthCore doesn't automatically fix Kong. Having one authority for token validation makes auditing straightforward.`},
+{id:'de-050',session:'observability-stack-2026-01',text:`Chose the observability stack for the new platform.
+
+Metrics and dashboards: Prometheus + Grafana. Prometheus is the de facto standard for Kubernetes metrics collection. Grafana for dashboards. Both integrate with Kubernetes natively. The team has experience with both.
+
+Distributed tracing: OpenTelemetry SDK in all services, sending traces to a Tempo backend. OpenTelemetry is vendor-neutral — if we want to switch from Tempo to Jaeger or a hosted solution later, we change the exporter, not the instrumentation code. Tempo is free, runs in our cluster.
+
+Both decisions were also driven by the existing expertise of our DevOps contractor who set up the initial cluster.`},
+];
+
+const DD_DATA = [
+{id:'dd-001',a:{cid:'a-bm25-norm',txt:'Fixed the BM25 score normalisation bug — I was dividing each score by the maximum score in the result set. The problem: if all documents score equally (e.g. all have score 1.0), you get 1.0/1.0=1.0 for everyone, which is technically correct but the "neutral" value when there\'s no meaningful ranking should be 0.5, not 1.0. Changed to min-max normalisation: (score - min_score) / (max_score - min_score), which gracefully falls back to 0.5 when max equals min.'},b:{cid:'b-bm25-norm',txt:'The BM25 ranking normalisation was using max-only division: raw_score / max_score. This fails when all scores in the result set are equal — you get 1.0 for every result when the semantically correct "no meaningful signal" value is 0.5. Replaced with min-max: (raw - min) / (max - min). Added a zero-range guard that returns 0.5 when max equals min.'}},
+{id:'dd-002',a:{cid:'a-jwt-single-use',txt:'JWT refresh tokens are now single-use. Once a client uses a refresh token to get a new access token, the refresh token is immediately invalidated in Redis. A fresh refresh token is issued alongside the new access token. If someone steals a refresh token and tries to use it after the legitimate client has already used it, the invalidated token is rejected.'},b:{cid:'b-jwt-single-use',txt:'Established the rule that each refresh token can only be used once. When the client sends a refresh token to get a new access token, two things happen atomically: the old refresh token is added to a Redis revocation set, and a new refresh token is generated and returned to the client. A revoked token is refused on any subsequent use.'}},
+{id:'dd-003',a:{cid:'a-canary-stages',txt:'Canary deployment stages: new version starts at 5% of live traffic, monitored for 30 minutes. If p99 latency and error rate stay within 10% of baseline, traffic moves to 20%, then another 30-minute window, then 50%, then 100%. Any metric spike during any window triggers automatic rollback to the previous version.'},b:{cid:'b-canary-stages',txt:'New releases roll out in four stages: 5% → 20% → 50% → 100%. Each stage has a 30-minute observation window. The system watches p99 response time and error rate. If either climbs more than 10% above the stable baseline for the previous version, Kong automatically shifts all traffic back and alerts the team.'}},
+{id:'dd-004',a:{cid:'a-json-log',txt:'All service logs must be structured JSON with these required fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (from SERVICE_NAME env var), trace_id (propagated from request headers), user_id (when authenticated, omitted otherwise), message.'},b:{cid:'b-json-log',txt:'Standardized log format: every log entry is a JSON object. Mandatory fields are timestamp, level, service, trace_id, user_id (optional), and message. Free-form text logs are rejected by the log aggregator pipeline. This format enables structured queries across all services in Loki.'}},
+{id:'dd-005',a:{cid:'a-compound-idx',txt:'Created a compound index on events(tenant_id, created_at DESC). The slow queries were all in the pattern SELECT * FROM events WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 100. The compound index satisfies both the filter and the sort without a separate sort step.'},b:{cid:'b-compound-idx',txt:'Added index idx_events_tenant_time on events(tenant_id, created_at DESC). This was the missing index for the tenant-scoped time-ordered event fetches. Before: 4.2 seconds (full table scan + sort on 40M rows). After: 18 ms (index-only scan).'}},
+{id:'dd-006',a:{cid:'a-msgpack',txt:'Internal service-to-service messages use MessagePack serialization. External API responses use JSON. MessagePack is 30-40% smaller than equivalent JSON and faster to serialize/deserialize. Human readability is not needed for internal traffic.'},b:{cid:'b-msgpack',txt:'Two-tier serialization: MessagePack for everything that stays inside the cluster (service mesh traffic, job queue payloads, cache entries). JSON for everything external (public API responses, webhooks, partner integrations). The performance win from MessagePack does not justify the readability cost on the external API.'}},
+{id:'dd-007',a:{cid:'a-idem-jobs',txt:'Policy: all background jobs must be idempotent. Running a job twice with the same payload must produce the same outcome as running it once. This is required because RabbitMQ guarantees at-least-once delivery.'},b:{cid:'b-idem-jobs',txt:'Background job handlers are required to be idempotent — executing the same job twice must not cause double-effects. The message queue delivers at-least-once, not exactly-once. Each handler must use one of: idempotency keys checked against the database, unique constraints that reject duplicate inserts, or check-then-skip logic.'}},
+{id:'dd-008',a:{cid:'a-ext-error',txt:'Wrapping all external API call failures in a typed ExternalCallError class. Fields: service (e.g. "stripe"), operation (e.g. "charge_card"), original_error. Instead of catching raw SDK exceptions that differ between providers, the rest of the codebase handles one error type.'},b:{cid:'b-ext-error',txt:'Standardized external API error wrapping: all calls to third-party services (payment processor, email provider, analytics API) are caught at the integration boundary and re-raised as ExternalCallError(service=..., operation=..., cause=...). Callers handle ExternalCallError, not raw SDK exceptions.'}},
+{id:'dd-009',a:{cid:'a-read-rep',txt:'Added PostgreSQL read replicas. Analytics dashboard queries (10-30 second reporting queries) are routed to replicas, leaving the primary database exclusively for OLTP writes and reads. Replication lag is 1-2 seconds, which the analytics team confirmed is acceptable.'},b:{cid:'b-read-rep',txt:'Introduced read replicas to isolate analytics query load from production OLTP traffic. The primary handles all writes. A replica connection pool is used for reporting queries. The analytics team accepts up to 2 seconds of staleness.'}},
+{id:'dd-010',a:{cid:'a-env-flags',txt:'Feature flags are stored in environment variables, not a database table. Changing a flag requires a deploy, but deploys are fast. Env vars are visible in deployment config, not hidden state in a database.'},b:{cid:'b-env-flags',txt:'Decided against database-backed feature flags. A database flag creates a runtime dependency — flag reads can fail if the database is slow. Environment variable flags are resolved at startup and do not add runtime overhead. The trade-off (deploy required to change a flag) is acceptable at our deployment frequency.'}},
+{id:'dd-011',a:{cid:'a-kong-rl',txt:'Rate limiting is handled at Kong (our API gateway), not in individual microservices. Centralized rate limiting means consistent enforcement across all services and no duplicate implementation. Rate limit state is stored in Redis behind Kong.'},b:{cid:'b-kong-rl',txt:'Moving rate limiting to the Kong layer. Service-level rate limiting creates inconsistency — each service has different limits and the state is not shared, so a user can circumvent per-service limits by spreading requests. Kong enforces rate limits at the entry point with shared Redis state.'}},
+{id:'dd-012',a:{cid:'a-utc',txt:'All timestamps stored in the database are UTC. No exceptions. Timezone conversion from UTC to user local time happens only in the frontend at display time.'},b:{cid:'b-utc',txt:'Established the UTC-only storage rule: the backend stores all datetimes in UTC. The API always returns UTC. The frontend is responsible for converting to the user local timezone for display. Mixing timezones in storage is a source of subtle bugs, especially around DST transitions.'}},
+{id:'dd-013',a:{cid:'a-gql-rest',txt:'GraphQL for the internal frontend (our own team). REST for the external public API. GraphQL flexibility benefits our own frontend but the learning curve is a barrier for external developers who expect REST.'},b:{cid:'b-gql-rest',txt:'Dual API strategy: internal-facing API is GraphQL — the frontend team can request exactly the data shape they need. External public API is REST — third-party developers have a lower integration barrier and all their existing tooling works without special clients.'}},
+{id:'dd-014',a:{cid:'a-soft-del',txt:'User account deletion uses soft-delete: set deleted_at timestamp, scrub PII fields (email, name, address) immediately for GDPR compliance. Keep the record shell for referential integrity.'},b:{cid:'b-soft-del',txt:'GDPR deletion implementation: mark user as deleted (deleted_at = now()), overwrite personal data fields with placeholders immediately, but preserve the row. Hard deletion would break foreign key constraints on orders, reviews, and activity logs.'}},
+{id:'dd-015',a:{cid:'a-redis-zset',txt:'Using Redis sorted sets (ZSETs) for the leaderboard. ZADD updates a user score, ZRANGEBYSCORE fetches the top N, ZRANK returns a specific user position. All O(log n). No database query on the leaderboard read path.'},b:{cid:'b-redis-zset',txt:'Leaderboard is backed by a Redis ZSET keyed by season. Score updates call ZADD. Rank queries call ZRANGEBYSCORE. Redis sorted set operations are O(log n), which gives sub-millisecond leaderboard reads for 500k members.'}},
+{id:'dd-016',a:{cid:'a-access-exp',txt:'Access tokens (JWTs issued for API authentication) expire after 15 minutes. Short expiry limits the window of exposure if a token is stolen.'},b:{cid:'b-refresh-rot',txt:'Refresh tokens rotate on every use. When a client uses a refresh token, the old token is invalidated and a new one is issued. If a refresh token is used twice (old token used after rotation), both the old and new token are immediately revoked — this detects token theft.'}},
+{id:'dd-017',a:{cid:'a-per-user-rl',txt:'Authenticated endpoints are rate-limited at 100 requests per minute per user_id. Exceeding the limit returns 429 with a Retry-After header.'},b:{cid:'b-per-ip-rl',txt:'Unauthenticated endpoints (login, registration, password reset) are rate-limited at 20 requests per minute per IP address. This prevents credential stuffing on public endpoints where user_id is not available.'}},
+{id:'dd-018',a:{cid:'a-job-idem-req',txt:'All background job handlers must be idempotent — identical input must produce identical output regardless of how many times the job executes.'},b:{cid:'b-job-retry',txt:'Failed background jobs are retried up to 3 times with exponential backoff: first retry after 30 seconds, second after 2 minutes, third after 10 minutes. After 3 failures, the job moves to a dead-letter queue for manual review.'}},
+{id:'dd-019',a:{cid:'a-login-idx',txt:'Added a B-tree index on users(email) to speed up the login query (SELECT id, password_hash FROM users WHERE email = ?). Login is a high-frequency operation.'},b:{cid:'b-admin-idx',txt:'Added a composite index on users(created_at, status) for the admin dashboard user listing query, which filters by status and sorts by registration date. Different from the login index — this one supports range queries.'}},
+{id:'dd-020',a:{cid:'a-api-err',txt:'API error responses use the format: {"error": {"code": "VALIDATION_ERROR", "message": "...", "fields": {"email": "required"}}}. The code field is a machine-readable enum for programmatic handling.'},b:{cid:'b-backend-err',txt:'Backend error logging format: when an unhandled exception occurs, log {"level": "ERROR", "correlation_id": "...", "service": "...", "error": {"type": "...", "message": "...", "stack": "..."}}. The correlation_id links the error log to the request that triggered it.'}},
+{id:'dd-021',a:{cid:'a-redis-cache',txt:'User profile data is cached in Redis with a 5-minute TTL and LRU eviction. Profiles are read on nearly every authenticated request, and profile updates invalidate the cache key immediately.'},b:{cid:'b-redis-pub',txt:'Real-time notifications use Redis pub/sub. When a notification event is generated, it is published to a user-specific channel (user:{id}:notifications). Connected clients subscribe to their channel and receive notifications with sub-100ms latency.'}},
+{id:'dd-022',a:{cid:'a-log-format',txt:'All service logs use structured JSON format with standardized fields: timestamp, level, service, trace_id, user_id, message.'},b:{cid:'b-log-ret',txt:'Log retention policy: operational logs (application and access logs) retained 90 days then deleted. Transaction records (orders, payments, audit trail) retained 2 years for compliance.'}},
+{id:'dd-023',a:{cid:'a-canary-pct',txt:'Canary traffic split: 5% → 20% → 50% → 100%, with 30-minute observation windows between stages.'},b:{cid:'b-canary-rb',txt:'Canary rollback criteria: automatic rollback triggers if p99 latency increases more than 10% above baseline OR if error rate increases more than 10% above baseline during any canary stage observation window.'}},
+{id:'dd-024',a:{cid:'a-user-ff',txt:'User-level feature flags: specific users can be enrolled in a feature independently. Used for beta testing with specific customers.'},b:{cid:'b-org-ff',txt:'Organization-level feature flags: enabling a flag for an organization enables it for all users in that organization. Used for staged rollout to enterprise customers.'}},
+{id:'dd-025',a:{cid:'a-jwt-cookie',txt:'JWTs are stored in httpOnly cookies, not localStorage. httpOnly prevents JavaScript from accessing the cookie, protecting against XSS attacks stealing the token.'},b:{cid:'b-jwt-15m',txt:'Access tokens (JWTs) rotate every 15 minutes. The short lifetime limits exposure if a token is stolen or intercepted.'}},
+{id:'dd-026',a:{cid:'a-mig-rev',txt:'Every database migration must include a down() method that reverses the migration. Migrations without a rollback path are not permitted.'},b:{cid:'b-mig-order',txt:'Migrations run sequentially in the order of their timestamp prefix. Parallel migration execution is not permitted — concurrent schema changes can cause deadlocks and unpredictable results.'}},
+{id:'dd-027',a:{cid:'a-int-test',txt:'Integration tests clean up database state by running inside a transaction that is rolled back at the end of each test. Each test starts with a clean slate.'},b:{cid:'b-unit-test',txt:'Unit tests mock all service interfaces and external dependencies. No real database connections, no real HTTP calls. Fast execution, complete isolation. Integration tests (a separate suite) use real dependencies.'}},
+{id:'dd-028',a:{cid:'a-cache-ttl',txt:'Cached user profiles expire after 5 minutes (time-based TTL). After 5 minutes, the next read fetches fresh data from the database and repopulates the cache.'},b:{cid:'b-cache-inv',txt:'Cache entries for user profiles are immediately invalidated (deleted from Redis) on any profile update. The next read after an update always goes to the database. This is write-through invalidation, separate from the TTL policy.'}},
+{id:'dd-029',a:{cid:'a-cursor-pag',txt:'Paginated endpoints use cursor-based pagination: the client passes a cursor (encoded last-seen ID) and receives the next page. No OFFSET queries — all pagination is via index-range lookups.'},b:{cid:'b-no-count',txt:'Paginated API responses do not include a total count of results. Total count queries (SELECT COUNT(*)) are expensive on large tables and rarely needed by clients who paginate forward. Clients receive has_next_page instead.'}},
+{id:'dd-030',a:{cid:'a-utc-db',txt:'The database stores all timestamps in UTC. The backend always writes UTC and always reads UTC.'},b:{cid:'b-tz-fe',txt:'Timezone conversion from UTC to user local time happens exclusively in the frontend. The API always returns UTC. The frontend uses the browser Intl API to format dates in the user local timezone.'}},
+];
+
+const NEG_DATA = [
+{id:'neg-001',session:'depthfusion-recall-tuning-2026-04',text:`Tried increasing the recall top_k to 100 to improve coverage. The problem: we're using Haiku as the reranker, and with 100 candidates it hits the Haiku API rate limit consistently during busy sessions. Requests start queuing, the MCP server times out, and the whole recall operation fails.\n\nPulled back to top_k=20. That keeps us well under the rate limit. We're trading some recall coverage for reliability.`},
+{id:'neg-002',session:'task-queue-architecture-2026-03',text:`Used SQLite as the backing store for the background task queue. Seemed convenient — no infrastructure to set up, file-based, easy to inspect.\n\nProblem: SQLite has file-level locking. Only one writer can hold the lock at a time. With 4 worker processes picking up tasks simultaneously, they're constantly contending for the lock. Task throughput dropped by 60% compared to our previous system, and we're seeing deadlock errors under load.\n\nMigrated to PostgreSQL, which has proper row-level locking. Workers pick up different rows simultaneously without contention.`},
+{id:'neg-003',session:'file-upload-progress-2026-03',text:`Implemented server-sent events (SSE) to stream file upload progress to the browser. Worked perfectly locally. Broke completely in staging.\n\nThe issue: our Nginx proxy has a proxy_request_buffering directive that buffers the entire request body before forwarding it to the application. The upload is complete before we even see the first byte. SSE for upload progress is pointless when the proxy is buffering the upload.\n\nAlso, Nginx has a 60-second proxy timeout. Large uploads were being killed mid-transfer.\n\nSwitched to a polling approach: the client sends the file, gets a task ID back, then polls /tasks/{id}/status every second.`},
+{id:'neg-004',session:'retry-logic-2026-02',text:`Implemented plain exponential backoff for retrying failed API calls: wait 1 second, then 2, then 4, then 8. This caused a "retry storm" when our payment processor had a 90-second outage. All queued retries synchronized and fired at the same time when the processor came back online, immediately overwhelming it again.\n\nSwitched to exponential backoff with random jitter. Now each retry waits a random amount within the window. Retries spread out and the recovering service gets a gradual traffic ramp instead of a sudden spike.`},
+{id:'neg-005',session:'async-celery-integration-2026-03',text:`Tried using aioredis (async Redis client) inside Celery task handlers so we could share async code between our FastAPI app and our Celery workers.\n\nThe problem: Celery runs a synchronous event loop (it predates Python async). When aioredis tries to create an event loop inside a Celery worker, it conflicts with the loop Celery uses internally. Getting "There is no current event loop in thread" errors constantly.\n\nReverted to sync redis-py inside Celery workers. Kept aioredis only in the FastAPI async context where it belongs.`},
+{id:'neg-006',session:'pagination-performance-2026-02',text:`Had OFFSET-based pagination on the products table. Page 1 was fast. Page 200 (items 3,981-4,000 in a sorted list of 2 million products) was taking 15 seconds — the database fetches rows 1 through 4,000 and discards the first 3,980 every time.\n\nReplaced with keyset pagination: WHERE id > {last_seen_id} ORDER BY id LIMIT 20. The index lookup is instant regardless of which "page" you're on. Page 1 and page 50,000 are equally fast.`},
+{id:'neg-007',session:'caching-architecture-2026-03',text:`Added an in-process LRU cache to the user service — a Python dictionary with a max size. Seemed efficient since it avoids a Redis network roundtrip on every request.\n\nProblem: we run 8 Gunicorn worker processes. Each process has its own in-process cache, so we effectively have 8 separate caches. When a user updates their profile, we invalidate the cache in the worker that handled the update — but the other 7 workers still have stale data.\n\nWe had an incident where a user changed their email address and kept seeing the old email for 20 minutes because 7 of 8 workers were serving stale cached data.\n\nMoved to Redis as the shared cache.`},
+{id:'neg-008',session:'grpc-migration-attempt-2026-02',text:`Attempted to migrate inter-service communication from REST to gRPC for the performance benefits (binary protocol, multiplexing, streaming).\n\nSpent a week on the migration. Then discovered our infrastructure uses HAProxy in TCP mode as the load balancer between services. HAProxy in TCP mode doesn't understand HTTP/2, which gRPC requires. It terminates HTTP/2 connections because it expects HTTP/1.1.\n\nReverting the entire migration back to REST/JSON.`},
+{id:'neg-009',session:'primary-key-design-2026-01',text:`Switched all primary keys from auto-increment integers to ULIDs (Universally Unique Lexicographically Sortable Identifiers). ULIDs are sortable by time, URL-safe, and don't expose sequence information.\n\nIntegration test with our payment processor revealed the problem: their API requires a numeric-only merchant reference ID. ULIDs contain letters. Sending a ULID as the merchant reference ID caused their API to return a 400 error.\n\nReverted to auto-increment integers. The payment processor integration is too important to work around.`},
+{id:'neg-010',session:'search-scaling-2026-03',text:`Hit the limits of PostgreSQL full-text search at production scale. With 10 million products, search queries are consistently taking 800ms to 2 seconds — well above the 200ms target.\n\nPostgreSQL FTS works well at moderate scale but doesn't have the tuning knobs needed for fast faceted search (filtering by category + brand + price range + availability simultaneously) at this data size.\n\nEvaluating Elasticsearch and Typesense as dedicated search solutions. Haven't migrated yet — this is a finding from load testing, not a completed migration.`},
+{id:'neg-011',session:'realtime-updates-2026-02',text:`Used WebSockets for real-time order status updates to the dashboard. Worked well in development. In production, connections drop after a few minutes.\n\nRoot cause: our HAProxy load balancer has a 60-second timeout on idle TCP connections. WebSockets look like idle TCP to HAProxy if no data is flowing. After 60 seconds of no new order status changes, HAProxy kills the connection.\n\nSwitched to long-polling (client waits up to 30 seconds for a response, reconnects immediately after each response).`},
+{id:'neg-012',session:'distributed-transaction-2026-02',text:`Tried implementing the Saga pattern for distributed transactions across the order, inventory, and payment services. Each service has a compensating transaction (undo action) that gets called if a later step fails.\n\nAfter 3 weeks of implementation, the compensating transaction logic became extremely complex. We built compensation chains for compensating transactions.\n\nFor our current scale (500 orders/day), this is massive over-engineering. Replaced with a sequential flow with retry logic: step 1 → step 2 → step 3, with idempotent retries on failure. Much simpler and handles 99% of failure scenarios.`},
+{id:'neg-013',session:'cqrs-evaluation-2026-03',text:`Evaluated CQRS (Command Query Responsibility Segregation) for handling the read/write performance mismatch in the reporting service. The idea: maintain a separate read model optimized for queries, updated asynchronously from the write model via events.\n\nAfter a week of design work, concluded it's premature optimization. Our write throughput is 500 orders/day and peak read load is 200 concurrent dashboard users. Adding CQRS means maintaining two data models, an event bus, and eventual consistency semantics.\n\nThe current PostgreSQL setup with proper indexes handles our actual load fine. Shelving CQRS for if/when we're 10x bigger.`},
+{id:'neg-014',session:'auth-performance-2026-02',text:`Added a Bloom filter to the authentication middleware for fast "is this token revoked?" checks. Bloom filters give probabilistic membership tests in O(1) with very small memory footprint.\n\nThe problem: Bloom filters have false positives. Our configuration had a 1% false positive rate. This meant 1% of valid login requests were being rejected as "revoked" — legitimate users getting "invalid session" errors on 1 in 100 requests.\n\nRemoved the Bloom filter from the auth flow. Reverted to a direct Redis lookup (still fast). The false positive rate is unacceptable in an auth context — any false positive is a user incorrectly locked out.`},
+{id:'neg-015',session:'analytics-db-evaluation-2026-03',text:`Evaluated ClickHouse as the database for our analytics service. ClickHouse is a column-oriented database purpose-built for analytical queries — aggregations over large datasets are extremely fast.\n\nProblem: our analytics data also has OLTP requirements. When an order is placed, we need to update several analytics tables atomically. ClickHouse is optimized for append-only workloads and doesn't support traditional ACID transactions or foreign key relationships.\n\nKeeping PostgreSQL for the analytics tables. ClickHouse would be appropriate if we needed sub-second queries across billions of rows.`},
+{id:'neg-016',session:'auth-revocation-2026-03',text:`The original authentication design used JWTs with no server-side state — completely stateless. This seemed like an architectural win.\n\nProblem: if a user's account is compromised, we can't revoke their token. The token stays valid until it naturally expires (we had 24-hour expiry at the time). An attacker with a stolen token has 24 hours of access even after the user reports the compromise and resets their password.\n\nChanged to: short-lived access tokens (15 minutes) + Redis-backed revocation list. On password reset or explicit logout, add the user's token family to the revocation list.`},
+{id:'neg-017',session:'sqlalchemy-async-migration-2026-03',text:`Proposed migrating from sync SQLAlchemy to async SQLAlchemy (SQLAlchemy 2.0+ async extension) to fit our async FastAPI codebase.\n\nAfter 2 weeks of partial migration work: the async SQLAlchemy API is significantly different from the sync API. Every query pattern needs to be rewritten. Lazy loading doesn't work in async context. We hit three bugs in edge cases.\n\nEstimated completion: 3 more weeks plus significant regression testing. Risk of introducing subtle data integrity bugs is high. Decided to stay with sync SQLAlchemy called via thread pool executor.`},
+{id:'neg-018',session:'jwt-payload-design-2026-02',text:`Stored all user permissions and role memberships in the JWT payload so the API gateway could validate authorization without hitting a backend service. An enterprise user with many roles had a JWT payload that expanded to 6-8KB.\n\nThis caused two problems: the 4KB limit on cookie storage (browsers refuse to set the cookie), and the 8KB HTTP header limit (nginx was returning 400 errors).\n\nSwitched to minimal JWT claims (user_id, issued_at, expiry). Permissions are cached in Redis with a 5-minute TTL, keyed by user_id.`},
+{id:'neg-019',session:'python-upgrade-attempt-2026-03',text:`Attempted to upgrade from Python 3.10 to 3.12 to get the performance improvements and new language features.\n\nBlocker: one of our core dependencies uses greenlet, a C extension for coroutine switching. The greenlet build for Python 3.12 had a C API incompatibility with the version of gevent our code depends on. The gevent team was aware but hadn't released a fix yet.\n\nReverting to Python 3.10. Will re-evaluate in 3-6 months when the ecosystem catches up.`},
+{id:'neg-020',session:'scheduled-maintenance-2026-02',text:`Tried using pg_cron (PostgreSQL cron extension) to schedule database cleanup tasks — delete expired sessions, archive old logs, vacuum large tables.\n\nProblem: pg_cron uses PostgreSQL advisory locks to prevent duplicate runs. Our application has transaction patterns that hold advisory locks for extended periods. pg_cron jobs were consistently failing because the advisory locks were already held, causing maintenance to be skipped entirely for days at a time.\n\nMoved scheduled maintenance to a separate Python service that runs as a Kubernetes CronJob.`},
+{id:'neg-021',session:'multi-region-architecture-2026-03',text:`Evaluated multi-region active-active write deployment — having multiple geographic regions each accept writes independently for lower latency.\n\nThe core problem: we have global invariants that can't be violated. Account balances can't go negative. Inventory quantities can't go below zero. With active-active writes, two users in different regions can both try to use the last item in stock simultaneously.\n\nThese invariants require coordination between regions for writes, which eliminates the latency advantage. Staying with active-passive (one write region, read replicas in other regions).`},
+{id:'neg-022',session:'orm-evaluation-2026-02',text:`The codebase uses a custom ORM that was built in-house 3 years ago. At the time, it made sense.\n\nProblems now: it's become a maintenance burden. Bugs take 2-3x longer to fix than they would in a standard ORM. New team members spend a week learning its quirks before they can be productive. It's missing features (no connection pooling, no async support) that we now need.\n\nMigrating to SQLAlchemy over the next two releases. The migration is scoped and phased, with the custom ORM running in parallel during transition.`},
+{id:'neg-023',session:'redis-as-primary-store-2026-01',text:`Evaluated using Redis as the primary data store for the session management service instead of PostgreSQL. Redis is much faster for the simple key-value lookups that session management requires.\n\nCritical risk: Redis by default stores data in memory with asynchronous persistence. If the server crashes before a write is persisted to disk, that data is lost. With default configuration, you can lose up to the last second of writes.\n\nFor session data this might be acceptable, but we also store important session-adjacent data (rate limit counters, CSRF tokens) in the same store. Keeping PostgreSQL as the primary store. Redis remains a cache layer.`},
+{id:'neg-024',session:'mongodb-odm-evaluation-2026-03',text:`Started using Mongoose as the ODM (Object Document Mapper) for our MongoDB-backed product catalog service. Mongoose adds schema validation and a familiar ActiveRecord-style API.\n\nProblem: our reporting queries are relational — "give me all products in category X that have had at least 3 orders in the last 30 days, grouped by supplier." In MongoDB + Mongoose, this requires complex $lookup aggregation pipelines.\n\nConsidering moving to the native MongoDB Node.js driver directly, which at least makes the aggregation pipeline code more legible without the ODM abstraction pretending the data is not a document store.`},
+{id:'neg-025',session:'push-notification-architecture-2026-02',text:`Investigated using WebRTC data channels for push notifications. WebRTC can punch through NAT and firewalls better than WebSockets, which was attractive given that some corporate users are behind strict firewalls.\n\nThe operational complexity was prohibitive: WebRTC requires STUN and TURN servers for NAT traversal. Setting up and maintaining TURN infrastructure is significant.\n\nAbout 30% of our corporate users are behind firewalls that block WebRTC. SSE (Server-Sent Events) works through those firewalls because it's just long-lived HTTP. Switched to SSE for push notifications.`},
+{id:'neg-026',session:'subscription-plan-perf-2026-03',text:`The /billing/subscriptions endpoint was returning in 8-10 seconds for enterprise accounts. Profiled the query: joining users → subscriptions → subscription_plans was doing a sequential scan on subscription_plans (50,000 rows).\n\nThe plans table had no index on plan_id — it was treated as a small lookup table when the service was first built, but it has grown to 50k rows with complex plan hierarchies.\n\nAdded a B-tree index on subscription_plans(plan_id). Query time: 8 seconds → 20 milliseconds. No code changes needed.`},
+{id:'neg-027',session:'inventory-race-condition-2026-02',text:`Users were able to over-order limited inventory items. Two users would simultaneously check "is item X available?" (yes, 1 left), both proceed to checkout, both successfully place orders, now we have -1 inventory.\n\nClassic read-modify-write race condition. The fix: use SELECT FOR UPDATE when reading inventory during checkout. This places a row-level lock — the second user's SELECT waits until the first transaction commits or rolls back.\n\nThis is now the pattern for all inventory reservation operations.`},
+{id:'neg-028',session:'user-registration-500-2026-02',text:`Users were getting 500 errors when registering with a phone number that does not include a country code. The phone validation middleware was calling phone.strip('+') before checking if it is null, throwing a NullPointerException on null inputs.\n\nFixed: moved the null check before any method calls. Added test cases for null, empty string, and various phone formats.`},
+{id:'neg-029',session:'csv-import-flaky-test-2026-03',text:`The test_import_products_csv integration test was failing intermittently — about 1 in 10 runs on CI. The test imports 500 rows, then asserts the database contains 500 products.\n\nRoot cause: the test was running the import (async) and immediately asserting without waiting for all async workers to finish. On slow CI machines, some rows had not been committed when the assertion ran.\n\nFixed: added a polling assertion that waits up to 5 seconds for the count to reach 500, checking every 100ms. Flakiness eliminated across 50 subsequent CI runs.`},
+{id:'neg-030',session:'api-v1-deprecation-2026-02',text:`Completed the v1 to v2 API migration. We announced v1 deprecation 3 months ago, gave all API consumers a 3-month migration window, sent reminder emails at 90/60/30/7 days. Traffic to v1 endpoints dropped from 100% to under 2% over the window.\n\nTurned off v1 endpoints yesterday. The remaining 2% of traffic was from abandoned integrations. No support tickets after the cutover.\n\nThe migration is complete.`},
+{id:'neg-031',session:'timezone-double-conversion-2026-03',text:`Bug: users in non-UTC timezones were seeing event times that were wrong by their UTC offset — twice. Traced it: the server was converting UTC timestamps to local time before sending them in the API response, and the frontend was also converting assuming the server sent UTC.\n\nFix: server now sends UTC timestamps only. Frontend always treats received timestamps as UTC before converting to local time for display. The double-conversion is eliminated.`},
+{id:'neg-032',session:'websocket-memory-leak-2026-02',text:`Memory usage in the WebSocket service was growing unboundedly. Connections were being properly closed from the client side, but memory was not being reclaimed.\n\nFound: event listeners were being attached to connections but only cleaned up in the 'close' event handler. Connections that ended with an error ('error' event) before reaching 'close' were not cleaning up their listeners — references were kept alive.\n\nFixed: cleanup function now runs on both 'error' and 'close' events. Memory usage stabilized in monitoring after deploy.`},
+{id:'neg-033',session:'project-list-n-plus-one-2026-02',text:`The GET /api/projects endpoint was taking 1.2 seconds for users with many projects. Database profiling showed 1 query to load the project list + 1 additional query per project to load the owner information — 51 queries for a page of 50 projects.\n\nFixed: changed the query to JOIN users ON users.id = projects.owner_id in the initial query, loading the owner data in one roundtrip. Response time: 1.2s to 85ms.`},
+{id:'neg-034',session:'migration-0043-fix-2026-03',text:`Migration 0043 (adding a not-null status column to orders) was broken. It tried to add the column and set a default value in one transaction, but existing rows were still null after the migration because the UPDATE statement was missing a WHERE clause.\n\nFixed the migration: added a correct WHERE clause (WHERE status IS NULL). Wrote a separate data repair migration to fix the rows affected by the broken run in staging.`},
+{id:'neg-035',session:'compose-service-name-fix-2026-02',text:`The app service was failing to start in Docker Compose with "could not connect to database" errors. The DATABASE_URL environment variable was referencing "postgres" as the hostname, but the service in docker-compose.yml was named "db".\n\nDocker Compose uses service names as hostnames. Fixed the DATABASE_URL to reference "db" instead of "postgres". Service started correctly.`},
+{id:'neg-036',session:'websocket-tls-fix-2026-03',text:`WebSocket connections were failing in production with "WebSocket is closed before the connection is established." Development worked fine.\n\nRoot cause: the frontend was connecting to ws:// (unencrypted) but production is served over HTTPS. Browsers block mixed content — an HTTPS page cannot open an unencrypted ws:// connection.\n\nFixed: changed ws:// to wss:// (WebSocket Secure) in the production frontend config.`},
+{id:'neg-037',session:'react-query-v5-upgrade-2026-02',text:`Upgraded from react-query v4 to v5. The API changed significantly — useQuery and useMutation hook signatures changed, QueryClient instantiation changed, and several types were renamed or restructured.\n\nWent through all 40+ hook usages in the codebase and updated the type signatures and hook options to match v5 API. TypeScript was helpful here — every error was a compile-time type error pointing to the exact change needed. All type errors resolved.`},
+{id:'neg-038',session:'npm-peer-dependency-2026-01',text:`Running npm install was failing with "ERESOLVE unable to resolve dependency tree" because two packages both required react as a peer dependency but specified different version ranges that did not overlap.\n\nFixed by adding a resolutions field to package.json pinning the shared react version to the range that satisfies both packages. npm install now completes cleanly.`},
+{id:'neg-039',session:'users-email-index-2026-02',text:`Users were reporting slow login times (3+ seconds). Database profiling showed the login query (SELECT id, password_hash FROM users WHERE email = ?) was doing a sequential scan on 2 million user rows.\n\nAdded a unique B-tree index on users(email). Login query time: 3 seconds to under 10 milliseconds.`},
+{id:'neg-040',session:'env-var-typo-fix-2026-01',text:`The user service was failing to connect to the database in the development environment. Error: "connection refused" on startup.\n\nFound a typo in the .env file: the variable was named DATABASE_URL in the config file but DATABASE_URI in the application code that reads it. The application was reading undefined, falling back to a default localhost URL that did not exist in the dev setup.\n\nFixed the variable name in .env to match what the application reads.`},
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'depthfusion-labeller-v1';
+let state = {tab:'de',de:{idx:0,labels:{}},dd:{idx:0,labels:{}},neg:{idx:0,labels:{}}};
+
+function loadState(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)state=JSON.parse(s);}catch(e){}}
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}
+
+function countDone(tab){let n=0;for(const id in state[tab].labels){if(state[tab].labels[id].saved)n++;}return n;}
+
+function updateTabCounts(){
+  document.getElementById('de-count').textContent=countDone('de');
+  document.getElementById('dd-count').textContent=countDone('dd');
+  document.getElementById('neg-count').textContent=countDone('neg');
+}
+
+function currentData(){return state.tab==='de'?DE_DATA:state.tab==='dd'?DD_DATA:NEG_DATA;}
+function currentIdx(){return state[state.tab].idx;}
+function currentItem(){return currentData()[currentIdx()];}
+function currentLabels(){return state[state.tab].labels;}
+
+function getOrInitLabel(tab,id){
+  if(!state[tab].labels[id]){
+    if(tab==='de') state[tab].labels[id]={saved:false,skipped:false,no_decisions:false,decisions:[],notes:''};
+    else if(tab==='dd') state[tab].labels[id]={saved:false,skipped:false,label:null,notes:''};
+    else state[tab].labels[id]={saved:false,skipped:false,type:null,negatives:[],notes:''};
+  }
+  return state[tab].labels[id];
+}
+
+// ─── GUIDE (static text built with DOM) ───────────────────────────────────────
+
+function renderGuide(){
+  const g=document.getElementById('guide');
+  while(g.firstChild)g.removeChild(g.firstChild);
+  const h=document.createElement('h3');
+  const ps=[];
+  if(state.tab==='de'){
+    h.textContent='What counts as a decision?';
+    const p1=document.createElement('p');
+    p1.textContent='A decision is a deliberate choice that helps future developers understand WHY the code looks the way it does.';
+    const p2=document.createElement('p');
+    const y=document.createElement('span');y.className='yes';y.textContent='✓ COUNT these: ';
+    p2.append(y);p2.append(document.createTextNode('Choosing a technology (Redis over Memcached), setting a team policy ("all timestamps must be UTC"), picking an architecture pattern, deciding to refactor something and why.'));
+    const p3=document.createElement('p');
+    const n=document.createElement('span');n.className='no';n.textContent='✗ DON\'T COUNT these: ';
+    p3.append(n);p3.append(document.createTextNode('Pure implementation work ("added the function"), bug fixes ("fixed the null pointer"), temporary workarounds, or speculation ("we might consider…").'));
+    const p4=document.createElement('p');
+    p4.textContent='If reading this text, you\'d think "I need to know this before changing the code" — it\'s probably a decision.';
+    ps.push(p1,p2,p3,p4);
+  } else if(state.tab==='dd'){
+    h.textContent='Are these the same fact?';
+    const p1=document.createElement('p');
+    p1.textContent='Ask yourself: if you already knew one, would the other tell you anything new?';
+    const p2=document.createElement('p');
+    const y=document.createElement('span');y.className='yes';y.textContent='TRUE DUPLICATE ';
+    p2.append(y);p2.append(document.createTextNode('= same core fact, just phrased differently. Keeping both clutters memory with redundant information.'));
+    const p3=document.createElement('p');
+    const n=document.createElement('span');n.className='no';n.textContent='NOT A DUPLICATE ';
+    p3.append(n);p3.append(document.createTextNode('= same general topic, but different detail, different scope, or complementary perspective. Both are worth keeping.'));
+    const p4=document.createElement('p');
+    const b=document.createElement('strong');b.textContent='Tricky case: ';
+    p4.append(b);p4.append(document.createTextNode('"tokens expire after 15 minutes" and "tokens use RS256 signing" are both about JWTs but cover different aspects — NOT duplicates.'));
+    ps.push(p1,p2,p3,p4);
+  } else {
+    h.textContent='Was something tried and rejected?';
+    const p1=document.createElement('p');
+    p1.textContent='Genuine negatives capture valuable institutional knowledge: "we tried X and it broke Y, so we use Z instead."';
+    const p2=document.createElement('p');
+    const y=document.createElement('span');y.className='yes';y.textContent='YES — genuine negative: ';
+    p2.append(y);p2.append(document.createTextNode('Something was explicitly tried, explicitly abandoned, AND the reason is stated. The rejection is the key part.'));
+    const p3=document.createElement('p');
+    const n=document.createElement('span');n.className='no';n.textContent='NO — not a negative: ';
+    p3.append(n);p3.append(document.createTextNode('A bug was fixed and resolved. A temporary struggle was overcome. A limitation was noted without abandoning anything. A successful migration was completed.'));
+    const p4=document.createElement('p');
+    const b=document.createElement('strong');b.textContent='Key test: ';
+    p4.append(b);p4.append(document.createTextNode('Is the system currently NOT using this approach because of the experience described?'));
+    ps.push(p1,p2,p3,p4);
+  }
+  g.append(h,...ps);
+}
+
+// ─── DOTS ─────────────────────────────────────────────────────────────────────
+
+function renderDots(){
+  const data=currentData();const labels=currentLabels();const idx=currentIdx();
+  const grid=document.getElementById('dot-grid');
+  while(grid.firstChild)grid.removeChild(grid.firstChild);
+  data.forEach((item,i)=>{
+    const d=document.createElement('div');
+    d.className='dot';
+    const lab=labels[item.id];
+    let cls='';
+    if(lab&&lab.saved)cls='done';
+    else if(lab&&lab.skipped)cls='skipped';
+    if(i===idx)cls=cls?cls+'-current':'current';
+    if(cls)d.className='dot '+cls;
+    d.title=`${item.id} (${i+1}/${data.length})`;
+    d.onclick=()=>{state[state.tab].idx=i;render();};
+    grid.appendChild(d);
+  });
+}
+
+// ─── FORM BUILDERS (DOM only) ─────────────────────────────────────────────────
+
+function clearAndAppend(el,child){while(el.firstChild)el.removeChild(el.firstChild);el.appendChild(child);}
+
+function buildDE(item){
+  const lab=getOrInitLabel('de',item.id);
+  const form=document.createElement('div');form.id='de-form';
+
+  // No-decisions row
+  const noRow=document.createElement('div');noRow.className='no-decision-row';
+  const cb=document.createElement('input');cb.type='checkbox';cb.id='no-dec-cb';cb.checked=lab.no_decisions;
+  cb.onchange=toggleNoDecisions;
+  const lbl=document.createElement('label');lbl.htmlFor='no-dec-cb';
+  lbl.textContent='No decisions in this text — it\'s pure implementation, a bug fix, or a workaround';
+  noRow.append(cb,lbl);form.appendChild(noRow);
+
+  // Decision list
+  const decList=document.createElement('div');decList.id='decision-list';
+  lab.decisions.forEach((dec,i)=>decList.appendChild(buildDecRow(dec,i)));
+  form.appendChild(decList);
+
+  if(!lab.no_decisions){
+    const addBtn=document.createElement('button');addBtn.id='add-decision-btn';
+    addBtn.textContent='+ Add decision';addBtn.onclick=addDecision;
+    form.appendChild(addBtn);
+  }
+  return form;
+}
+
+function buildDecRow(dec,i){
+  const row=document.createElement('div');row.className='decision-row';
+  const num=document.createElement('span');num.className='dec-num';num.textContent='#'+(i+1);
+  const txt=document.createElement('input');txt.type='text';txt.className='dec-text';
+  txt.placeholder='Summarise the decision in a few words...';txt.value=dec.text;
+  txt.oninput=e=>{
+    const item=currentItem();const lab=getOrInitLabel('de',item.id);
+    lab.decisions[i].text=e.target.value;saveState();
+  };
+  const sel=document.createElement('select');sel.className='dec-cat';
+  ['architecture','stack-choice','policy','refactor','other'].forEach(v=>{
+    const opt=document.createElement('option');opt.value=v;opt.textContent=
+      v==='architecture'?'Architecture':v==='stack-choice'?'Stack choice':v==='policy'?'Policy / rule':v==='refactor'?'Refactor direction':'Other';
+    if(dec.category===v)opt.selected=true;
+    sel.appendChild(opt);
+  });
+  sel.onchange=e=>{
+    const item=currentItem();const lab=getOrInitLabel('de',item.id);
+    lab.decisions[i].category=e.target.value;saveState();
+  };
+  const rmBtn=document.createElement('button');rmBtn.className='remove-btn';rmBtn.textContent='✕';
+  rmBtn.onclick=()=>removeDecision(i);
+  row.append(num,txt,sel,rmBtn);return row;
+}
+
+function buildDD(item){
+  const lab=getOrInitLabel('dd',item.id);
+  const form=document.createElement('div');form.id='dd-form';
+
+  const panels=document.createElement('div');panels.className='pair-panels';
+  const pa=document.createElement('div');pa.className='pair-panel';
+  const la=document.createElement('div');la.className='pair-panel-label';la.textContent='Text A';
+  const ta=document.createElement('div');ta.textContent=item.a.txt;
+  pa.append(la,ta);
+  const pb=document.createElement('div');pb.className='pair-panel';
+  const lb=document.createElement('div');lb.className='pair-panel-label';lb.textContent='Text B';
+  const tb=document.createElement('div');tb.textContent=item.b.txt;
+  pb.append(lb,tb);
+  panels.append(pa,pb);form.appendChild(panels);
+
+  const btns=document.createElement('div');btns.className='dd-buttons';
+  const dupBtn=document.createElement('button');
+  dupBtn.className='dd-btn dd-btn-dup'+(lab.label==='true-dup'?' selected':'');
+  dupBtn.textContent='✓ TRUE DUPLICATE — same fact, different words';
+  dupBtn.onclick=()=>setDDLabel('true-dup');
+  const notBtn=document.createElement('button');
+  notBtn.className='dd-btn dd-btn-notdup'+(lab.label==='false-dup'?' selected':'');
+  notBtn.textContent='✗ NOT A DUPLICATE — different detail or perspective';
+  notBtn.onclick=()=>setDDLabel('false-dup');
+  btns.append(dupBtn,notBtn);form.appendChild(btns);
+  return form;
+}
+
+function buildNEG(item){
+  const lab=getOrInitLabel('neg',item.id);
+  const form=document.createElement('div');form.id='neg-form';
+
+  const btns=document.createElement('div');btns.className='neg-buttons';
+  const yBtn=document.createElement('button');
+  yBtn.className='neg-btn neg-btn-yes'+(lab.type==='negative'?' selected':'');
+  yBtn.textContent='YES — something was tried and rejected';
+  yBtn.onclick=()=>setNEGType('negative');
+  const nBtn=document.createElement('button');
+  nBtn.className='neg-btn neg-btn-no'+(lab.type==='positive'?' selected':'');
+  nBtn.textContent='NO — this is a resolved problem or completed work';
+  nBtn.onclick=()=>setNEGType('positive');
+  btns.append(yBtn,nBtn);form.appendChild(btns);
+
+  if(lab.type==='negative'){
+    const hint=document.createElement('div');hint.className='neg-hint';
+    hint.textContent='What was rejected and why? (add one entry per distinct rejection reason)';
+    form.appendChild(hint);
+
+    const negList=document.createElement('div');negList.id='neg-list';
+    lab.negatives.forEach((neg,i)=>negList.appendChild(buildNegRow(neg,i)));
+    form.appendChild(negList);
+
+    const addBtn=document.createElement('button');addBtn.id='add-neg-btn';
+    addBtn.textContent='+ Add rejection reason';addBtn.onclick=addNeg;
+    form.appendChild(addBtn);
+  }
+  return form;
+}
+
+function buildNegRow(neg,i){
+  const row=document.createElement('div');row.className='neg-row';
+  const hdr=document.createElement('div');hdr.className='neg-row-header';
+  const num=document.createElement('span');num.className='neg-row-num';num.textContent='Rejection #'+(i+1);
+  const rm=document.createElement('button');rm.className='remove-btn';rm.textContent='✕';rm.onclick=()=>removeNeg(i);
+  hdr.append(num,rm);row.appendChild(hdr);
+  const fields=document.createElement('div');fields.className='neg-row-fields';
+  const f1=document.createElement('div');f1.className='neg-field';
+  const l1=document.createElement('label');l1.textContent='What was tried / rejected';
+  const i1=document.createElement('input');i1.type='text';i1.placeholder='e.g. gRPC for inter-service comms';i1.value=neg.what;
+  i1.oninput=e=>{const item=currentItem();getOrInitLabel('neg',item.id).negatives[i].what=e.target.value;saveState();};
+  f1.append(l1,i1);
+  const f2=document.createElement('div');f2.className='neg-field';
+  const l2=document.createElement('label');l2.textContent='Why it was rejected';
+  const i2=document.createElement('input');i2.type='text';i2.placeholder='e.g. HAProxy does not support HTTP/2';i2.value=neg.why;
+  i2.oninput=e=>{const item=currentItem();getOrInitLabel('neg',item.id).negatives[i].why=e.target.value;saveState();};
+  f2.append(l2,i2);
+  fields.append(f1,f2);row.appendChild(fields);
+  return row;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+
+function render(){
+  const item=currentItem();const data=currentData();const idx=currentIdx();
+  document.getElementById('item-id').textContent=item.id;
+  document.getElementById('item-count').textContent=(idx+1)+' / '+data.length;
+
+  const sessionLabel=document.getElementById('session-label');
+  const sessionBox=document.getElementById('session-box');
+  if(state.tab==='dd'){
+    sessionLabel.style.display='none';sessionBox.style.display='none';
+  } else {
+    sessionLabel.style.display='block';sessionBox.style.display='block';
+    sessionBox.textContent=item.text;
+  }
+
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  if(state.tab==='de')fa.appendChild(buildDE(item));
+  else if(state.tab==='dd')fa.appendChild(buildDD(item));
+  else fa.appendChild(buildNEG(item));
+
+  const lab=currentLabels()[item.id];
+  document.getElementById('notes-area').value=lab?lab.notes||'':'';
+  document.getElementById('btn-prev').disabled=idx===0;
+  document.getElementById('btn-next').disabled=idx===data.length-1;
+
+  renderDots();renderGuide();updateTabCounts();
+}
+
+// ─── ACTIONS ──────────────────────────────────────────────────────────────────
+
+function switchTab(tab){
+  state.tab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  saveState();render();
+}
+
+function navigate(dir){
+  const n=currentIdx()+dir;
+  if(n<0||n>=currentData().length)return;
+  state[state.tab].idx=n;saveState();render();
+}
+
+function skipItem(){
+  const item=currentItem();const lab=getOrInitLabel(state.tab,item.id);
+  lab.skipped=true;lab.notes=document.getElementById('notes-area').value;
+  saveState();
+  if(currentIdx()<currentData().length-1)state[state.tab].idx++;
+  render();
+}
+
+function showSaved(){
+  const el=document.getElementById('save-status');el.style.opacity='1';
+  setTimeout(()=>el.style.opacity='0',1500);
+}
+
+function saveItem(){
+  const item=currentItem();const lab=getOrInitLabel(state.tab,item.id);
+  lab.notes=document.getElementById('notes-area').value;
+  if(state.tab==='de'){
+    if(!lab.no_decisions&&lab.decisions.length===0){alert('Add at least one decision, or check "No decisions in this text".');return;}
+    lab.saved=true;
+  } else if(state.tab==='dd'){
+    if(!lab.label){alert('Select TRUE DUPLICATE or NOT A DUPLICATE before saving.');return;}
+    lab.saved=true;
+  } else {
+    if(!lab.type){alert('Select YES or NO before saving.');return;}
+    if(lab.type==='negative'&&lab.negatives.length===0){alert('Add at least one rejection reason when marking as a genuine negative.');return;}
+    lab.saved=true;
+  }
+  saveState();showSaved();updateTabCounts();renderDots();
+  if(currentIdx()<currentData().length-1){state[state.tab].idx++;saveState();render();}
+}
+
+function toggleNoDecisions(){
+  const item=currentItem();const lab=getOrInitLabel('de',item.id);
+  lab.no_decisions=document.getElementById('no-dec-cb').checked;
+  if(lab.no_decisions)lab.decisions=[];
+  saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildDE(item));
+}
+
+function addDecision(){
+  const item=currentItem();const lab=getOrInitLabel('de',item.id);
+  lab.decisions.push({text:'',category:'architecture'});
+  saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildDE(item));
+}
+
+function removeDecision(i){
+  const item=currentItem();const lab=getOrInitLabel('de',item.id);
+  lab.decisions.splice(i,1);saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildDE(item));
+}
+
+function setDDLabel(val){
+  const item=currentItem();const lab=getOrInitLabel('dd',item.id);
+  lab.label=val;saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildDD(item));
+}
+
+function setNEGType(val){
+  const item=currentItem();const lab=getOrInitLabel('neg',item.id);
+  lab.type=val;if(val==='positive')lab.negatives=[];saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildNEG(item));
+}
+
+function addNeg(){
+  const item=currentItem();const lab=getOrInitLabel('neg',item.id);
+  lab.negatives.push({what:'',why:''});saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildNEG(item));
+}
+
+function removeNeg(i){
+  const item=currentItem();const lab=getOrInitLabel('neg',item.id);
+  lab.negatives.splice(i,1);saveState();
+  const fa=document.getElementById('form-area');
+  while(fa.firstChild)fa.removeChild(fa.firstChild);
+  fa.appendChild(buildNEG(item));
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+
+function exportAll(){
+  const now=new Date().toISOString();
+  const deOut=[];
+  for(const item of DE_DATA){
+    const lab=state.de.labels[item.id];if(!lab||!lab.saved)continue;
+    deOut.push({schema:'decision-extraction/v1',source_session:item.session,input_text:item.text,
+      expected:lab.no_decisions?[]:lab.decisions.map(d=>({text:d.text,category:d.category})),
+      reviewer_notes:lab.notes||'',labelled_by:'human',labelled_at:now});
+  }
+  download('de-gold.json',JSON.stringify(deOut,null,2));
+
+  const ddOut=[];
+  for(const item of DD_DATA){
+    const lab=state.dd.labels[item.id];if(!lab||!lab.saved)continue;
+    ddOut.push({schema:'dedup/v1',label:lab.label,
+      a:{chunk_id:item.a.cid,text:item.a.txt},b:{chunk_id:item.b.cid,text:item.b.txt},
+      reviewer_notes:lab.notes||'',labelled_by:'human',labelled_at:now});
+  }
+  download('dd-gold.json',JSON.stringify(ddOut,null,2));
+
+  const negOut=[];
+  for(const item of NEG_DATA){
+    const lab=state.neg.labels[item.id];if(!lab||!lab.saved)continue;
+    negOut.push({schema:'negative/v1',source_session:item.session,input_text:item.text,
+      expected_type:lab.type,
+      expected_negatives:lab.type==='negative'?lab.negatives.map(n=>({what:n.what,why:n.why})):[],
+      reviewer_notes:lab.notes||'',labelled_by:'human',labelled_at:now});
+  }
+  download('neg-gold.json',JSON.stringify(negOut,null,2));
+}
+
+function download(filename,content){
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(content);
+  a.download=filename;a.click();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadState();render();
+</script>
+</body>
+</html>
