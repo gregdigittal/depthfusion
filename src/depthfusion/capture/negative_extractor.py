@@ -41,22 +41,42 @@ _DISCOVERIES_DIR = Path.home() / ".claude" / "shared" / "discoveries"
 # Heuristic patterns that signal a failure or something that didn't work.
 # Ordered by specificity — more specific patterns first.
 _NEGATIVE_PATTERNS = [
-    # "X did not work because Y"
-    (r"(.{10,150})\s+did(?:n'?t| not)\s+work\s+because\s+(.{5,200})", re.IGNORECASE),
-    # "X failed with Y"
-    (r"(.{10,100})\s+failed\s+(?:with|because|due to)\s+(.{5,200})", re.IGNORECASE),
-    # "X doesn't support Y"
-    (r"(.{5,80})\s+doesn'?t\s+support\s+(.{5,100})", re.IGNORECASE),
-    # "X is incompatible with Y"
-    (r"(.{5,80})\s+is(?:n'?t)?\s+incompatible\s+with\s+(.{5,100})", re.IGNORECASE),
-    # "DO NOT / NEVER X"
+    # Explicit annotation markers
     (r"^(?:DO NOT|NEVER|DON'T)\s+(.{10,200})$", re.MULTILINE | re.IGNORECASE),
-    # "X causes Y"
-    (r"(.{10,100})\s+causes?\s+(.{5,100}(?:error|bug|issue|crash|failure))", re.IGNORECASE),
-    # "avoid X" or "don't use X"
     (r"^(?:avoid|don'?t use|never use)\s+(.{10,200})$", re.MULTILINE | re.IGNORECASE),
-    # Error/exception mentions with context
+    # Classic failure phrases
+    (r"(.{10,150})\s+did(?:n'?t| not)\s+work\s+because\s+(.{5,200})", re.IGNORECASE),
+    (r"(.{10,100})\s+failed\s+(?:with|because|due to)\s+(.{5,200})", re.IGNORECASE),
+    (r"(.{5,80})\s+doesn'?t\s+support\s+(.{5,100})", re.IGNORECASE),
+    (r"(.{5,80})\s+is(?:n'?t)?\s+incompatible\s+with\s+(.{5,100})", re.IGNORECASE),
+    (r"(.{10,100})\s+causes?\s+(.{5,100}(?:error|bug|issue|crash|failure))", re.IGNORECASE),
     (r"(?:error|exception|traceback):\s*(.{10,200})", re.IGNORECASE),
+    # Past-tense implementation openers — sentence-initial "Used/Implemented/Deployed X"
+    # These catch descriptions of failed approaches written as "We used X. Problem: Y."
+    (r"^(?:Implemented|Used|Deployed|Introduced|Added|Set up|Enabled|Had|Stored)\s+(.{10,200}?)(?:[.,;]|\s+so\s+|\s+(?:to\s+\w+\s+){0,3}(?:Worked|Seemed|Appeared|Initially|But\s+it|Problem|Issue|The\s+issue)|$)", re.MULTILINE | re.IGNORECASE),
+    # "Evaluated/Investigated/Considered X" — considered-and-rejected approaches
+    (r"^(?:Evaluated|Investigated|Considered|Explored)\s+(.{10,200}?)(?:[.,;]|\s+so\s+|$)", re.MULTILINE | re.IGNORECASE),
+    # "Attempted/Proposed/Tried to migrate/use X"
+    (r"^(?:Attempted|Proposed)\s+(?:to\s+)?(.{10,200}?)(?:[.,;]|$)", re.MULTILINE | re.IGNORECASE),
+    # "Tried X" — tried-and-reverted opener; group 1 = what was tried
+    (r"[Tt]ried\s+(.{10,150}?)(?:\s*[.,;—]|$)", re.IGNORECASE),
+    # Inline "used X" (non-sentence-initial) — "design used JWTs with no server-side state"
+    (r"\bused\s+(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
+    # Explicit revert/abandon signals
+    (r"(?:reverted?|rolled back|abandoned|pulled back|switched away from)\s+(?:\S+\s+){0,3}(.{10,150}?)(?:[.,;]|$)", re.IGNORECASE),
+    # "hit the X limit/rate limit/quota"
+    (r"(.{10,100}?)\s+(?:hit|hits|hitting)\s+(?:the\s+)?(.{5,80}?(?:limit|quota|cap|ceiling))(?:[.,;]|$)", re.IGNORECASE),
+    # "X doesn't work / wasn't working"
+    (r"(.{10,120}?)\s+(?:doesn'?t|wasn'?t|stopped)\s+work(?:ing)?(?:\s+because\s+(.{5,150}))?(?:[.,;]|$)", re.IGNORECASE),
+    # "X caused/led to/resulted in problems"
+    (r"(.{10,120}?)\s+(?:caused?|led to|resulted in)\s+(.{5,100}?(?:problem|issue|failure|error|timeout|crash|conflict))(?:[.,;]|$)", re.IGNORECASE),
+    # "The problem (with X)?: Y"
+    (r"[Tt]he problem(?:\s+(?:is|with\s+\S+)\s*)?:\s*(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
+    # "X breaks when Y"
+    (r"(.{10,100}?)\s+breaks?\s+(?:when|if|because)\s+(.{5,150}?)(?:[.,;]|$)", re.IGNORECASE),
+    # "The codebase/system uses X" — legacy technology with implicit problems
+    # Captures long-standing decisions the team is now questioning or replacing
+    (r"(?:codebase|system|application|service|team)\s+uses?\s+(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
 ]
 
 _DEFAULT_CONFIDENCE = 0.70

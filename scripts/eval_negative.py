@@ -94,11 +94,21 @@ def _best_match(extracted_what_list: list[str], target: str, threshold: float) -
     return max(bow_cosine(x, target) for x in extracted_what_list)
 
 
-def compute_metrics(files: list[Path], threshold: float) -> NegativeResult:
+def compute_metrics(files: list[Path], threshold: float, use_llm: bool = False) -> NegativeResult:
     # Import deferred: same rationale as eval_decision.compute_metrics.
-    from depthfusion.capture.negative_extractor import HeuristicNegativeExtractor
-
-    extractor = HeuristicNegativeExtractor()
+    if use_llm:
+        from depthfusion.capture.negative_extractor import LLMNegativeExtractor
+        extractor = LLMNegativeExtractor()
+        if not extractor.is_available():
+            print(
+                "WARNING: LLM backend unavailable — falling back to heuristic. "
+                "Set DEPTHFUSION_DECISION_EXTRACTOR_ENABLED=true and ensure "
+                "DEPTHFUSION_API_KEY is set.",
+                file=sys.stderr,
+            )
+    else:
+        from depthfusion.capture.negative_extractor import HeuristicNegativeExtractor
+        extractor = HeuristicNegativeExtractor()
     result = NegativeResult()
 
     for path in files:
@@ -136,13 +146,14 @@ def compute_metrics(files: list[Path], threshold: float) -> NegativeResult:
     return result
 
 
-def format_report(result: NegativeResult, n_files: int, threshold: float) -> str:
+def format_report(result: NegativeResult, n_files: int, threshold: float, use_llm: bool = False) -> str:
+    extractor_name = "LLMNegativeExtractor" if use_llm else "HeuristicNegativeExtractor"
     lines = []
     lines.append("# Negative-Signal Eval Report")
     lines.append("")
     lines.append(f"- Files evaluated: {n_files}")
     lines.append(f"- Cosine threshold for match: {threshold}")
-    lines.append(f"- Extractor: HeuristicNegativeExtractor")
+    lines.append(f"- Extractor: {extractor_name}")
     lines.append("")
     lines.append("## Summary")
     lines.append("")
@@ -176,6 +187,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="Bag-of-words cosine threshold for match (default 0.5)")
     parser.add_argument("--include-seeds", action="store_true",
                         help="Include _seeds/ files")
+    parser.add_argument(
+        "--llm", action="store_true",
+        help=(
+            "Use LLMNegativeExtractor (production path) instead of the heuristic fallback. "
+            "Requires DEPTHFUSION_DECISION_EXTRACTOR_ENABLED=true and DEPTHFUSION_API_KEY set."
+        ),
+    )
     args = parser.parse_args(argv)
 
     files = collect_gold_files(args.include_seeds)
@@ -185,11 +203,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        result = compute_metrics(files, args.threshold)
+        result = compute_metrics(files, args.threshold, use_llm=args.llm)
     except ImportError as err:
         print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
         return 2
-    print(format_report(result, len(files), args.threshold))
+    print(format_report(result, len(files), args.threshold, use_llm=args.llm))
     return 0
 
 

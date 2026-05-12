@@ -73,7 +73,8 @@ Focus on durable knowledge that would help in a future session.
 Session transcript:
 {content}"""
 
-_HEURISTIC_PATTERNS = [
+# Explicit annotation markers: human intent is declared; no length filter applied.
+_ANNOTATED_PATTERNS: list[tuple[str, int]] = [
     (r"^→\s+(.{10,300})", re.MULTILINE),
     (r"^DECISION:\s*(.{10,300})", re.MULTILINE | re.IGNORECASE),
     (r"^NOTE:\s*(.{10,300})", re.MULTILINE | re.IGNORECASE),
@@ -81,6 +82,45 @@ _HEURISTIC_PATTERNS = [
     (r"^WARNING:\s*(.{10,300})", re.MULTILINE | re.IGNORECASE),
     (r"^\*\*(.{10,150})\*\*", re.MULTILINE),
 ]
+
+# Prose heuristic patterns: length and topic filters are applied to reduce FPs.
+_PROSE_PATTERNS: list[tuple[str, int]] = [
+    # Commitment verbs — "going with X", "settled on X", "decided to X"
+    (r"(?:I'?m |we'?re |going )?going with\s+(.{10,200}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"settled on\s+(.{10,200}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"decided(?:\s+to)?\s*:?\s+(.{10,200}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"(?:we |I )?chose\s+(.{10,200}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"(?:the )?decision(?:\s+is|:)\s+(.{10,200}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    # Architecture/policy statements — "Use X for Y", "Policy: X", "Standard: X"
+    (r"^(?:Use|Using)\s+(.{10,200}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
+    (r"^Policy:\s*(.{10,200}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
+    (r"^Standard(?:\s+rule)?:\s*(.{10,200}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
+    (r"^(?:All|Every)\s+(.{10,200}?must.{5,100}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
+    # Migration / switch / replacement decisions
+    (r"migrat(?:e|ed|ing)\s+(?:from\s+\S+\s+)?to\s+(.{10,150}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"switch(?:ed|ing)\s+(?:from\s+\S+\s+)?to\s+(.{10,150}?)(?:[.;,\n]|$)", re.IGNORECASE),
+    (r"^Replacing\s+(.{10,200}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
+    # Chosen-over comparisons — "X over Y because Z"
+    (r"(.{10,100}?)\s+over\s+\S.{5,80}?\s+(?:because|since|as)\s+.{5,100}?(?:[.;]|$)", re.IGNORECASE),
+]
+
+# Combined list kept for backwards-compat callers that reference _HEURISTIC_PATTERNS.
+_HEURISTIC_PATTERNS = _ANNOTATED_PATTERNS + _PROSE_PATTERNS
+
+# Regex patterns for topic-description false positives — phrases that describe
+# the subject of a decision rather than the decision itself.
+_FP_TOPIC_PATTERNS = [
+    re.compile(r"^the following", re.IGNORECASE),
+    re.compile(r"^where\s+to\s+", re.IGNORECASE),
+    re.compile(r"^how\s+to\s+", re.IGNORECASE),
+    re.compile(r"^on\s+the\s+", re.IGNORECASE),
+    re.compile(
+        r"^the\s+(?:\w+[\s-]){0,3}(?:toolchain|stack|approach|design|system|solution|architecture)\b",
+        re.IGNORECASE,
+    ),
+]
+
+_MIN_DECISION_LENGTH = 25
 
 _DEFAULT_CONFIDENCE_HEURISTIC = 0.60
 
@@ -112,21 +152,45 @@ class HeuristicDecisionExtractor:
     def extract(self, content: str, source_session: str = "") -> list[DecisionEntry]:
         if not content or len(content.strip()) < 20:
             return []
-        results: list[DecisionEntry] = []
+        raw: list[DecisionEntry] = []
         seen: set[str] = set()
-        for pattern, flags in _HEURISTIC_PATTERNS:
-            for m in re.finditer(pattern, content, flags):
-                text = m.group(1).strip()
-                if len(text) >= 10 and text not in seen:
+
+        for pattern_list, apply_filters in (
+            (_ANNOTATED_PATTERNS, False),
+            (_PROSE_PATTERNS, True),
+        ):
+            for pattern, flags in pattern_list:
+                for m in re.finditer(pattern, content, flags):
+                    text = m.group(1).strip()
+                    if text in seen:
+                        continue
+                    if apply_filters:
+                        if len(text) < _MIN_DECISION_LENGTH:
+                            continue
+                        if any(p.search(text) for p in _FP_TOPIC_PATTERNS):
+                            continue
                     seen.add(text)
-                    results.append(DecisionEntry(
+                    raw.append(DecisionEntry(
                         text=text,
                         confidence=_DEFAULT_CONFIDENCE_HEURISTIC,
                         category="decision",
                         source_session=source_session,
                     ))
-                    if len(results) >= 50:
+                    if len(raw) >= 50:
                         break
+
+        # Substring deduplication: keep the longest representative when one
+        # entry is a substring of another (greedy-match FP suppression).
+        raw.sort(key=lambda e: len(e.text), reverse=True)
+        results: list[DecisionEntry] = []
+        kept_texts: list[str] = []
+        for entry in raw:
+            lower = entry.text.lower()
+            if any(lower in kept.lower() for kept in kept_texts):
+                continue
+            kept_texts.append(entry.text)
+            results.append(entry)
+
         return results[:50]
 
 

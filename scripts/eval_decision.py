@@ -143,12 +143,22 @@ def match_extracted_to_expected(
 # Main
 # --------------------------------------------------------------------------
 
-def compute_metrics(files: list[Path], threshold: float) -> MatchResult:
+def compute_metrics(files: list[Path], threshold: float, use_llm: bool = False) -> MatchResult:
     # Import deferred: lets tests exercise the pure-function path without
     # requiring the full depthfusion package in the test env.
-    from depthfusion.capture.decision_extractor import HeuristicDecisionExtractor
-
-    extractor = HeuristicDecisionExtractor()
+    if use_llm:
+        from depthfusion.capture.decision_extractor import LLMDecisionExtractor
+        extractor = LLMDecisionExtractor()
+        if not extractor.is_available():
+            print(
+                "WARNING: LLM backend unavailable — falling back to heuristic. "
+                "Set DEPTHFUSION_DECISION_EXTRACTOR_ENABLED=true and ensure "
+                "DEPTHFUSION_API_KEY is set.",
+                file=sys.stderr,
+            )
+    else:
+        from depthfusion.capture.decision_extractor import HeuristicDecisionExtractor
+        extractor = HeuristicDecisionExtractor()
     result = MatchResult()
 
     for path in files:
@@ -177,13 +187,14 @@ def compute_metrics(files: list[Path], threshold: float) -> MatchResult:
     return result
 
 
-def format_report(result: MatchResult, n_files: int, threshold: float) -> str:
+def format_report(result: MatchResult, n_files: int, threshold: float, use_llm: bool = False) -> str:
+    extractor_name = "LLMDecisionExtractor" if use_llm else "HeuristicDecisionExtractor"
     lines = []
     lines.append("# Decision-Extraction Eval Report")
     lines.append("")
     lines.append(f"- Files evaluated: {n_files}")
     lines.append(f"- Match threshold (bag-of-words cosine): {threshold}")
-    lines.append(f"- Extractor: HeuristicDecisionExtractor")
+    lines.append(f"- Extractor: {extractor_name}")
     lines.append("")
     lines.append("## Summary")
     lines.append("")
@@ -218,6 +229,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-seeds", action="store_true",
                         help="Include _seeds/ files (normally excluded)")
     parser.add_argument("--single", help="Measure a single file instead of the full set")
+    parser.add_argument(
+        "--llm", action="store_true",
+        help=(
+            "Use LLMDecisionExtractor (production path) instead of the heuristic fallback. "
+            "Requires DEPTHFUSION_DECISION_EXTRACTOR_ENABLED=true and DEPTHFUSION_API_KEY set."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.single:
@@ -230,11 +248,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        result = compute_metrics(files, args.threshold)
+        result = compute_metrics(files, args.threshold, use_llm=args.llm)
     except ImportError as err:
         print(f"ERROR: cannot import extractor: {err}", file=sys.stderr)
         return 2
-    print(format_report(result, len(files), args.threshold))
+    print(format_report(result, len(files), args.threshold, use_llm=args.llm))
     return 0
 
 
