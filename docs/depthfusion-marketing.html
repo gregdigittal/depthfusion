@@ -161,6 +161,9 @@
 
   /* ─── FOOTER ─── */
   footer{border-top:1px solid rgba(255,255,255,.06);padding:2.5rem 2rem;text-align:center;color:var(--muted);font-size:.82rem;position:relative;z-index:1;}
+
+  /* ─── TECH ARCH ─── */
+  #cog-chart{display:block;width:100%;max-width:900px;margin:0 auto;}
 </style>
 </head>
 <body>
@@ -335,6 +338,30 @@
   </div>
 </section>
 
+<!-- ══════════ TECHNICAL ARCHITECTURE ══════════ -->
+<section id="tech-arch" class="section reveal">
+  <span class="eyebrow">Technical architecture</span>
+  <h2>Hybrid retrieval, cognitive scoring, <span class="hl">local-first storage.</span></h2>
+  <p class="lead">A full recall pipeline running on your VPS. No external services, no data leaving your machine — everything is SQLite, local embeddings, and file-backed queues.</p>
+  <div id="pipeline-wrap" style="margin:3rem 0 2rem;"></div>
+  <div style="margin:3rem 0;">
+    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">CognitiveScorer — 8 Weighted Components</h3>
+    <canvas id="cog-chart" width="900" height="280"></canvas>
+  </div>
+  <div style="margin:3rem 0;">
+    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Memory Type Taxonomy</h3>
+    <div id="mem-type-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;"></div>
+  </div>
+  <div style="margin:3rem 0;">
+    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Cross-Session Data Flow</h3>
+    <div id="flow-timeline" style="max-width:600px;margin:0 auto;"></div>
+  </div>
+  <div style="margin:3rem 0 0;">
+    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Storage Layer</h3>
+    <div id="storage-table-wrap" style="overflow-x:auto;"></div>
+  </div>
+</section>
+
 <!-- ══════════ RECALL DEMO ══════════ -->
 <section id="recall" class="section reveal">
   <span class="eyebrow">Live recall simulation</span>
@@ -351,7 +378,7 @@
 </section>
 
 <!-- ══════════ CTA ══════════ -->
-<section class="cta-section z1 reveal">
+<section id="cta-section" class="cta-section z1 reveal">
   <h2>Ready to give Claude <span class="hl">permanent memory?</span></h2>
   <p>Install in under 2 minutes. Works with your existing Claude Code setup. No API changes, no workflow changes — just memory.</p>
   <div class="cta-card">
@@ -727,6 +754,262 @@ setTimeout(function(){
     requestAnimationFrame(loop);
   })();
   setStatus('Click to trigger recall demo');
+})();
+
+// ── BUTTON HANDLERS ──
+(function(){
+  var hero = document.getElementById('hero');
+  var recallSection = document.getElementById('recall');
+  var ctaSection = document.getElementById('cta-section');
+  var installCmd = document.getElementById('install-cmd');
+
+  if(hero) {
+    var heroGhost = hero.querySelector('.btn-ghost');
+    if(heroGhost) heroGhost.addEventListener('click', function() {
+      if(recallSection) recallSection.scrollIntoView({behavior:'smooth'});
+    });
+    var heroPrimary = hero.querySelector('.btn-primary');
+    if(heroPrimary) heroPrimary.addEventListener('click', function() {
+      if(ctaSection) ctaSection.scrollIntoView({behavior:'smooth'});
+    });
+  }
+
+  var navCta = document.querySelector('nav .nav-cta');
+  if(navCta) navCta.addEventListener('click', function() {
+    if(ctaSection) ctaSection.scrollIntoView({behavior:'smooth'});
+  });
+
+  if(ctaSection) {
+    var ctaPrimary = ctaSection.querySelector('.btn-primary');
+    if(ctaPrimary) ctaPrimary.addEventListener('click', function() {
+      if(installCmd) installCmd.scrollIntoView({behavior:'smooth'});
+    });
+    var ctaGhost = ctaSection.querySelector('.btn-ghost');
+    if(ctaGhost) ctaGhost.addEventListener('click', function() {
+      window.open('https://github.com/gregdigittal/depthfusion', '_blank');
+    });
+  }
+})();
+
+// ── TECH ARCH — PIPELINE ──
+(function(){
+  var wrap = document.getElementById('pipeline-wrap');
+  if(!wrap) return;
+  var stages = [
+    {label:'User Query',    color:'#7c3aed', ann:''},
+    {label:'BM25 Lexical',  color:'#06b6d4', ann:'w=0.18'},
+    {label:'Vector Search', color:'#10b981', ann:'MiniLM-L6-v2'},
+    {label:'RRF Fusion',    color:'#f59e0b', ann:'k=60'},
+    {label:'CognitiveScorer',color:'#8b5cf6', ann:'8 dims'},
+    {label:'Haiku Reranker',color:'#22d3ee', ann:'optional'},
+    {label:'Top-K Returned',color:'#10b981', ann:'≤1.5s p95'},
+  ];
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;justify-content:center;';
+  stages.forEach(function(s, i) {
+    var pill = document.createElement('div');
+    pill.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:.15rem;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:'+s.color+'22;border:1px solid '+s.color+'55;border-radius:24px;padding:.45rem .9rem;text-align:center;';
+    var name = document.createElement('span');
+    name.style.cssText = 'display:block;font-size:.82rem;font-weight:600;color:'+s.color+';white-space:nowrap;';
+    name.textContent = s.label;
+    box.appendChild(name);
+    if(s.ann) {
+      var ann = document.createElement('span');
+      ann.style.cssText = 'display:block;font-size:.68rem;color:var(--muted);';
+      ann.textContent = s.ann;
+      box.appendChild(ann);
+    }
+    pill.appendChild(box);
+    row.appendChild(pill);
+    if(i < stages.length - 1) {
+      var arrow = document.createElement('div');
+      arrow.style.cssText = 'color:var(--muted);font-size:1.1rem;flex-shrink:0;';
+      arrow.textContent = '→';
+      row.appendChild(arrow);
+    }
+  });
+  wrap.appendChild(row);
+})();
+
+// ── TECH ARCH — COGNITIVE SCORER CHART ──
+(function(){
+  var c = document.getElementById('cog-chart');
+  if(!c) return;
+  var ctx2 = c.getContext('2d');
+  var W = c.width, H = c.height;
+  var components = [
+    {name:'semantic',        weight:0.25, color:'#7c3aed'},
+    {name:'lexical',         weight:0.18, color:'#06b6d4'},
+    {name:'confidence',      weight:0.15, color:'#10b981'},
+    {name:'regime',          weight:0.12, color:'#f59e0b'},
+    {name:'graph',           weight:0.10, color:'#8b5cf6'},
+    {name:'recency',         weight:0.08, color:'#22d3ee'},
+    {name:'hist_usefulness', weight:0.07, color:'#fb923c'},
+    {name:'workflow',        weight:0.05, color:'#f43f5e'},
+  ];
+  var padL = 148, padR = 72, padT = 18, padB = 18;
+  var chartW = W - padL - padR;
+  var barH = 26, gap = 7;
+  var totalH = components.length * (barH + gap) - gap;
+  var offsetY = padT + (H - padT - padB - totalH) / 2;
+  var animP = 0;
+
+  function drawCog(p) {
+    ctx2.clearRect(0, 0, W, H);
+    components.forEach(function(comp, i) {
+      var y = offsetY + i * (barH + gap);
+      var maxW = chartW * (comp.weight / 0.25);
+      var fillW = maxW * p;
+      ctx2.font = '13px system-ui,sans-serif';
+      ctx2.fillStyle = 'rgba(241,245,249,0.6)';
+      ctx2.textAlign = 'right';
+      ctx2.fillText(comp.name, padL - 10, y + barH / 2 + 5);
+      ctx2.fillStyle = 'rgba(30,41,59,0.5)';
+      ctx2.beginPath();
+      ctx2.roundRect(padL, y, chartW, barH, 4);
+      ctx2.fill();
+      if(fillW > 0) {
+        ctx2.fillStyle = comp.color + 'cc';
+        ctx2.beginPath();
+        ctx2.roundRect(padL, y, fillW, barH, 4);
+        ctx2.fill();
+      }
+      if(p > 0.55) {
+        ctx2.font = '12px system-ui,sans-serif';
+        ctx2.fillStyle = 'rgba(241,245,249,0.85)';
+        ctx2.textAlign = 'left';
+        ctx2.fillText(Math.round(comp.weight * 100) + '%', padL + maxW + 6, y + barH / 2 + 5);
+      }
+    });
+  }
+
+  drawCog(0);
+
+  function animCog() {
+    animP = Math.min(1, animP + 0.038);
+    drawCog(animP);
+    if(animP < 1) requestAnimationFrame(animCog);
+  }
+
+  var cogObs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if(e.isIntersecting) { requestAnimationFrame(animCog); cogObs.disconnect(); }
+    });
+  }, {threshold: 0.25});
+  cogObs.observe(c);
+})();
+
+// ── TECH ARCH — MEMORY TYPES ──
+(function(){
+  var grid = document.getElementById('mem-type-grid');
+  if(!grid) return;
+  var types = [
+    {name:'decision',    color:'#7c3aed', desc:'Architectural choices, technology selections, design patterns adopted'},
+    {name:'semantic',    color:'#06b6d4', desc:'Facts about the codebase, APIs, data models, and system topology'},
+    {name:'operational', color:'#10b981', desc:'Commands, workflows, scripts, and procedural knowledge'},
+    {name:'procedural',  color:'#8b5cf6', desc:'Step-by-step processes, runbooks, and repeatable sequences'},
+    {name:'episodic',    color:'#f59e0b', desc:'Specific past sessions, time-anchored events and experiences'},
+    {name:'social',      color:'#22d3ee', desc:'Team conventions, stakeholder preferences, communication patterns'},
+    {name:'temporal',    color:'#f43f5e', desc:'Time-sensitive facts, deadlines, and schedule-aware context'},
+  ];
+  types.forEach(function(t) {
+    var card = document.createElement('div');
+    card.style.cssText = 'background:'+t.color+'11;border:1px solid '+t.color+'33;border-radius:12px;padding:1rem;';
+    var badge = document.createElement('div');
+    badge.style.cssText = 'display:inline-block;background:'+t.color+'22;color:'+t.color+';font-size:.72rem;font-weight:700;letter-spacing:.06em;padding:.2rem .65rem;border-radius:9999px;text-transform:uppercase;margin-bottom:.55rem;';
+    badge.textContent = t.name;
+    var desc = document.createElement('p');
+    desc.style.cssText = 'font-size:.8rem;color:rgba(241,245,249,0.55);margin:0;line-height:1.5;';
+    desc.textContent = t.desc;
+    card.appendChild(badge);
+    card.appendChild(desc);
+    grid.appendChild(card);
+  });
+})();
+
+// ── TECH ARCH — DATA FLOW TIMELINE ──
+(function(){
+  var wrap = document.getElementById('flow-timeline');
+  if(!wrap) return;
+  var steps = [
+    {icon:'⏹', label:'Session ends',         desc:'PostCompact or Stop hook fires automatically'},
+    {icon:'🔧', label:'Extractor runs',       desc:'HeuristicExtractor or HaikuSummarizer processes the session transcript'},
+    {icon:'💾', label:'Indexed',              desc:'BM25 tokens + sentence-transformer embeddings stored in SQLite WAL'},
+    {icon:'📁', label:'Discovery written',    desc:'Markdown + YAML frontmatter saved to ~/.claude/shared/discoveries/'},
+    {icon:'🌐', label:'Available everywhere', desc:'All future sessions, any account, any client — via MCP or hook'},
+  ];
+  steps.forEach(function(s, i) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:flex-start;gap:.85rem;';
+    var left = document.createElement('div');
+    left.style.cssText = 'display:flex;flex-direction:column;align-items:center;flex-shrink:0;';
+    var dot = document.createElement('div');
+    dot.style.cssText = 'width:36px;height:36px;border-radius:50%;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;';
+    dot.textContent = s.icon;
+    left.appendChild(dot);
+    if(i < steps.length - 1) {
+      var line = document.createElement('div');
+      line.style.cssText = 'width:1px;height:28px;background:rgba(124,58,237,0.2);margin-top:3px;';
+      left.appendChild(line);
+    }
+    var right = document.createElement('div');
+    right.style.cssText = 'padding-top:.35rem;';
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'font-weight:600;font-size:.9rem;color:rgba(241,245,249,0.9);';
+    lbl.textContent = s.label;
+    var ddesc = document.createElement('div');
+    ddesc.style.cssText = 'font-size:.78rem;color:var(--muted);margin-top:.1rem;margin-bottom:.55rem;';
+    ddesc.textContent = s.desc;
+    right.appendChild(lbl);
+    right.appendChild(ddesc);
+    row.appendChild(left);
+    row.appendChild(right);
+    wrap.appendChild(row);
+  });
+})();
+
+// ── TECH ARCH — STORAGE TABLE ──
+(function(){
+  var wrap = document.getElementById('storage-table-wrap');
+  if(!wrap) return;
+  var rows = [
+    {layer:'Memory store',   tech:'SQLite WAL',                  path:'~/.claude/.depthfusion_memories.db'},
+    {layer:'Working memory', tech:'SQLite WAL',                  path:'~/.claude/.depthfusion_working_memory.db'},
+    {layer:'Event log',      tech:'JSONL (fcntl-safe)',          path:'~/.claude/shared/depthfusion-events.jsonl'},
+    {layer:'Discoveries',    tech:'Markdown + YAML frontmatter', path:'~/.claude/shared/discoveries/'},
+    {layer:'Context bus',    tech:'File-backed queue',           path:'~/.claude/context-bus/'},
+  ];
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:.85rem;max-width:860px;margin:0 auto;';
+  var thead = document.createElement('thead');
+  var hrow = document.createElement('tr');
+  ['Layer', 'Technology', 'Path'].forEach(function(h) {
+    var th = document.createElement('th');
+    th.style.cssText = 'text-align:left;padding:.6rem 1rem;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(124,58,237,0.25);';
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  rows.forEach(function(r, i) {
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? 'rgba(30,41,59,0.25)' : 'transparent';
+    [r.layer, r.tech, r.path].forEach(function(val, ci) {
+      var td = document.createElement('td');
+      td.style.cssText = 'padding:.6rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);';
+      if(ci === 0) { td.style.fontWeight = '600'; td.style.color = 'rgba(241,245,249,0.9)'; }
+      else if(ci === 2) { td.style.fontFamily = 'monospace'; td.style.fontSize = '.78rem'; td.style.color = '#06b6d4'; }
+      else { td.style.color = 'rgba(241,245,249,0.6)'; }
+      td.textContent = val;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
 })();
 
 // ── SCROLL REVEAL ──

@@ -124,6 +124,9 @@ class DepthFusionConfig:
     rest_api_enabled: bool = False
     api_public: bool = False
     api_token: str = ""
+    mcp_http_enabled: bool = False   # DEPTHFUSION_MCP_HTTP_ENABLED
+    mcp_http_port: int = 7301        # DEPTHFUSION_MCP_PORT
+    mcp_http_token: str = ""         # DEPTHFUSION_MCP_TOKEN
 
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
@@ -185,6 +188,9 @@ class DepthFusionConfig:
             rest_api_enabled=_env_bool("DEPTHFUSION_REST_API", False),
             api_public=_env_bool("DEPTHFUSION_API_PUBLIC", False),
             api_token=os.environ.get("DEPTHFUSION_API_TOKEN", ""),
+            mcp_http_enabled=_env_bool("DEPTHFUSION_MCP_HTTP_ENABLED", False),
+            mcp_http_port=_env_int("DEPTHFUSION_MCP_PORT", 7301),
+            mcp_http_token=os.environ.get("DEPTHFUSION_MCP_TOKEN", ""),
         )
 
     @property
