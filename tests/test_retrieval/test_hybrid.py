@@ -136,3 +136,134 @@ def test_expand_query_no_op_when_store_is_none(monkeypatch):
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     result = pipeline.maybe_expand_query("any query", graph_store=None)
     assert result == "any query"
+
+
+# ---------------------------------------------------------------------------
+# T-323 — CognitiveScorer integration tests
+# ---------------------------------------------------------------------------
+
+def _make_scored_blocks(n: int) -> list[dict]:
+    """Return blocks with descending BM25 scores (doc0 is highest ranked)."""
+    return [
+        {
+            "chunk_id": f"doc{i}",
+            "source": "memory",
+            "score": float(n - i),
+            "snippet": f"content about topic {i}",
+        }
+        for i in range(n)
+    ]
+
+
+def test_cognitive_scoring_disabled_by_default(monkeypatch):
+    """When DEPTHFUSION_COGNITIVE_SCORING is unset, blocks are returned unchanged."""
+    monkeypatch.delenv("DEPTHFUSION_COGNITIVE_SCORING", raising=False)
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    blocks = _make_scored_blocks(4)
+    original_ids = [b["chunk_id"] for b in blocks]
+
+    result = pipeline.apply_cognitive_scoring(blocks)
+
+    assert [b["chunk_id"] for b in result] == original_ids
+    # cognitive_score must NOT be present when flag is off
+    for block in result:
+        assert "cognitive_score" not in block
+
+
+def test_cognitive_scoring_explicit_false(monkeypatch):
+    """DEPTHFUSION_COGNITIVE_SCORING=false keeps existing behaviour."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "false")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    blocks = _make_scored_blocks(3)
+    result = pipeline.apply_cognitive_scoring(blocks)
+    assert result is blocks  # same object returned unchanged
+
+
+def test_cognitive_scoring_enabled_attaches_score(monkeypatch):
+    """When flag is true, each block gains a `cognitive_score` key."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    blocks = _make_scored_blocks(3)
+
+    result = pipeline.apply_cognitive_scoring(blocks)
+
+    assert len(result) == 3
+    for block in result:
+        assert "cognitive_score" in block
+        score = block["cognitive_score"]
+        assert 0.0 <= score <= 1.0
+
+
+def test_cognitive_scoring_reorders_by_score(monkeypatch):
+    """With flag on, blocks are sorted by cognitive_score descending."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+
+    # Construct blocks where doc2 has the highest vector_score so CognitiveScorer
+    # should prefer it despite its lower BM25 rank.
+    blocks = [
+        {"chunk_id": "doc0", "score": 10.0, "vector_score": 0.1, "snippet": "a"},
+        {"chunk_id": "doc1", "score": 5.0,  "vector_score": 0.5, "snippet": "b"},
+        {"chunk_id": "doc2", "score": 1.0,  "vector_score": 0.99, "snippet": "c"},
+    ]
+
+    result = pipeline.apply_cognitive_scoring(blocks)
+
+    cog_scores = [b["cognitive_score"] for b in result]
+    # Scores must be sorted descending
+    assert cog_scores == sorted(cog_scores, reverse=True)
+
+    # doc2 has the highest semantic input (0.99) and should appear first
+    # (semantic weight 0.25 dominates the score delta from doc0's higher lexical).
+    assert result[0]["chunk_id"] == "doc2"
+
+
+def test_cognitive_scoring_handles_empty_blocks(monkeypatch):
+    """Empty input → empty output, no error."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    result = pipeline.apply_cognitive_scoring([])
+    assert result == []
+
+
+def test_cognitive_scoring_fallback_on_import_error(monkeypatch):
+    """If CognitiveScorer import fails, original blocks are returned unchanged."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    blocks = _make_scored_blocks(3)
+
+    with patch("builtins.__import__", side_effect=ImportError("scorer not found")):
+        result = pipeline.apply_cognitive_scoring(blocks)
+
+    assert result is blocks
+
+
+def test_cognitive_scoring_uses_recency_from_block(monkeypatch):
+    """Blocks with `recency` field use it; blocks without default to 0.5."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+
+    # Two identical blocks except for recency; higher recency should score higher.
+    blocks = [
+        {"chunk_id": "old",    "score": 5.0, "recency": 0.1, "snippet": "x"},
+        {"chunk_id": "recent", "score": 5.0, "recency": 0.9, "snippet": "x"},
+    ]
+
+    result = pipeline.apply_cognitive_scoring(blocks)
+
+    # "recent" should rank above "old" because recency weight is 0.08
+    assert result[0]["chunk_id"] == "recent"
+
+
+def test_cognitive_scoring_zero_score_blocks_no_division_error(monkeypatch):
+    """Blocks with score=0 should not cause division by zero."""
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
+    pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
+    blocks = [
+        {"chunk_id": "a", "score": 0.0, "snippet": "alpha"},
+        {"chunk_id": "b", "score": 0.0, "snippet": "beta"},
+    ]
+    result = pipeline.apply_cognitive_scoring(blocks)
+    assert len(result) == 2
+    for block in result:
+        assert "cognitive_score" in block

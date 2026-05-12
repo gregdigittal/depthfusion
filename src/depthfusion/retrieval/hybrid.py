@@ -19,6 +19,15 @@ v0.5.0 T-157: selective fusion gates (Mamba B/C/Δ port, S-51).
 and before reranking. Gated on `DEPTHFUSION_FUSION_GATES_ENABLED=true`
 (default false — preserves v0.4.x byte-identity). Emits a D-3-compliant
 gate log per query via MetricsCollector.
+
+v1.0.0 T-323: CognitiveScorer integration (E-31 Structured Evolving Cognition).
+`apply_cognitive_scoring()` re-scores result blocks using `CognitiveScorer`
+after the BM25/RRF/reranker pipeline. Gated on
+`DEPTHFUSION_COGNITIVE_SCORING=true` (default false — preserves v0.6.x
+byte-identity). Uses block's existing BM25 `score` and `vector_score` as
+lexical/semantic inputs; all other ScoringContext fields default to
+conservative values. Sorts results by cognitive score descending and
+attaches `cognitive_score` to each returned block.
 """
 from __future__ import annotations
 
@@ -214,6 +223,73 @@ class RecallPipeline:
             )
             return blocks
         return survivors
+
+    def apply_cognitive_scoring(
+        self,
+        blocks: list[dict],
+    ) -> list[dict]:
+        """Re-score `blocks` using CognitiveScorer when the feature flag is on.
+
+        T-323 / E-31: gated on `DEPTHFUSION_COGNITIVE_SCORING=true`.
+        When disabled (default), returns `blocks` unchanged — preserves
+        v0.6.x byte-identity of the recall path.
+
+        Scoring context mapping from block fields:
+          - `lexical`  = block['score'] normalised to [0, 1] across the batch
+          - `semantic` = block['vector_score'] if present, else 0.0
+          - `recency`  = block['recency'] if present, else 0.5 (neutral)
+          - all other ScoringContext fields = their dataclass defaults
+            (conservative: confidence=0.7, everything else 0.0)
+
+        Attaches `cognitive_score` to each block and returns the list
+        sorted by `cognitive_score` descending. Fail-open: if CognitiveScorer
+        raises, returns the original `blocks` unchanged.
+        """
+        if os.getenv("DEPTHFUSION_COGNITIVE_SCORING", "false").lower() != "true":
+            return blocks
+        if not blocks:
+            return blocks
+
+        try:
+            from depthfusion.cognitive.scorer import CognitiveScorer, ScoringContext
+
+            scorer = CognitiveScorer()
+
+            # Normalise raw BM25 scores to [0, 1] across the batch so
+            # they can serve as the `lexical` input to ScoringContext.
+            raw_scores = [float(b.get("score", 0.0)) for b in blocks]
+            max_score = max(raw_scores) if raw_scores else 1.0
+            if max_score == 0.0:
+                max_score = 1.0  # avoid division by zero
+
+            scored: list[tuple[float, dict]] = []
+            for block, raw in zip(blocks, raw_scores, strict=False):
+                lexical = raw / max_score
+                semantic = float(block.get("vector_score", 0.0))
+                recency = float(block.get("recency", 0.5))
+
+                ctx = ScoringContext(
+                    semantic=semantic,
+                    lexical=lexical,
+                    recency=recency,
+                )
+                cog_score = scorer.score(ctx)
+                enriched = {**block, "cognitive_score": cog_score}
+                scored.append((cog_score, enriched))
+
+            scored.sort(key=lambda t: -t[0])
+            result = [b for _, b in scored]
+
+            logger.debug(
+                "apply_cognitive_scoring: re-scored %d blocks (top cognitive_score=%.4f)",
+                len(result),
+                result[0]["cognitive_score"] if result else 0.0,
+            )
+            return result
+
+        except Exception as exc:  # noqa: BLE001 — fail-open contract
+            logger.debug("apply_cognitive_scoring: degraded to pass-through (%s)", exc)
+            return blocks
 
     def apply_vector_search(
         self,
