@@ -758,37 +758,24 @@ setTimeout(function(){
 
 // ── BUTTON HANDLERS ──
 (function(){
-  var hero = document.getElementById('hero');
+  function show(el) { if(el) el.classList.add('visible'); }
+  function scrollTo(el) { if(el) { show(el); el.scrollIntoView({behavior:'smooth'}); } }
+
   var recallSection = document.getElementById('recall');
-  var ctaSection = document.getElementById('cta-section');
-  var installCmd = document.getElementById('install-cmd');
+  var ctaSection    = document.getElementById('cta-section');
+  var installCmd    = document.getElementById('install-cmd');
 
-  if(hero) {
-    var heroGhost = hero.querySelector('.btn-ghost');
-    if(heroGhost) heroGhost.addEventListener('click', function() {
-      if(recallSection) recallSection.scrollIntoView({behavior:'smooth'});
-    });
-    var heroPrimary = hero.querySelector('.btn-primary');
-    if(heroPrimary) heroPrimary.addEventListener('click', function() {
-      if(ctaSection) ctaSection.scrollIntoView({behavior:'smooth'});
-    });
-  }
+  var heroGhost   = document.querySelector('#hero .btn-ghost');
+  var heroPrimary = document.querySelector('#hero .btn-primary');
+  var navCta      = document.querySelector('.nav-cta');
+  var ctaPrimary  = document.querySelector('#cta-section .btn-primary');
+  var ctaGhost    = document.querySelector('#cta-section .btn-ghost');
 
-  var navCta = document.querySelector('nav .nav-cta');
-  if(navCta) navCta.addEventListener('click', function() {
-    if(ctaSection) ctaSection.scrollIntoView({behavior:'smooth'});
-  });
-
-  if(ctaSection) {
-    var ctaPrimary = ctaSection.querySelector('.btn-primary');
-    if(ctaPrimary) ctaPrimary.addEventListener('click', function() {
-      if(installCmd) installCmd.scrollIntoView({behavior:'smooth'});
-    });
-    var ctaGhost = ctaSection.querySelector('.btn-ghost');
-    if(ctaGhost) ctaGhost.addEventListener('click', function() {
-      window.open('https://github.com/gregdigittal/depthfusion', '_blank');
-    });
-  }
+  if(heroGhost)   heroGhost.addEventListener('click',   function(){ scrollTo(recallSection); });
+  if(heroPrimary) heroPrimary.addEventListener('click', function(){ scrollTo(ctaSection); });
+  if(navCta)      navCta.addEventListener('click',      function(){ scrollTo(ctaSection); });
+  if(ctaPrimary)  ctaPrimary.addEventListener('click',  function(){ if(installCmd) installCmd.scrollIntoView({behavior:'smooth'}); });
+  if(ctaGhost)    ctaGhost.addEventListener('click',    function(){ window.open('https://github.com/gregdigittal/depthfusion','_blank'); });
 })();
 
 // ── TECH ARCH — PIPELINE ──
