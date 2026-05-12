@@ -6,15 +6,34 @@ Idempotent: skips files already compressed (output file exists).
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from depthfusion.capture._metrics import emit_capture_event
 from depthfusion.capture.auto_learn import HaikuSummarizer, HeuristicExtractor
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_DISCOVERIES = Path.home() / ".claude" / "shared" / "discoveries"
+_DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+
+
+def _project_from_stem(stem: str) -> str:
+    """Derive a project slug from a session file stem.
+
+    "2026-05-12-agent-ops-session" → "agent-ops"
+    "2026-05-12-depthfusion-session" → "depthfusion"
+    "my-session" → "my"          (no date prefix, strips -session)
+    "plain" → "plain"            (no recognisable suffix)
+    """
+    name = _DATE_PREFIX_RE.sub("", stem)
+    if name.endswith("-session"):
+        name = name[: -len("-session")]
+    elif name == "session":
+        name = ""
+    return name or "unknown"
 
 
 def idle_sessions(
@@ -70,10 +89,18 @@ class SessionCompressor:
         self,
         session_file: Path,
         output_dir: Path | None = None,
+        project: str | None = None,
     ) -> Path | None:
         """Compress session_file to output_dir.
 
         Returns the output Path on success, None if skipped (empty or already exists).
+
+        Args:
+            session_file: Path to the .tmp session file.
+            output_dir: Directory to write the autocapture file into.
+            project: Project slug for metrics emission; derived from the session
+                file stem when not supplied (strips YYYY-MM-DD- prefix and
+                -session suffix so "2026-05-12-agent-ops-session" → "agent-ops").
         """
         out_dir = output_dir or _DEFAULT_DISCOVERIES
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -95,4 +122,20 @@ class SessionCompressor:
 
         output_path.write_text(summary, encoding="utf-8")
         logger.info("Compressed %s → %s", session_file.name, output_path.name)
+
+        # Emit capture metric so the PostCompact path appears in the metrics stream.
+        # project is derived from the stem when not explicitly provided.
+        resolved_project = project or _project_from_stem(stem)
+        try:
+            emit_capture_event(
+                capture_mechanism="session_compressor",
+                project=resolved_project,
+                session_id=stem,
+                write_success=True,
+                entries_written=1,
+                file_path=str(output_path),
+            )
+        except Exception:  # noqa: BLE001 — metrics must never block capture
+            pass
+
         return output_path
