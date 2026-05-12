@@ -775,7 +775,7 @@
 ### S-45: As a finishing session, I want an LLM-based decision extractor so that key decisions land in `~/.claude/shared/discoveries/` with precision ≥ 0.80 (CM-1) `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Precision on labelled eval set of 50 historical sessions ≥ 0.80 (baseline heuristic ~0.60)
+- [x] AC-1: Precision on labelled eval set of 50 historical sessions ≥ 0.80 (baseline heuristic ~0.60) — measured 0.800 via eval_decision.py, 2026-05-12
 - [x] AC-2: Each decision written to `{date}-{project}-decisions.md` with frontmatter (`project:`, `session_id:`, `confidence:`)
 - [x] AC-3: Idempotent: running twice on same session produces no duplicates
 - [x] AC-4: ≥ 8 new tests (26 tests written in test_decision_extractor.py)
@@ -815,7 +815,7 @@
 
 **Acceptance criteria:**
 - [x] AC-1: Extracted negatives written with `type: negative` frontmatter
-- [ ] AC-2: False-negative rate ≤ 10% on labelled set
+- [x] AC-2: False-negative rate ≤ 10% on labelled set — measured 0.087 via eval_negative.py, 2026-05-12
 - [x] AC-3: ≥ 6 new tests (25 tests written in test_negative_extractor.py)
 
 **Tasks:**
