@@ -255,16 +255,18 @@ class RecallPipeline:
 
             scorer = CognitiveScorer()
 
-            # Normalise raw BM25 scores to [0, 1] across the batch so
-            # they can serve as the `lexical` input to ScoringContext.
+            # Normalise raw BM25 scores to [0, 1] using min-max so that
+            # the range of the batch maps to [0, 1] regardless of absolute
+            # values.  When all scores are equal (score_range == 0) we
+            # assign the neutral midpoint 0.5 to avoid biasing the scorer.
             raw_scores = [float(b.get("score", 0.0)) for b in blocks]
-            max_score = max(raw_scores) if raw_scores else 1.0
-            if max_score == 0.0:
-                max_score = 1.0  # avoid division by zero
+            min_score = min(raw_scores)
+            max_score = max(raw_scores)
+            score_range = max_score - min_score
 
             scored: list[tuple[float, dict]] = []
             for block, raw in zip(blocks, raw_scores, strict=False):
-                lexical = raw / max_score
+                lexical = (raw - min_score) / score_range if score_range > 0.0 else 0.5
                 semantic = float(block.get("vector_score", 0.0))
                 recency = float(block.get("recency", 0.5))
 

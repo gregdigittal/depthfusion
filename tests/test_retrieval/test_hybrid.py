@@ -176,7 +176,8 @@ def test_cognitive_scoring_explicit_false(monkeypatch):
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     blocks = _make_scored_blocks(3)
     result = pipeline.apply_cognitive_scoring(blocks)
-    assert result is blocks  # same object returned unchanged
+    assert [b["chunk_id"] for b in result] == [b["chunk_id"] for b in blocks]
+    assert all("cognitive_score" not in b for b in result)
 
 
 def test_cognitive_scoring_enabled_attaches_score(monkeypatch):
@@ -231,11 +232,13 @@ def test_cognitive_scoring_fallback_on_import_error(monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "true")
     pipeline = RecallPipeline(mode=PipelineMode.LOCAL)
     blocks = _make_scored_blocks(3)
+    original_ids = [b["chunk_id"] for b in blocks]
 
-    with patch("builtins.__import__", side_effect=ImportError("scorer not found")):
+    with patch.dict("sys.modules", {"depthfusion.cognitive.scorer": None}):
         result = pipeline.apply_cognitive_scoring(blocks)
 
-    assert result is blocks
+    assert [b["chunk_id"] for b in result] == original_ids
+    assert all("cognitive_score" not in b for b in result)
 
 
 def test_cognitive_scoring_uses_recency_from_block(monkeypatch):

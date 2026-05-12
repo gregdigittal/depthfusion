@@ -350,8 +350,66 @@ def test_contradiction_engine_enabled_high_severity_logged(tmp_path, monkeypatch
     assert "severity=high" in warning_records[0].message
 
 
+def test_contradiction_engine_medium_severity_logged_at_debug(tmp_path, monkeypatch, caplog):
+    """MEDIUM severity conflict → DEBUG log only, NOT WARNING.
+
+    This is the production path: confidence=0.75 < 0.8 threshold → MEDIUM.
+    Verifies the logger.debug branch, not just the mock-patched WARNING path.
+    """
+    monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
+
+    from depthfusion.cognitive.contradiction import (
+        Conflict,
+        ConflictSeverity,
+        ConflictStatus,
+    )
+
+    import unittest.mock as mock
+    medium_conflict = Conflict(
+        memory_a_id="a",
+        memory_b_id="b",
+        conflict_type="negation",
+        description="Test MEDIUM conflict",
+        severity=ConflictSeverity.MEDIUM,
+        status=ConflictStatus.AUTO_EMITTED,
+        confidence_a=0.75,
+        confidence_b=0.75,
+    )
+
+    with mock.patch(
+        "depthfusion.cognitive.contradiction.ContradictionEngine.detect",
+        return_value=[medium_conflict],
+    ):
+        from depthfusion.capture.auto_learn import _run_contradiction_detection
+
+        with caplog.at_level(logging.DEBUG, logger="depthfusion.capture.auto_learn"):
+            _run_contradiction_detection(
+                ["always use RS256", "never use RS256"],
+                session_id="test-session",
+                project="testproj",
+            )
+
+    # No WARNING records for MEDIUM severity
+    warning_records = [
+        r for r in caplog.records
+        if r.levelno == logging.WARNING and "[contradiction]" in r.message
+    ]
+    assert len(warning_records) == 0, "MEDIUM conflict must not emit WARNING"
+
+    # DEBUG record must be present
+    debug_records = [
+        r for r in caplog.records
+        if r.levelno == logging.DEBUG and "[contradiction]" in r.message
+    ]
+    assert len(debug_records) >= 1, "MEDIUM conflict must emit DEBUG log"
+    assert "severity=medium" in debug_records[0].message
+
+
 def test_contradiction_engine_import_failure_does_not_crash(tmp_path, monkeypatch, caplog):
-    """If ContradictionEngine import fails, extraction continues without raising."""
+    """If ContradictionEngine import fails, extraction continues without raising.
+
+    Also verifies the debug log is emitted so the failure is traceable.
+    """
     monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
 
     session_file = tmp_path / "sess.tmp"
@@ -369,12 +427,17 @@ def test_contradiction_engine_import_failure_does_not_crash(tmp_path, monkeypatc
         {"depthfusion.cognitive.contradiction": None},  # type: ignore[dict-item]
     ):
         from depthfusion.capture.auto_learn import _run_contradiction_detection
-        # Should not raise.
-        _run_contradiction_detection(
-            ["always use RS256", "never use RS256"],
-            session_id="test-session",
-            project="testproj",
-        )
+        with caplog.at_level(logging.DEBUG, logger="depthfusion.capture.auto_learn"):
+            # Should not raise.
+            _run_contradiction_detection(
+                ["always use RS256", "never use RS256"],
+                session_id="test-session",
+                project="testproj",
+            )
+
+    # Import failure must emit a debug log so it's traceable
+    debug_records = [r for r in caplog.records if "ContradictionEngine unavailable" in r.message]
+    assert len(debug_records) >= 1, "Import failure must emit debug log"
 
 
 def test_contradiction_engine_does_not_block_extraction(tmp_path, monkeypatch):

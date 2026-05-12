@@ -159,7 +159,7 @@ def _run_contradiction_detection(decisions: list[str], session_id: str, project:
         return
 
     try:
-        from depthfusion.cognitive.contradiction import ContradictionEngine
+        from depthfusion.cognitive.contradiction import ConflictSeverity, ContradictionEngine
         from depthfusion.core.memory_object import (
             MemoryConfidence,
             MemoryObject,
@@ -193,7 +193,7 @@ def _run_contradiction_detection(decisions: list[str], session_id: str, project:
             for j in range(i + 1, len(memory_objects)):
                 conflicts = engine.detect(memory_objects[i], memory_objects[j])
                 for conflict in conflicts:
-                    if conflict.severity.value in ("high", "critical"):
+                    if conflict.severity in (ConflictSeverity.HIGH, ConflictSeverity.CRITICAL):
                         logger.warning(
                             "[contradiction] %s: %s (severity=%s)",
                             conflict.conflict_type,
@@ -231,16 +231,26 @@ def summarize_and_extract_graph(
     # Phase 1: run the summarizer (existing behaviour — unchanged)
     HaikuSummarizer().summarize_file(path)
 
+    # Single shared read for Phase 1b and Phase 2 so both see consistent content
+    # and the file is opened only once.  If the read fails, Phase 1b and the
+    # extractor phase are both skipped.
+    session_id = path.stem
+    try:
+        _shared_content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        logger.debug("summarize_and_extract_graph: could not read %s: %s", path.name, exc)
+        _shared_content = ""
+
     # Phase 1b: contradiction detection on heuristically extracted decisions.
     # Gated on DEPTHFUSION_CONTRADICTION_ENGINE; never blocks on error.
-    try:
-        _content_for_contradiction = path.read_text(encoding="utf-8", errors="replace")
-        _decisions_for_contradiction = extract_key_decisions(_content_for_contradiction)
-        _run_contradiction_detection(
-            _decisions_for_contradiction, session_id=path.stem, project=project
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("Contradiction detection phase skipped (%s)", exc)
+    if _shared_content:
+        try:
+            _decisions_for_contradiction = extract_key_decisions(_shared_content)
+            _run_contradiction_detection(
+                _decisions_for_contradiction, session_id=session_id, project=project
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Contradiction detection phase skipped (%s)", exc)
 
     # Phase 2: LLM decision extractor + negative extractor (v0.5 CM-1/CM-6)
     # Gated on DEPTHFUSION_DECISION_EXTRACTOR_ENABLED to avoid API calls in local mode.
@@ -249,15 +259,7 @@ def summarize_and_extract_graph(
     written_paths: list[Any] = []
     _extractor_flag = os.environ.get("DEPTHFUSION_DECISION_EXTRACTOR_ENABLED", "false").lower()
     if _extractor_flag in ("true", "1", "yes"):
-        # Single shared read so both extractors see the same content and
-        # neither depends on the other's success. If the read itself fails,
-        # skip extractor phase entirely.
-        try:
-            content = path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            logger.debug("Extractor phase: could not read %s: %s", path.name, exc)
-            content = ""
-        session_id = path.stem
+        content = _shared_content
 
         if content:
             try:

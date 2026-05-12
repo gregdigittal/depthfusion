@@ -2200,9 +2200,16 @@ def _autonomic_consolidation_loop(config: Any) -> None:
     Env:
         DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES  (default 30)
     """
-    interval_minutes = int(
-        os.getenv("DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES", "30")
-    )
+    try:
+        interval_minutes = int(
+            os.getenv("DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES", "30")
+        )
+    except ValueError:
+        logger.warning(
+            "[autonomic] invalid DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES, "
+            "defaulting to 30 minutes"
+        )
+        interval_minutes = 30
     interval_seconds = interval_minutes * 60
     logger.info(
         "[autonomic] consolidation scheduler started (interval=%dm)", interval_minutes
@@ -2260,9 +2267,6 @@ def main() -> None:
     _check_backend_health(normalise_mode(_os.environ.get("DEPTHFUSION_MODE")))
 
     if os.getenv("DEPTHFUSION_AUTONOMIC", "0") == "1":
-        interval_minutes = int(
-            os.getenv("DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES", "30")
-        )
         t = threading.Thread(
             target=_autonomic_consolidation_loop,
             args=(config,),
@@ -2270,10 +2274,6 @@ def main() -> None:
             name="depthfusion-autonomic",
         )
         t.start()
-        logger.info(
-            "[autonomic] consolidation scheduler started (interval=%dm)",
-            interval_minutes,
-        )
 
     for line in sys.stdin:
         line = line.strip()
