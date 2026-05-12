@@ -740,14 +740,14 @@
 **Acceptance criteria:**
 - [x] AC-1: Byte-identical output when `DEPTHFUSION_EMBEDDING_BACKEND` unset (factory returns NullBackend on local mode; verified by existing `test_local_mode_returns_null_for_every_capability` + `test_v04_output_identity.py` regression)
 - [ ] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu (requires live vps-gpu benchmark)
-- [ ] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus (requires live vps-gpu benchmark)
+- [x] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus — measured p95=36.9ms (mean=28.2ms, max=47.7ms) via scripts/bench_recall_latency.py on hetzner-gpu RTX 4000 SFF Ada, 2026-05-12; root-cause fix: backend must be pre-created once and passed to apply_vector_search() to avoid per-call model reload (~2500ms → ~30ms)
 - [x] AC-4: ≥ 10 new tests (22 in test_local_embedding.py + 17 in test_hybrid_with_embeddings.py + 2 factory tests = 41)
 
 **Tasks:**
 - [x] T-129: Implement `backends/local_embedding.py` (sentence-transformers, default `all-MiniLM-L6-v2`) — same file as T-118 (ticked once, shared across S-41/S-43)
 - [x] T-130: Wire embedding step into `retrieval/hybrid.py` RRF fusion alongside BM25/ChromaDB (added `apply_vector_search()` + `_cosine_similarity` helper; fuses with existing `rrf_fuse`)
 - [x] T-131: Author `tests/test_backends/test_local_embedding.py` + `tests/test_retrieval/test_hybrid_with_embeddings.py` (39 tests across both files)
-- [ ] T-262: Upgrade pip on hetzner-gpu (currently 22.0.2, predates PEP 660) so `pip install -e '.[vps-gpu]'` succeeds without the `PYTHONPATH=src` workaround used during the 2026-05-02 vps-gpu CIQS baseline (`docs/runbooks/dogfood-reports/2026-05-02-vps-gpu-ciqs-baseline.md` §Install Method)
+- [x] T-262: Upgrade pip on hetzner-gpu (currently 22.0.2, predates PEP 660) so `pip install -e '.[vps-gpu]'` succeeds without the `PYTHONPATH=src` workaround used during the 2026-05-02 vps-gpu CIQS baseline (`docs/runbooks/dogfood-reports/2026-05-02-vps-gpu-ciqs-baseline.md` §Install Method) — confirmed pip 26.1.1 on 2026-05-12
 
 ### S-44: As a vps-gpu operator, I want a Gemma backend for all LLM capabilities so that reranking, extraction, summarisation, and linking run on-box with Haiku fallback `P1` `L`
 
