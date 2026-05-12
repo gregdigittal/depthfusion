@@ -6,6 +6,8 @@ import logging
 import os
 import re
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +106,41 @@ TOOLS: dict[str, str] = {
         "Response: {filename, exists, frontmatter: {importance, salience, pinned, "
         "project, type, ...}} or {filename, exists: false, error}."
     ),
+    # E-31 cognitive tools
+    "depthfusion_retrieve_context": (
+        "Cognitive retrieval with 8-component scoring and retrieval trace (E-31). "
+        "Args: query (str), project_id (str), top_k (int, default 10), "
+        "memory_types (str[], optional). Response: {memories: [...], trace: {...}}."
+    ),
+    "depthfusion_record_decision": (
+        "Record an architectural or implementation decision as a typed memory (E-31). "
+        "Args: project_id (str), decision (str), rationale (str, required non-empty), "
+        "rejected_options (str[], optional), constraints (str[], optional), "
+        "impact_radius (str, default 'local'), actor (str, default 'unknown'). "
+        "Response: {memory_id, type, status}."
+    ),
+    "depthfusion_record_incident": (
+        "Record an error→fix→lesson triple as operational memory (E-31). "
+        "Args: project_id (str), error (str), fix (str), lesson (str), "
+        "severity (str, default 'medium'), recurrence_risk (float, default 0.3), "
+        "actor (str, default 'unknown'). Response: {memory_id, type, severity}."
+    ),
+    "depthfusion_mark_superseded": (
+        "Mark a memory as superseded by a newer one (E-31). "
+        "Args: project_id (str), old_memory_id (str), new_memory_id (str), "
+        "reason (str), actor (str, default 'unknown'). "
+        "Response: {status, old_id, new_id} or {error}."
+    ),
+    "depthfusion_report_outcome": (
+        "Record the outcome of applying a decision or procedure (E-31). "
+        "Args: project_id (str), memory_id (str), outcome (str), success (bool), "
+        "actor (str, default 'unknown'). Response: {status, memory_id, success}."
+    ),
+    "depthfusion_get_cognitive_state": (
+        "Return a summary of the current cognitive state for a project (E-31). "
+        "Args: project_id (str). Response: {project_id, total_memories, "
+        "active_memories, total_events, feature_flags}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -126,6 +163,13 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_pin_discovery": None,            # always enabled (S-69)
     "depthfusion_describe_capabilities": None,    # always enabled (S-76)
     "depthfusion_inspect_discovery": None,        # always enabled (S-76)
+    # E-31 cognitive tools
+    "depthfusion_retrieve_context": "cognitive_retrieval",
+    "depthfusion_record_decision": "decision_memory",
+    "depthfusion_record_incident": "operational_memory",
+    "depthfusion_mark_superseded": "operational_memory",
+    "depthfusion_report_outcome": "operational_memory",
+    "depthfusion_get_cognitive_state": None,      # always enabled
 }
 
 
@@ -287,6 +331,66 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {},
         "required": [],
     },
+    # E-31 cognitive tools
+    "depthfusion_retrieve_context": {
+        "properties": {
+            "query": {"type": "string"},
+            "project_id": {"type": "string"},
+            "top_k": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
+            "memory_types": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["query", "project_id"],
+    },
+    "depthfusion_record_decision": {
+        "properties": {
+            "project_id": {"type": "string"},
+            "decision": {"type": "string"},
+            "rationale": {"type": "string"},
+            "rejected_options": {"type": "array", "items": {"type": "string"}},
+            "constraints": {"type": "array", "items": {"type": "string"}},
+            "impact_radius": {"type": "string", "default": "local"},
+            "actor": {"type": "string", "default": "unknown"},
+        },
+        "required": ["project_id", "decision", "rationale"],
+    },
+    "depthfusion_record_incident": {
+        "properties": {
+            "project_id": {"type": "string"},
+            "error": {"type": "string"},
+            "fix": {"type": "string"},
+            "lesson": {"type": "string"},
+            "severity": {"type": "string", "default": "medium"},
+            "recurrence_risk": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.3},
+            "actor": {"type": "string", "default": "unknown"},
+        },
+        "required": ["project_id", "error", "fix", "lesson"],
+    },
+    "depthfusion_mark_superseded": {
+        "properties": {
+            "project_id": {"type": "string"},
+            "old_memory_id": {"type": "string"},
+            "new_memory_id": {"type": "string"},
+            "reason": {"type": "string"},
+            "actor": {"type": "string", "default": "unknown"},
+        },
+        "required": ["project_id", "old_memory_id", "new_memory_id", "reason"],
+    },
+    "depthfusion_report_outcome": {
+        "properties": {
+            "project_id": {"type": "string"},
+            "memory_id": {"type": "string"},
+            "outcome": {"type": "string"},
+            "success": {"type": "boolean"},
+            "actor": {"type": "string", "default": "unknown"},
+        },
+        "required": ["project_id", "memory_id", "outcome", "success"],
+    },
+    "depthfusion_get_cognitive_state": {
+        "properties": {
+            "project_id": {"type": "string"},
+        },
+        "required": ["project_id"],
+    },
 }
 
 
@@ -378,6 +482,18 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_describe_capabilities()
     elif tool_name == "depthfusion_inspect_discovery":
         return _tool_inspect_discovery(arguments)
+    elif tool_name == "depthfusion_retrieve_context":
+        return _tool_retrieve_context(arguments, config)
+    elif tool_name == "depthfusion_record_decision":
+        return _tool_record_decision(arguments, config)
+    elif tool_name == "depthfusion_record_incident":
+        return _tool_record_incident(arguments, config)
+    elif tool_name == "depthfusion_mark_superseded":
+        return _tool_mark_superseded(arguments, config)
+    elif tool_name == "depthfusion_report_outcome":
+        return _tool_report_outcome(arguments, config)
+    elif tool_name == "depthfusion_get_cognitive_state":
+        return _tool_get_cognitive_state(arguments, config)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -1864,6 +1980,269 @@ def _check_backend_health(mode: str) -> None:
         logger.debug("_check_backend_health: could not complete check: %s", exc)
 
 
+## ---------------------------------------------------------------------------
+## E-31 Cognitive tool implementations
+## ---------------------------------------------------------------------------
+
+def _tool_retrieve_context(arguments: dict, config: Any) -> str:
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.cognitive.scorer import CognitiveScorer, ScoringContext
+
+    project_id = arguments.get("project_id", "")
+    query = arguments.get("query", "")
+    top_k = int(arguments.get("top_k", 10))
+    memory_types = arguments.get("memory_types")
+
+    store = MemoryStore(config.memory_store_path)
+    memories = store.query(
+        project_id=project_id or None,
+        memory_type=memory_types[0] if memory_types and len(memory_types) == 1 else None,
+        limit=top_k * 4,
+    )
+
+    scorer = CognitiveScorer()
+    scored = []
+    for m in memories:
+        ctx = ScoringContext(confidence=m.confidence.score)
+        score = scorer.score(ctx)
+        scored.append((score, m))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = scored[:top_k]
+
+    return json.dumps({
+        "query": query,
+        "project_id": project_id,
+        "memories": [
+            {"memory_id": m.id, "type": m.type.value, "content": m.content[:500], "score": s}
+            for s, m in top
+        ],
+        "count": len(top),
+    })
+
+
+def _tool_record_decision(arguments: dict, config: Any) -> str:
+    import uuid
+    from datetime import datetime, timezone
+    from depthfusion.mcp.cognitive_tools import build_decision_memory
+    from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
+
+    project_id = arguments.get("project_id", "")
+    actor = arguments.get("actor", "unknown")
+    m = build_decision_memory(
+        project_id=project_id,
+        decision=arguments.get("decision", ""),
+        rationale=arguments.get("rationale", ""),
+        actor=actor,
+        rejected_options=arguments.get("rejected_options"),
+        constraints=arguments.get("constraints"),
+        impact_radius=arguments.get("impact_radius", "local"),
+    )
+    event = MemoryEvent(
+        event_id=str(uuid.uuid4()),
+        memory_id=m.id,
+        event_type=MemoryEventType.CREATED,
+        project_id=project_id,
+        payload=m.to_dict(),
+        actor=actor,
+        timestamp=datetime.now(timezone.utc),
+    )
+    EventLog(config.event_log_path).append(event)
+    MemoryStore(config.memory_store_path).upsert(m)
+    return json.dumps({"memory_id": m.id, "type": "decision", "status": "recorded"})
+
+
+def _tool_record_incident(arguments: dict, config: Any) -> str:
+    import uuid
+    from datetime import datetime, timezone
+    from depthfusion.mcp.cognitive_tools import build_incident_memory
+    from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
+
+    project_id = arguments.get("project_id", "")
+    actor = arguments.get("actor", "unknown")
+    severity = arguments.get("severity", "medium")
+    m = build_incident_memory(
+        project_id=project_id,
+        error=arguments.get("error", ""),
+        fix=arguments.get("fix", ""),
+        lesson=arguments.get("lesson", ""),
+        actor=actor,
+        severity=severity,
+        recurrence_risk=float(arguments.get("recurrence_risk", 0.3)),
+    )
+    event = MemoryEvent(
+        event_id=str(uuid.uuid4()),
+        memory_id=m.id,
+        event_type=MemoryEventType.CREATED,
+        project_id=project_id,
+        payload=m.to_dict(),
+        actor=actor,
+        timestamp=datetime.now(timezone.utc),
+    )
+    EventLog(config.event_log_path).append(event)
+    MemoryStore(config.memory_store_path).upsert(m)
+    return json.dumps({"memory_id": m.id, "type": "operational", "severity": severity})
+
+
+def _tool_mark_superseded(arguments: dict, config: Any) -> str:
+    import uuid
+    from datetime import datetime, timezone
+    from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
+    from depthfusion.core.memory_object import MemoryStatus
+
+    project_id = arguments.get("project_id", "")
+    old_id = arguments.get("old_memory_id", "")
+    new_id = arguments.get("new_memory_id", "")
+    reason = arguments.get("reason", "")
+    actor = arguments.get("actor", "unknown")
+
+    store = MemoryStore(config.memory_store_path)
+    log = EventLog(config.event_log_path)
+    old = store.get(old_id)
+    if not old:
+        return json.dumps({"error": f"memory {old_id} not found"})
+    old.status = MemoryStatus.SUPERSEDED
+    old.extra["superseded_by"] = new_id
+    old.extra["superseded_reason"] = reason
+    event = MemoryEvent(
+        event_id=str(uuid.uuid4()),
+        memory_id=old_id,
+        event_type=MemoryEventType.SUPERSEDED,
+        project_id=project_id,
+        payload={"new_id": new_id, "reason": reason},
+        actor=actor,
+        timestamp=datetime.now(timezone.utc),
+    )
+    log.append(event)
+    store.upsert(old)
+    return json.dumps({"status": "superseded", "old_id": old_id, "new_id": new_id})
+
+
+def _tool_report_outcome(arguments: dict, config: Any) -> str:
+    import uuid
+    from datetime import datetime, timezone
+    from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
+
+    project_id = arguments.get("project_id", "")
+    memory_id = arguments.get("memory_id", "")
+    outcome = arguments.get("outcome", "")
+    success = bool(arguments.get("success", False))
+    actor = arguments.get("actor", "unknown")
+
+    store = MemoryStore(config.memory_store_path)
+    log = EventLog(config.event_log_path)
+    m = store.get(memory_id)
+    if not m:
+        return json.dumps({"error": f"memory {memory_id} not found"})
+    outcomes = m.extra.get("outcomes", [])
+    outcomes.append({
+        "outcome": outcome,
+        "success": success,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+    })
+    m.extra["outcomes"] = outcomes
+    if success:
+        m.confidence.verification_count += 1
+        m.confidence.score = min(1.0, m.confidence.score + 0.05)
+    event = MemoryEvent(
+        event_id=str(uuid.uuid4()),
+        memory_id=memory_id,
+        event_type=MemoryEventType.OUTCOME_RECORDED,
+        project_id=project_id,
+        payload={"outcome": outcome, "success": success},
+        actor=actor,
+        timestamp=datetime.now(timezone.utc),
+    )
+    log.append(event)
+    store.upsert(m)
+    return json.dumps({"status": "recorded", "memory_id": memory_id, "success": success})
+
+
+def _tool_get_cognitive_state(arguments: dict, config: Any) -> str:
+    from depthfusion.storage.memory_store import MemoryStore
+    from depthfusion.storage.event_log import EventLog
+
+    project_id = arguments.get("project_id", "")
+    store = MemoryStore(config.memory_store_path)
+    log = EventLog(config.event_log_path)
+    total = store.count(project_id or None)
+    active = len(store.query(project_id=project_id or None, limit=1000))
+    return json.dumps({
+        "project_id": project_id,
+        "total_memories": total,
+        "active_memories": active,
+        "total_events": log.count(),
+        "feature_flags": {
+            "cognitive_retrieval": getattr(config, "cognitive_retrieval", False),
+            "contradiction_engine": getattr(config, "contradiction_engine", False),
+            "decision_memory": getattr(config, "decision_memory", False),
+            "operational_memory": getattr(config, "operational_memory", False),
+            "autonomic": getattr(config, "autonomic", False),
+        },
+    })
+
+
+def _autonomic_consolidation_loop(config: Any) -> None:
+    """Background daemon thread: find near-duplicate and archive candidates.
+
+    Activated when DEPTHFUSION_AUTONOMIC=1. Never crashes — all exceptions
+    are caught so the MCP server remains stable regardless of consolidation
+    failures.
+
+    Env:
+        DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES  (default 30)
+    """
+    interval_minutes = int(
+        os.getenv("DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES", "30")
+    )
+    interval_seconds = interval_minutes * 60
+    logger.info(
+        "[autonomic] consolidation scheduler started (interval=%dm)", interval_minutes
+    )
+
+    while True:
+        try:
+            # Lazy imports inside the loop — keeps module-level import surface clean
+            from depthfusion.cognitive.consolidator import MemoryConsolidator
+            from depthfusion.storage.memory_store import MemoryStore
+
+            store = MemoryStore(config.memory_store_path)
+            memories = store.query(limit=2000)
+
+            consolidator = MemoryConsolidator()
+
+            merge_result = consolidator.find_near_duplicates(memories)
+            for src_id, target_id in merge_result.merge_candidates:
+                logger.info(
+                    "[autonomic] merge candidate: %s → %s", src_id, target_id
+                )
+
+            archive_result = consolidator.find_archive_candidates(memories)
+            for mem in archive_result.archive_candidates:
+                logger.info("[autonomic] archive candidate: %s", mem.id)
+
+            if not merge_result.merge_candidates and not archive_result.archive_candidates:
+                logger.debug("[autonomic] consolidation pass complete — no candidates")
+            else:
+                logger.info(
+                    "[autonomic] consolidation pass complete — %d merge, %d archive",
+                    len(merge_result.merge_candidates),
+                    len(archive_result.archive_candidates),
+                )
+        except Exception as exc:  # noqa: BLE001 — must never crash the server
+            logger.warning("[autonomic] consolidation error (continuing): %s", exc)
+
+        time.sleep(interval_seconds)
+
+
 def main() -> None:
     """MCP server entry point.
 
@@ -1879,6 +2258,22 @@ def main() -> None:
     import os as _os
     from depthfusion.utils.mode import normalise_mode
     _check_backend_health(normalise_mode(_os.environ.get("DEPTHFUSION_MODE")))
+
+    if os.getenv("DEPTHFUSION_AUTONOMIC", "0") == "1":
+        interval_minutes = int(
+            os.getenv("DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES", "30")
+        )
+        t = threading.Thread(
+            target=_autonomic_consolidation_loop,
+            args=(config,),
+            daemon=True,
+            name="depthfusion-autonomic",
+        )
+        t.start()
+        logger.info(
+            "[autonomic] consolidation scheduler started (interval=%dm)",
+            interval_minutes,
+        )
 
     for line in sys.stdin:
         line = line.strip()
