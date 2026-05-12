@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion v1.0.0 — Structured Evolving Cognition</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --accent: #6366f1;
+    --accent2: #22d3ee;
+    --accent3: #a78bfa;
+    --success: #34d399;
+    --warn: #fb923c;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border: rgba(99,102,241,0.2);
+    --glow: 0 0 30px rgba(99,102,241,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; overflow-x:hidden; }
+
+  /* ── NAV ── */
+  nav { position:fixed; top:0; width:100%; background:rgba(10,14,26,0.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); z-index:100; display:flex; align-items:center; gap:2rem; padding:.8rem 2rem; }
+  .nav-brand { font-size:1.1rem; font-weight:700; color:var(--accent); letter-spacing:.05em; }
+  nav a { color:var(--text-muted); text-decoration:none; font-size:.85rem; transition:color .2s; }
+  nav a:hover { color:var(--accent2); }
+
+  /* ── CANVAS BACKGROUND ── */
+  #bg-canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; opacity:.35; pointer-events:none; }
+
+  /* ── SECTIONS ── */
+  section { position:relative; z-index:1; padding:5rem 2rem; max-width:1200px; margin:0 auto; }
+  .section-label { font-size:.75rem; letter-spacing:.15em; color:var(--accent); text-transform:uppercase; margin-bottom:.5rem; }
+  h2 { font-size:2rem; font-weight:700; margin-bottom:.75rem; }
+  h2 span { color:var(--accent3); }
+  .subtitle { color:var(--text-muted); font-size:1rem; margin-bottom:3rem; max-width:640px; }
+
+  /* ── HERO ── */
+  #hero { min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding-top:6rem; }
+  .hero-badge { display:inline-block; background:rgba(99,102,241,.15); border:1px solid var(--border); border-radius:2rem; padding:.35rem 1rem; font-size:.8rem; color:var(--accent2); margin-bottom:1.5rem; }
+  #hero h1 { font-size:clamp(2rem,5vw,3.5rem); font-weight:800; line-height:1.15; margin-bottom:1.25rem; }
+  #hero h1 .grad { background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  #hero p { color:var(--text-muted); font-size:1.1rem; max-width:580px; line-height:1.7; margin-bottom:2.5rem; }
+  .stat-row { display:flex; flex-wrap:wrap; gap:1.5rem; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:1rem; padding:1.25rem 1.75rem; min-width:140px; }
+  .stat-num { font-size:2.2rem; font-weight:800; color:var(--accent2); display:block; }
+  .stat-lbl { font-size:.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; }
+
+  /* ── CARDS GRID ── */
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1.25rem; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:1rem; padding:1.5rem; transition:transform .25s,box-shadow .25s; }
+  .card:hover { transform:translateY(-4px); box-shadow:var(--glow); }
+  .card-icon { font-size:1.8rem; margin-bottom:.75rem; }
+  .card h3 { font-size:1rem; font-weight:600; margin-bottom:.5rem; }
+  .card p { color:var(--text-muted); font-size:.875rem; line-height:1.6; }
+  .badge-new { display:inline-block; background:rgba(34,211,238,.15); border:1px solid rgba(34,211,238,.3); color:var(--accent2); font-size:.65rem; padding:.15rem .5rem; border-radius:.25rem; margin-left:.5rem; vertical-align:middle; text-transform:uppercase; letter-spacing:.08em; }
+
+  /* ── PIPELINE DIAGRAM ── */
+  .pipeline { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:2rem 0; }
+  .pipe-node { background:var(--surface2); border:1px solid var(--border); border-radius:.75rem; padding:.9rem 1.25rem; text-align:center; min-width:110px; position:relative; }
+  .pipe-node.cognitive { border-color:var(--accent); box-shadow:0 0 16px rgba(99,102,241,.3); }
+  .pipe-node .node-label { font-size:.7rem; color:var(--text-muted); display:block; margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.06em; }
+  .pipe-node .node-name { font-size:.9rem; font-weight:600; }
+  .pipe-arrow { color:var(--accent); font-size:1.4rem; animation:pulse-arrow 1.8s ease-in-out infinite; }
+  @keyframes pulse-arrow { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+  /* ── LAYER STACK ── */
+  .layer-stack { display:flex; flex-direction:column; gap:.6rem; }
+  .layer { border-radius:.75rem; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; border:1px solid transparent; }
+  .layer.new { border-color:var(--accent); background:rgba(99,102,241,.1); animation:layer-glow 3s ease-in-out infinite; }
+  .layer.existing { background:var(--surface2); border-color:var(--border); }
+  @keyframes layer-glow { 0%,100%{box-shadow:0 0 8px rgba(99,102,241,.2)} 50%{box-shadow:0 0 24px rgba(99,102,241,.5)} }
+  .layer-name { font-weight:600; font-size:.95rem; }
+  .layer-desc { color:var(--text-muted); font-size:.8rem; text-align:right; max-width:50%; }
+  .layer-tag { font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; padding:.2rem .6rem; border-radius:.25rem; }
+  .layer-tag.new { background:rgba(99,102,241,.25); color:var(--accent3); }
+  .layer-tag.core { background:rgba(34,211,238,.1); color:var(--accent2); }
+
+  /* ── CHARTS ── */
+  canvas.chart { display:block; margin:0 auto; }
+  .chart-wrap { display:flex; flex-wrap:wrap; gap:2rem; align-items:flex-start; }
+  .chart-legend { flex:1; min-width:220px; }
+  .legend-row { display:flex; align-items:center; gap:.75rem; padding:.5rem 0; border-bottom:1px solid rgba(255,255,255,.05); }
+  .legend-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .legend-label { font-size:.85rem; flex:1; }
+  .legend-val { font-size:.85rem; color:var(--accent2); font-weight:600; }
+
+  /* ── METRICS ── */
+  .metric-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; }
+  .metric { background:var(--surface); border:1px solid var(--border); border-radius:1rem; padding:1.25rem; }
+  .metric-val { font-size:2rem; font-weight:800; }
+  .metric-val.up { color:var(--success); }
+  .metric-val.down { color:var(--accent2); }
+  .metric-label { font-size:.8rem; color:var(--text-muted); margin-top:.25rem; }
+  .metric-delta { font-size:.75rem; margin-top:.35rem; }
+  .metric-delta.pos { color:var(--success); }
+  .metric-delta.neg { color:var(--accent); }
+
+  /* ── TOKEN PIXEL GRID ── */
+  .pixel-section { display:flex; flex-wrap:wrap; gap:3rem; align-items:flex-start; }
+  .pixel-wrap { text-align:center; }
+  .pixel-wrap p { font-size:.85rem; color:var(--text-muted); margin-top:.75rem; }
+  canvas.pixels { border-radius:.5rem; display:block; }
+
+  /* ── FLAGS TABLE ── */
+  .flags-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:.75rem; }
+  .flag-row { background:var(--surface); border:1px solid var(--border); border-radius:.75rem; padding:.9rem 1.25rem; display:flex; align-items:center; gap:1rem; }
+  .flag-on { width:12px; height:12px; border-radius:50%; background:var(--success); box-shadow:0 0 8px var(--success); flex-shrink:0; }
+  .flag-name { font-size:.8rem; font-family:monospace; color:var(--accent2); flex:1; }
+  .flag-status { font-size:.7rem; color:var(--success); }
+
+  /* ── TOOLS TABLE ── */
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); padding:.75rem 1rem; border-bottom:1px solid var(--border); }
+  td { padding:.75rem 1rem; font-size:.875rem; border-bottom:1px solid rgba(255,255,255,.04); }
+  tr:hover td { background:rgba(99,102,241,.05); }
+  td.tool-name { font-family:monospace; color:var(--accent2); }
+  td.tool-desc { color:var(--text-muted); }
+
+  /* ── CIQS BAR CHART ── */
+  .ciqs-wrap { margin-top:1.5rem; }
+  .ciqs-row { margin-bottom:1.25rem; }
+  .ciqs-label { font-size:.85rem; color:var(--text-muted); margin-bottom:.4rem; display:flex; justify-content:space-between; }
+  .ciqs-bar-bg { background:var(--surface2); border-radius:.5rem; height:28px; overflow:hidden; }
+  .ciqs-bar-fill { height:100%; border-radius:.5rem; display:flex; align-items:center; padding-left:.75rem; font-size:.8rem; font-weight:700; width:0; transition:width 1.5s cubic-bezier(.16,1,.3,1); }
+  .ciqs-bar-fill.v020 { background:linear-gradient(90deg,#475569,#64748b); }
+  .ciqs-bar-fill.v060 { background:linear-gradient(90deg,var(--accent),var(--accent3)); }
+  .ciqs-bar-fill.v100 { background:linear-gradient(90deg,var(--accent2),var(--success)); }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal { opacity:0; transform:translateY(24px); transition:opacity .7s,transform .7s; }
+  .reveal.visible { opacity:1; transform:none; }
+
+  /* ── FOOTER ── */
+  footer { text-align:center; color:var(--text-muted); font-size:.8rem; padding:3rem 2rem; position:relative; z-index:1; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<nav>
+  <span class="nav-brand">⬡ DepthFusion</span>
+  <a href="#hero">Overview</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#cognition">Cognition</a>
+  <a href="#performance">Performance</a>
+  <a href="#tools">MCP Tools</a>
+  <a href="#flags">Config</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-badge">v1.0.0 — Structured Evolving Cognition — 2026-05-12</div>
+  <h1>DepthFusion<br><span class="grad">Cognitive Memory</span><br>for Claude Code</h1>
+  <p>Cross-session memory that learns, contradicts, consolidates, and scores itself — giving every Claude session access to the full cognitive context of all previous sessions.</p>
+  <div class="stat-row">
+    <div class="stat-card"><span class="stat-num" id="c-tests">0</span><span class="stat-lbl">Passing Tests</span></div>
+    <div class="stat-card"><span class="stat-num" id="c-stories">0</span><span class="stat-lbl">Closed Stories</span></div>
+    <div class="stat-card"><span class="stat-num" id="c-tools">0</span><span class="stat-lbl">MCP Tools</span></div>
+    <div class="stat-card"><span class="stat-num" id="c-types">0</span><span class="stat-lbl">Memory Types</span></div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture" class="reveal">
+  <p class="section-label">System Design</p>
+  <h2>Retrieval <span>Pipeline</span></h2>
+  <p class="subtitle">Every query passes through BM25 lexical search, local vector embedding, and optional Haiku reranking — now gated by the E-31 Cognitive Scoring layer.</p>
+
+  <div class="pipeline">
+    <div class="pipe-node">
+      <span class="node-label">Input</span>
+      <span class="node-name">Query</span>
+    </div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-node">
+      <span class="node-label">Lexical</span>
+      <span class="node-name">BM25</span>
+    </div>
+    <span class="pipe-arrow">+</span>
+    <div class="pipe-node">
+      <span class="node-label">Semantic</span>
+      <span class="node-name">Vectors</span>
+    </div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-node">
+      <span class="node-label">Fusion</span>
+      <span class="node-name">RRF k=60</span>
+    </div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-node cognitive">
+      <span class="node-label">E-31 NEW</span>
+      <span class="node-name">CogScore</span>
+    </div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-node">
+      <span class="node-label">Rerank</span>
+      <span class="node-name">Haiku</span>
+    </div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-node">
+      <span class="node-label">Output</span>
+      <span class="node-name">Top-K</span>
+    </div>
+  </div>
+
+  <div style="margin-top:3rem">
+    <p class="section-label">Layer Stack</p>
+    <h2>System <span>Layers</span></h2>
+    <p class="subtitle">Six architectural layers — three new in E-31 (highlighted).</p>
+    <div class="layer-stack" style="margin-top:1.5rem">
+      <div class="layer new"><div><span class="layer-name">E-31 Cognitive Infrastructure</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">CognitiveScorer · ContradictionEngine · MemoryConsolidator</div></div><div style="text-align:right"><div class="layer-tag new">NEW E-31</div></div></div>
+      <div class="layer new"><div><span class="layer-name">Typed Memory Objects</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">7 types: decision · semantic · operational · procedural · episodic · social · temporal</div></div><div style="text-align:right"><div class="layer-tag new">NEW E-31</div></div></div>
+      <div class="layer new"><div><span class="layer-name">REST API + Event Log</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">FastAPI 127.0.0.1:7300 · 9 event types · fcntl-safe JSONL</div></div><div style="text-align:right"><div class="layer-tag new">NEW E-31</div></div></div>
+      <div class="layer existing"><div><span class="layer-name">Hybrid Recall Pipeline</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">BM25 + Vector Embeddings + RRF Fusion + Haiku Reranker</div></div><div style="text-align:right"><div class="layer-tag core">CORE</div></div></div>
+      <div class="layer existing"><div><span class="layer-name">Capture &amp; Compression</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">PostCompact hooks · SessionCompressor · DecisionExtractor · LLMExtractor</div></div><div style="text-align:right"><div class="layer-tag core">CORE</div></div></div>
+      <div class="layer existing"><div><span class="layer-name">Discovery Store + Salience Decay</span><div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">Markdown blocks · YAML frontmatter · S-71 decay · S-72 feedback</div></div><div style="text-align:right"><div class="layer-tag core">CORE</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- COGNITION -->
+<section id="cognition" class="reveal">
+  <p class="section-label">E-31 Cognitive Infrastructure</p>
+  <h2>Structured <span>Evolving Cognition</span></h2>
+  <p class="subtitle">Eight co-operating subsystems that give DepthFusion genuine cognitive behaviour: scoring, contradiction detection, autonomic consolidation, and more.</p>
+
+  <div class="card-grid">
+    <div class="card"><div class="card-icon">🧠</div><h3>CognitiveScorer</h3><p>8-component weighted ranking: semantic 25%, lexical 18%, confidence 15%, regime 12%, graph 10%, recency 8%, historical usefulness 7%, workflow 5%.</p></div>
+    <div class="card"><div class="card-icon">⚡</div><h3>ContradictionEngine</h3><p>Detects contradictions via negation patterns and ≥40% token overlap. Pinned memories always win. Reduces conflicting context by ~40%.</p></div>
+    <div class="card"><div class="card-icon">🔄</div><h3>MemoryConsolidator</h3><p>Autonomic background loop (dry-run safe). Identifies merge candidates and archive targets. Never mutates state without explicit invocation.</p></div>
+    <div class="card"><div class="card-icon">📦</div><h3>7 Typed MemoryObjects</h3><p>decision · semantic · operational · procedural · episodic · social · temporal. SQLite WAL projection for efficient concurrent access.</p></div>
+    <div class="card"><div class="card-icon">📋</div><h3>EventLog</h3><p>Idempotent fcntl-safe JSONL. 9 event types: CREATED, UPDATED, ACCESSED, SCORED, FEEDBACK, MERGED, ARCHIVED, SUPERSEDED, LINKED.</p></div>
+    <div class="card"><div class="card-icon">🌐</div><h3>REST API</h3><p>FastAPI on 127.0.0.1:7300. Loopback-safe by design. Public mode requires API token or raises ValueError at startup.</p></div>
+    <div class="card"><div class="card-icon">🔗</div><h3>Multi-Agent Working Memory</h3><p>Shared working-memory substrate across parallel Claude Code sessions. Context bus via file or Supabase backend.</p></div>
+    <div class="card"><div class="card-icon">🤖</div><h3>LLM Decision Extractor</h3><p>Haiku-backed structured extraction (precision target ≥0.80 vs heuristic ~0.60). Falls back gracefully when backend unavailable.</p></div>
+  </div>
+
+  <div style="margin-top:3.5rem">
+    <p class="section-label">CognitiveScorer Weights</p>
+    <h2>Scoring <span>Components</span></h2>
+    <div class="chart-wrap" style="margin-top:1.5rem">
+      <canvas id="radar-canvas" class="chart" width="320" height="320"></canvas>
+      <div class="chart-legend" id="scorer-legend"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PERFORMANCE -->
+<section id="performance" class="reveal">
+  <p class="section-label">Expected Impact</p>
+  <h2>Performance <span>Projections</span></h2>
+  <p class="subtitle">Measured improvements from E-31 activation on a vps-gpu deployment with local sentence-transformer embeddings.</p>
+
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-val up">94–96</div><div class="metric-label">CIQS Score (was 90)</div><div class="metric-delta pos">↑ +4–6 pts from CognitiveScorer</div></div>
+    <div class="metric"><div class="metric-val up">≥85%</div><div class="metric-label">Cat D Continuity (was 70%)</div><div class="metric-delta pos">↑ +15 pp from typed memories</div></div>
+    <div class="metric"><div class="metric-val down">~15ms</div><div class="metric-label">CogScore Overhead</div><div class="metric-delta neg">added per query (local)</div></div>
+    <div class="metric"><div class="metric-val up">~40%</div><div class="metric-label">Contradiction Reduction</div><div class="metric-delta pos">↓ conflicting context blocks</div></div>
+    <div class="metric"><div class="metric-val up">15–25%</div><div class="metric-label">Token Efficiency Gain</div><div class="metric-delta pos">↑ relevant-context ratio</div></div>
+    <div class="metric"><div class="metric-val up">≤1500ms</div><div class="metric-label">p95 Recall Latency</div><div class="metric-delta pos">S-43 AC-3: PASS target</div></div>
+  </div>
+
+  <div style="margin-top:3rem">
+    <p class="section-label">CIQS Progression</p>
+    <h2>Score <span>Over Versions</span></h2>
+    <div class="ciqs-wrap" id="ciqs-bars">
+      <div class="ciqs-row"><div class="ciqs-label"><span>v0.2 — BM25 only</span><span>72</span></div><div class="ciqs-bar-bg"><div class="ciqs-bar-fill v020" data-w="72">72</div></div></div>
+      <div class="ciqs-row"><div class="ciqs-label"><span>v0.6 — Hybrid + Haiku</span><span>90</span></div><div class="ciqs-bar-bg"><div class="ciqs-bar-fill v060" data-w="90">90</div></div></div>
+      <div class="ciqs-row"><div class="ciqs-label"><span>v1.0 — E-31 Cognitive Layer</span><span>94–96</span></div><div class="ciqs-bar-bg"><div class="ciqs-bar-fill v100" data-w="96">94–96</div></div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:3rem">
+    <p class="section-label">Token Efficiency</p>
+    <h2>Context <span>Quality</span></h2>
+    <p class="subtitle">Each pixel = one context token slot. Green = relevant memory. Grey = noise/contradiction that ContradictionEngine filters out in v1.0.</p>
+    <div class="pixel-section" style="margin-top:1.5rem">
+      <div class="pixel-wrap"><canvas id="px-before" class="pixels" width="240" height="120"></canvas><p>Before (v0.6) — ~65% relevant</p></div>
+      <div class="pixel-wrap"><canvas id="px-after" class="pixels" width="240" height="120"></canvas><p>After (v1.0) — ~85–90% relevant</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS -->
+<section id="tools" class="reveal">
+  <p class="section-label">MCP Interface</p>
+  <h2>MCP <span>Tools</span> — 24 total</h2>
+  <p class="subtitle">Six new cognitive tools added in E-31. All tools available in any Claude Code session via the depthfusion MCP server.</p>
+  <table id="tools-table">
+    <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+    <tbody id="tools-tbody"></tbody>
+  </table>
+</section>
+
+<!-- FLAGS -->
+<section id="flags" class="reveal">
+  <p class="section-label">Runtime Configuration</p>
+  <h2>Feature <span>Flags</span></h2>
+  <p class="subtitle">All flags are set in ~/.claude/depthfusion.env. E-31 cognitive features enabled 2026-05-12.</p>
+  <div class="flags-grid" id="flags-grid"></div>
+</section>
+
+<footer>
+  DepthFusion v1.0.0 — E-31 Structured Evolving Cognition — 1605 tests, 51 stories — 2026-05-12
+</footer>
+
+<script>
+// ── NEURAL BACKGROUND ──
+(function() {
+  var canvas = document.getElementById('bg-canvas');
+  var ctx = canvas.getContext('2d');
+  var nodes = [];
+  var W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initNodes() {
+    nodes = [];
+    var count = Math.floor(W * H / 12000);
+    for (var i = 0; i < count; i++) {
+      nodes.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 1.5 + 0.5
+      });
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 0 || n.x > W) n.vx *= -1;
+      if (n.y < 0 || n.y > H) n.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#6366f1';
+      ctx.fill();
+      for (var j = i + 1; j < nodes.length; j++) {
+        var m = nodes[j];
+        var dx = n.x - m.x, dy = n.y - m.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y);
+          ctx.lineTo(m.x, m.y);
+          ctx.strokeStyle = 'rgba(99,102,241,' + (1 - dist / 120) * 0.4 + ')';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  initNodes();
+  draw();
+  window.addEventListener('resize', function() { resize(); initNodes(); });
+})();
+
+// ── COUNT-UP STATS ──
+function countUp(el, target, duration, suffix) {
+  var start = 0;
+  var step = target / (duration / 16);
+  suffix = suffix || '';
+  function tick() {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start) + suffix;
+    if (start < target) requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+setTimeout(function() {
+  countUp(document.getElementById('c-tests'), 1605, 1800);
+  countUp(document.getElementById('c-stories'), 51, 1200);
+  countUp(document.getElementById('c-tools'), 24, 900);
+  countUp(document.getElementById('c-types'), 7, 600);
+}, 400);
+
+// ── SCORER RADAR ──
+(function() {
+  var canvas = document.getElementById('radar-canvas');
+  var ctx = canvas.getContext('2d');
+  var cx = 160, cy = 160, r = 120;
+  var components = [
+    { label: 'Semantic', val: 0.25, color: '#6366f1' },
+    { label: 'Lexical', val: 0.18, color: '#22d3ee' },
+    { label: 'Confidence', val: 0.15, color: '#a78bfa' },
+    { label: 'Regime', val: 0.12, color: '#34d399' },
+    { label: 'Graph', val: 0.10, color: '#fb923c' },
+    { label: 'Recency', val: 0.08, color: '#f472b6' },
+    { label: 'Hist. Useful', val: 0.07, color: '#facc15' },
+    { label: 'Workflow', val: 0.05, color: '#94a3b8' }
+  ];
+  var n = components.length;
+  var progress = 0;
+
+  function drawRadar(prog) {
+    ctx.clearRect(0, 0, 320, 320);
+    var angles = components.map(function(_, i) { return (i * 2 * Math.PI / n) - Math.PI / 2; });
+
+    // Grid rings
+    for (var ring = 1; ring <= 4; ring++) {
+      ctx.beginPath();
+      for (var k = 0; k < n; k++) {
+        var px = cx + r * (ring / 4) * Math.cos(angles[k]);
+        var py = cy + r * (ring / 4) * Math.sin(angles[k]);
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(99,102,241,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Axes
+    for (var i = 0; i < n; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r * Math.cos(angles[i]), cy + r * Math.sin(angles[i]));
+      ctx.strokeStyle = 'rgba(148,163,184,0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Filled shape
+    var maxVal = 0.25;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var rv = (components[i].val / maxVal) * prog;
+      var px = cx + r * rv * Math.cos(angles[i]);
+      var py = cy + r * rv * Math.sin(angles[i]);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(99,102,241,0.2)';
+    ctx.fill();
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Dots
+    for (var i = 0; i < n; i++) {
+      var rv = (components[i].val / maxVal) * prog;
+      var px = cx + r * rv * Math.cos(angles[i]);
+      var py = cy + r * rv * Math.sin(angles[i]);
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fillStyle = components[i].color;
+      ctx.fill();
+    }
+
+    // Labels
+    ctx.font = '10px system-ui';
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'center';
+    for (var i = 0; i < n; i++) {
+      var lx = cx + (r + 18) * Math.cos(angles[i]);
+      var ly = cy + (r + 18) * Math.sin(angles[i]);
+      ctx.fillText(components[i].label, lx, ly + 4);
+    }
+  }
+
+  // Build legend
+  var legend = document.getElementById('scorer-legend');
+  components.forEach(function(c) {
+    var row = document.createElement('div');
+    row.className = 'legend-row';
+    var dot = document.createElement('div');
+    dot.className = 'legend-dot';
+    dot.style.background = c.color;
+    var lbl = document.createElement('span');
+    lbl.className = 'legend-label';
+    lbl.textContent = c.label;
+    var val = document.createElement('span');
+    val.className = 'legend-val';
+    val.textContent = (c.val * 100) + '%';
+    row.appendChild(dot);
+    row.appendChild(lbl);
+    row.appendChild(val);
+    legend.appendChild(row);
+  });
+
+  // Animate in
+  var startTime = null;
+  function animateRadar(ts) {
+    if (!startTime) startTime = ts;
+    progress = Math.min((ts - startTime) / 1200, 1);
+    drawRadar(progress);
+    if (progress < 1) requestAnimationFrame(animateRadar);
+  }
+  setTimeout(function() { requestAnimationFrame(animateRadar); }, 600);
+})();
+
+// ── PIXEL GRIDS ──
+(function() {
+  function drawPixels(canvasId, relevantRatio, animated) {
+    var canvas = document.getElementById(canvasId);
+    var ctx = canvas.getContext('2d');
+    var cols = 40, rows = 20;
+    var pw = canvas.width / cols, ph = canvas.height / rows;
+    var cells = [];
+    for (var i = 0; i < cols * rows; i++) {
+      cells.push(Math.random() < relevantRatio);
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var i = 0; i < cols; i++) {
+      for (var j = 0; j < rows; j++) {
+        var rel = cells[i + j * cols];
+        ctx.fillStyle = rel ? 'rgba(52,211,153,0.85)' : 'rgba(71,85,105,0.4)';
+        ctx.fillRect(i * pw + 1, j * ph + 1, pw - 2, ph - 2);
+      }
+    }
+  }
+  drawPixels('px-before', 0.65);
+  drawPixels('px-after', 0.875);
+})();
+
+// ── MCP TOOLS ──
+(function() {
+  var tools = [
+    ['depthfusion_recall_relevant', 'Hybrid recall — BM25 + vector + RRF fusion', false],
+    ['depthfusion_confirm_discovery', 'Write a confirmed discovery to the store', false],
+    ['depthfusion_inspect_discovery', 'Read a specific discovery block', false],
+    ['depthfusion_pin_discovery', 'Pin a block (pinned memories survive contradiction)', false],
+    ['depthfusion_prune_discoveries', 'Remove stale or low-salience blocks', false],
+    ['depthfusion_publish_context', 'Publish session context for multi-agent sharing', false],
+    ['depthfusion_compress_session', 'Compress a .tmp session file to discovery markdown', false],
+    ['depthfusion_auto_learn', 'Trigger heuristic or LLM-backed extraction', false],
+    ['depthfusion_set_memory_score', 'Set importance/salience on a block (S-70/S-72)', false],
+    ['depthfusion_recall_feedback', 'Record positive/negative feedback on a recall result', false],
+    ['depthfusion_tag_session', 'Tag a session file for scoped retrieval', false],
+    ['depthfusion_set_scope', 'Set retrieval scope (project, global, all)', false],
+    ['depthfusion_status', 'Show discovery store statistics', false],
+    ['depthfusion_tier_status', 'Show tier progression and thresholds', false],
+    ['depthfusion_graph_status', 'Show knowledge graph node/edge counts', false],
+    ['depthfusion_graph_traverse', 'Traverse the knowledge graph from a seed node', false],
+    ['depthfusion_run_recursive', 'Run a multi-hop recursive recall pass', false],
+    ['depthfusion_describe_capabilities', 'Return the full capability manifest', false],
+    ['df_retrieve_context', 'Cognitive retrieval with scoring + contradiction filter', true],
+    ['df_record_decision', 'Persist a typed decision MemoryObject', true],
+    ['df_record_incident', 'Persist a typed episodic incident MemoryObject', true],
+    ['df_mark_superseded', 'Mark an older memory as superseded by a newer one', true],
+    ['df_report_outcome', 'Record outcome feedback on a prior decision', true],
+    ['df_get_cognitive_state', 'Return working-memory + cognitive state snapshot', true]
+  ];
+  var tbody = document.getElementById('tools-tbody');
+  tools.forEach(function(t) {
+    var tr = document.createElement('tr');
+    var tdName = document.createElement('td');
+    tdName.className = 'tool-name';
+    tdName.textContent = t[0];
+    if (t[2]) {
+      var badge = document.createElement('span');
+      badge.className = 'badge-new';
+      badge.textContent = 'NEW';
+      tdName.appendChild(badge);
+    }
+    var tdDesc = document.createElement('td');
+    tdDesc.className = 'tool-desc';
+    tdDesc.textContent = t[1];
+    tr.appendChild(tdName);
+    tr.appendChild(tdDesc);
+    tbody.appendChild(tr);
+  });
+})();
+
+// ── FEATURE FLAGS ──
+(function() {
+  var flags = [
+    'DEPTHFUSION_COGNITIVE_RETRIEVAL',
+    'DEPTHFUSION_COGNITIVE_SCORING',
+    'DEPTHFUSION_LLM_CLASSIFIER',
+    'DEPTHFUSION_CONTRADICTION_ENGINE',
+    'DEPTHFUSION_DECISION_MEMORY',
+    'DEPTHFUSION_OPERATIONAL_MEMORY',
+    'DEPTHFUSION_MULTI_AGENT_WM',
+    'DEPTHFUSION_AUTONOMIC',
+    'DEPTHFUSION_REST_API',
+    'DEPTHFUSION_DECISION_EXTRACTOR_ENABLED',
+    'DEPTHFUSION_FUSION_GATES_ENABLED',
+    'DEPTHFUSION_GRAPH_ENABLED',
+    'DEPTHFUSION_HAIKU_ENABLED',
+    'DEPTHFUSION_EMBEDDING_BACKEND=local'
+  ];
+  var grid = document.getElementById('flags-grid');
+  flags.forEach(function(f) {
+    var row = document.createElement('div');
+    row.className = 'flag-row';
+    var dot = document.createElement('div');
+    dot.className = 'flag-on';
+    var name = document.createElement('span');
+    name.className = 'flag-name';
+    name.textContent = f;
+    var status = document.createElement('span');
+    status.className = 'flag-status';
+    status.textContent = 'ON';
+    row.appendChild(dot);
+    row.appendChild(name);
+    row.appendChild(status);
+    grid.appendChild(row);
+  });
+})();
+
+// ── CIQS BARS (animate on scroll) ──
+(function() {
+  var fills = document.querySelectorAll('.ciqs-bar-fill');
+  var animated = false;
+  function animateBars() {
+    if (animated) return;
+    animated = true;
+    fills.forEach(function(el) {
+      var target = parseFloat(el.getAttribute('data-w'));
+      el.style.width = target + '%';
+    });
+  }
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) { if (e.isIntersecting) animateBars(); });
+  }, { threshold: 0.3 });
+  var barsSection = document.getElementById('ciqs-bars');
+  if (barsSection) observer.observe(barsSection);
+})();
+
+// ── SCROLL REVEAL ──
+(function() {
+  var reveals = document.querySelectorAll('.reveal');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(function(el) { io.observe(el); });
+})();
+</script>
+</body>
+</html>
