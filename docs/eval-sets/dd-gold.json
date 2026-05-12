@@ -1,0 +1,452 @@
+[
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-bm25-norm",
+      "text": "Fixed the BM25 score normalisation bug — I was dividing each score by the maximum score in the result set. The problem: if all documents score equally (e.g. all have score 1.0), you get 1.0/1.0=1.0 for everyone, which is technically correct but the \"neutral\" value when there's no meaningful ranking should be 0.5, not 1.0. Changed to min-max normalisation: (score - min_score) / (max_score - min_score), which gracefully falls back to 0.5 when max equals min."
+    },
+    "b": {
+      "chunk_id": "b-bm25-norm",
+      "text": "The BM25 ranking normalisation was using max-only division: raw_score / max_score. This fails when all scores in the result set are equal — you get 1.0 for every result when the semantically correct \"no meaningful signal\" value is 0.5. Replaced with min-max: (raw - min) / (max - min). Added a zero-range guard that returns 0.5 when max equals min."
+    },
+    "reviewer_notes": "Both describe the same BM25 normalisation bug and fix: switching from max-only to min-max normalisation, with the same zero-range fallback to 0.5.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-jwt-single-use",
+      "text": "JWT refresh tokens are now single-use. Once a client uses a refresh token to get a new access token, the refresh token is immediately invalidated in Redis. A fresh refresh token is issued alongside the new access token. If someone steals a refresh token and tries to use it after the legitimate client has already used it, the invalidated token is rejected."
+    },
+    "b": {
+      "chunk_id": "b-jwt-single-use",
+      "text": "Established the rule that each refresh token can only be used once. When the client sends a refresh token to get a new access token, two things happen atomically: the old refresh token is added to a Redis revocation set, and a new refresh token is generated and returned to the client. A revoked token is refused on any subsequent use."
+    },
+    "reviewer_notes": "Both describe single-use refresh tokens with atomic revocation+reissue in Redis.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-canary-stages",
+      "text": "Canary deployment stages: new version starts at 5% of live traffic, monitored for 30 minutes. If p99 latency and error rate stay within 10% of baseline, traffic moves to 20%, then another 30-minute window, then 50%, then 100%. Any metric spike during any window triggers automatic rollback to the previous version."
+    },
+    "b": {
+      "chunk_id": "b-canary-stages",
+      "text": "New releases roll out in four stages: 5% → 20% → 50% → 100%. Each stage has a 30-minute observation window. The system watches p99 response time and error rate. If either climbs more than 10% above the stable baseline for the previous version, Kong automatically shifts all traffic back and alerts the team."
+    },
+    "reviewer_notes": "Both describe the same canary rollout: 5/20/50/100% stages, 30-minute windows, 10% threshold, auto-rollback at Kong.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-json-log",
+      "text": "All service logs must be structured JSON with these required fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (from SERVICE_NAME env var), trace_id (propagated from request headers), user_id (when authenticated, omitted otherwise), message."
+    },
+    "b": {
+      "chunk_id": "b-json-log",
+      "text": "Standardized log format: every log entry is a JSON object. Mandatory fields are timestamp, level, service, trace_id, user_id (optional), and message. Free-form text logs are rejected by the log aggregator pipeline. This format enables structured queries across all services in Loki."
+    },
+    "reviewer_notes": "Both describe the same JSON log schema with the same mandatory field set.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-compound-idx",
+      "text": "Created a compound index on events(tenant_id, created_at DESC). The slow queries were all in the pattern SELECT * FROM events WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 100. The compound index satisfies both the filter and the sort without a separate sort step."
+    },
+    "b": {
+      "chunk_id": "b-compound-idx",
+      "text": "Added index idx_events_tenant_time on events(tenant_id, created_at DESC). This was the missing index for the tenant-scoped time-ordered event fetches. Before: 4.2 seconds (full table scan + sort on 40M rows). After: 18 ms (index-only scan)."
+    },
+    "reviewer_notes": "Both describe the same compound index events(tenant_id, created_at DESC) for the same slow-query pattern.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-msgpack",
+      "text": "Internal service-to-service messages use MessagePack serialization. External API responses use JSON. MessagePack is 30-40% smaller than equivalent JSON and faster to serialize/deserialize. Human readability is not needed for internal traffic."
+    },
+    "b": {
+      "chunk_id": "b-msgpack",
+      "text": "Two-tier serialization: MessagePack for everything that stays inside the cluster (service mesh traffic, job queue payloads, cache entries). JSON for everything external (public API responses, webhooks, partner integrations). The performance win from MessagePack does not justify the readability cost on the external API."
+    },
+    "reviewer_notes": "Both describe the same MessagePack-internal / JSON-external split with the same rationale.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-idem-jobs",
+      "text": "Policy: all background jobs must be idempotent. Running a job twice with the same payload must produce the same outcome as running it once. This is required because RabbitMQ guarantees at-least-once delivery."
+    },
+    "b": {
+      "chunk_id": "b-idem-jobs",
+      "text": "Background job handlers are required to be idempotent — executing the same job twice must not cause double-effects. The message queue delivers at-least-once, not exactly-once. Each handler must use one of: idempotency keys checked against the database, unique constraints that reject duplicate inserts, or check-then-skip logic."
+    },
+    "reviewer_notes": "Both state the same idempotent-jobs policy driven by at-least-once delivery.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-ext-error",
+      "text": "Wrapping all external API call failures in a typed ExternalCallError class. Fields: service (e.g. \"stripe\"), operation (e.g. \"charge_card\"), original_error. Instead of catching raw SDK exceptions that differ between providers, the rest of the codebase handles one error type."
+    },
+    "b": {
+      "chunk_id": "b-ext-error",
+      "text": "Standardized external API error wrapping: all calls to third-party services (payment processor, email provider, analytics API) are caught at the integration boundary and re-raised as ExternalCallError(service=..., operation=..., cause=...). Callers handle ExternalCallError, not raw SDK exceptions."
+    },
+    "reviewer_notes": "Both describe wrapping external API failures as ExternalCallError with the same {service, operation, cause} fields.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-read-rep",
+      "text": "Added PostgreSQL read replicas. Analytics dashboard queries (10-30 second reporting queries) are routed to replicas, leaving the primary database exclusively for OLTP writes and reads. Replication lag is 1-2 seconds, which the analytics team confirmed is acceptable."
+    },
+    "b": {
+      "chunk_id": "b-read-rep",
+      "text": "Introduced read replicas to isolate analytics query load from production OLTP traffic. The primary handles all writes. A replica connection pool is used for reporting queries. The analytics team accepts up to 2 seconds of staleness."
+    },
+    "reviewer_notes": "Both describe routing analytics queries to PG read replicas with the same 1–2s lag acceptance.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-env-flags",
+      "text": "Feature flags are stored in environment variables, not a database table. Changing a flag requires a deploy, but deploys are fast. Env vars are visible in deployment config, not hidden state in a database."
+    },
+    "b": {
+      "chunk_id": "b-env-flags",
+      "text": "Decided against database-backed feature flags. A database flag creates a runtime dependency — flag reads can fail if the database is slow. Environment variable flags are resolved at startup and do not add runtime overhead. The trade-off (deploy required to change a flag) is acceptable at our deployment frequency."
+    },
+    "reviewer_notes": "Both describe env-var feature flags and the same DB-flag rejection rationale.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-kong-rl",
+      "text": "Rate limiting is handled at Kong (our API gateway), not in individual microservices. Centralized rate limiting means consistent enforcement across all services and no duplicate implementation. Rate limit state is stored in Redis behind Kong."
+    },
+    "b": {
+      "chunk_id": "b-kong-rl",
+      "text": "Moving rate limiting to the Kong layer. Service-level rate limiting creates inconsistency — each service has different limits and the state is not shared, so a user can circumvent per-service limits by spreading requests. Kong enforces rate limits at the entry point with shared Redis state."
+    },
+    "reviewer_notes": "Both describe centralised rate limiting at Kong backed by Redis.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-utc",
+      "text": "All timestamps stored in the database are UTC. No exceptions. Timezone conversion from UTC to user local time happens only in the frontend at display time."
+    },
+    "b": {
+      "chunk_id": "b-utc",
+      "text": "Established the UTC-only storage rule: the backend stores all datetimes in UTC. The API always returns UTC. The frontend is responsible for converting to the user local timezone for display. Mixing timezones in storage is a source of subtle bugs, especially around DST transitions."
+    },
+    "reviewer_notes": "Both state the same UTC-only storage rule with frontend-side display conversion.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-gql-rest",
+      "text": "GraphQL for the internal frontend (our own team). REST for the external public API. GraphQL flexibility benefits our own frontend but the learning curve is a barrier for external developers who expect REST."
+    },
+    "b": {
+      "chunk_id": "b-gql-rest",
+      "text": "Dual API strategy: internal-facing API is GraphQL — the frontend team can request exactly the data shape they need. External public API is REST — third-party developers have a lower integration barrier and all their existing tooling works without special clients."
+    },
+    "reviewer_notes": "Both describe the same internal-GraphQL / external-REST split with the same rationale.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-soft-del",
+      "text": "User account deletion uses soft-delete: set deleted_at timestamp, scrub PII fields (email, name, address) immediately for GDPR compliance. Keep the record shell for referential integrity."
+    },
+    "b": {
+      "chunk_id": "b-soft-del",
+      "text": "GDPR deletion implementation: mark user as deleted (deleted_at = now()), overwrite personal data fields with placeholders immediately, but preserve the row. Hard deletion would break foreign key constraints on orders, reviews, and activity logs."
+    },
+    "reviewer_notes": "Both describe the same soft-delete with immediate PII scrub for GDPR while keeping the row for FK integrity.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "true-dup",
+    "a": {
+      "chunk_id": "a-redis-zset",
+      "text": "Using Redis sorted sets (ZSETs) for the leaderboard. ZADD updates a user score, ZRANGEBYSCORE fetches the top N, ZRANK returns a specific user position. All O(log n). No database query on the leaderboard read path."
+    },
+    "b": {
+      "chunk_id": "b-redis-zset",
+      "text": "Leaderboard is backed by a Redis ZSET keyed by season. Score updates call ZADD. Rank queries call ZRANGEBYSCORE. Redis sorted set operations are O(log n), which gives sub-millisecond leaderboard reads for 500k members."
+    },
+    "reviewer_notes": "Both describe Redis ZSETs as the leaderboard backing store with the same operations and O(log n) profile.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-access-exp",
+      "text": "Access tokens (JWTs issued for API authentication) expire after 15 minutes. Short expiry limits the window of exposure if a token is stolen."
+    },
+    "b": {
+      "chunk_id": "b-refresh-rot",
+      "text": "Refresh tokens rotate on every use. When a client uses a refresh token, the old token is invalidated and a new one is issued. If a refresh token is used twice (old token used after rotation), both the old and new token are immediately revoked — this detects token theft."
+    },
+    "reviewer_notes": "Both are about JWT lifecycle, but A is access-token expiry (15 min) and B is refresh-token rotation + theft detection. Different aspects — the tricky-case example in the guide.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-per-user-rl",
+      "text": "Authenticated endpoints are rate-limited at 100 requests per minute per user_id. Exceeding the limit returns 429 with a Retry-After header."
+    },
+    "b": {
+      "chunk_id": "b-per-ip-rl",
+      "text": "Unauthenticated endpoints (login, registration, password reset) are rate-limited at 20 requests per minute per IP address. This prevents credential stuffing on public endpoints where user_id is not available."
+    },
+    "reviewer_notes": "Different rate-limit policies: A is 100/min per user_id on authenticated endpoints; B is 20/min per IP on unauthenticated endpoints. Different limits, different keys, different endpoint classes.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-job-idem-req",
+      "text": "All background job handlers must be idempotent — identical input must produce identical output regardless of how many times the job executes."
+    },
+    "b": {
+      "chunk_id": "b-job-retry",
+      "text": "Failed background jobs are retried up to 3 times with exponential backoff: first retry after 30 seconds, second after 2 minutes, third after 10 minutes. After 3 failures, the job moves to a dead-letter queue for manual review."
+    },
+    "reviewer_notes": "Complementary, not the same fact: A is the idempotency requirement; B is the retry schedule + DLQ. You can implement one without the other.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-login-idx",
+      "text": "Added a B-tree index on users(email) to speed up the login query (SELECT id, password_hash FROM users WHERE email = ?). Login is a high-frequency operation."
+    },
+    "b": {
+      "chunk_id": "b-admin-idx",
+      "text": "Added a composite index on users(created_at, status) for the admin dashboard user listing query, which filters by status and sorts by registration date. Different from the login index — this one supports range queries."
+    },
+    "reviewer_notes": "Two different indexes on the same users table for two different queries (login lookup vs admin listing). Different columns, different use cases.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-api-err",
+      "text": "API error responses use the format: {\"error\": {\"code\": \"VALIDATION_ERROR\", \"message\": \"...\", \"fields\": {\"email\": \"required\"}}}. The code field is a machine-readable enum for programmatic handling."
+    },
+    "b": {
+      "chunk_id": "b-backend-err",
+      "text": "Backend error logging format: when an unhandled exception occurs, log {\"level\": \"ERROR\", \"correlation_id\": \"...\", \"service\": \"...\", \"error\": {\"type\": \"...\", \"message\": \"...\", \"stack\": \"...\"}}. The correlation_id links the error log to the request that triggered it."
+    },
+    "reviewer_notes": "Different schemas for different audiences: A is the client-facing API error envelope; B is the server-side error log shape.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-redis-cache",
+      "text": "User profile data is cached in Redis with a 5-minute TTL and LRU eviction. Profiles are read on nearly every authenticated request, and profile updates invalidate the cache key immediately."
+    },
+    "b": {
+      "chunk_id": "b-redis-pub",
+      "text": "Real-time notifications use Redis pub/sub. When a notification event is generated, it is published to a user-specific channel (user:{id}:notifications). Connected clients subscribe to their channel and receive notifications with sub-100ms latency."
+    },
+    "reviewer_notes": "Both use Redis but for different patterns — A is caching (key/value with TTL); B is pub/sub (channels and subscriptions). Different Redis features, different data flows.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-log-format",
+      "text": "All service logs use structured JSON format with standardized fields: timestamp, level, service, trace_id, user_id, message."
+    },
+    "b": {
+      "chunk_id": "b-log-ret",
+      "text": "Log retention policy: operational logs (application and access logs) retained 90 days then deleted. Transaction records (orders, payments, audit trail) retained 2 years for compliance."
+    },
+    "reviewer_notes": "Different aspects of logging: A is the log format; B is the retention schedule. Complementary.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-canary-pct",
+      "text": "Canary traffic split: 5% → 20% → 50% → 100%, with 30-minute observation windows between stages."
+    },
+    "b": {
+      "chunk_id": "b-canary-rb",
+      "text": "Canary rollback criteria: automatic rollback triggers if p99 latency increases more than 10% above baseline OR if error rate increases more than 10% above baseline during any canary stage observation window."
+    },
+    "reviewer_notes": "Both describe canary deploys but A is the traffic-split schedule and B is the rollback criteria/thresholds. Different facets of the same policy — keeping both is informative.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-user-ff",
+      "text": "User-level feature flags: specific users can be enrolled in a feature independently. Used for beta testing with specific customers."
+    },
+    "b": {
+      "chunk_id": "b-org-ff",
+      "text": "Organization-level feature flags: enabling a flag for an organization enables it for all users in that organization. Used for staged rollout to enterprise customers."
+    },
+    "reviewer_notes": "Different flag scopes: A is user-level enrollment (per individual); B is organization-level enrollment (whole tenant). Different rollout patterns.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-jwt-cookie",
+      "text": "JWTs are stored in httpOnly cookies, not localStorage. httpOnly prevents JavaScript from accessing the cookie, protecting against XSS attacks stealing the token."
+    },
+    "b": {
+      "chunk_id": "b-jwt-15m",
+      "text": "Access tokens (JWTs) rotate every 15 minutes. The short lifetime limits exposure if a token is stolen or intercepted."
+    },
+    "reviewer_notes": "Both about JWT security but different mechanisms: A is cookie storage attributes for XSS protection; B is short token lifetime to bound theft. Different defences.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-mig-rev",
+      "text": "Every database migration must include a down() method that reverses the migration. Migrations without a rollback path are not permitted."
+    },
+    "b": {
+      "chunk_id": "b-mig-order",
+      "text": "Migrations run sequentially in the order of their timestamp prefix. Parallel migration execution is not permitted — concurrent schema changes can cause deadlocks and unpredictable results."
+    },
+    "reviewer_notes": "Both rules about migrations but different concerns: A is reversibility (down()); B is ordering/concurrency (sequential, no parallel).",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-int-test",
+      "text": "Integration tests clean up database state by running inside a transaction that is rolled back at the end of each test. Each test starts with a clean slate."
+    },
+    "b": {
+      "chunk_id": "b-unit-test",
+      "text": "Unit tests mock all service interfaces and external dependencies. No real database connections, no real HTTP calls. Fast execution, complete isolation. Integration tests (a separate suite) use real dependencies."
+    },
+    "reviewer_notes": "Different test classes: A is integration tests using transaction rollback; B is unit tests with mocked dependencies. Different isolation strategies.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-cache-ttl",
+      "text": "Cached user profiles expire after 5 minutes (time-based TTL). After 5 minutes, the next read fetches fresh data from the database and repopulates the cache."
+    },
+    "b": {
+      "chunk_id": "b-cache-inv",
+      "text": "Cache entries for user profiles are immediately invalidated (deleted from Redis) on any profile update. The next read after an update always goes to the database. This is write-through invalidation, separate from the TTL policy."
+    },
+    "reviewer_notes": "Two cache invalidation mechanisms layered together: A is time-based TTL; B is write-through invalidation on update. Complementary, not the same fact.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-cursor-pag",
+      "text": "Paginated endpoints use cursor-based pagination: the client passes a cursor (encoded last-seen ID) and receives the next page. No OFFSET queries — all pagination is via index-range lookups."
+    },
+    "b": {
+      "chunk_id": "b-no-count",
+      "text": "Paginated API responses do not include a total count of results. Total count queries (SELECT COUNT(*)) are expensive on large tables and rarely needed by clients who paginate forward. Clients receive has_next_page instead."
+    },
+    "reviewer_notes": "Both about pagination but different facets: A is the pagination mechanism (cursors, no OFFSET); B is the omission of total-count. Either could exist independently.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "dedup/v1",
+    "label": "false-dup",
+    "a": {
+      "chunk_id": "a-utc-db",
+      "text": "The database stores all timestamps in UTC. The backend always writes UTC and always reads UTC."
+    },
+    "b": {
+      "chunk_id": "b-tz-fe",
+      "text": "Timezone conversion from UTC to user local time happens exclusively in the frontend. The API always returns UTC. The frontend uses the browser Intl API to format dates in the user local timezone."
+    },
+    "reviewer_notes": "Two halves of the UTC policy stated separately: A is backend/DB storage rule; B is frontend display conversion. Same overall policy but distinctly different obligations on different layers.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  }
+]

@@ -1080,13 +1080,13 @@
 ### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: 50-session decision-extraction gold set under `docs/eval-sets/decision-extraction/` — each session has human-labelled "decisions worth capturing" + expected discovery files. **Scaffolding + 2 seed examples landed 2026-04-21; full curation (50 examples) calendar-blocked.**
-- [ ] AC-2: 30-pair near-duplicate dedup gold set under `docs/eval-sets/dedup/` — pairs labelled as true-dup / false-dup. **Scaffolding + 2 seed pairs landed 2026-04-21; full curation (30 pairs) calendar-blocked.**
-- [ ] AC-3: 40-example negative-signal gold set under `docs/eval-sets/negative/` — sentences labelled as genuine negative vs false-positive. **Scaffolding + 2 seed examples landed 2026-04-21; full curation (40 examples) calendar-blocked.**
-- [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%) — **execution blocked on AC-1/2/3 population**
+- [x] AC-1: 50-entry decision-extraction gold set — `docs/eval-sets/de-gold.json` (schema: decision-extraction/v1; 50 human-labelled entries, 0 skipped; committed 2026-05-12)
+- [x] AC-2: 30-pair dedup gold set — `docs/eval-sets/dd-gold.json` (schema: dedup/v1; 30 human-labelled pairs, 0 skipped; committed 2026-05-12)
+- [x] AC-3: 40-entry negative-signal gold set — `docs/eval-sets/neg-gold.json` (schema: negative/v1; 40 human-labelled entries, 0 skipped; committed 2026-05-12)
+- [ ] AC-4: Closes S-45 AC-1 (precision ≥ 0.80), S-48 AC-2 (false-neg ≤ 10%), S-49 AC-2 (false-dedup ≤ 5%) — **unblocked; run eval scripts to measure**
 
 **Tasks:**
-- [~] T-202: Curate + commit the three gold sets with eval scripts (`scripts/eval_decision.py`, `scripts/eval_dedup.py`, `scripts/eval_negative.py`) — **partial:** all three eval scripts shipped (heuristic extractor + bag-of-words cosine matching, deliberate backend-free lower-bound); 2 seed examples per set pin the JSON schema and smoke-test the scripts. Full curation (50 + 30 + 40 examples) pending T-346 labelling session.
+- [x] T-202: Curate + commit the three gold sets — `docs/eval-sets/de-gold.json` (50), `docs/eval-sets/dd-gold.json` (30), `docs/eval-sets/neg-gold.json` (40) — all 120 examples human-labelled via T-346 interactive tool; committed 2026-05-12
 - [x] T-203: Document eval methodology in `docs/eval-sets/README.md` (labelling protocol, inter-rater-agreement guidance, add-new-example workflow) — 175-line methodology doc + per-set READMEs covering schema, edge cases, running the measurements
 - [x] T-346: Build interactive labelling tool — `docs/eval-sets/labeller.html` (single self-contained HTML; 50 DE + 30 DD + 40 NEG examples pre-loaded; localStorage persistence; exports de-gold.json / dd-gold.json / neg-gold.json in schema-compliant format)
 

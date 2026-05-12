@@ -1,0 +1,517 @@
+[
+  {
+    "schema": "negative/v1",
+    "source_session": "depthfusion-recall-tuning-2026-04",
+    "input_text": "Tried increasing the recall top_k to 100 to improve coverage. The problem: we're using Haiku as the reranker, and with 100 candidates it hits the Haiku API rate limit consistently during busy sessions. Requests start queuing, the MCP server times out, and the whole recall operation fails.\n\nPulled back to top_k=20. That keeps us well under the rate limit. We're trading some recall coverage for reliability.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Recall top_k of 100 for the Haiku reranker",
+        "why": "Consistently hit the Haiku API rate limit during busy sessions — requests queued, MCP server timed out, and recall failed. Pulled back to top_k=20."
+      }
+    ],
+    "reviewer_notes": "Explicit try → fail → rollback with the rate-limit reason recorded.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "task-queue-architecture-2026-03",
+    "input_text": "Used SQLite as the backing store for the background task queue. Seemed convenient — no infrastructure to set up, file-based, easy to inspect.\n\nProblem: SQLite has file-level locking. Only one writer can hold the lock at a time. With 4 worker processes picking up tasks simultaneously, they're constantly contending for the lock. Task throughput dropped by 60% compared to our previous system, and we're seeing deadlock errors under load.\n\nMigrated to PostgreSQL, which has proper row-level locking. Workers pick up different rows simultaneously without contention.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "SQLite as the backing store for the background task queue",
+        "why": "SQLite uses file-level locking — with 4 concurrent worker processes, lock contention dropped throughput by 60% and produced deadlocks. Migrated to PostgreSQL for row-level locking."
+      }
+    ],
+    "reviewer_notes": "Classic 'tried X, broke at scale, switched to Y' negative.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "file-upload-progress-2026-03",
+    "input_text": "Implemented server-sent events (SSE) to stream file upload progress to the browser. Worked perfectly locally. Broke completely in staging.\n\nThe issue: our Nginx proxy has a proxy_request_buffering directive that buffers the entire request body before forwarding it to the application. The upload is complete before we even see the first byte. SSE for upload progress is pointless when the proxy is buffering the upload.\n\nAlso, Nginx has a 60-second proxy timeout. Large uploads were being killed mid-transfer.\n\nSwitched to a polling approach: the client sends the file, gets a task ID back, then polls /tasks/{id}/status every second.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Server-Sent Events (SSE) for streaming file upload progress to the browser",
+        "why": "Nginx's proxy_request_buffering buffers the full request body before forwarding, so the upload is complete before the application sees the first byte — progress streaming is pointless. The 60s proxy timeout also killed large uploads. Switched to polling (/tasks/{id}/status)."
+      }
+    ],
+    "reviewer_notes": "Two concrete Nginx behaviours killed the approach.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "retry-logic-2026-02",
+    "input_text": "Implemented plain exponential backoff for retrying failed API calls: wait 1 second, then 2, then 4, then 8. This caused a \"retry storm\" when our payment processor had a 90-second outage. All queued retries synchronized and fired at the same time when the processor came back online, immediately overwhelming it again.\n\nSwitched to exponential backoff with random jitter. Now each retry waits a random amount within the window. Retries spread out and the recovering service gets a gradual traffic ramp instead of a sudden spike.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Plain exponential backoff (no jitter) for retrying failed API calls",
+        "why": "Synchronised retries caused a retry storm when the payment processor recovered from a 90s outage — every queued retry fired at the same instant and re-overwhelmed it. Switched to exponential backoff with random jitter."
+      }
+    ],
+    "reviewer_notes": "Concrete incident makes the rejection unambiguous.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "async-celery-integration-2026-03",
+    "input_text": "Tried using aioredis (async Redis client) inside Celery task handlers so we could share async code between our FastAPI app and our Celery workers.\n\nThe problem: Celery runs a synchronous event loop (it predates Python async). When aioredis tries to create an event loop inside a Celery worker, it conflicts with the loop Celery uses internally. Getting \"There is no current event loop in thread\" errors constantly.\n\nReverted to sync redis-py inside Celery workers. Kept aioredis only in the FastAPI async context where it belongs.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Using aioredis (async Redis client) inside Celery task handlers",
+        "why": "Celery runs its own synchronous event loop; aioredis trying to create its own loop conflicted with Celery's, producing 'There is no current event loop in thread' errors. Reverted to sync redis-py inside Celery; kept aioredis only inside FastAPI's async context."
+      }
+    ],
+    "reviewer_notes": "Tried, broke, reverted, with a clear runtime-conflict reason.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "pagination-performance-2026-02",
+    "input_text": "Had OFFSET-based pagination on the products table. Page 1 was fast. Page 200 (items 3,981-4,000 in a sorted list of 2 million products) was taking 15 seconds — the database fetches rows 1 through 4,000 and discards the first 3,980 every time.\n\nReplaced with keyset pagination: WHERE id > {last_seen_id} ORDER BY id LIMIT 20. The index lookup is instant regardless of which \"page\" you're on. Page 1 and page 50,000 are equally fast.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "OFFSET-based pagination on the products table",
+        "why": "At deep pages, the DB has to fetch-and-discard the leading rows on every request — page 200 of 20 took 15s on a 2M-row table. Replaced with keyset pagination (WHERE id > last_seen_id ORDER BY id LIMIT 20), constant cost regardless of page."
+      }
+    ],
+    "reviewer_notes": "System is explicitly no longer using OFFSET pagination because of this experience.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "caching-architecture-2026-03",
+    "input_text": "Added an in-process LRU cache to the user service — a Python dictionary with a max size. Seemed efficient since it avoids a Redis network roundtrip on every request.\n\nProblem: we run 8 Gunicorn worker processes. Each process has its own in-process cache, so we effectively have 8 separate caches. When a user updates their profile, we invalidate the cache in the worker that handled the update — but the other 7 workers still have stale data.\n\nWe had an incident where a user changed their email address and kept seeing the old email for 20 minutes because 7 of 8 workers were serving stale cached data.\n\nMoved to Redis as the shared cache.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "In-process Python LRU cache in a multi-worker Gunicorn setup",
+        "why": "Each of 8 worker processes had its own cache — invalidation in one worker didn't propagate to the others. An email-change incident left 7 of 8 workers serving stale data for ~20 minutes. Moved to Redis as a shared cache."
+      }
+    ],
+    "reviewer_notes": "Real incident makes the rejection concrete.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "grpc-migration-attempt-2026-02",
+    "input_text": "Attempted to migrate inter-service communication from REST to gRPC for the performance benefits (binary protocol, multiplexing, streaming).\n\nSpent a week on the migration. Then discovered our infrastructure uses HAProxy in TCP mode as the load balancer between services. HAProxy in TCP mode doesn't understand HTTP/2, which gRPC requires. It terminates HTTP/2 connections because it expects HTTP/1.1.\n\nReverting the entire migration back to REST/JSON.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "gRPC for internal inter-service communication",
+        "why": "Our HAProxy load balancer runs in TCP mode and doesn't speak HTTP/2 — it terminates HTTP/2 connections expecting HTTP/1.1, which gRPC can't tolerate. Reverted the migration back to REST/JSON."
+      }
+    ],
+    "reviewer_notes": "Same pattern as the gRPC entry in DE — captured here as institutional negative knowledge.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "primary-key-design-2026-01",
+    "input_text": "Switched all primary keys from auto-increment integers to ULIDs (Universally Unique Lexicographically Sortable Identifiers). ULIDs are sortable by time, URL-safe, and don't expose sequence information.\n\nIntegration test with our payment processor revealed the problem: their API requires a numeric-only merchant reference ID. ULIDs contain letters. Sending a ULID as the merchant reference ID caused their API to return a 400 error.\n\nReverted to auto-increment integers. The payment processor integration is too important to work around.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "ULIDs as primary keys across the system",
+        "why": "Our payment processor's API requires numeric-only merchant reference IDs; ULIDs contain letters and were rejected with 400 errors at integration test time. Reverted to auto-increment integers — payment integration is too important to work around."
+      }
+    ],
+    "reviewer_notes": "External dependency constraint forced the rollback.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "search-scaling-2026-03",
+    "input_text": "Hit the limits of PostgreSQL full-text search at production scale. With 10 million products, search queries are consistently taking 800ms to 2 seconds — well above the 200ms target.\n\nPostgreSQL FTS works well at moderate scale but doesn't have the tuning knobs needed for fast faceted search (filtering by category + brand + price range + availability simultaneously) at this data size.\n\nEvaluating Elasticsearch and Typesense as dedicated search solutions. Haven't migrated yet — this is a finding from load testing, not a completed migration.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "A limitation was noted (PG FTS slow at 10M products) but the team explicitly says 'Haven't migrated yet — this is a finding from load testing, not a completed migration.' Per the guide's 'limitation noted without abandoning anything' rule, this is NOT a genuine negative yet.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "realtime-updates-2026-02",
+    "input_text": "Used WebSockets for real-time order status updates to the dashboard. Worked well in development. In production, connections drop after a few minutes.\n\nRoot cause: our HAProxy load balancer has a 60-second timeout on idle TCP connections. WebSockets look like idle TCP to HAProxy if no data is flowing. After 60 seconds of no new order status changes, HAProxy kills the connection.\n\nSwitched to long-polling (client waits up to 30 seconds for a response, reconnects immediately after each response).",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "WebSockets for real-time order status updates to the dashboard",
+        "why": "HAProxy has a 60-second idle TCP timeout, and WebSocket connections look idle to it when no events are flowing — HAProxy was killing connections after 60 seconds of quiet. Switched to long-polling."
+      }
+    ],
+    "reviewer_notes": "Specific load-balancer behaviour drove the rejection.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "distributed-transaction-2026-02",
+    "input_text": "Tried implementing the Saga pattern for distributed transactions across the order, inventory, and payment services. Each service has a compensating transaction (undo action) that gets called if a later step fails.\n\nAfter 3 weeks of implementation, the compensating transaction logic became extremely complex. We built compensation chains for compensating transactions.\n\nFor our current scale (500 orders/day), this is massive over-engineering. Replaced with a sequential flow with retry logic: step 1 → step 2 → step 3, with idempotent retries on failure. Much simpler and handles 99% of failure scenarios.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Saga pattern with compensating transactions for distributed transactions across order, inventory, and payment services",
+        "why": "Compensation chains grew recursive (compensations for compensations) and complexity exploded after 3 weeks. Massive over-engineering for 500 orders/day. Replaced with a sequential flow + idempotent retries."
+      }
+    ],
+    "reviewer_notes": "Explicitly abandoned and replaced after 3 weeks of work.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "cqrs-evaluation-2026-03",
+    "input_text": "Evaluated CQRS (Command Query Responsibility Segregation) for handling the read/write performance mismatch in the reporting service. The idea: maintain a separate read model optimized for queries, updated asynchronously from the write model via events.\n\nAfter a week of design work, concluded it's premature optimization. Our write throughput is 500 orders/day and peak read load is 200 concurrent dashboard users. Adding CQRS means maintaining two data models, an event bus, and eventual consistency semantics.\n\nThe current PostgreSQL setup with proper indexes handles our actual load fine. Shelving CQRS for if/when we're 10x bigger.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "CQRS (separate read/write models with async event-based projection) for the reporting service",
+        "why": "Premature optimization at current scale (500 writes/day, 200 concurrent dashboard users) — the cost of maintaining two data models, an event bus, and eventual consistency outweighs the benefit. Shelved until ~10x larger."
+      }
+    ],
+    "reviewer_notes": "Explicit rejection with a re-evaluation trigger recorded.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "auth-performance-2026-02",
+    "input_text": "Added a Bloom filter to the authentication middleware for fast \"is this token revoked?\" checks. Bloom filters give probabilistic membership tests in O(1) with very small memory footprint.\n\nThe problem: Bloom filters have false positives. Our configuration had a 1% false positive rate. This meant 1% of valid login requests were being rejected as \"revoked\" — legitimate users getting \"invalid session\" errors on 1 in 100 requests.\n\nRemoved the Bloom filter from the auth flow. Reverted to a direct Redis lookup (still fast). The false positive rate is unacceptable in an auth context — any false positive is a user incorrectly locked out.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Bloom filter in the authentication middleware to do fast 'is this token revoked?' checks",
+        "why": "Bloom filters have inherent false positives; the configured 1% false-positive rate meant ~1 in 100 legitimate users got 'invalid session' errors. False positives are unacceptable in an auth path — removed from the auth flow entirely, reverted to direct Redis lookup."
+      }
+    ],
+    "reviewer_notes": "Domain-fit problem (false positives + auth) drove the rejection.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "analytics-db-evaluation-2026-03",
+    "input_text": "Evaluated ClickHouse as the database for our analytics service. ClickHouse is a column-oriented database purpose-built for analytical queries — aggregations over large datasets are extremely fast.\n\nProblem: our analytics data also has OLTP requirements. When an order is placed, we need to update several analytics tables atomically. ClickHouse is optimized for append-only workloads and doesn't support traditional ACID transactions or foreign key relationships.\n\nKeeping PostgreSQL for the analytics tables. ClickHouse would be appropriate if we needed sub-second queries across billions of rows.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "ClickHouse as the database for the analytics service",
+        "why": "Analytics tables also have OLTP requirements (atomic updates with order placement, foreign keys to orders/users). ClickHouse is optimised for append-only workloads and lacks traditional ACID transactions and FK relationships. Keeping PostgreSQL."
+      }
+    ],
+    "reviewer_notes": "Specific workload mismatch ruled out ClickHouse for this service.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "auth-revocation-2026-03",
+    "input_text": "The original authentication design used JWTs with no server-side state — completely stateless. This seemed like an architectural win.\n\nProblem: if a user's account is compromised, we can't revoke their token. The token stays valid until it naturally expires (we had 24-hour expiry at the time). An attacker with a stolen token has 24 hours of access even after the user reports the compromise and resets their password.\n\nChanged to: short-lived access tokens (15 minutes) + Redis-backed revocation list. On password reset or explicit logout, add the user's token family to the revocation list.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Pure stateless JWT authentication with no server-side state and long (24h) expiry",
+        "why": "Tokens can't be revoked before they naturally expire — an attacker with a stolen token has 24 hours of access even after the user reports the compromise and changes their password. Changed to short-lived (15m) access tokens + Redis-backed revocation list."
+      }
+    ],
+    "reviewer_notes": "Captures the rationale behind the current hybrid stateful approach.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "sqlalchemy-async-migration-2026-03",
+    "input_text": "Proposed migrating from sync SQLAlchemy to async SQLAlchemy (SQLAlchemy 2.0+ async extension) to fit our async FastAPI codebase.\n\nAfter 2 weeks of partial migration work: the async SQLAlchemy API is significantly different from the sync API. Every query pattern needs to be rewritten. Lazy loading doesn't work in async context. We hit three bugs in edge cases.\n\nEstimated completion: 3 more weeks plus significant regression testing. Risk of introducing subtle data integrity bugs is high. Decided to stay with sync SQLAlchemy called via thread pool executor.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Migrating from sync SQLAlchemy to async SQLAlchemy 2.0",
+        "why": "The async API is significantly different from sync — every query pattern needs rewriting, lazy loading doesn't work in async context, and we hit 3 bugs in edge cases. Estimated 3 more weeks plus heavy regression testing risk. Staying with sync SQLAlchemy called via thread pool executor."
+      }
+    ],
+    "reviewer_notes": "Tried for 2 weeks then abandoned; cost/risk explicitly given.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "jwt-payload-design-2026-02",
+    "input_text": "Stored all user permissions and role memberships in the JWT payload so the API gateway could validate authorization without hitting a backend service. An enterprise user with many roles had a JWT payload that expanded to 6-8KB.\n\nThis caused two problems: the 4KB limit on cookie storage (browsers refuse to set the cookie), and the 8KB HTTP header limit (nginx was returning 400 errors).\n\nSwitched to minimal JWT claims (user_id, issued_at, expiry). Permissions are cached in Redis with a 5-minute TTL, keyed by user_id.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Storing the full user permission/role set inside the JWT payload",
+        "why": "Enterprise users with many roles produced 6–8 KB JWTs, which broke the 4 KB cookie storage limit (browsers refuse to set them) and the 8 KB HTTP header limit (Nginx returned 400). Switched to minimal JWT claims + Redis-cached permissions with a 5-min TTL keyed by user_id."
+      }
+    ],
+    "reviewer_notes": "Two concrete byte limits drove the rejection.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "python-upgrade-attempt-2026-03",
+    "input_text": "Attempted to upgrade from Python 3.10 to 3.12 to get the performance improvements and new language features.\n\nBlocker: one of our core dependencies uses greenlet, a C extension for coroutine switching. The greenlet build for Python 3.12 had a C API incompatibility with the version of gevent our code depends on. The gevent team was aware but hadn't released a fix yet.\n\nReverting to Python 3.10. Will re-evaluate in 3-6 months when the ecosystem catches up.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Upgrading from Python 3.10 to 3.12",
+        "why": "One of our core dependencies uses greenlet (C extension), whose 3.12 build has a C-API incompatibility with our pinned gevent version. The gevent team is aware but hasn't released a fix. Reverted to 3.10; will re-evaluate in 3–6 months."
+      }
+    ],
+    "reviewer_notes": "Ecosystem readiness blocked the upgrade — explicit re-evaluation window.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "scheduled-maintenance-2026-02",
+    "input_text": "Tried using pg_cron (PostgreSQL cron extension) to schedule database cleanup tasks — delete expired sessions, archive old logs, vacuum large tables.\n\nProblem: pg_cron uses PostgreSQL advisory locks to prevent duplicate runs. Our application has transaction patterns that hold advisory locks for extended periods. pg_cron jobs were consistently failing because the advisory locks were already held, causing maintenance to be skipped entirely for days at a time.\n\nMoved scheduled maintenance to a separate Python service that runs as a Kubernetes CronJob.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "pg_cron (the PostgreSQL cron extension) for scheduled DB maintenance",
+        "why": "pg_cron uses PostgreSQL advisory locks for at-most-once execution. Application transactions in our codebase hold those advisory locks for extended periods, so pg_cron jobs were silently skipped for days at a time. Moved to a Python service running as a Kubernetes CronJob."
+      }
+    ],
+    "reviewer_notes": "Lock-contention failure mode is specific and the replacement is concrete.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "multi-region-architecture-2026-03",
+    "input_text": "Evaluated multi-region active-active write deployment — having multiple geographic regions each accept writes independently for lower latency.\n\nThe core problem: we have global invariants that can't be violated. Account balances can't go negative. Inventory quantities can't go below zero. With active-active writes, two users in different regions can both try to use the last item in stock simultaneously.\n\nThese invariants require coordination between regions for writes, which eliminates the latency advantage. Staying with active-passive (one write region, read replicas in other regions).",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Multi-region active-active write deployment",
+        "why": "Global invariants (account balances ≥ 0, inventory ≥ 0) can't be honoured when two regions accept writes independently — coordinating the cross-region locking required to enforce them eliminates the latency advantage that motivated active-active in the first place. Staying active-passive."
+      }
+    ],
+    "reviewer_notes": "Invariant-driven rejection with the latency rationale specifically nullified.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "orm-evaluation-2026-02",
+    "input_text": "The codebase uses a custom ORM that was built in-house 3 years ago. At the time, it made sense.\n\nProblems now: it's become a maintenance burden. Bugs take 2-3x longer to fix than they would in a standard ORM. New team members spend a week learning its quirks before they can be productive. It's missing features (no connection pooling, no async support) that we now need.\n\nMigrating to SQLAlchemy over the next two releases. The migration is scoped and phased, with the custom ORM running in parallel during transition.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Continuing with the in-house custom ORM (built 3 years ago)",
+        "why": "Maintenance burden: bugs take 2–3x longer to fix than in a standard ORM, new engineers need a week to ramp on its quirks, and it lacks features we now need (no connection pooling, no async support). Migrating to SQLAlchemy over the next two releases, phased."
+      }
+    ],
+    "reviewer_notes": "The author is explicitly abandoning the custom ORM with the rationale recorded.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "redis-as-primary-store-2026-01",
+    "input_text": "Evaluated using Redis as the primary data store for the session management service instead of PostgreSQL. Redis is much faster for the simple key-value lookups that session management requires.\n\nCritical risk: Redis by default stores data in memory with asynchronous persistence. If the server crashes before a write is persisted to disk, that data is lost. With default configuration, you can lose up to the last second of writes.\n\nFor session data this might be acceptable, but we also store important session-adjacent data (rate limit counters, CSRF tokens) in the same store. Keeping PostgreSQL as the primary store. Redis remains a cache layer.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "Using Redis as the primary data store for session management",
+        "why": "Redis's default async persistence can lose up to ~1 second of writes on a crash. The same store also holds rate-limit counters and CSRF tokens that we can't afford to drop. Keeping PostgreSQL as primary; Redis stays a cache layer."
+      }
+    ],
+    "reviewer_notes": "Durability requirement ruled out Redis as primary.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "mongodb-odm-evaluation-2026-03",
+    "input_text": "Started using Mongoose as the ODM (Object Document Mapper) for our MongoDB-backed product catalog service. Mongoose adds schema validation and a familiar ActiveRecord-style API.\n\nProblem: our reporting queries are relational — \"give me all products in category X that have had at least 3 orders in the last 30 days, grouped by supplier.\" In MongoDB + Mongoose, this requires complex $lookup aggregation pipelines.\n\nConsidering moving to the native MongoDB Node.js driver directly, which at least makes the aggregation pipeline code more legible without the ODM abstraction pretending the data is not a document store.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Borderline, but per the guide's strict test: the system is currently STILL using Mongoose — the author writes 'Considering moving' rather than committing to abandon it. Limitation noted without abandoning anything → NOT a genuine negative.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "push-notification-architecture-2026-02",
+    "input_text": "Investigated using WebRTC data channels for push notifications. WebRTC can punch through NAT and firewalls better than WebSockets, which was attractive given that some corporate users are behind strict firewalls.\n\nThe operational complexity was prohibitive: WebRTC requires STUN and TURN servers for NAT traversal. Setting up and maintaining TURN infrastructure is significant.\n\nAbout 30% of our corporate users are behind firewalls that block WebRTC. SSE (Server-Sent Events) works through those firewalls because it's just long-lived HTTP. Switched to SSE for push notifications.",
+    "expected_type": "negative",
+    "expected_negatives": [
+      {
+        "what": "WebRTC data channels for push notifications",
+        "why": "WebRTC requires STUN/TURN infrastructure (significant operational complexity), and ~30% of our corporate users are behind firewalls that block WebRTC outright. SSE works through those firewalls because it's just long-lived HTTP. Switched to SSE."
+      }
+    ],
+    "reviewer_notes": "Operational and reach concerns combined to defeat the use case.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "subscription-plan-perf-2026-03",
+    "input_text": "The /billing/subscriptions endpoint was returning in 8-10 seconds for enterprise accounts. Profiled the query: joining users → subscriptions → subscription_plans was doing a sequential scan on subscription_plans (50,000 rows).\n\nThe plans table had no index on plan_id — it was treated as a small lookup table when the service was first built, but it has grown to 50k rows with complex plan hierarchies.\n\nAdded a B-tree index on subscription_plans(plan_id). Query time: 8 seconds → 20 milliseconds. No code changes needed.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved performance bug — adding a B-tree index on subscription_plans(plan_id) fixed the slow /billing/subscriptions endpoint. Nothing was tried-and-abandoned; this is completed work.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "inventory-race-condition-2026-02",
+    "input_text": "Users were able to over-order limited inventory items. Two users would simultaneously check \"is item X available?\" (yes, 1 left), both proceed to checkout, both successfully place orders, now we have -1 inventory.\n\nClassic read-modify-write race condition. The fix: use SELECT FOR UPDATE when reading inventory during checkout. This places a row-level lock — the second user's SELECT waits until the first transaction commits or rolls back.\n\nThis is now the pattern for all inventory reservation operations.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved race condition fixed with SELECT FOR UPDATE. While it does establish a forward pattern, nothing was tried-and-rejected — it's completed remediation.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "user-registration-500-2026-02",
+    "input_text": "Users were getting 500 errors when registering with a phone number that does not include a country code. The phone validation middleware was calling phone.strip('+') before checking if it is null, throwing a NullPointerException on null inputs.\n\nFixed: moved the null check before any method calls. Added test cases for null, empty string, and various phone formats.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Pure NullPointerException bug fix in phone validation. No design rejection.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "csv-import-flaky-test-2026-03",
+    "input_text": "The test_import_products_csv integration test was failing intermittently — about 1 in 10 runs on CI. The test imports 500 rows, then asserts the database contains 500 products.\n\nRoot cause: the test was running the import (async) and immediately asserting without waiting for all async workers to finish. On slow CI machines, some rows had not been committed when the assertion ran.\n\nFixed: added a polling assertion that waits up to 5 seconds for the count to reach 500, checking every 100ms. Flakiness eliminated across 50 subsequent CI runs.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Flaky test fixed by adding a polling assertion. Resolved infra bug, nothing rejected.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "api-v1-deprecation-2026-02",
+    "input_text": "Completed the v1 to v2 API migration. We announced v1 deprecation 3 months ago, gave all API consumers a 3-month migration window, sent reminder emails at 90/60/30/7 days. Traffic to v1 endpoints dropped from 100% to under 2% over the window.\n\nTurned off v1 endpoints yesterday. The remaining 2% of traffic was from abandoned integrations. No support tickets after the cutover.\n\nThe migration is complete.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Successfully completed v1→v2 API migration. Completed work, not a rejection.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "timezone-double-conversion-2026-03",
+    "input_text": "Bug: users in non-UTC timezones were seeing event times that were wrong by their UTC offset — twice. Traced it: the server was converting UTC timestamps to local time before sending them in the API response, and the frontend was also converting assuming the server sent UTC.\n\nFix: server now sends UTC timestamps only. Frontend always treats received timestamps as UTC before converting to local time for display. The double-conversion is eliminated.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved timezone double-conversion bug. Pure bug fix.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "websocket-memory-leak-2026-02",
+    "input_text": "Memory usage in the WebSocket service was growing unboundedly. Connections were being properly closed from the client side, but memory was not being reclaimed.\n\nFound: event listeners were being attached to connections but only cleaned up in the 'close' event handler. Connections that ended with an error ('error' event) before reaching 'close' were not cleaning up their listeners — references were kept alive.\n\nFixed: cleanup function now runs on both 'error' and 'close' events. Memory usage stabilized in monitoring after deploy.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved WebSocket memory leak by cleaning up listeners on both 'error' and 'close'. Pure bug fix.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "project-list-n-plus-one-2026-02",
+    "input_text": "The GET /api/projects endpoint was taking 1.2 seconds for users with many projects. Database profiling showed 1 query to load the project list + 1 additional query per project to load the owner information — 51 queries for a page of 50 projects.\n\nFixed: changed the query to JOIN users ON users.id = projects.owner_id in the initial query, loading the owner data in one roundtrip. Response time: 1.2s to 85ms.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved N+1 query by adding a JOIN. Pure performance bug fix.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "migration-0043-fix-2026-03",
+    "input_text": "Migration 0043 (adding a not-null status column to orders) was broken. It tried to add the column and set a default value in one transaction, but existing rows were still null after the migration because the UPDATE statement was missing a WHERE clause.\n\nFixed the migration: added a correct WHERE clause (WHERE status IS NULL). Wrote a separate data repair migration to fix the rows affected by the broken run in staging.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Migration bug (missing WHERE clause) fixed with a data-repair migration. Resolved.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "compose-service-name-fix-2026-02",
+    "input_text": "The app service was failing to start in Docker Compose with \"could not connect to database\" errors. The DATABASE_URL environment variable was referencing \"postgres\" as the hostname, but the service in docker-compose.yml was named \"db\".\n\nDocker Compose uses service names as hostnames. Fixed the DATABASE_URL to reference \"db\" instead of \"postgres\". Service started correctly.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Compose service-name typo fix. Resolved config bug.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "websocket-tls-fix-2026-03",
+    "input_text": "WebSocket connections were failing in production with \"WebSocket is closed before the connection is established.\" Development worked fine.\n\nRoot cause: the frontend was connecting to ws:// (unencrypted) but production is served over HTTPS. Browsers block mixed content — an HTTPS page cannot open an unencrypted ws:// connection.\n\nFixed: changed ws:// to wss:// (WebSocket Secure) in the production frontend config.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Mixed-content WebSocket fix (ws:// → wss://). Resolved config bug.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "react-query-v5-upgrade-2026-02",
+    "input_text": "Upgraded from react-query v4 to v5. The API changed significantly — useQuery and useMutation hook signatures changed, QueryClient instantiation changed, and several types were renamed or restructured.\n\nWent through all 40+ hook usages in the codebase and updated the type signatures and hook options to match v5 API. TypeScript was helpful here — every error was a compile-time type error pointing to the exact change needed. All type errors resolved.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Successfully completed react-query v4→v5 upgrade. Completed migration, nothing rejected.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "npm-peer-dependency-2026-01",
+    "input_text": "Running npm install was failing with \"ERESOLVE unable to resolve dependency tree\" because two packages both required react as a peer dependency but specified different version ranges that did not overlap.\n\nFixed by adding a resolutions field to package.json pinning the shared react version to the range that satisfies both packages. npm install now completes cleanly.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "npm peer-dependency conflict resolved via package.json resolutions. Resolved dependency issue.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "users-email-index-2026-02",
+    "input_text": "Users were reporting slow login times (3+ seconds). Database profiling showed the login query (SELECT id, password_hash FROM users WHERE email = ?) was doing a sequential scan on 2 million user rows.\n\nAdded a unique B-tree index on users(email). Login query time: 3 seconds to under 10 milliseconds.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved slow-login bug by adding a unique index on users(email). Pure performance bug fix.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "negative/v1",
+    "source_session": "env-var-typo-fix-2026-01",
+    "input_text": "The user service was failing to connect to the database in the development environment. Error: \"connection refused\" on startup.\n\nFound a typo in the .env file: the variable was named DATABASE_URL in the config file but DATABASE_URI in the application code that reads it. The application was reading undefined, falling back to a default localhost URL that did not exist in the dev setup.\n\nFixed the variable name in .env to match what the application reads.",
+    "expected_type": "positive",
+    "expected_negatives": [],
+    "reviewer_notes": "Resolved env-var name mismatch (DATABASE_URL vs DATABASE_URI). Pure config bug fix.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  }
+]

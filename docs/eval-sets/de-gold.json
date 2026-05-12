@@ -1,0 +1,669 @@
+[
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "authentication-design-2026-03",
+    "input_text": "After a long discussion about session management approaches, I've settled on the following design for our authentication system.\n\nFor the main user-facing application, I'm going with Redis-backed sessions. The key advantage here is instant revocation — if a user's account is compromised or they click \"sign out all devices,\" we can delete the session from Redis and it's gone immediately. JWTs can't be revoked before they expire, which means a stolen token stays valid for its entire lifetime. For users logging into our main app, that risk is unacceptable.\n\nFor the public API where external partners are integrating, I'm keeping JWTs. Partners build integrations that run autonomously without a user present — they need a credential they can use without hitting our servers for every request. The stateless nature of JWTs is exactly right here.\n\nOn top of this, I'm establishing a rotation policy: session tokens must rotate on every single request. Each API call invalidates the previous session token and issues a new one. This means a captured token from packet sniffing or logging is useless by the time an attacker tries to use it.",
+    "expected": [
+      {
+        "text": "Use Redis-backed sessions for the main user-facing application (instant revocation; chosen over JWT for revocability)",
+        "category": "stack-choice"
+      },
+      {
+        "text": "Use JWTs for the public partner API (partners need stateless credentials for autonomous integrations)",
+        "category": "stack-choice"
+      },
+      {
+        "text": "Session token rotation policy: rotate session tokens on every request — each call invalidates the previous token",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Three decisions in one session: stack choice for two audiences (Redis for app, JWT for partners) plus a rotation policy.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "search-endpoint-2026-03",
+    "input_text": "Added the full-text search endpoint for product listings. It takes a query string, applies the existing BM25 ranking we use everywhere else in the codebase, filters out products with inactive status, and returns paginated results.\n\nI used the same cursor pagination pattern as the /users and /orders endpoints — there's no new pagination logic here, just plugging the existing CursorPaginator class into the search results. The query parsing and sanitization follows the same approach as the admin search endpoint introduced last month.\n\nTests pass, nothing new to document architecturally.",
+    "expected": [],
+    "reviewer_notes": "Pure implementation work — reused existing BM25 ranking, CursorPaginator, and admin search sanitization patterns. Author explicitly says nothing new to document.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "message-queue-eval-2026-02",
+    "input_text": "Evaluated RabbitMQ vs Kafka for the order processing pipeline. Here's my conclusion:\n\nKafka is clearly more powerful for high-throughput event streaming at scale — it's designed for millions of messages per second with long-term replay capability. But that power comes with significant operational complexity: we'd need to manage partitions, consumer groups, offset tracking, and a ZooKeeper or KRaft cluster.\n\nOur current load is roughly 2,000 orders per day. Kafka is seriously overengineered for this. RabbitMQ is simpler to operate, the team already has experience with it, and it handles our throughput easily. We're going with RabbitMQ for the order processing pipeline.",
+    "expected": [
+      {
+        "text": "RabbitMQ chosen over Kafka for the order processing pipeline (Kafka overengineered for ~2k orders/day; team has RabbitMQ experience)",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Classic technology choice between two alternatives with clear rationale.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "api-versioning-setup-2026-01",
+    "input_text": "Set up the versioning scheme for the new public API. I evaluated two main approaches:\n\nHeader-based versioning (Accept: application/vnd.myapi.v1+json): Cleaner from a REST purist perspective, but URLs aren't self-describing, it's harder to test with a browser or Postman, and it's a pain to share with partners in documentation.\n\nURL path versioning (/api/v1/...): The URL itself tells you everything. Easy to test, easy to document, easy to share. Partners can see immediately which version they're calling.\n\nGoing with URL path versioning. All endpoints will live under /api/v1/ prefix.",
+    "expected": [
+      {
+        "text": "Use URL path versioning (/api/v1/...) over header-based versioning for the public API — chosen for ease of testing, documentation, and partner-facing clarity",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "API design pattern choice — architectural decision about how the API is structured.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "jwt-algorithm-migration-2026-02",
+    "input_text": "Changing our JWT signing algorithm from HS256 to RS256. Here's the problem we're solving:\n\nHS256 uses a shared secret key — the same key is used to both sign tokens (auth service) and verify them (API gateway, three microservices). That means all five services need access to the same secret. If any one of those five is compromised, the attacker can forge tokens for any user.\n\nRS256 uses a public/private key pair. Only the auth service holds the private key and signs tokens. Everyone else just needs the public key to verify. Sharing a public key is fine — you can publish it openly. The private key stays in one place.\n\nThis change doesn't affect what's inside the tokens, just how they're signed and verified.",
+    "expected": [
+      {
+        "text": "Migrate JWT signing from HS256 (shared secret) to RS256 (public/private key pair) — only auth service holds private key, others verify with public key",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural decision about trust boundaries and key distribution.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "rate-limiting-architecture-2026-03",
+    "input_text": "Decision on where rate limiting lives in the stack.\n\nThe option was between implementing it in each microservice individually versus putting it at the API gateway layer (we're using Kong). Service-level rate limiting would mean each team maintains their own, with different implementations and no shared state — a request could get rate-limited by service A but not service B even if the underlying user is hammering the API.\n\nCentralized at Kong, all services automatically get rate limiting protection. The rate limit state is stored in Redis behind Kong and is consistent across the entire cluster. New services get protection for free as soon as they're registered.\n\nGoing with Kong-level rate limiting.",
+    "expected": [
+      {
+        "text": "Implement rate limiting centrally at the Kong API gateway with Redis-backed state, rather than per-microservice",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural decision about where a cross-cutting concern lives.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "null-reference-bugfix-2026-02",
+    "input_text": "Found and fixed a NullPointerException in the authentication middleware chain. The bug was triggered when a request came in with a valid session token but the corresponding user record had been deleted from the database — an edge case we hadn't handled.\n\nThe middleware was calling user.getProfile() before checking if user was null. Moved the null check to happen before any method calls. Added a test case that exercises this exact scenario.\n\nAll 47 middleware tests now pass. This was a pure bug fix, no design decisions involved.",
+    "expected": [],
+    "reviewer_notes": "Pure bug fix — NPE in auth middleware. Author explicitly states 'no design decisions involved'.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "database-index-optimization-2026-03",
+    "input_text": "Added a compound index on (tenant_id, created_at DESC) to the events table.\n\nThe slow queries were all doing tenant-scoped event fetches ordered by time — something like \"give me the last 100 events for tenant X.\" Without the index, PostgreSQL was doing a full table scan and sort. The table has 40M rows.\n\nWith the compound index, PostgreSQL can use a single index scan to both filter by tenant and return results in order. Query time dropped from 4.2 seconds to 18 milliseconds in our test environment.",
+    "expected": [],
+    "reviewer_notes": "Pure performance optimization — adding an index for an obvious slow query pattern. No architectural choice between alternatives is recorded.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "caching-layer-design-2026-01",
+    "input_text": "Designed the caching strategy for the application. Two separate concerns, two different solutions:\n\nUser profile data: This changes infrequently but is read on nearly every authenticated request. Using Redis with a 5-minute TTL. Redis is already in our stack. LRU eviction policy so the cache naturally prioritizes frequently-accessed profiles. When a profile is updated, we explicitly delete the cache key rather than waiting for TTL.\n\nStatic assets (product images, icons, CSS, JS): These don't change except on deployment. Pushing these to CloudFront CDN with a 7-day cache. CDN handles geographic distribution and takes the load off our origin servers entirely. We'll use cache-busting via filename hashing in the build pipeline so deploys get fresh assets.",
+    "expected": [
+      {
+        "text": "Use Redis with a 5-minute TTL and LRU eviction for user profile caching; explicit cache delete on profile update",
+        "category": "architecture"
+      },
+      {
+        "text": "Use CloudFront CDN with 7-day cache for static assets, with filename-hash cache-busting on deploy",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Two distinct caching architecture decisions for two different data types.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "test-isolation-design-2026-02",
+    "input_text": "Had a long team discussion about how to handle test isolation. The core problem: our integration tests were sharing state — if test A creates some data and test B reads from the database, B might see A's data and pass or fail for the wrong reason.\n\nOption 1: Wrap each test in a transaction and roll it back at the end. Fast (no actual disk writes), but doesn't work for tests that have side effects spanning multiple transactions.\n\nOption 2: Wipe and re-seed the database before each test. Slower, but completely reliable — each test starts from a known clean state.\n\nWe went with option 2. The test suite takes about 40 seconds longer to run than option 1 would, but reliability is worth it. The team agreed: debugging phantom test failures caused by shared state costs more time than the extra 40 seconds.",
+    "expected": [
+      {
+        "text": "Test isolation policy: wipe and re-seed the database before every integration test (Option 2) rather than transaction-rollback — reliability worth the ~40s extra runtime",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Team-agreed policy on how tests must isolate state.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "logging-standardization-2026-01",
+    "input_text": "Switching all our logging to structured JSON format. The current state is a mess — some services log plain text, some log semi-structured messages, some add fields inconsistently. Feeding this into our log aggregator (Loki) for querying is painful.\n\nNew standard: all log entries will be JSON objects with these fields: timestamp (ISO 8601), level (DEBUG/INFO/WARN/ERROR), service (service name from env), trace_id (from request context when available), user_id (when applicable, omitted for unauthenticated requests), message (human-readable description).\n\nThis will let us do structured queries like \"show me all ERROR logs for trace_id X across all services\" instead of grep-based text search.",
+    "expected": [
+      {
+        "text": "All service logs must be structured JSON with required fields: timestamp (ISO 8601), level, service, trace_id, user_id (when applicable), message",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Logging standard / team policy — required field schema.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "notification-service-extract-2026-02",
+    "input_text": "Extracting the notification sending logic out of the main application service. Currently, the 1,200-line AppService class handles everything from business logic to sending emails, Slack messages, and webhooks — it's become unmanageable.\n\nThe new NotificationService owns all outbound notification delivery. It exposes one method: send(channel, recipient, template, data). The channel can be 'email', 'slack', or 'webhook'. The caller doesn't need to know how delivery works.\n\nThe main service will call NotificationService.send(...) instead of directly calling the email library or Slack SDK. This follows the same pattern we used when we extracted PaymentService last quarter.",
+    "expected": [
+      {
+        "text": "Extract notification sending out of AppService into a dedicated NotificationService exposing send(channel, recipient, template, data) — following the same pattern used for PaymentService",
+        "category": "refactor"
+      }
+    ],
+    "reviewer_notes": "Refactor direction: pulling cross-cutting concern out of a god-class into a focused service.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "error-handling-standardization-2026-01",
+    "input_text": "Establishing a standard error handling pattern for external API calls across the codebase.\n\nCurrently, errors from external services (payment processor, email provider, analytics API) bubble up as raw exceptions from the SDKs — sometimes a requests.HTTPError, sometimes a custom exception class from the SDK, sometimes a JSON decode error. This makes them hard to handle consistently.\n\nNew pattern: all external API calls are wrapped in try/except blocks. Errors are caught and re-raised as our own ExternalCallError class. The class includes three fields: service (which external service), operation (what we were trying to do), and original_error (the raw exception for debugging). This means the rest of the codebase only needs to handle one error type for all external failures.",
+    "expected": [
+      {
+        "text": "Wrap all external API calls in try/except and re-raise as ExternalCallError {service, operation, original_error} — one error type for all external failures",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Codebase-wide error-handling convention.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "serialization-format-decision-2026-01",
+    "input_text": "Choosing the serialization format for internal service-to-service communication.\n\nJSON is the default but it has overhead: it's text-based, verbose, and parsing is slower than binary formats. For the high-volume internal events that flow between our services (roughly 10,000/second at peak), this adds up.\n\nEvaluated MessagePack: it's a binary format that maps exactly to the same types as JSON (strings, numbers, arrays, maps), but is typically 30-40% smaller and significantly faster to serialize/deserialize. Libraries exist for all our languages (Python, Node.js). The downside is you can't read it with a text editor, but internal service communication doesn't need to be human-readable.\n\nDecision: MessagePack for internal service-to-service traffic. Keep JSON for the external public API where human readability matters.",
+    "expected": [
+      {
+        "text": "Use MessagePack for internal service-to-service communication (smaller, faster); keep JSON for the external public API where human readability matters",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Serialization format choice with a clear internal/external split.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "job-idempotency-policy-2026-02",
+    "input_text": "Establishing a policy for background jobs: all jobs must be idempotent.\n\nIdempotent means: running a job twice with the same input produces the same result as running it once. No double-charges, no duplicate emails, no double-counting.\n\nThis matters because our job queue (RabbitMQ with manual acknowledgment) guarantees at-least-once delivery. Under some failure conditions (network partition between the worker and RabbitMQ, worker crash after processing but before acknowledgment), a job can be delivered more than once.\n\nImplementation requirement: every job handler must have a mechanism to detect and safely handle duplicate deliveries. Options include idempotency keys in the database, checking for existing results before executing, or using database unique constraints to reject duplicate inserts.",
+    "expected": [
+      {
+        "text": "All background jobs must be idempotent — handlers must safely tolerate at-least-once delivery (idempotency keys, existence checks, or DB unique constraints)",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Mandatory engineering rule driven by RabbitMQ at-least-once delivery semantics.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "cursor-pagination-rollout-2026-02",
+    "input_text": "Added cursor-based pagination to the /orders endpoint. Used the same CursorPaginator class we introduced for /users last sprint.\n\nThe /orders endpoint was the last major endpoint still using OFFSET-based pagination. This completes the migration we've been doing progressively across the API. No new architecture decisions here — just applying the established pattern to the remaining endpoint.\n\nTests pass.",
+    "expected": [],
+    "reviewer_notes": "Pure rollout work — applying the previously-established CursorPaginator pattern to /orders. Author explicitly says 'no new architecture decisions here'.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "pytest-upgrade-2026-01",
+    "input_text": "Upgraded from pytest 7.2 to pytest 8.1. The main motivation was getting access to the improved diff output for failed assertions — 8.x gives much more readable failure messages.\n\nUpdated about a dozen deprecated fixture usages (the @pytest.fixture syntax for yield fixtures changed slightly). Ran the full test suite: 487 tests pass, 0 failures. No logic changes to any test or application code, pure tooling upgrade.",
+    "expected": [],
+    "reviewer_notes": "Pure tooling upgrade (pytest 7.2 → 8.1). No design or policy decisions.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "feature-flag-cleanup-2026-03",
+    "input_text": "Removed the old feature flag infrastructure that was left over from the pre-v0.5 A/B test system.\n\nThe old system had a FeatureFlagRegistry class, a flags table in the database, and middleware that checked flags on every request. It was used for three experiments, all of which have been concluded. The new system just reads directly from environment variables — no registry, no database table, no middleware.\n\nDeleted approximately 800 lines of code including the registry, the database migration, the middleware, and all associated tests. This is pure dead code removal.",
+    "expected": [],
+    "reviewer_notes": "Pure dead code removal (~800 lines of obsolete feature flag infra). The replacement decision happened previously; this session is just cleanup.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "search-perf-investigation-2026-03",
+    "input_text": "Investigated the /search endpoint timeout issues. Users are reporting the search taking 10-15 seconds, sometimes timing out entirely.\n\nProfiled the endpoint with a typical query: found an N+1 query pattern where we load the base product list in one query, then for each product we issue a separate query to load its category, brand, and variant information. For a page of 20 results, that's 60+ database roundtrips per request.\n\nI've identified the problem but haven't fixed it yet. The options are: (1) eager load with JOINs in the initial query, or (2) batch load the related objects in a few IN queries. Need to map out exactly which data is actually used in the search results before choosing, otherwise we risk over-fetching.",
+    "expected": [],
+    "reviewer_notes": "Investigation only — author explicitly says 'I've identified the problem but haven't fixed it yet' and is still weighing options. No decision made.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "deployment-runbook-2026-02",
+    "input_text": "Wrote the deployment runbook for the new database migration process. This documents the steps we've been following informally for the last two months:\n\n1. Run migrations in a transaction\n2. Verify row counts match expectations before committing\n3. Keep a rollback SQL script for each migration\n4. Post to #deployments Slack channel before and after\n\nNo code changes. This is purely documentation of existing practice.",
+    "expected": [],
+    "reviewer_notes": "Author explicitly says this is 'purely documentation of existing practice' — no new decisions.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "leaderboard-redis-design-2026-02",
+    "input_text": "Designed the data structure for the real-time leaderboard feature.\n\nThe naive approach would be to query the database sorted by score for every leaderboard view. But our expected scale is 500,000 users, and we want to refresh the leaderboard every 30 seconds. That's a lot of expensive sort operations.\n\nRedis sorted sets (ZSETs) are purpose-built for this. A ZSET stores members with a numeric score, and operations like ZRANGEBYSCORE (get top N) and ZRANK (get a specific user's rank) run in O(log n) time regardless of the dataset size. For 500k users, that's ~19 operations deep — essentially instant.\n\nLeaderboard writes: when a user's score changes, update the ZSET with ZADD. Leaderboard reads: query the ZSET directly. No database involved in the read path.",
+    "expected": [
+      {
+        "text": "Use Redis ZSETs as the data structure for the real-time leaderboard — ZADD for writes, ZRANGEBYSCORE/ZRANK for reads, O(log n), no DB on read path",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural choice driven by scale (500k users, 30s refresh).",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "password-hashing-upgrade-2026-01",
+    "input_text": "Switching the password hashing algorithm for new accounts from bcrypt to argon2id.\n\nWhy argon2id: It won the Password Hashing Competition in 2015, it's the current OWASP recommendation, and it has better resistance to GPU-based brute force attacks (bcrypt's memory requirements are fixed; argon2 lets you dial up memory usage, which is what makes GPU cracking expensive).\n\nExisting bcrypt hashes will continue to work — we're not re-hashing on login. We're only applying argon2id to new passwords and password changes going forward.",
+    "expected": [
+      {
+        "text": "Switch password hashing for new accounts/changes from bcrypt to argon2id (PHC winner; OWASP recommendation; better GPU-attack resistance). Existing bcrypt hashes are not re-hashed",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Algorithm/library choice for security primitive.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "notification-pubsub-migration-2026-03",
+    "input_text": "Moving the notification system from polling to event-driven pub/sub.\n\nThe current system: the frontend polls /api/notifications every 5 seconds for new notifications. This means each of our 10,000 active users is hitting our API 720 times per hour for notification checks, whether or not anything has changed. That's 7.2 million polling requests per hour, most of which return empty.\n\nNew system: Redis pub/sub. When an event occurs that generates a notification (order status change, new message, etc.), the backend publishes to a user-specific Redis channel. Users have a persistent connection that subscribes to their channel. Notifications arrive in under 100ms and we eliminate 99%+ of polling traffic.",
+    "expected": [
+      {
+        "text": "Replace 5s frontend polling of /api/notifications with Redis pub/sub over a persistent connection per user — eliminates ~99% of polling traffic",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural shift from polling to event-driven delivery.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "analytics-query-engine-2026-02",
+    "input_text": "For the analytics query service, I'm bypassing SQLAlchemy and using raw psycopg2 queries directly.\n\nThe analytics queries are genuinely complex: multi-level GROUP BYs, window functions, CTEs with lateral joins. Writing these through SQLAlchemy's ORM layer produces ugly, hard-to-debug SQL that often doesn't match what you wrote in Python. You spend as much time reading EXPLAIN output and translating back to the ORM as you would just writing the SQL directly.\n\nFor the analytics service specifically, the queries are written by engineers who are comfortable with SQL, and they're complex enough that the ORM is getting in the way rather than helping. Raw psycopg2 it is.",
+    "expected": [
+      {
+        "text": "In the analytics query service, bypass SQLAlchemy and use raw psycopg2 — ORM gets in the way for complex multi-level GROUP BY / window function / CTE queries",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Targeted exception to the default ORM stack, scoped to the analytics service.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "multitenancy-isolation-2026-02",
+    "input_text": "Evaluated three approaches to multi-tenancy isolation:\n\nDatabase-per-tenant: Complete isolation, easy to comply with data residency requirements. But: N databases to manage, connection pooling complexity, expensive for small tenants.\n\nSchema-per-tenant: Good isolation, single database instance. But: PostgreSQL handles schema proliferation poorly at scale (vacuum costs, migration complexity across hundreds of schemas).\n\nRow-level security (RLS): Single schema, single database. Tenant isolation enforced at the database layer — PostgreSQL literally prevents queries from returning rows belonging to other tenants. Migration scripts run once. Connection pooling is simple.\n\nGoing with RLS. The isolation is enforced by the database itself, not by application code that could have bugs. This is the most robust option.",
+    "expected": [
+      {
+        "text": "Use PostgreSQL Row-Level Security (RLS) for multi-tenant isolation — single DB, isolation enforced by the database rather than application code",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural decision evaluated against DB-per-tenant and schema-per-tenant alternatives.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "canary-deployment-design-2026-01",
+    "input_text": "Setting up the canary deployment process for production releases.\n\nNew deployments will follow this traffic split progression: 5% → 20% → 50% → 100%. We wait 30 minutes at each stage and monitor error rate and p99 latency. If either metric spikes more than 10% above the baseline during any stage, the load balancer automatically shifts 100% of traffic back to the previous version.\n\nThe routing is implemented at the Kong load balancer level using weighted upstream targets. We're not using feature flags or user-segment routing — it's pure traffic splitting.",
+    "expected": [
+      {
+        "text": "Canary deployment process: 5% → 20% → 50% → 100% with 30-minute observation windows; auto-rollback at Kong if error rate or p99 latency rises >10% above baseline",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Deployment process / release policy.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "pagination-migration-2026-01",
+    "input_text": "Replacing OFFSET-based pagination with keyset (cursor) pagination across the API.\n\nThe problem with OFFSET: to return page 50 with 20 items per page, the database fetches 1,020 rows and discards the first 1,000. At page 50 that's wasteful. At page 5,000, it's unusable — we were seeing 15+ second queries on large tables.\n\nKeyset pagination uses WHERE id > last_seen_id (or a similar condition on an indexed column). The database does a single index lookup to find the starting position, then reads forward. Cost is constant regardless of which page you're on.\n\nTrade-off: you lose the ability to jump to an arbitrary page number (page 47 of search results). Our API consumers have told us they don't need this — they paginate forward through results sequentially.",
+    "expected": [
+      {
+        "text": "Replace OFFSET-based pagination with keyset (cursor) pagination across the API — accept the loss of arbitrary-page jump (confirmed acceptable with API consumers)",
+        "category": "refactor"
+      }
+    ],
+    "reviewer_notes": "Codebase-wide refactor direction with an explicit trade-off acknowledged.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "feature-flag-storage-2026-02",
+    "input_text": "Decided where to store feature flags.\n\nThe database approach (storing flags in a database table) is attractive because you can change flags without deploying. But it means your application has a runtime dependency on a database query to decide whether a feature is enabled. If the database is slow or unreachable, feature flag reads can fail. It also creates a hidden config state that's not visible in code review.\n\nEnvironment variables: simple, explicit, visible in your deployment config, no runtime dependency. To change a flag, you change an env var and redeploy. For our deployment velocity (3-4 deploys per day), this is fast enough.\n\nGoing with environment variables.",
+    "expected": [
+      {
+        "text": "Store feature flags in environment variables, not a database table — avoids runtime DB dependency and hidden config state; deploy velocity (3-4/day) makes redeploy-to-flip acceptable",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Architectural choice for where dynamic configuration lives.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "timezone-policy-2026-01",
+    "input_text": "Establishing the project-wide timezone handling rule.\n\nRule: all timestamps stored in the database are UTC. Period. No timezone conversions happen on the write path. When data is read and displayed to a user, the frontend is responsible for converting UTC to the user's local timezone.\n\nWhy: if you store timestamps in local timezones (or mix timezones), you end up with ambiguous data when users travel, when you expand to new markets, or when daylight saving time creates duplicate hours. UTC is unambiguous.\n\nThis is a standing rule. Any code that stores a non-UTC timestamp is a bug.",
+    "expected": [
+      {
+        "text": "Project-wide rule: all timestamps stored in the database are UTC. No timezone conversion on the write path; frontend handles display-time conversion to local TZ",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Standing engineering rule — author explicitly calls it out as 'any code that stores a non-UTC timestamp is a bug'.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "api-protocol-split-2026-02",
+    "input_text": "Decided on the API protocol split between internal and external consumers.\n\nInternal frontend (our own team building the dashboard and mobile app): GraphQL. Lets the frontend request exactly the shape of data it needs, reduces over-fetching, and the type system catches mismatches at compile time. The frontend team is comfortable with GraphQL.\n\nExternal public API (third-party developers integrating with our platform): REST. REST is universally understood, has better tooling support across all languages, and is what partners expect. GraphQL is less familiar to external developers and creates a steeper integration learning curve.",
+    "expected": [
+      {
+        "text": "Use GraphQL for the internal frontend (dashboard + mobile) — flexible shape, type-checked, team familiar",
+        "category": "stack-choice"
+      },
+      {
+        "text": "Use REST for the external public API for third-party developers — universally understood, better tooling, lower partner onboarding friction",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Two protocol decisions split by audience.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "cookie-security-fix-2026-02",
+    "input_text": "Discovered and fixed a CSRF (Cross-Site Request Forgery) exposure in our login cookies.\n\nThe problem: our session cookies didn't have SameSite set. This means a malicious website could embed a form that POSTs to our API and the browser would include the session cookie with the request — the user's browser sends their credentials to our server on behalf of an attacker.\n\nFix: Added SameSite=Lax to all session cookies. Lax blocks the dangerous case (cross-site form POSTs, iframe requests) while allowing normal navigation (clicking a link to our site from another page still works).\n\nI also took the opportunity to add Secure (HTTPS-only) and HttpOnly (no JavaScript access) to the cookie attributes.",
+    "expected": [
+      {
+        "text": "Set SameSite=Lax, Secure, and HttpOnly on all session cookies — standing requirement to mitigate CSRF, MITM over HTTP, and XSS-based token theft",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "The immediate CSRF fix is a bug fix, but locking in the cookie attribute requirements going forward is a policy decision.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "test-coverage-gate-2026-01",
+    "input_text": "Setting a minimum code coverage requirement as a CI gate.\n\nAfter three incidents where untested code paths caused production regressions, the team agreed we need an enforced floor. CI builds will now fail if overall line coverage drops below 80%.\n\nThis doesn't mean 80% is the goal — it's the minimum. Critical paths (authentication, payment processing, data mutations) should be close to 100%. The 80% gate exists to prevent coverage from silently eroding over time.",
+    "expected": [
+      {
+        "text": "Enforce minimum 80% line coverage as a CI gate — builds fail below this threshold. Floor, not target; critical paths should approach 100%",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Team-agreed CI policy following three regressions caused by untested code.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "retry-strategy-design-2026-02",
+    "input_text": "Implementing the retry strategy for failed external API calls.\n\nPlain exponential backoff (retry after 1s, 2s, 4s, 8s...) has a problem: if a service goes down and comes back up, all the queued retries fire at exactly the same time and immediately overload the recovering service. This is a \"retry storm.\"\n\nExponential backoff with jitter: add a random component to the wait time. Instead of exactly 4 seconds, wait somewhere between 2 and 6 seconds. This spreads the retry load across a time window. For the recovering service, it sees a gradual ramp of traffic rather than a sudden spike.\n\nThis is now the standard retry pattern for all external API calls.",
+    "expected": [
+      {
+        "text": "Standard retry pattern for external API calls: exponential backoff with jitter (random component on each backoff window) to avoid retry storms",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Codebase-wide retry convention.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "data-retention-policy-2026-03",
+    "input_text": "Establishing data retention policy for log data.\n\nTwo tiers:\n\nOperational logs (application logs, access logs, debug output): retained for 90 days then deleted. These are primarily for debugging and incident response, where anything older than 90 days is rarely useful.\n\nTransactional records (orders, payments, user actions, audit trail): retained for 2 years. This is driven by our financial compliance requirements and by practical needs — support requests for transactions from 8 months ago are common.\n\nThese retention rules will be enforced by automated cleanup jobs, not manual processes.",
+    "expected": [
+      {
+        "text": "Data retention policy: operational logs retained 90 days then deleted; transactional records (orders, payments, audit trail) retained 2 years. Enforced via automated cleanup jobs",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Compliance-driven data retention rule.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "dns-workaround-2026-02",
+    "input_text": "The staging environment has been broken for two days because DNS is misconfigured — the database hostname in the staging config isn't resolving. The infrastructure team is working on it but it's blocking the whole dev team.\n\nTemporary workaround: I hardcoded the database IP address (10.0.1.45) directly in the staging.env config file so the team can unblock. Left a clear TODO comment: \"REMOVE THIS — hardcoded IP, waiting for DNS fix from infra team.\" The infrastructure ticket is INFRA-2847.\n\nThis is explicitly a temporary workaround, not a permanent solution.",
+    "expected": [],
+    "reviewer_notes": "Author explicitly labels this a temporary workaround (hardcoded IP) waiting on INFRA-2847. Not a permanent decision.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "personal-naming-preference-2026-01",
+    "input_text": "I've been thinking about variable naming conventions and I personally prefer to use 'should' as a prefix for boolean variables rather than 'is' — shouldShowModal feels more imperative than isModalVisible to me.\n\nChanged a few files in my local branch to use this convention. Haven't discussed with the team yet, just experimenting with the style.",
+    "expected": [],
+    "reviewer_notes": "Personal preference / experimentation in a local branch. Author has not discussed with the team, so it is not a team convention or policy.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "cqrs-evaluation-2026-02",
+    "input_text": "Started looking at whether CQRS (Command Query Responsibility Segregation) would help with the read/write performance mismatch we're seeing. The idea is to separate the data model for writes from the data model for reads — writes go into a normalized OLTP schema, a read model is asynchronously derived from events and optimized for queries.\n\nI've read through the documentation and a few blog posts. The concept makes sense for our problem. Haven't decided anything yet — want to actually benchmark the current approach with the new indexes before deciding whether CQRS is warranted. It's a significant architectural change.",
+    "expected": [],
+    "reviewer_notes": "Author explicitly says 'haven't decided anything yet' — pure speculation/research phase. No commitment made.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "monorepo-migration-2026-01",
+    "input_text": "Migrating from our current multi-repo setup (separate Git repos for frontend, backend, shared-types, infrastructure) to an Nx monorepo.\n\nThe multi-repo problem: shared code lives in shared-types, but every time we update it we have to version-bump, publish to npm, and update each consuming repo separately. A single cross-cutting change touches 4 PRs. In the monorepo, the shared code is just an import. One commit touches everything atomically.\n\nTool: Nx, because it handles caching (only rebuilds what changed), dependency graph analysis, and has good support for our stack (React frontend, Node.js backend, TypeScript throughout).",
+    "expected": [
+      {
+        "text": "Migrate from multi-repo to a single monorepo so shared code is a direct import rather than versioned/published per repo",
+        "category": "refactor"
+      },
+      {
+        "text": "Use Nx as the monorepo tooling — caching, dependency graph, good React/Node.js/TypeScript support",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Two decisions: the structural shift (refactor) and the specific tool to enable it (stack-choice).",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "container-orchestration-choice-2026-01",
+    "input_text": "Choosing between Kubernetes and Docker Swarm for container orchestration.\n\nDocker Swarm: simpler to set up and operate. But ecosystem has stagnated — Helm charts, GitOps tooling, and most DevOps tooling targets Kubernetes. Finding Swarm expertise is hard.\n\nKubernetes: steeper learning curve, more complex. But it's the industry standard, our DevOps contractor already knows it, and we get access to the Helm, ArgoCD, and Keda ecosystems for free. Long-term, it's easier to hire for.\n\nGoing with Kubernetes.",
+    "expected": [
+      {
+        "text": "Use Kubernetes (over Docker Swarm) for container orchestration — industry standard, ecosystem (Helm/ArgoCD/Keda), DevOps contractor expertise, easier long-term hiring",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Platform / orchestration technology choice.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "async-architecture-policy-2026-02",
+    "input_text": "Establishing the architecture rule for our new Python microservices: async/await throughout, no mixing of sync and async code within a service.\n\nThe reason: mixing sync and async code is a common source of bugs. Calling a sync blocking function from an async context blocks the entire event loop. It also makes the codebase harder to reason about — you have to track which functions are async-safe.\n\nThe rule: new Python services use asyncio throughout. All I/O (database, HTTP, Redis) uses async libraries (asyncpg, httpx, aioredis). If a library is sync-only, it goes behind a thread pool executor.",
+    "expected": [
+      {
+        "text": "New Python microservices use async/await throughout (asyncpg, httpx, aioredis). Sync-only libraries must be wrapped in a thread pool executor — no mixing sync and async in the same service",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Architecture rule for new Python services.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "user-deletion-design-2026-02",
+    "input_text": "Decided how to handle user account deletion. Two decisions:\n\nFirst, how to delete: soft-delete rather than hard-delete. When a user deletes their account, we set a deleted_at timestamp on the user record rather than removing the row. This preserves referential integrity (foreign keys from orders, comments, etc. still resolve). For GDPR, we separately scrub the PII fields (email, name, address) immediately while keeping the record shell for the foreign keys.\n\nSecond, audit trail: every deletion event writes a record to an append-only audit_log table with the user_id and timestamp. This satisfies compliance requirements for demonstrating that a deletion request was honored, even though the original user record is anonymized.",
+    "expected": [
+      {
+        "text": "User deletion uses soft-delete (set deleted_at) with PII fields scrubbed immediately — preserves FK integrity while satisfying GDPR",
+        "category": "architecture"
+      },
+      {
+        "text": "Every deletion writes a record to an append-only audit_log table with user_id and timestamp — compliance evidence that the deletion request was honored",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Two related compliance/architecture decisions.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "cicd-tooling-selection-2026-01",
+    "input_text": "Settled on the CI/CD toolchain.\n\nFor CI (running tests, linting, building): GitHub Actions. We're already on GitHub, it's tightly integrated, the workflow YAML is straightforward, and the marketplace has actions for everything we need. The free tier covers our current usage.\n\nFor CD (deploying to Kubernetes): ArgoCD implementing GitOps. The concept: the desired state of our Kubernetes cluster is defined in a Git repo. ArgoCD watches that repo and makes the live cluster match. Deployments become Git commits. Every change is auditable, reversible, and visible.",
+    "expected": [
+      {
+        "text": "CI tool: GitHub Actions — already on GitHub, tight integration, marketplace coverage, free tier sufficient",
+        "category": "stack-choice"
+      },
+      {
+        "text": "CD tool: ArgoCD using GitOps — Git is the source of truth for cluster state; deployments are commits; changes are auditable and reversible",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Two tooling decisions for the CI/CD toolchain.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "network-security-policy-2026-03",
+    "input_text": "Adding an outbound HTTP allowlist to our services following a security audit.\n\nThe audit flagged that our services can make outbound HTTP requests to any URL — there's nothing preventing a service from being exploited to make requests to internal infrastructure (Server-Side Request Forgery) or to exfiltrate data to external servers.\n\nNew policy: services can only make outbound HTTP requests to hosts on an explicit allow-list. The list is maintained in the security config and is reviewed quarterly. Any new external integration requires adding the host to the list, which creates a review checkpoint.",
+    "expected": [
+      {
+        "text": "Outbound HTTP allowlist for services — services can only call hosts on an explicit list; new integrations require adding hosts (quarterly review)",
+        "category": "policy"
+      }
+    ],
+    "reviewer_notes": "Security policy from audit, with a review cadence.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "pagination-helper-refactor-2026-02",
+    "input_text": "Extracting the pagination logic into a shared helper module. The same pagination code (parse page/per_page params, apply limits, return metadata) is duplicated across 7 different endpoint files with minor variations. It's drifted — some handle edge cases, some don't, and the inconsistencies are causing subtle bugs.\n\nNew file: pagination.py with a single paginate(queryset, page, per_page, max_per_page=100) function. All 7 endpoints will use this instead.\n\nThis is a refactor to reduce duplication. No behavior changes.",
+    "expected": [
+      {
+        "text": "Extract duplicated pagination logic from 7 endpoint files into a single pagination.py with paginate(queryset, page, per_page, max_per_page=100) — all endpoints adopt this helper",
+        "category": "refactor"
+      }
+    ],
+    "reviewer_notes": "Pure refactor to deduplicate drifted code paths.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "read-replica-scaling-2026-03",
+    "input_text": "Adding PostgreSQL read replicas to handle the analytics query load.\n\nThe analytics dashboard is running complex reporting queries (often 10-30 second queries) against the production database. These queries compete for I/O with regular OLTP operations and we're seeing latency spikes in the main application as a result.\n\nRead replicas: changes from the primary are asynchronously replicated to replicas. Analytics queries route to replicas via a read-only connection string. The write path (primary database) is completely unaffected.\n\nTrade-off: replication lag means analytics queries might see data that's up to 1-2 seconds stale. The analytics team confirmed this is acceptable for their reporting use case.",
+    "expected": [
+      {
+        "text": "Add PostgreSQL read replicas; route analytics queries to replicas via a read-only connection string. Accept 1-2s replication lag (confirmed acceptable with analytics team)",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Scaling architecture decision with a documented trade-off.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "startup-timeout-investigation-2026-02",
+    "input_text": "Tracked down why the new deployment was taking 45 seconds to start instead of the usual 8 seconds. Suspected the new migrations, but they ran in under 2 seconds.\n\nFound it: the DATABASE_URL in the new service's environment config was pointing to the old database hostname that's been decommissioned. The service was waiting for a connection timeout on each attempt. The URL had a typo — missing the -prod suffix on the hostname.\n\nFixed the URL. Deployment is back to normal startup time. No code changes.",
+    "expected": [],
+    "reviewer_notes": "Pure config bugfix — typo in DATABASE_URL. No design decisions.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "grpc-revert-2026-02",
+    "input_text": "We tried switching internal service communication to gRPC. Spent a week on the migration — updated the service definitions, generated client/server stubs, converted the main inter-service calls.\n\nThen hit a wall: our infrastructure runs Nginx as a reverse proxy, and the standard Nginx build doesn't support gRPC (HTTP/2 framing). Getting gRPC through Nginx requires either a custom Nginx build or upgrading to Nginx 1.13.10+ with the grpc_pass module. Our managed Kubernetes provider doesn't easily support custom Nginx builds, and the upgrade path involves a maintenance window.\n\nReverting everything back to REST/JSON. Keeping the gRPC investigation findings in a decision doc for if/when we revisit.",
+    "expected": [
+      {
+        "text": "Revert internal service communication from gRPC back to REST/JSON — Nginx reverse proxy doesn't support gRPC framing without custom build/upgrade, which our managed K8s provider can't easily accommodate. Keep gRPC findings for a future revisit",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Stack-choice decision to reverse a previous direction due to infrastructure constraints. The institutional knowledge ('we tried gRPC and it failed because of X') is exactly the kind of thing future devs need.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "repository-pattern-adoption-2026-01",
+    "input_text": "Adding the new ProductRepository to the codebase. Looking at the existing code, the repository pattern (a class that abstracts all database access for a given model) has clearly become the standard here — UserRepository, OrderRepository, PaymentRepository are all implemented this way.\n\nThere's no explicit decision document anywhere recording when this became the standard, but the code is consistent. Following the existing pattern for the new Product data model.",
+    "expected": [],
+    "reviewer_notes": "Author is following the existing repository pattern for a new model — no new decision, just adherence to an undocumented but established convention.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "auth-boundary-clarification-2026-02",
+    "input_text": "Clarified the ownership boundary for token validation: the AuthCore service is the single owner of all JWT validation — including tokens issued for partner API access, not just internal user sessions.\n\nThe question came up when we were designing the partner integration flow. The API gateway team wanted to handle partner token validation directly in Kong (the gateway), avoiding the network hop to AuthCore. We considered it but rejected it: if validation logic lives in two places, they can drift. A bug fix in AuthCore doesn't automatically fix Kong. Having one authority for token validation makes auditing straightforward.",
+    "expected": [
+      {
+        "text": "AuthCore is the single owner of JWT validation for ALL token types, including partner API tokens — explicitly rejected duplicating validation in Kong to avoid drift between the two implementations",
+        "category": "architecture"
+      }
+    ],
+    "reviewer_notes": "Ownership / boundary architecture decision with the rejected alternative recorded.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  },
+  {
+    "schema": "decision-extraction/v1",
+    "source_session": "observability-stack-2026-01",
+    "input_text": "Chose the observability stack for the new platform.\n\nMetrics and dashboards: Prometheus + Grafana. Prometheus is the de facto standard for Kubernetes metrics collection. Grafana for dashboards. Both integrate with Kubernetes natively. The team has experience with both.\n\nDistributed tracing: OpenTelemetry SDK in all services, sending traces to a Tempo backend. OpenTelemetry is vendor-neutral — if we want to switch from Tempo to Jaeger or a hosted solution later, we change the exporter, not the instrumentation code. Tempo is free, runs in our cluster.\n\nBoth decisions were also driven by the existing expertise of our DevOps contractor who set up the initial cluster.",
+    "expected": [
+      {
+        "text": "Metrics and dashboards: Prometheus + Grafana — de facto K8s standard, native integration, team experience",
+        "category": "stack-choice"
+      },
+      {
+        "text": "Distributed tracing: OpenTelemetry SDK in all services exporting to Tempo — vendor-neutral instrumentation, free, runs in-cluster",
+        "category": "stack-choice"
+      }
+    ],
+    "reviewer_notes": "Two observability stack decisions.",
+    "labelled_by": "human",
+    "labelled_at": "2026-05-12T10:34:01.470Z"
+  }
+]
