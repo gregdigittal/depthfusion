@@ -1077,7 +1077,7 @@
 - [x] T-200: Implement aggregation + CI computation (`scripts/ciqs_summarise.py`) — linear-interpolated percentile, deterministic bootstrap CI, per-category stats table + raw dump; `docs/benchmarks/README.md` documents the three-stage flow
 - [x] T-201: Commit baseline 3-run for each of local / vps-cpu / vps-gpu under `docs/benchmarks/` — **all three modes committed 2026-05-02; vps-gpu via S-66 on hetzner-gpu (RTX 4000 SFF Ada)**
 
-### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M`
+### S-64: As a capture-mechanism maintainer, I want labelled evaluation sets so that precision/recall claims in S-45/S-48/S-49 can be measured rather than asserted `P2` `M` [done]
 
 **Acceptance criteria:**
 - [x] AC-1: 50-entry decision-extraction gold set — `docs/eval-sets/de-gold.json` (schema: decision-extraction/v1; 50 human-labelled entries, 0 skipped; committed 2026-05-12)
