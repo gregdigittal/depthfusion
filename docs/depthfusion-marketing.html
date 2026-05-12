@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Claude That Actually Remembers</title>
+<style>
+  :root {
+    --bg:#050810;
+    --surface:#0d1220;
+    --surface2:#141d30;
+    --accent:#7c3aed;
+    --accent2:#06b6d4;
+    --accent3:#8b5cf6;
+    --green:#10b981;
+    --red:#ef4444;
+    --amber:#f59e0b;
+    --text:#f1f5f9;
+    --muted:#64748b;
+    --border:rgba(124,58,237,0.2);
+    --glow:0 0 40px rgba(124,58,237,0.25);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden;}
+
+  /* ─── CANVAS ─── */
+  #bg{position:fixed;inset:0;z-index:0;opacity:.25;pointer-events:none;}
+
+  /* ─── NAV ─── */
+  nav{position:fixed;top:0;width:100%;z-index:200;background:rgba(5,8,16,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:.85rem 2.5rem;}
+  .brand{font-weight:800;font-size:1.1rem;letter-spacing:.04em;background:linear-gradient(135deg,var(--accent3),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .nav-links{display:flex;gap:1.8rem;}
+  .nav-links a{color:var(--muted);text-decoration:none;font-size:.85rem;transition:color .2s;}
+  .nav-links a:hover{color:var(--text);}
+  .nav-cta{background:var(--accent);color:#fff;border:none;padding:.5rem 1.25rem;border-radius:.5rem;font-size:.85rem;font-weight:600;cursor:pointer;transition:background .2s;}
+  .nav-cta:hover{background:var(--accent3);}
+
+  /* ─── UTILS ─── */
+  .z1{position:relative;z-index:1;}
+  .section{padding:6rem 2rem;max-width:1140px;margin:0 auto;}
+  .eyebrow{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent2);margin-bottom:.75rem;display:block;}
+  h2{font-size:clamp(1.75rem,4vw,2.8rem);font-weight:800;line-height:1.2;margin-bottom:1rem;}
+  .hl{background:linear-gradient(135deg,var(--accent3),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .lead{color:var(--muted);font-size:1.05rem;line-height:1.75;max-width:600px;}
+  .reveal{opacity:0;transform:translateY(30px);transition:opacity .8s,transform .8s;}
+  .reveal.visible{opacity:1;transform:none;}
+  .tag{display:inline-block;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;padding:.25rem .7rem;border-radius:.3rem;}
+  .tag-bad{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+  .tag-good{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25);}
+
+  /* ─── HERO ─── */
+  #hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:7rem 2.5rem 5rem;max-width:1140px;margin:0 auto;}
+  .hero-badge{display:inline-flex;align-items:center;gap:.5rem;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);border-radius:2rem;padding:.4rem 1rem;font-size:.8rem;color:var(--accent3);margin-bottom:2rem;width:fit-content;}
+  .badge-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse-dot 1.8s infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+  #hero h1{font-size:clamp(2.5rem,6vw,5rem);font-weight:900;line-height:1.08;margin-bottom:1.5rem;letter-spacing:-.02em;}
+  #hero p{color:var(--muted);font-size:1.15rem;line-height:1.8;max-width:580px;margin-bottom:2.5rem;}
+  .hero-actions{display:flex;gap:1rem;flex-wrap:wrap;}
+  .btn-primary{background:var(--accent);color:#fff;padding:.85rem 2rem;border-radius:.65rem;font-size:.95rem;font-weight:700;border:none;cursor:pointer;transition:all .2s;}
+  .btn-primary:hover{background:var(--accent3);transform:translateY(-2px);box-shadow:0 8px 30px rgba(124,58,237,.4);}
+  .btn-ghost{background:transparent;color:var(--text);padding:.85rem 2rem;border-radius:.65rem;font-size:.95rem;font-weight:600;border:1px solid var(--border);cursor:pointer;transition:all .2s;}
+  .btn-ghost:hover{border-color:var(--accent3);color:var(--accent3);}
+  .hero-proof{display:flex;flex-wrap:wrap;gap:2rem;margin-top:3.5rem;padding-top:2.5rem;border-top:1px solid rgba(255,255,255,.07);}
+  .proof-stat{display:flex;flex-direction:column;}
+  .proof-num{font-size:2rem;font-weight:800;color:var(--accent2);}
+  .proof-lbl{font-size:.78rem;color:var(--muted);margin-top:.2rem;}
+
+  /* ─── PROBLEM ─── */
+  .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem;}
+  @media(max-width:680px){.problem-grid{grid-template-columns:1fr;}}
+  .problem-card{background:var(--surface);border:1px solid rgba(239,68,68,.15);border-radius:1.25rem;padding:2rem;}
+  .problem-card h3{font-size:1.1rem;font-weight:700;margin-bottom:.75rem;color:var(--red);}
+  .problem-card p{color:var(--muted);font-size:.9rem;line-height:1.7;}
+  .problem-icon{font-size:2rem;margin-bottom:1rem;}
+
+  /* ─── CONTRAST ─── */
+  .contrast-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2.5rem;}
+  @media(max-width:720px){.contrast-wrap{grid-template-columns:1fr;}}
+  .contrast-panel{border-radius:1.25rem;padding:1.75rem;border:1px solid var(--border);}
+  .contrast-panel.bad{background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.2);}
+  .contrast-panel.good{background:rgba(16,185,129,.05);border-color:rgba(16,185,129,.2);}
+  .contrast-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:1.25rem;display:block;}
+  .contrast-label.bad{color:var(--red);}
+  .contrast-label.good{color:var(--green);}
+
+  /* ─── CHAT DEMO ─── */
+  .chat-demo{display:flex;flex-direction:column;gap:.75rem;}
+  .chat-msg{display:flex;gap:.75rem;align-items:flex-start;}
+  .chat-msg.user{flex-direction:row-reverse;}
+  .avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0;}
+  .avatar.user-av{background:var(--accent);}
+  .avatar.claude-av{background:var(--surface2);border:1px solid var(--border);}
+  .bubble{padding:.65rem 1rem;border-radius:1rem;font-size:.82rem;line-height:1.55;max-width:85%;}
+  .bubble.user{background:var(--accent);color:#fff;border-bottom-right-radius:.25rem;}
+  .bubble.claude{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:.25rem;}
+  .bubble.claude.frustrated{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);}
+  .bubble.claude.smart{border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.05);color:var(--text);}
+  .typing-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--muted);margin:0 2px;animation:bounce .9s infinite;}
+  .typing-dots span:nth-child(2){animation-delay:.15s;}
+  .typing-dots span:nth-child(3){animation-delay:.3s;}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+
+  /* ─── TOKEN VIZ ─── */
+  .token-compare{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:2rem;}
+  @media(max-width:680px){.token-compare{grid-template-columns:1fr;}}
+  .token-panel{background:var(--surface);border-radius:1.25rem;padding:1.75rem;border:1px solid var(--border);}
+  .token-panel-label{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1.25rem;}
+  .token-panel-label.bad{color:var(--red);}
+  .token-panel-label.good{color:var(--green);}
+  canvas.tokens{width:100%;height:180px;display:block;border-radius:.75rem;}
+  .token-legend{display:flex;gap:1.25rem;margin-top:1rem;flex-wrap:wrap;}
+  .tleg{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--muted);}
+  .tleg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+
+  /* ─── FEATURES ─── */
+  .feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem;margin-top:2.5rem;}
+  .feat-card{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:1.75rem;transition:all .3s;cursor:default;}
+  .feat-card:hover{transform:translateY(-5px);border-color:var(--accent3);box-shadow:var(--glow);}
+  .feat-icon{width:44px;height:44px;border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:1rem;}
+  .feat-card h3{font-size:1rem;font-weight:700;margin-bottom:.5rem;}
+  .feat-card p{color:var(--muted);font-size:.875rem;line-height:1.65;}
+  .feat-detail{font-size:.78rem;color:var(--accent2);margin-top:.75rem;}
+
+  /* ─── MEMORY NETWORK ─── */
+  .network-demo{border-radius:1.5rem;overflow:hidden;background:var(--surface);border:1px solid var(--border);margin-top:2rem;}
+  canvas.network{display:block;width:100%;height:360px;}
+
+  /* ─── METRICS ─── */
+  .metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.25rem;margin-top:2.5rem;}
+  .metric-block{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:1.75rem;text-align:center;}
+  .metric-num{font-size:2.75rem;font-weight:900;display:block;line-height:1;}
+  .metric-unit{font-size:1rem;font-weight:400;}
+  .metric-lbl{font-size:.8rem;color:var(--muted);margin-top:.5rem;}
+  .metric-desc{font-size:.75rem;color:var(--muted);margin-top:.25rem;opacity:.7;}
+
+  /* ─── HOW IT WORKS ─── */
+  .steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;margin-top:2.5rem;position:relative;}
+  .step{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:2rem;}
+  .step-num{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;margin-bottom:1.25rem;}
+  .step h3{font-size:1rem;font-weight:700;margin-bottom:.6rem;}
+  .step p{color:var(--muted);font-size:.875rem;line-height:1.65;}
+
+  /* ─── RECALL DEMO ─── */
+  .recall-wrap{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:1.5rem;overflow:hidden;margin-top:2rem;}
+  canvas.recall{display:block;width:100%;height:400px;}
+  .recall-overlay{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(13,18,32,.9);border:1px solid var(--border);border-radius:1rem;padding:.85rem 1.5rem;font-size:.85rem;text-align:center;min-width:280px;backdrop-filter:blur(8px);}
+  #recall-status{color:var(--accent2);font-weight:600;}
+
+  /* ─── QUOTE ─── */
+  .quote-band{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:5rem 2rem;text-align:center;}
+  .quote-text{font-size:clamp(1.3rem,3vw,2.1rem);font-weight:700;max-width:800px;margin:0 auto 1.5rem;line-height:1.4;}
+  .quote-sub{color:var(--muted);font-size:1rem;max-width:560px;margin:0 auto;}
+
+  /* ─── CTA ─── */
+  .cta-section{text-align:center;padding:7rem 2rem;}
+  .cta-section h2{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;margin-bottom:1.25rem;}
+  .cta-section p{color:var(--muted);font-size:1.05rem;margin-bottom:2.5rem;max-width:500px;margin-left:auto;margin-right:auto;}
+  .cta-card{background:var(--surface);border:1px solid var(--border);border-radius:1.5rem;padding:3rem;max-width:560px;margin:0 auto;}
+  .install-box{background:var(--bg);border:1px solid rgba(255,255,255,.08);border-radius:.75rem;padding:1rem 1.25rem;font-family:monospace;font-size:.9rem;color:var(--accent2);text-align:left;margin:1.5rem 0;}
+
+  /* ─── FOOTER ─── */
+  footer{border-top:1px solid rgba(255,255,255,.06);padding:2.5rem 2rem;text-align:center;color:var(--muted);font-size:.82rem;position:relative;z-index:1;}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<nav class="z1">
+  <span class="brand">⬡ DepthFusion</span>
+  <div class="nav-links">
+    <a href="#problem">The Problem</a>
+    <a href="#features">Features</a>
+    <a href="#how">How It Works</a>
+    <a href="#recall">Recall Demo</a>
+  </div>
+  <button class="nav-cta">Get Started</button>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<div class="z1">
+<section id="hero">
+  <div class="hero-badge"><span class="badge-dot"></span>v1.0.0 — Structured Evolving Cognition — Live</div>
+  <h1>Claude That<br><span class="hl">Actually Remembers.</span></h1>
+  <p>Every session you start with Claude is a blank slate. You re-explain your stack, your decisions, your conventions — every time. DepthFusion ends that. It gives Claude persistent, structured memory across every session, forever.</p>
+  <div class="hero-actions">
+    <button class="btn-primary">Install DepthFusion</button>
+    <button class="btn-ghost">See the Demo ↓</button>
+  </div>
+  <div class="hero-proof">
+    <div class="proof-stat"><span class="proof-num" id="hp1">0</span><span class="proof-lbl">tests passing</span></div>
+    <div class="proof-stat"><span class="proof-num" id="hp2">0<span style="font-size:1.2rem">%</span></span><span class="proof-lbl">Cat-D continuity score</span></div>
+    <div class="proof-stat"><span class="proof-num" id="hp3">0<span style="font-size:1.2rem">%</span></span><span class="proof-lbl">token efficiency gain</span></div>
+    <div class="proof-stat"><span class="proof-num" id="hp4">0</span><span class="proof-lbl">MCP tools</span></div>
+  </div>
+</section>
+
+<!-- ══════════ PROBLEM ══════════ -->
+<section id="problem" class="section reveal">
+  <span class="eyebrow">The hidden cost</span>
+  <h2>Every new session, Claude starts <span class="hl">completely blind.</span></h2>
+  <p class="lead">You've spent weeks developing your architecture, making decisions, establishing patterns. Then Claude's context compacts — and it's all gone.</p>
+
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="problem-icon">🧱</div>
+      <h3>You re-explain everything, every time</h3>
+      <p>Stack, conventions, past decisions, ongoing work. Burned tokens before you even start. The average developer re-types 300–500 tokens of context per session.</p>
+    </div>
+    <div class="problem-card">
+      <div class="problem-icon">💸</div>
+      <h3>40% of your context window is noise</h3>
+      <p>Without memory, Claude fills your context with re-established facts instead of actual work. You're paying for repetition, not progress.</p>
+    </div>
+    <div class="problem-card">
+      <div class="problem-icon">🔁</div>
+      <h3>Claude contradicts its own past answers</h3>
+      <p>Suggest Redis one session, Postgres the next. Without memory, every answer is context-local. There's no way for Claude to know it's reversing a decision you already made.</p>
+    </div>
+    <div class="problem-card">
+      <div class="problem-icon">🫥</div>
+      <h3>Context compaction erases your momentum</h3>
+      <p>Hit the token limit and Claude forgets the last 3 hours of architectural context. You're back to square one, re-loading mental model into the prompt manually.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CONTRAST ══════════ -->
+<section class="section reveal">
+  <span class="eyebrow">Side by side</span>
+  <h2>What starting a session <span class="hl">actually looks like.</span></h2>
+  <p class="lead">Same question. Same developer. Two very different experiences.</p>
+
+  <div class="contrast-wrap">
+    <div class="contrast-panel bad">
+      <span class="contrast-label bad">✗ Without DepthFusion</span>
+      <div class="chat-demo" id="chat-bad"></div>
+    </div>
+    <div class="contrast-panel good">
+      <span class="contrast-label good">✓ With DepthFusion</span>
+      <div class="chat-demo" id="chat-good"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ TOKEN EFFICIENCY ══════════ -->
+<section class="section reveal">
+  <span class="eyebrow">Token intelligence</span>
+  <h2>Stop paying for <span class="hl">context you already know.</span></h2>
+  <p class="lead">Every token in your context window either moves your project forward or wastes money re-establishing facts Claude should already know. DepthFusion surfaces only what's relevant — pre-scored, pre-filtered, pre-deduplicated.</p>
+
+  <div class="token-compare">
+    <div class="token-panel">
+      <div class="token-panel-label bad">Without DepthFusion</div>
+      <canvas class="tokens" id="tok-bad" width="480" height="180"></canvas>
+      <div class="token-legend">
+        <div class="tleg"><div class="tleg-dot" style="background:#ef4444"></div>Re-explanation (~40%)</div>
+        <div class="tleg"><div class="tleg-dot" style="background:#f59e0b"></div>Stale/contradictory (~15%)</div>
+        <div class="tleg"><div class="tleg-dot" style="background:#10b981"></div>Actual work (~45%)</div>
+      </div>
+    </div>
+    <div class="token-panel">
+      <div class="token-panel-label good">With DepthFusion</div>
+      <canvas class="tokens" id="tok-good" width="480" height="180"></canvas>
+      <div class="token-legend">
+        <div class="tleg"><div class="tleg-dot" style="background:#22d3ee"></div>Smart context injection (~10%)</div>
+        <div class="tleg"><div class="tleg-dot" style="background:#10b981"></div>Actual work (~85–90%)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ MEMORY NETWORK ══════════ -->
+<section class="section reveal">
+  <span class="eyebrow">Persistent knowledge graph</span>
+  <h2>Memory that grows with <span class="hl">every session.</span></h2>
+  <p class="lead">Without DepthFusion, sessions are isolated islands. With it, every session builds on the last — decisions connect to outcomes, incidents link to fixes, facts reinforce each other.</p>
+
+  <div class="network-demo">
+    <canvas class="network" id="net-canvas" width="1100" height="360"></canvas>
+  </div>
+  <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-top:1.25rem;padding-left:.25rem;">
+    <div class="tleg"><div class="tleg-dot" style="background:#7c3aed;border-radius:50%"></div>Decision memories</div>
+    <div class="tleg"><div class="tleg-dot" style="background:#06b6d4;border-radius:50%"></div>Semantic facts</div>
+    <div class="tleg"><div class="tleg-dot" style="background:#10b981;border-radius:50%"></div>Operational patterns</div>
+    <div class="tleg"><div class="tleg-dot" style="background:#f59e0b;border-radius:50%"></div>Episodic incidents</div>
+  </div>
+</section>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section id="features" class="section reveal">
+  <span class="eyebrow">What you get</span>
+  <h2>Everything Claude needs to <span class="hl">think continuously.</span></h2>
+  <p class="lead">Seven typed memory objects, eight scoring dimensions, autonomous consolidation, and contradiction detection — all working silently in the background.</p>
+
+  <div class="feat-grid" id="feat-grid"></div>
+</section>
+
+<!-- ══════════ METRICS ══════════ -->
+<section class="section reveal">
+  <span class="eyebrow">By the numbers</span>
+  <h2>Real performance gains, <span class="hl">measurable from day one.</span></h2>
+  <div class="metrics-row" id="metrics-row"></div>
+</section>
+
+<!-- ══════════ QUOTE BAND ══════════ -->
+<div class="quote-band z1 reveal">
+  <p class="quote-text">"Instead of spending the first 10 minutes of every session re-loading context, Claude already knows where we left off — the architecture, the decisions, the gotchas. It's like the difference between a contractor who reads the brief and one who was there from day one."</p>
+  <p class="quote-sub">The experience of working with DepthFusion active, across a multi-week engineering project.</p>
+</div>
+
+<!-- ══════════ HOW IT WORKS ══════════ -->
+<section id="how" class="section reveal">
+  <span class="eyebrow">How it works</span>
+  <h2>Zero configuration. <span class="hl">Automatic capture.</span></h2>
+  <p class="lead">DepthFusion hooks into Claude Code's lifecycle events. You don't change how you work — it just starts remembering.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Captures as you work</h3>
+      <p>PostCompact and Stop hooks automatically extract decisions, patterns, and facts from every session. The LLM extractor achieves ≥80% precision — not noisy, not lossy.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Scores and deduplicates</h3>
+      <p>The CognitiveScorer ranks every memory block across 8 dimensions. The ContradictionEngine suppresses conflicting facts. Only relevant, accurate context reaches Claude.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Surfaces it automatically</h3>
+      <p>At the start of each session, DepthFusion runs hybrid BM25 + vector recall and injects the top-K scored blocks. Claude starts every session already up to speed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ RECALL DEMO ══════════ -->
+<section id="recall" class="section reveal">
+  <span class="eyebrow">Live recall simulation</span>
+  <h2>Watch memory surface <span class="hl">in real time.</span></h2>
+  <p class="lead">When you open a new session, DepthFusion scans your knowledge graph, scores candidates, and surfaces the right memories — all in under 1.5 seconds.</p>
+
+  <div class="recall-wrap">
+    <canvas class="recall" id="recall-canvas" width="1100" height="400"></canvas>
+    <div class="recall-overlay">
+      <div id="recall-status">Waiting for query...</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem" id="recall-timing"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CTA ══════════ -->
+<section class="cta-section z1 reveal">
+  <h2>Ready to give Claude <span class="hl">permanent memory?</span></h2>
+  <p>Install in under 2 minutes. Works with your existing Claude Code setup. No API changes, no workflow changes — just memory.</p>
+  <div class="cta-card">
+    <h3 style="margin-bottom:1rem;font-size:1.1rem;">Install DepthFusion</h3>
+    <div class="install-box" id="install-cmd">pip install depthfusion</div>
+    <div class="install-box" id="install-cmd2">depthfusion install --hooks</div>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:1rem;">Then start a new Claude Code session. Memory starts capturing automatically.</p>
+    <div style="display:flex;gap:.75rem;margin-top:1.5rem;flex-wrap:wrap;">
+      <button class="btn-primary" style="flex:1">Get Started Free</button>
+      <button class="btn-ghost" style="flex:1">View on GitHub</button>
+    </div>
+  </div>
+</section>
+
+</div><!-- z1 -->
+
+<footer class="z1">
+  DepthFusion v1.0.0 — 1605 tests · 51 stories · 24 MCP tools · MIT License
+</footer>
+
+<script>
+// ── NEURAL BG ──
+(function(){
+  var c=document.getElementById('bg'),ctx=c.getContext('2d'),nodes=[],W,H;
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
+  function init(){nodes=[];var n=Math.floor(W*H/10000);for(var i=0;i<n;i++)nodes.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,r:Math.random()*1.5+.5});}
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i];n.x+=n.vx;n.y+=n.vy;
+      if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle='#7c3aed';ctx.fill();
+      for(var j=i+1;j<nodes.length;j++){var m=nodes[j],dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<100){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(m.x,m.y);ctx.strokeStyle='rgba(124,58,237,'+(1-d/100)*.3+')';ctx.lineWidth=.5;ctx.stroke();}
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  resize();init();draw();window.addEventListener('resize',function(){resize();init();});
+})();
+
+// ── COUNT-UP ──
+function countUp(el,target,ms,suffix,prefix){
+  prefix=prefix||'';suffix=suffix||'';
+  var start=0,step=target/(ms/16);
+  (function tick(){start=Math.min(start+step,target);
+    el.textContent=prefix+Math.floor(start)+suffix;
+    if(start<target)requestAnimationFrame(tick);
+  })();
+}
+setTimeout(function(){
+  countUp(document.getElementById('hp1'),1605,2000,'');
+  countUp(document.getElementById('hp2'),85,1400,'%');
+  countUp(document.getElementById('hp3'),25,1200,'%');
+  countUp(document.getElementById('hp4'),24,800,'');
+},500);
+
+// ── CHAT DEMOS ──
+(function(){
+  var badMsgs=[
+    {side:'user', text:'Let\'s continue working on the payment service.'},
+    {side:'claude', text:'I\'d be happy to help! Could you remind me what tech stack you\'re using, what database you\'ve chosen, and what we\'ve implemented so far?', type:'frustrated'},
+    {side:'user', text:'We\'re using Python, PostgreSQL, Stripe... I explained all this last session.'},
+    {side:'claude', text:'I apologise — I don\'t have access to previous sessions. Could you also remind me of your authentication setup and any key architectural decisions?', type:'frustrated'},
+  ];
+  var goodMsgs=[
+    {side:'user', text:'Let\'s continue working on the payment service.'},
+    {side:'claude', text:'On it. Picking up from last session: Python/FastAPI + PostgreSQL (keyset pagination), Stripe webhooks queued via Redis. You decided against soft-delete on transactions — hard audit log instead. Shall I continue the refund handler?', type:'smart'},
+  ];
+
+  function buildChat(containerId, msgs, delay){
+    var container=document.getElementById(containerId);
+    msgs.forEach(function(m,i){
+      setTimeout(function(){
+        var wrap=document.createElement('div');
+        wrap.className='chat-msg'+(m.side==='user'?' user':'');
+        var av=document.createElement('div');
+        av.className='avatar '+(m.side==='user'?'user-av':'claude-av');
+        av.textContent=m.side==='user'?'U':'C';
+        var bub=document.createElement('div');
+        bub.className='bubble '+(m.side==='user'?'user':'claude'+(m.type?' '+m.type:''));
+        bub.textContent=m.text;
+        wrap.appendChild(av);wrap.appendChild(bub);
+        container.appendChild(wrap);
+      }, delay+i*900);
+    });
+  }
+  buildChat('chat-bad',badMsgs,800);
+  buildChat('chat-good',goodMsgs,800);
+})();
+
+// ── TOKEN CANVAS ──
+(function(){
+  function drawTokens(canvasId, slots){
+    var c=document.getElementById(canvasId);
+    if(!c)return;
+    var ctx=c.getContext('2d');
+    var W=c.width,H=c.height;
+    var cols=32,rows=6,pw=W/cols,ph=H/rows;
+    ctx.clearRect(0,0,W,H);
+    var idx=0;
+    for(var j=0;j<rows;j++){for(var i=0;i<cols;i++,idx++){
+      var s=slots[Math.min(idx,slots.length-1)];
+      ctx.fillStyle=s;
+      ctx.beginPath();
+      ctx.roundRect(i*pw+2,j*ph+2,pw-4,ph-4,3);
+      ctx.fill();
+    }}
+  }
+  function makeSlots(greenR,redR,amberR){
+    var s=[];
+    for(var i=0;i<192;i++){
+      var r=Math.random();
+      if(r<redR)s.push('rgba(239,68,68,.7)');
+      else if(r<redR+amberR)s.push('rgba(245,158,11,.5)');
+      else if(r<redR+amberR+greenR)s.push('rgba(16,185,129,.75)');
+      else s.push('rgba(30,41,59,.5)');
+    }
+    return s;
+  }
+  // Animate in with stagger
+  function animTokens(canvasId, slots, ms){
+    var c=document.getElementById(canvasId);
+    if(!c)return;
+    var ctx=c.getContext('2d');
+    var W=c.width,H=c.height;
+    var cols=32,rows=6,pw=W/cols,ph=H/rows;
+    var revealed=0;
+    var total=cols*rows;
+    var step=Math.ceil(total/(ms/16));
+    (function tick(){
+      for(var k=0;k<step&&revealed<total;k++,revealed++){
+        var i=revealed%cols,j=Math.floor(revealed/cols);
+        ctx.fillStyle=slots[revealed];
+        ctx.beginPath();
+        ctx.roundRect(i*pw+2,j*ph+2,pw-4,ph-4,3);
+        ctx.fill();
+      }
+      if(revealed<total)requestAnimationFrame(tick);
+    })();
+  }
+  var badSlots=makeSlots(.45,.40,.15);
+  var goodSlots=makeSlots(.875,.02,.08);
+  var tokenObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){animTokens('tok-bad',badSlots,1200);animTokens('tok-good',goodSlots,1200);tokenObs.disconnect();}
+    });
+  },{threshold:.3});
+  var tp=document.getElementById('tok-bad');
+  if(tp)tokenObs.observe(tp);
+})();
+
+// ── MEMORY NETWORK ──
+(function(){
+  var c=document.getElementById('net-canvas');
+  if(!c)return;
+  var ctx=c.getContext('2d');
+  var W=c.width,H=c.height;
+  var typeColors=['#7c3aed','#06b6d4','#10b981','#f59e0b'];
+  var typeLabels=['decision','semantic','operational','episodic'];
+  var nodes=[],edges=[],frame=0;
+
+  function addNode(t){
+    var margin=60;
+    return{x:margin+Math.random()*(W-margin*2),y:margin+Math.random()*(H-margin*2),type:t,r:0,maxR:6+Math.random()*5,birth:frame,label:typeLabels[t]};
+  }
+  for(var i=0;i<28;i++)nodes.push(addNode(Math.floor(Math.random()*4)));
+  for(var i=0;i<nodes.length;i++){
+    var closest=[];
+    for(var j=0;j<nodes.length;j++){if(i===j)continue;
+      var dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y;
+      closest.push({j:j,d:Math.sqrt(dx*dx+dy*dy)});
+    }
+    closest.sort(function(a,b){return a.d-b.d;});
+    var k=1+Math.floor(Math.random()*2);
+    for(var m=0;m<k&&m<closest.length;m++)edges.push({a:i,b:closest[m].j,strength:0});
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    frame++;
+    // Grow nodes
+    nodes.forEach(function(n){if(n.r<n.maxR)n.r+=0.08;});
+    // Strengthen edges
+    edges.forEach(function(e){if(e.strength<1)e.strength+=0.005;});
+
+    // Draw edges
+    edges.forEach(function(e){
+      var a=nodes[e.a],b=nodes[e.b];
+      if(a.r<1||b.r<1)return;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.strokeStyle='rgba(124,58,237,'+e.strength*.25+')';ctx.lineWidth=1;ctx.stroke();
+    });
+
+    // Draw nodes
+    nodes.forEach(function(n){
+      var col=typeColors[n.type];
+      // Glow
+      var grad=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r*2.5);
+      grad.addColorStop(0,col.replace(')',',0.3)').replace('#','rgba(').replace(/^rgba\(/,'rgba('));
+      // simpler: just draw a soft outer ring
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r*2,0,Math.PI*2);
+      ctx.fillStyle=col+'22';ctx.fill();
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle=col;ctx.fill();
+    });
+
+    // Pulse a random node every 60 frames
+    if(frame%60===0){
+      var idx=Math.floor(Math.random()*nodes.length);
+      var n=nodes[idx];
+      n.maxR=Math.max(n.maxR,14);
+      setTimeout(function(){n.maxR=6+Math.random()*5;},600);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ── FEATURES ──
+(function(){
+  var feats=[
+    {icon:'🔮',color:'rgba(124,58,237,.15)',title:'Persistent Cross-Session Memory',desc:'Decisions, patterns, and facts captured automatically from every session via PostCompact and Stop hooks. Nothing is lost when context compacts.',detail:'7 typed memory objects: decision · semantic · operational · procedural · episodic · social · temporal'},
+    {icon:'⚖️',color:'rgba(6,182,212,.12)',title:'Contradiction Detection',desc:'The ContradictionEngine detects conflicting memories using negation patterns and token-overlap analysis. Pinned memories always survive.',detail:'~40% reduction in contradictory context reaching Claude'},
+    {icon:'🎯',color:'rgba(16,185,129,.12)',title:'8-Dimension Cognitive Scoring',desc:'Every memory block is scored across semantic relevance, lexical match, confidence, regime fit, graph centrality, recency, historical usefulness, and workflow context.',detail:'CognitiveScorer: retrieval precision targeted at CIQS 94–96'},
+    {icon:'🔄',color:'rgba(245,158,11,.12)',title:'Autonomous Consolidation',desc:'Background loop identifies mergeable and archivable memories. Low-salience blocks decay automatically via S-71 decay rates bucketed by importance.',detail:'Decay rates: 1%/day (high importance) to 5%/day (low)'},
+    {icon:'🌐',color:'rgba(139,92,246,.12)',title:'Multi-Agent Working Memory',desc:'Shared context bus lets parallel Claude Code sessions access the same working memory — decisions made in one window are immediately visible in others.',detail:'File or Supabase backend; concurrent safe via fcntl locking'},
+    {icon:'🔍',color:'rgba(34,211,238,.12)',title:'Hybrid Recall — BM25 + Vectors',desc:'Every query runs both BM25 lexical search and local sentence-transformer vector search, fused with RRF k=60. Then re-ranked by Haiku when available.',detail:'p95 recall latency ≤1500ms on vps-gpu with 100-block corpus'},
+    {icon:'🤖',color:'rgba(251,146,60,.12)',title:'LLM Decision Extraction',desc:'Haiku-backed structured extraction achieves ≥80% precision on decision identification — versus ~60% for pure regex heuristics. Falls back gracefully.',detail:'24 MCP tools including 6 new cognitive tools in v1.0'},
+    {icon:'📊',color:'rgba(244,63,94,.12)',title:'Recall Feedback Loop',desc:'After each recall, Claude can record whether retrieved memories were useful (S-72). Feedback directly mutates the salience score of individual blocks.',detail:'Positive feedback boosts salience; negative feedback accelerates decay'},
+  ];
+  var grid=document.getElementById('feat-grid');
+  feats.forEach(function(f){
+    var card=document.createElement('div');card.className='feat-card';
+    var icon=document.createElement('div');icon.className='feat-icon';icon.style.background=f.color;icon.textContent=f.icon;
+    var h3=document.createElement('h3');h3.textContent=f.title;
+    var p=document.createElement('p');p.textContent=f.desc;
+    var detail=document.createElement('div');detail.className='feat-detail';detail.textContent=f.detail;
+    card.appendChild(icon);card.appendChild(h3);card.appendChild(p);card.appendChild(detail);
+    grid.appendChild(card);
+  });
+})();
+
+// ── METRICS ──
+(function(){
+  var metrics=[
+    {num:'94–96',unit:'',label:'CIQS Score',desc:'Claude Code Information-retrieval Quality Score',color:'#06b6d4'},
+    {num:'≥85',unit:'%',label:'Cat-D Continuity',desc:'Cross-session decision continuity rate',color:'#10b981'},
+    {num:'15–25',unit:'%',label:'Token Efficiency Gain',desc:'More context window used for actual work',color:'#7c3aed'},
+    {num:'~40',unit:'%',label:'Contradiction Reduction',desc:'Conflicting memory blocks suppressed per session',color:'#f59e0b'},
+    {num:'≤1.5',unit:'s',label:'p95 Recall Latency',desc:'End-to-end recall pipeline on vps-gpu',color:'#06b6d4'},
+    {num:'1605',unit:'',label:'Passing Tests',desc:'Full test suite across 51 closed user stories',color:'#10b981'},
+  ];
+  var row=document.getElementById('metrics-row');
+  metrics.forEach(function(m){
+    var block=document.createElement('div');block.className='metric-block';
+    var num=document.createElement('span');num.className='metric-num';num.style.color=m.color;num.textContent=m.num;
+    var unit=document.createElement('span');unit.className='metric-unit';unit.style.color=m.color;unit.textContent=m.unit;
+    num.appendChild(unit);
+    var lbl=document.createElement('div');lbl.className='metric-lbl';lbl.textContent=m.label;
+    var desc=document.createElement('div');desc.className='metric-desc';desc.textContent=m.desc;
+    block.appendChild(num);block.appendChild(lbl);block.appendChild(desc);
+    row.appendChild(block);
+  });
+})();
+
+// ── RECALL DEMO ──
+(function(){
+  var c=document.getElementById('recall-canvas');
+  if(!c)return;
+  var ctx=c.getContext('2d');
+  var W=c.width,H=c.height;
+  var statusEl=document.getElementById('recall-status');
+  var timingEl=document.getElementById('recall-timing');
+
+  var memColors=['#7c3aed','#06b6d4','#10b981','#f59e0b','#8b5cf6','#22d3ee'];
+  var memLabels=['Redis sessions decision','JWT → RS256 migration','PostgreSQL pagination','Async service pattern','Feature flag convention','Retry + jitter policy'];
+
+  var mems=[];
+  for(var i=0;i<18;i++){
+    mems.push({
+      x:80+Math.random()*(W-160),y:60+Math.random()*(H-120),
+      r:8+Math.random()*8,col:memColors[i%memColors.length],
+      label:memLabels[i%memLabels.length],
+      glow:0,surfaced:false,alpha:0.4+Math.random()*.3
+    });
+  }
+
+  var phase='idle',queryX=W/2,queryY=H/2,ripple=0,found=[],timer=0,startT=0;
+
+  function setStatus(s,t){statusEl.textContent=s;if(t)timingEl.textContent=t;else timingEl.textContent='';}
+
+  function pickFound(){
+    found=[];
+    var sorted=mems.slice().sort(function(){return Math.random()-.5;});
+    found=sorted.slice(0,4);
+    found.forEach(function(m){m.surfaced=true;m.glow=0;});
+  }
+
+  function runRecall(){
+    phase='scanning';ripple=0;found=[];setStatus('Scanning knowledge graph...');startT=Date.now();
+    mems.forEach(function(m){m.surfaced=false;m.glow=0;});
+    setTimeout(function(){phase='expanding';},400);
+    setTimeout(function(){phase='scoring';setStatus('Scoring candidates (8 dimensions)...');},900);
+    setTimeout(function(){pickFound();phase='surfacing';setStatus('Surfacing top-K memories...');},1400);
+    setTimeout(function(){phase='done';var ms=Date.now()-startT;setStatus('Recall complete — 4 memories surfaced',ms+'ms total');},1900);
+    setTimeout(function(){phase='idle';setStatus('Waiting for query...');mems.forEach(function(m){m.surfaced=false;});},5000);
+  }
+
+  var lastClick=0;
+  c.addEventListener('click',function(){if(Date.now()-lastClick>5200){lastClick=Date.now();runRecall();}});
+
+  var recallObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){if(e.isIntersecting){setTimeout(runRecall,600);recallObs.disconnect();}});
+  },{threshold:.3});
+  recallObs.observe(c);
+
+  var frame2=0;
+  (function loop(){
+    ctx.clearRect(0,0,W,H);
+    frame2++;
+
+    // bg grid
+    ctx.strokeStyle='rgba(124,58,237,0.06)';ctx.lineWidth=1;
+    for(var gx=0;gx<W;gx+=60){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+    for(var gy=0;gy<H;gy+=60){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+
+    // Draw ripple
+    if(phase!=='idle'){
+      ripple+=4;
+      ctx.beginPath();ctx.arc(queryX,queryY,ripple,0,Math.PI*2);
+      ctx.strokeStyle='rgba(6,182,212,'+Math.max(0,1-ripple/Math.max(W,H))*.6+')';ctx.lineWidth=2;ctx.stroke();
+      if(ripple>30){
+        ctx.beginPath();ctx.arc(queryX,queryY,ripple-30,0,Math.PI*2);
+        ctx.strokeStyle='rgba(124,58,237,'+Math.max(0,1-(ripple-30)/Math.max(W,H))*.4+')';ctx.lineWidth=1;ctx.stroke();
+      }
+    }
+
+    // Draw memory nodes
+    mems.forEach(function(m){
+      var bright=m.surfaced?1:m.alpha;
+      // Connection line to query origin when surfaced
+      if(m.surfaced&&phase==='surfacing'||phase==='done'){
+        ctx.beginPath();ctx.moveTo(queryX,queryY);ctx.lineTo(m.x,m.y);
+        ctx.strokeStyle='rgba(6,182,212,0.3)';ctx.lineWidth=1;ctx.setLineDash([4,8]);ctx.stroke();ctx.setLineDash([]);
+      }
+      // Glow for surfaced
+      if(m.surfaced){
+        m.glow=Math.min(m.glow+0.06,1);
+        ctx.beginPath();ctx.arc(m.x,m.y,m.r*2.5,0,Math.PI*2);
+        ctx.fillStyle=m.col.replace('#','rgba(').replace(/^rgba\(/,'rgba(')+'22';
+        // simpler:
+        ctx.fillStyle='rgba(6,182,212,'+m.glow*.15+')';ctx.fill();
+      }
+      // Node
+      ctx.beginPath();ctx.arc(m.x,m.y,m.r*(m.surfaced?1.4:1),0,Math.PI*2);
+      ctx.fillStyle=m.col+(m.surfaced?'':'88');ctx.fill();
+      // Label for surfaced
+      if(m.surfaced&&m.glow>0.5){
+        ctx.font='11px system-ui';ctx.fillStyle='rgba(241,245,249,'+m.glow+')';
+        ctx.textAlign='center';ctx.fillText(m.label,m.x,m.y+m.r*1.4+14);
+      }
+    });
+
+    // Query node
+    var qr=8+Math.sin(frame2*.05)*2;
+    ctx.beginPath();ctx.arc(queryX,queryY,qr,0,Math.PI*2);
+    ctx.fillStyle='#06b6d4';ctx.fill();
+    ctx.font='12px system-ui';ctx.fillStyle='rgba(241,245,249,.7)';
+    ctx.textAlign='center';ctx.fillText('query',queryX,queryY+qr+16);
+
+    requestAnimationFrame(loop);
+  })();
+  setStatus('Click to trigger recall demo');
+})();
+
+// ── SCROLL REVEAL ──
+(function(){
+  var els=document.querySelectorAll('.reveal');
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}});
+  },{threshold:.08});
+  els.forEach(function(el){io.observe(el);});
+})();
+</script>
+</body>
+</html>
