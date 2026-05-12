@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-11 (added E-30, S-85–S-92, T-281–T-310 from build plan handoff review)
+> Last updated: 2026-05-12 (E-31 all tasks complete; E-16 marked done)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -494,7 +494,7 @@
 
 ---
 
-## E-16: SkillForge Integration [active]
+## E-16: SkillForge Integration [done]
 
 > Integrate DepthFusion retrieval/fusion primitives into SkillForge via 5 non-destructive seams. Full spec in `docs/skillforge-integration-plan.md`. Most seams already wired in SkillForge; 3 ACs remain open across S-32/S-33/S-34 + S-35 HTTP sidecar.
 
@@ -1756,7 +1756,7 @@
 
 ---
 
-## E-31: Structured Evolving Cognition (v1) [active]
+## E-31: Structured Evolving Cognition (v1) [done]
 
 > Transform DepthFusion from a retrieval/memory layer into a full Cognitive Infrastructure Layer with event-sourced memory, 7 typed memories, 9 event types, cognitive scoring, contradiction detection, decision/operational memory, multi-agent coordination, and explainable retrieval.
 
@@ -1801,7 +1801,7 @@
 **Tasks:**
 - [x] T-321: Write failing tests for CognitiveScorer
 - [x] T-322: Implement CognitiveScorer in cognitive/scorer.py
-- [ ] T-323: Integrate CognitiveScorer into RecallPipeline behind feature flag
+- [x] T-323: Integrate CognitiveScorer into RecallPipeline behind feature flag
 
 ### S-96: As an agent, I want contradiction detection so that conflicting memories surface for resolution `P1` `L`
 
@@ -1814,7 +1814,7 @@
 **Tasks:**
 - [x] T-324: Write failing tests for ContradictionEngine
 - [x] T-325: Implement ContradictionEngine in cognitive/contradiction.py
-- [ ] T-326: Wire ContradictionEngine into auto_learn.py behind DEPTHFUSION_CONTRADICTION_ENGINE flag
+- [x] T-326: Wire ContradictionEngine into auto_learn.py behind DEPTHFUSION_CONTRADICTION_ENGINE flag
 
 ### S-97: As an architect, I want decision memory so that architectural choices are preserved with rationale `P1` `M`
 
@@ -1878,7 +1878,7 @@
 **Tasks:**
 - [x] T-339: Write failing tests for MemoryConsolidator
 - [x] T-340: Implement MemoryConsolidator in cognitive/consolidator.py
-- [ ] T-341: Wire consolidator to run on schedule when DEPTHFUSION_AUTONOMIC=1
+- [x] T-341: Wire consolidator to run on schedule when DEPTHFUSION_AUTONOMIC=1
 
 ### S-102: As a QA engineer, I want integration tests covering the full cognitive pipeline `P1` `M`
 
@@ -1899,7 +1899,7 @@
 
 **Tasks:**
 - [x] T-344: Implement cognitive eval benchmark suite
-- [ ] T-345: Add benchmarks to CI pipeline
+- [x] T-345: Add benchmarks to CI pipeline
 
 ---
 
