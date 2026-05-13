@@ -641,11 +641,20 @@ WantedBy=multi-user.target</pre>
     </div>
   </div>
 
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">Upgrading from a previous install?</div>
+      If you already have a <code>depthfusion</code> MCP registration (local or SSE), remove it first:<br>
+      <code>claude mcp remove depthfusion -s user</code><br>
+      Then run the command below. The <code>--header</code> flag is <strong>not supported</strong> by this version of the Claude CLI — use the URL only; the bearer token is for curl/API verification (see Step A6), not for CLI registration.
+    </div>
+  </div>
+
   <div class="code-wrap">
     <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Developer's machine — register the shared memory server</span></div>
     <pre><span class="prompt">$</span> <span class="cmd">claude mcp add depthfusion \</span>
     <span class="arg">--transport sse \</span>
-    <span class="arg">--header "Authorization: Bearer YOUR_TOKEN_HERE" \</span>
     <span class="val">http://YOUR_VPS_IP:7301/sse</span>
 
 <span class="cmt"># Confirm it registered:</span>
@@ -933,6 +942,21 @@ WantedBy=multi-user.target</pre>
           <td>Intel Mac, Linux, or non-macOS system — arm64 macOS required</td>
           <td>Use <code>--mode local</code> (BM25-only) or <code>--mode vps-cpu</code> (Haiku reranker via API) on non-Apple-Silicon machines.</td>
         </tr>
+        <tr>
+          <td><code>error: unknown option '-m'</code> during <code>claude mcp add</code></td>
+          <td>Claude CLI intercepts the <code>-m</code> flag before it reaches the subprocess — the form <code>python3 -m depthfusion.mcp.server</code> cannot be passed directly</td>
+          <td>Use the wrapper script instead: <code>claude mcp add depthfusion -s user ~/projects/depthfusion/scripts/mcp-server.sh</code></td>
+        </tr>
+        <tr>
+          <td><code>MCP server depthfusion already exists in user config</code></td>
+          <td>A prior registration is present from a previous install</td>
+          <td>Remove the existing entry first: <code>claude mcp remove depthfusion -s user</code>, then re-run the add command.</td>
+        </tr>
+        <tr>
+          <td><code>WARNING: depthfusion does not provide the extra 'mac-mlx'</code> during pip install</td>
+          <td>Local clone predates the mac-mlx commit — the extra is not defined in the local <code>pyproject.toml</code></td>
+          <td>Run <code>git pull origin main</code> inside the depthfusion directory, then re-run <code>pip install -e ".[mac-mlx]"</code>.</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -1003,12 +1027,25 @@ WantedBy=multi-user.target</pre>
     </div>
   </div>
 
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">Upgrading from a previous install?</div>
+      If you already have a <code>depthfusion</code> MCP registration, remove it before re-registering:<br>
+      <code>claude mcp remove depthfusion -s user</code><br>
+      Also run <code>git pull origin main</code> before pip install if your clone predates the mac-mlx commit — an older clone will warn "does not provide the extra 'mac-mlx'" and the installer will reject <code>--mode mac-mlx</code>.
+    </div>
+  </div>
+
   <p>Clone or update the repository on your Mac, then install the mac-mlx extras:</p>
 
   <div class="code-wrap">
     <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — install mac-mlx extras</span></div>
     <pre><span class="cmt"># Navigate to your local depthfusion clone</span>
 <span class="prompt">$</span> <span class="cmd">cd ~/projects/depthfusion</span>
+
+<span class="cmt"># Pull latest (required if clone predates the mac-mlx commit)</span>
+<span class="prompt">$</span> <span class="cmd">git pull origin main</span>
 
 <span class="cmt"># Create or activate your venv</span>
 <span class="prompt">$</span> <span class="cmd">python3 -m venv .venv</span>
@@ -1094,6 +1131,28 @@ WantedBy=multi-user.target</pre>
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <p style="margin-top:1.1rem;">Register DepthFusion with Claude Code using the wrapper script (avoids the <code>-m</code> flag parsing issue):</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — register MCP server (stdio, local mode)</span></div>
+    <pre><span class="cmt"># If re-registering: remove the old entry first</span>
+<span class="prompt">$</span> <span class="cmd">claude mcp remove depthfusion -s user</span>
+
+<span class="cmt"># Register using the wrapper script (claude CLI intercepts -m, so use the script)</span>
+<span class="prompt">$</span> <span class="cmd">claude mcp add depthfusion -s user ~/projects/depthfusion/scripts/mcp-server.sh</span>
+
+<span class="prompt">$</span> <span class="cmd">claude mcp list</span>
+<span class="out">depthfusion   ← must appear here</span></pre>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Why the wrapper script?</div>
+      Running <code>claude mcp add depthfusion -s user python3 -m depthfusion.mcp.server</code> fails with <code>error: unknown option '-m'</code> because the Claude CLI intercepts the <code>-m</code> flag before passing arguments to the subprocess. <code>scripts/mcp-server.sh</code> wraps the call with <code>exec python3 -m depthfusion.mcp.server</code>, bypassing this.
+    </div>
   </div>
 
   <div class="callout warn">
@@ -1195,6 +1254,13 @@ WantedBy=multi-user.target</pre>
       </table>
     </div>
     <div class="copy-hint">★ Your machine (36 GB) — Qwen2.5-32B is the automatic recommendation, leaving ~16 GB for the OS and other apps</div>
+    <div class="callout warn" style="margin-top:.75rem;">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-title">Need more headroom on 36 GB?</div>
+        Qwen2.5-32B uses ~20 GB, leaving only ~16 GB for macOS and other running apps — which can be tight if you run browsers, Docker, or other memory-hungry tools simultaneously. For a more comfortable experience on 36 GB, choose <strong>[2] Qwen2.5-14B</strong> (~9 GB, leaves ~27 GB free). Quality is slightly lower than 32B but still well above the Haiku API fallback.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1246,10 +1312,10 @@ WantedBy=multi-user.target</pre>
   <div class="code-wrap standalone">
     <pre><span class="prompt">$</span> <span class="cmd">claude mcp add depthfusion \</span>
     <span class="arg">--transport sse \</span>
-    <span class="arg">--header "Authorization: Bearer TOKEN" \</span>
     <span class="val">http://VPS_IP:7301/sse</span>
 
-<span class="cmt"># Then restart Claude Code. Done.</span></pre>
+<span class="cmt"># Then restart Claude Code. Done.</span>
+<span class="cmt"># If already registered: claude mcp remove depthfusion -s user first.</span></pre>
   </div>
   <p style="font-size:.85rem;color:var(--muted);margin-top:1rem;">No local install. No Python. No config files. Works on Mac, Windows, Linux, any Claude account.</p>
 </div>

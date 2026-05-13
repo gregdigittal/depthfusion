@@ -23,11 +23,7 @@
   *{margin:0;padding:0;box-sizing:border-box;}
   html{scroll-behavior:smooth;}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden;}
-
-  /* ─── CANVAS ─── */
   #bg{position:fixed;inset:0;z-index:0;opacity:.25;pointer-events:none;}
-
-  /* ─── NAV ─── */
   nav{position:fixed;top:0;width:100%;z-index:200;background:rgba(5,8,16,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:.85rem 2.5rem;}
   .brand{font-weight:800;font-size:1.1rem;letter-spacing:.04em;background:linear-gradient(135deg,var(--accent3),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .nav-links{display:flex;gap:1.8rem;}
@@ -35,8 +31,6 @@
   .nav-links a:hover{color:var(--text);}
   .nav-cta{background:var(--accent);color:#fff;border:none;padding:.5rem 1.25rem;border-radius:.5rem;font-size:.85rem;font-weight:600;cursor:pointer;transition:background .2s;}
   .nav-cta:hover{background:var(--accent3);}
-
-  /* ─── UTILS ─── */
   .z1{position:relative;z-index:1;}
   .section{padding:6rem 2rem;max-width:1140px;margin:0 auto;}
   .eyebrow{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent2);margin-bottom:.75rem;display:block;}
@@ -45,11 +39,8 @@
   .lead{color:var(--muted);font-size:1.05rem;line-height:1.75;max-width:600px;}
   .reveal{opacity:0;transform:translateY(30px);transition:opacity .8s,transform .8s;}
   .reveal.visible{opacity:1;transform:none;}
-  .tag{display:inline-block;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;padding:.25rem .7rem;border-radius:.3rem;}
-  .tag-bad{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25);}
-  .tag-good{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25);}
 
-  /* ─── HERO ─── */
+  /* HERO */
   #hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:7rem 2.5rem 5rem;max-width:1140px;margin:0 auto;}
   .hero-badge{display:inline-flex;align-items:center;gap:.5rem;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);border-radius:2rem;padding:.4rem 1rem;font-size:.8rem;color:var(--accent3);margin-bottom:2rem;width:fit-content;}
   .badge-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse-dot 1.8s infinite;}
@@ -66,7 +57,7 @@
   .proof-num{font-size:2rem;font-weight:800;color:var(--accent2);}
   .proof-lbl{font-size:.78rem;color:var(--muted);margin-top:.2rem;}
 
-  /* ─── PROBLEM ─── */
+  /* PROBLEM */
   .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem;}
   @media(max-width:680px){.problem-grid{grid-template-columns:1fr;}}
   .problem-card{background:var(--surface);border:1px solid rgba(239,68,68,.15);border-radius:1.25rem;padding:2rem;}
@@ -74,7 +65,7 @@
   .problem-card p{color:var(--muted);font-size:.9rem;line-height:1.7;}
   .problem-icon{font-size:2rem;margin-bottom:1rem;}
 
-  /* ─── CONTRAST ─── */
+  /* CONTRAST */
   .contrast-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2.5rem;}
   @media(max-width:720px){.contrast-wrap{grid-template-columns:1fr;}}
   .contrast-panel{border-radius:1.25rem;padding:1.75rem;border:1px solid var(--border);}
@@ -83,8 +74,6 @@
   .contrast-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:1.25rem;display:block;}
   .contrast-label.bad{color:var(--red);}
   .contrast-label.good{color:var(--green);}
-
-  /* ─── CHAT DEMO ─── */
   .chat-demo{display:flex;flex-direction:column;gap:.75rem;}
   .chat-msg{display:flex;gap:.75rem;align-items:flex-start;}
   .chat-msg.user{flex-direction:row-reverse;}
@@ -96,12 +85,8 @@
   .bubble.claude{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:.25rem;}
   .bubble.claude.frustrated{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);}
   .bubble.claude.smart{border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.05);color:var(--text);}
-  .typing-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--muted);margin:0 2px;animation:bounce .9s infinite;}
-  .typing-dots span:nth-child(2){animation-delay:.15s;}
-  .typing-dots span:nth-child(3){animation-delay:.3s;}
-  @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 
-  /* ─── TOKEN VIZ ─── */
+  /* TOKEN VIZ */
   .token-compare{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:2rem;}
   @media(max-width:680px){.token-compare{grid-template-columns:1fr;}}
   .token-panel{background:var(--surface);border-radius:1.25rem;padding:1.75rem;border:1px solid var(--border);}
@@ -113,7 +98,7 @@
   .tleg{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--muted);}
   .tleg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
 
-  /* ─── FEATURES ─── */
+  /* FEATURES */
   .feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem;margin-top:2.5rem;}
   .feat-card{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:1.75rem;transition:all .3s;cursor:default;}
   .feat-card:hover{transform:translateY(-5px);border-color:var(--accent3);box-shadow:var(--glow);}
@@ -122,48 +107,103 @@
   .feat-card p{color:var(--muted);font-size:.875rem;line-height:1.65;}
   .feat-detail{font-size:.78rem;color:var(--accent2);margin-top:.75rem;}
 
-  /* ─── MEMORY NETWORK ─── */
+  /* NETWORK */
   .network-demo{border-radius:1.5rem;overflow:hidden;background:var(--surface);border:1px solid var(--border);margin-top:2rem;}
   canvas.network{display:block;width:100%;height:360px;}
 
-  /* ─── METRICS ─── */
+  /* METRICS */
   .metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.25rem;margin-top:2.5rem;}
   .metric-block{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:1.75rem;text-align:center;}
   .metric-num{font-size:2.75rem;font-weight:900;display:block;line-height:1;}
   .metric-unit{font-size:1rem;font-weight:400;}
   .metric-lbl{font-size:.8rem;color:var(--muted);margin-top:.5rem;}
-  .metric-desc{font-size:.75rem;color:var(--muted);margin-top:.25rem;opacity:.7;}
 
-  /* ─── HOW IT WORKS ─── */
-  .steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;margin-top:2.5rem;position:relative;}
+  /* HOW IT WORKS */
+  .steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;margin-top:2.5rem;}
   .step{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;padding:2rem;}
   .step-num{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;margin-bottom:1.25rem;}
   .step h3{font-size:1rem;font-weight:700;margin-bottom:.6rem;}
   .step p{color:var(--muted);font-size:.875rem;line-height:1.65;}
 
-  /* ─── RECALL DEMO ─── */
+  /* RECALL */
   .recall-wrap{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:1.5rem;overflow:hidden;margin-top:2rem;}
   canvas.recall{display:block;width:100%;height:400px;}
   .recall-overlay{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(13,18,32,.9);border:1px solid var(--border);border-radius:1rem;padding:.85rem 1.5rem;font-size:.85rem;text-align:center;min-width:280px;backdrop-filter:blur(8px);}
   #recall-status{color:var(--accent2);font-weight:600;}
 
-  /* ─── QUOTE ─── */
+  /* QUOTE */
   .quote-band{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:5rem 2rem;text-align:center;}
   .quote-text{font-size:clamp(1.3rem,3vw,2.1rem);font-weight:700;max-width:800px;margin:0 auto 1.5rem;line-height:1.4;}
   .quote-sub{color:var(--muted);font-size:1rem;max-width:560px;margin:0 auto;}
 
-  /* ─── CTA ─── */
+  /* CTA */
   .cta-section{text-align:center;padding:7rem 2rem;}
   .cta-section h2{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;margin-bottom:1.25rem;}
   .cta-section p{color:var(--muted);font-size:1.05rem;margin-bottom:2.5rem;max-width:500px;margin-left:auto;margin-right:auto;}
   .cta-card{background:var(--surface);border:1px solid var(--border);border-radius:1.5rem;padding:3rem;max-width:560px;margin:0 auto;}
   .install-box{background:var(--bg);border:1px solid rgba(255,255,255,.08);border-radius:.75rem;padding:1rem 1.25rem;font-family:monospace;font-size:.9rem;color:var(--accent2);text-align:left;margin:1.5rem 0;}
 
-  /* ─── FOOTER ─── */
+  /* FOOTER */
   footer{border-top:1px solid rgba(255,255,255,.06);padding:2.5rem 2rem;text-align:center;color:var(--muted);font-size:.82rem;position:relative;z-index:1;}
 
-  /* ─── TECH ARCH ─── */
-  #cog-chart{display:block;width:100%;max-width:900px;margin:0 auto;}
+  /* ━━━━━━━━━━ DEMO SECTION ━━━━━━━━━━ */
+  #demo{position:relative;z-index:1;background:linear-gradient(180deg,var(--bg) 0%,rgba(13,18,32,.6) 50%,var(--bg) 100%);padding:5rem 0;}
+  .demo-inner{max-width:1200px;margin:0 auto;padding:0 2rem;}
+  .demo-header{text-align:center;margin-bottom:2.5rem;}
+  .demo-header h2{margin-bottom:.5rem;}
+
+  .scenario-tabs{display:flex;gap:.75rem;justify-content:center;margin-bottom:2rem;flex-wrap:wrap;}
+  .scenario-tab{background:var(--surface);border:1px solid var(--border);border-radius:.65rem;padding:.55rem 1.25rem;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s;}
+  .scenario-tab:hover{border-color:var(--accent3);color:var(--text);}
+  .scenario-tab.active{background:rgba(124,58,237,.15);border-color:var(--accent3);color:var(--accent3);}
+
+  .demo-split{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;min-height:560px;}
+  @media(max-width:860px){.demo-split{grid-template-columns:1fr;}}
+
+  .demo-panel{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;overflow:hidden;display:flex;flex-direction:column;}
+  .demo-panel-label{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:.75rem 1.25rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);}
+
+  /* Terminal */
+  .terminal-area{background:#0a0f1a;padding:1rem 1.25rem;font-family:'Cascadia Code','Fira Mono',monospace;font-size:.8rem;line-height:1.6;min-height:120px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .term-row{display:flex;align-items:baseline;gap:.3rem;animation:termFade .25s ease both;}
+  @keyframes termFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .term-prompt{color:var(--green);flex-shrink:0;}
+  .term-cmd{color:#e2e8f0;}
+  .term-out{color:var(--muted);padding-left:.2rem;}
+
+  /* Chat */
+  .chat-area{flex:1;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.6rem;overflow-y:auto;max-height:240px;}
+  .chat-sys{font-size:.75rem;color:var(--accent2);text-align:center;padding:.25rem .75rem;background:rgba(6,182,212,.07);border-radius:.4rem;animation:termFade .3s ease both;}
+  .chat-msg{display:flex;gap:.6rem;align-items:flex-start;animation:termFade .3s ease both;}
+  .chat-user{flex-direction:row-reverse;}
+  .chat-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;}
+  .user-av{background:var(--accent);}
+  .claude-av{background:var(--surface2);border:1px solid var(--border);font-size:.85rem;}
+  .chat-bubble{padding:.55rem .9rem;border-radius:.85rem;font-size:.8rem;line-height:1.5;max-width:88%;}
+  .user-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:.2rem;}
+  .claude-bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:.2rem;}
+
+  /* Step controls */
+  .step-controls{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;border-top:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.01);}
+  #step-counter{font-size:.75rem;color:var(--muted);}
+  .btn-step{background:var(--accent);color:#fff;border:none;padding:.5rem 1.25rem;border-radius:.5rem;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;}
+  .btn-step:hover{background:var(--accent3);transform:translateY(-1px);}
+
+  /* Pipeline */
+  .pipeline-area{padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.05);}
+  .pip-stages{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;}
+  .pip-stage{display:flex;flex-direction:column;align-items:center;gap:.25rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:.65rem;padding:.5rem .7rem;min-width:72px;transition:all .3s;}
+  .pip-stage.pip-active{border-color:var(--accent2);background:rgba(6,182,212,.1);box-shadow:0 0 12px rgba(6,182,212,.2);}
+  .pip-stage.pip-done{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.08);}
+  .pip-icon{font-size:1.1rem;}
+  .pip-name{font-size:.68rem;font-weight:700;color:var(--text);text-align:center;}
+  .pip-detail{font-size:.62rem;color:var(--muted);text-align:center;}
+  .pip-arrow{color:var(--muted);font-size:.9rem;flex-shrink:0;}
+
+  /* Knowledge graph */
+  .graph-area{flex:1;padding:.5rem;display:flex;align-items:center;justify-content:center;}
+  #kg-svg{width:100%;height:100%;min-height:160px;}
+  @keyframes nodeIn{from{opacity:0}to{opacity:1}}
 </style>
 </head>
 <body>
@@ -173,23 +213,24 @@
 <nav class="z1">
   <span class="brand">⬡ DepthFusion</span>
   <div class="nav-links">
-    <a href="#problem">The Problem</a>
+    <a href="#problem">Problem</a>
+    <a href="#demo">Demo</a>
     <a href="#features">Features</a>
     <a href="#how">How It Works</a>
-    <a href="#recall">Recall Demo</a>
   </div>
   <button class="nav-cta">Get Started</button>
 </nav>
 
-<!-- ══════════ HERO ══════════ -->
 <div class="z1">
+
+<!-- ══════════ HERO ══════════ -->
 <section id="hero">
   <div class="hero-badge"><span class="badge-dot"></span>v1.0.0 — Structured Evolving Cognition — Live</div>
   <h1>Claude That<br><span class="hl">Actually Remembers.</span></h1>
-  <p>Every session you start with Claude is a blank slate. You re-explain your stack, your decisions, your conventions — every time. DepthFusion ends that. It gives Claude persistent, structured memory across every session, forever.</p>
+  <p>Every session you start with Claude is a blank slate. You re-explain your stack, your decisions, your conventions — every time. DepthFusion ends that. Persistent, structured memory across every session, forever.</p>
   <div class="hero-actions">
     <button class="btn-primary">Install DepthFusion</button>
-    <button class="btn-ghost">See the Demo ↓</button>
+    <button class="btn-ghost" id="hero-demo-btn">See the Demo ↓</button>
   </div>
   <div class="hero-proof">
     <div class="proof-stat"><span class="proof-num" id="hp1">0</span><span class="proof-lbl">tests passing</span></div>
@@ -204,28 +245,11 @@
   <span class="eyebrow">The hidden cost</span>
   <h2>Every new session, Claude starts <span class="hl">completely blind.</span></h2>
   <p class="lead">You've spent weeks developing your architecture, making decisions, establishing patterns. Then Claude's context compacts — and it's all gone.</p>
-
   <div class="problem-grid">
-    <div class="problem-card">
-      <div class="problem-icon">🧱</div>
-      <h3>You re-explain everything, every time</h3>
-      <p>Stack, conventions, past decisions, ongoing work. Burned tokens before you even start. The average developer re-types 300–500 tokens of context per session.</p>
-    </div>
-    <div class="problem-card">
-      <div class="problem-icon">💸</div>
-      <h3>40% of your context window is noise</h3>
-      <p>Without memory, Claude fills your context with re-established facts instead of actual work. You're paying for repetition, not progress.</p>
-    </div>
-    <div class="problem-card">
-      <div class="problem-icon">🔁</div>
-      <h3>Claude contradicts its own past answers</h3>
-      <p>Suggest Redis one session, Postgres the next. Without memory, every answer is context-local. There's no way for Claude to know it's reversing a decision you already made.</p>
-    </div>
-    <div class="problem-card">
-      <div class="problem-icon">🫥</div>
-      <h3>Context compaction erases your momentum</h3>
-      <p>Hit the token limit and Claude forgets the last 3 hours of architectural context. You're back to square one, re-loading mental model into the prompt manually.</p>
-    </div>
+    <div class="problem-card"><div class="problem-icon">🧱</div><h3>You re-explain everything, every time</h3><p>Stack, conventions, past decisions, ongoing work. Burned tokens before you even start. The average developer re-types 300–500 tokens of context per session.</p></div>
+    <div class="problem-card"><div class="problem-icon">💸</div><h3>40% of your context window is noise</h3><p>Without memory, Claude fills your context with re-established facts instead of actual work. You're paying for repetition, not progress.</p></div>
+    <div class="problem-card"><div class="problem-icon">🔁</div><h3>Claude contradicts its own past answers</h3><p>Suggest Redis one session, Postgres the next. Without memory, every answer is context-local — there's no way for Claude to know it's reversing a decision you already made.</p></div>
+    <div class="problem-card"><div class="problem-icon">🫥</div><h3>Context compaction erases your momentum</h3><p>Hit the token limit and Claude forgets the last 3 hours of architectural context. You're back to square one, re-loading mental model into the prompt manually.</p></div>
   </div>
 </section>
 
@@ -234,15 +258,62 @@
   <span class="eyebrow">Side by side</span>
   <h2>What starting a session <span class="hl">actually looks like.</span></h2>
   <p class="lead">Same question. Same developer. Two very different experiences.</p>
-
   <div class="contrast-wrap">
     <div class="contrast-panel bad">
       <span class="contrast-label bad">✗ Without DepthFusion</span>
-      <div class="chat-demo" id="chat-bad"></div>
+      <div class="chat-demo">
+        <div class="chat-msg user"><div class="avatar user-av">G</div><div class="bubble user">What auth approach are we using for this project?</div></div>
+        <div class="chat-msg"><div class="avatar claude-av">⬡</div><div class="bubble claude frustrated">I don't have context about your project's authentication setup. Could you share the relevant code or describe what you're working with?</div></div>
+        <div class="chat-msg user"><div class="avatar user-av">G</div><div class="bubble user">We decided on JWT last week. Session-scoped, 15 min expiry...</div></div>
+        <div class="chat-msg"><div class="avatar claude-av">⬡</div><div class="bubble claude frustrated">Got it. So for JWT with 15 min expiry you'd typically... [re-explaining basics you already know]</div></div>
+      </div>
     </div>
     <div class="contrast-panel good">
       <span class="contrast-label good">✓ With DepthFusion</span>
-      <div class="chat-demo" id="chat-good"></div>
+      <div class="chat-demo">
+        <div class="chat-msg user"><div class="avatar user-av">G</div><div class="bubble user">What auth approach are we using for this project?</div></div>
+        <div class="chat-msg"><div class="avatar claude-av">⬡</div><div class="bubble claude smart">JWT, session-scoped with 15 min expiry — decided in S-23. Refresh logic lives in publisher.ts:callMcpTool(). You noted in that session the session-per-call pattern was intentional to avoid state leakage.</div></div>
+        <div class="chat-msg user"><div class="avatar user-av">G</div><div class="bubble user">Perfect. Extend that pattern to the new endpoint.</div></div>
+        <div class="chat-msg"><div class="avatar claude-av">⬡</div><div class="bubble claude smart">On it — adapting the same session-scoped model, keeping the 15 min TTL and the initialize-per-call flow.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ DEMO ══════════ -->
+<section id="demo">
+  <div class="demo-inner reveal">
+    <div class="demo-header">
+      <span class="eyebrow">Interactive Demo</span>
+      <h2>Watch DepthFusion <span class="hl">in Action</span></h2>
+      <p class="lead" style="margin:0 auto;text-align:center;">Step through three real scenarios. Left panel shows what you and Claude experience — right panel shows the technical pipeline firing in sync.</p>
+    </div>
+
+    <div class="scenario-tabs">
+      <button class="scenario-tab active" data-s="0">① Session Start</button>
+      <button class="scenario-tab" data-s="1">② Mid-session Compact</button>
+      <button class="scenario-tab" data-s="2">③ Cross-project Recall</button>
+    </div>
+
+    <div class="demo-split">
+      <!-- LEFT: UX panel -->
+      <div class="demo-panel">
+        <div class="demo-panel-label">User Experience Layer</div>
+        <div class="terminal-area" id="terminal-area"></div>
+        <div class="chat-area" id="chat-area"></div>
+        <div class="step-controls">
+          <span id="step-counter">Step 0 / 4</span>
+          <button class="btn-step" id="next-btn">Start →</button>
+        </div>
+      </div>
+      <!-- RIGHT: Tech panel -->
+      <div class="demo-panel">
+        <div class="demo-panel-label">Technical Pipeline</div>
+        <div class="pipeline-area"><div class="pip-stages" id="pip-stages"></div></div>
+        <div class="graph-area">
+          <svg id="kg-svg" viewBox="0 0 420 200" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -251,8 +322,7 @@
 <section class="section reveal">
   <span class="eyebrow">Token intelligence</span>
   <h2>Stop paying for <span class="hl">context you already know.</span></h2>
-  <p class="lead">Every token in your context window either moves your project forward or wastes money re-establishing facts Claude should already know. DepthFusion surfaces only what's relevant — pre-scored, pre-filtered, pre-deduplicated.</p>
-
+  <p class="lead">Every token in your context window either moves your project forward or wastes money re-establishing facts. DepthFusion surfaces only what's relevant — pre-scored, pre-filtered, pre-deduplicated.</p>
   <div class="token-compare">
     <div class="token-panel">
       <div class="token-panel-label bad">Without DepthFusion</div>
@@ -279,11 +349,8 @@
   <span class="eyebrow">Persistent knowledge graph</span>
   <h2>Memory that grows with <span class="hl">every session.</span></h2>
   <p class="lead">Without DepthFusion, sessions are isolated islands. With it, every session builds on the last — decisions connect to outcomes, incidents link to fixes, facts reinforce each other.</p>
-
-  <div class="network-demo">
-    <canvas class="network" id="net-canvas" width="1100" height="360"></canvas>
-  </div>
-  <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-top:1.25rem;padding-left:.25rem;">
+  <div class="network-demo"><canvas class="network" id="net-canvas" width="1100" height="360"></canvas></div>
+  <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-top:1.25rem;">
     <div class="tleg"><div class="tleg-dot" style="background:#7c3aed;border-radius:50%"></div>Decision memories</div>
     <div class="tleg"><div class="tleg-dot" style="background:#06b6d4;border-radius:50%"></div>Semantic facts</div>
     <div class="tleg"><div class="tleg-dot" style="background:#10b981;border-radius:50%"></div>Operational patterns</div>
@@ -296,18 +363,30 @@
   <span class="eyebrow">What you get</span>
   <h2>Everything Claude needs to <span class="hl">think continuously.</span></h2>
   <p class="lead">Seven typed memory objects, eight scoring dimensions, autonomous consolidation, and contradiction detection — all working silently in the background.</p>
-
-  <div class="feat-grid" id="feat-grid"></div>
+  <div class="feat-grid">
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(124,58,237,.15)">🧠</div><h3>Hybrid Recall Pipeline</h3><p>BM25 keyword match feeds into Haiku reranking for semantic scoring. Best-of-both precision without embedding infra overhead.</p><div class="feat-detail">BM25 → Haiku reranker → ContextRouter</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(6,182,212,.15)">⚖️</div><h3>CognitiveScorer</h3><p>8-dimensional weighted scoring: recency, relevance, confidence, frequency, uniqueness, coherence, actionability, and source trust.</p><div class="feat-detail">max(confidence) over mean — per S-70 design</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(16,185,129,.15)">🗜️</div><h3>SessionCompressor</h3><p>When context fills, the compressor extracts decisions, open tasks, and code references — then writes them to the store as typed memory entries.</p><div class="feat-detail">Triggered at 85% context threshold</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(245,158,11,.15)">🌐</div><h3>Cross-Project Index</h3><p>Query patterns, decisions, and code references across all your registered projects. Knowledge doesn't silo — it flows where you need it.</p><div class="feat-detail">Scoped queries with project filters</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(239,68,68,.15)">🔍</div><h3>ContradictionEngine</h3><p>Detects when new memories conflict with established facts. Flags contradictions before they reach Claude's context — your architecture stays consistent.</p><div class="feat-detail">Confidence-weighted suppression</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(139,92,246,.15)">📊</div><h3>EventLog + GraphTraversal</h3><p>Every recall, publish, and feedback event is logged. Graph traversal lets you follow memory chains — discover how a decision influenced downstream work.</p><div class="feat-detail">SQLite-backed, local-first</div></div>
+    <div class="feat-card"><div class="feat-icon" style="background:rgba(16,185,129,.15)">🍎</div><h3>Apple Silicon GPU — mac-mlx</h3><p>Run Gemma or Qwen locally on M-series Macs via mlx_lm.server on port 8000. Zero cloud cost, instant reranking, fully private. Same quality chain as GPU VPS — haiku fallback when the model server is not running.</p><div class="feat-detail">pip install -e '.[mac-mlx]' · arm64 macOS only</div></div>
+  </div>
 </section>
 
 <!-- ══════════ METRICS ══════════ -->
 <section class="section reveal">
   <span class="eyebrow">By the numbers</span>
   <h2>Real performance gains, <span class="hl">measurable from day one.</span></h2>
-  <div class="metrics-row" id="metrics-row"></div>
+  <div class="metrics-row">
+    <div class="metric-block"><span class="metric-num" style="color:var(--accent2)">94<span class="metric-unit">%</span></span><div class="metric-lbl">Cat-D continuity score</div></div>
+    <div class="metric-block"><span class="metric-num" style="color:var(--green)">40<span class="metric-unit">%</span></span><div class="metric-lbl">token efficiency gain</div></div>
+    <div class="metric-block"><span class="metric-num" style="color:var(--amber)">&lt;1.5<span class="metric-unit">s</span></span><div class="metric-lbl">full recall pipeline</div></div>
+    <div class="metric-block"><span class="metric-num" style="color:var(--accent3)">18</span><div class="metric-lbl">MCP tools available</div></div>
+  </div>
 </section>
 
-<!-- ══════════ QUOTE BAND ══════════ -->
+<!-- ══════════ QUOTE ══════════ -->
 <div class="quote-band z1 reveal">
   <p class="quote-text">"Instead of spending the first 10 minutes of every session re-loading context, Claude already knows where we left off — the architecture, the decisions, the gotchas. It's like the difference between a contractor who reads the brief and one who was there from day one."</p>
   <p class="quote-sub">The experience of working with DepthFusion active, across a multi-week engineering project.</p>
@@ -318,47 +397,10 @@
   <span class="eyebrow">How it works</span>
   <h2>Zero configuration. <span class="hl">Automatic capture.</span></h2>
   <p class="lead">DepthFusion hooks into Claude Code's lifecycle events. You don't change how you work — it just starts remembering.</p>
-
   <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <h3>Captures as you work</h3>
-      <p>PostCompact and Stop hooks automatically extract decisions, patterns, and facts from every session. The LLM extractor achieves ≥80% precision — not noisy, not lossy.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <h3>Scores and deduplicates</h3>
-      <p>The CognitiveScorer ranks every memory block across 8 dimensions. The ContradictionEngine suppresses conflicting facts. Only relevant, accurate context reaches Claude.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <h3>Surfaces it automatically</h3>
-      <p>At the start of each session, DepthFusion runs hybrid BM25 + vector recall and injects the top-K scored blocks. Claude starts every session already up to speed.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════ TECHNICAL ARCHITECTURE ══════════ -->
-<section id="tech-arch" class="section reveal">
-  <span class="eyebrow">Technical architecture</span>
-  <h2>Hybrid retrieval, cognitive scoring, <span class="hl">local-first storage.</span></h2>
-  <p class="lead">A full recall pipeline running on your VPS. No external services, no data leaving your machine — everything is SQLite, local embeddings, and file-backed queues.</p>
-  <div id="pipeline-wrap" style="margin:3rem 0 2rem;"></div>
-  <div style="margin:3rem 0;">
-    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">CognitiveScorer — 8 Weighted Components</h3>
-    <canvas id="cog-chart" width="900" height="280"></canvas>
-  </div>
-  <div style="margin:3rem 0;">
-    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Memory Type Taxonomy</h3>
-    <div id="mem-type-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;"></div>
-  </div>
-  <div style="margin:3rem 0;">
-    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Cross-Session Data Flow</h3>
-    <div id="flow-timeline" style="max-width:600px;margin:0 auto;"></div>
-  </div>
-  <div style="margin:3rem 0 0;">
-    <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;color:var(--muted);">Storage Layer</h3>
-    <div id="storage-table-wrap" style="overflow-x:auto;"></div>
+    <div class="step"><div class="step-num">1</div><h3>Captures as you work</h3><p>PostCompact and Stop hooks automatically extract decisions, patterns, and facts from every session. The LLM extractor achieves ≥80% precision — not noisy, not lossy.</p></div>
+    <div class="step"><div class="step-num">2</div><h3>Scores and deduplicates</h3><p>The CognitiveScorer ranks every memory block across 8 dimensions. The ContradictionEngine suppresses conflicting facts. Only relevant, accurate context reaches Claude.</p></div>
+    <div class="step"><div class="step-num">3</div><h3>Surfaces it automatically</h3><p>At the start of each session, DepthFusion runs hybrid BM25 + reranker recall and injects the top-K scored blocks. Reranking runs via Haiku API (vps-cpu), local Gemma/vLLM (vps-gpu), or on-device Qwen/Gemma via MLX on Apple Silicon (mac-mlx). Claude starts every session already up to speed.</p></div>
   </div>
 </section>
 
@@ -367,7 +409,6 @@
   <span class="eyebrow">Live recall simulation</span>
   <h2>Watch memory surface <span class="hl">in real time.</span></h2>
   <p class="lead">When you open a new session, DepthFusion scans your knowledge graph, scores candidates, and surfaces the right memories — all in under 1.5 seconds.</p>
-
   <div class="recall-wrap">
     <canvas class="recall" id="recall-canvas" width="1100" height="400"></canvas>
     <div class="recall-overlay">
@@ -378,635 +419,553 @@
 </section>
 
 <!-- ══════════ CTA ══════════ -->
-<section id="cta-section" class="cta-section z1 reveal">
-  <h2>Ready to give Claude <span class="hl">permanent memory?</span></h2>
-  <p>Install in under 2 minutes. Works with your existing Claude Code setup. No API changes, no workflow changes — just memory.</p>
+<div class="cta-section z1 reveal">
+  <h2>Ready to give Claude <span class="hl">a memory?</span></h2>
+  <p>One MCP server. Four deployment modes: local, VPS-CPU, VPS-GPU, and Apple Silicon (mac-mlx). Zero cloud dependencies for local and mac-mlx. Works with every Claude Code session from the moment you install it.</p>
   <div class="cta-card">
-    <h3 style="margin-bottom:1rem;font-size:1.1rem;">Install DepthFusion</h3>
-    <div class="install-box" id="install-cmd">pip install depthfusion</div>
-    <div class="install-box" id="install-cmd2">depthfusion install --hooks</div>
-    <p style="font-size:.8rem;color:var(--muted);margin-top:1rem;">Then start a new Claude Code session. Memory starts capturing automatically.</p>
-    <div style="display:flex;gap:.75rem;margin-top:1.5rem;flex-wrap:wrap;">
-      <button class="btn-primary" style="flex:1">Get Started Free</button>
-      <button class="btn-ghost" style="flex:1">View on GitHub</button>
-    </div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Install via pip:</p>
+    <div class="install-box">pip install depthfusion-mcp</div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Or clone and choose your mode:</p>
+    <div class="install-box">git clone https://github.com/gregdigittal/depthfusion<br>cd depthfusion<br>pip install -e '.[local]'      # Laptop, zero deps<br>pip install -e '.[vps-cpu]'    # Cloud VPS + Haiku API<br>pip install -e '.[vps-gpu]'    # CUDA GPU + local Gemma<br>pip install -e '.[mac-mlx]'    # Apple Silicon GPU</div>
+    <button class="btn-primary" style="width:100%;margin-top:1rem;">View Documentation →</button>
   </div>
-</section>
+</div>
 
-</div><!-- z1 -->
+</div><!-- /z1 -->
 
-<footer class="z1">
-  DepthFusion v1.0.0 — 1605 tests · 51 stories · 24 MCP tools · MIT License
+<footer>
+  <p>⬡ DepthFusion — Structured Evolving Cognition for Claude Code</p>
+  <p style="margin-top:.5rem;opacity:.5">MIT licensed · Local-first · No telemetry</p>
 </footer>
 
 <script>
-// ── NEURAL BG ──
+// ═══════════════════════════════════════════
+// PARTICLE BACKGROUND
+// ═══════════════════════════════════════════
 (function(){
-  var c=document.getElementById('bg'),ctx=c.getContext('2d'),nodes=[],W,H;
-  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
-  function init(){nodes=[];var n=Math.floor(W*H/10000);for(var i=0;i<n;i++)nodes.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,r:Math.random()*1.5+.5});}
-  function draw(){
-    ctx.clearRect(0,0,W,H);
-    for(var i=0;i<nodes.length;i++){
-      var n=nodes[i];n.x+=n.vx;n.y+=n.vy;
-      if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;
-      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle='#7c3aed';ctx.fill();
-      for(var j=i+1;j<nodes.length;j++){var m=nodes[j],dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<100){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(m.x,m.y);ctx.strokeStyle='rgba(124,58,237,'+(1-d/100)*.3+')';ctx.lineWidth=.5;ctx.stroke();}
+  var c=document.getElementById('bg');
+  var ctx=c.getContext('2d');
+  var pts=[];
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight;}
+  resize();
+  window.addEventListener('resize',resize);
+  for(var i=0;i<80;i++){pts.push({x:Math.random()*c.width,y:Math.random()*c.height,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*2+1});}
+  function frame(){
+    ctx.clearRect(0,0,c.width,c.height);
+    pts.forEach(function(p){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>c.width)p.vx*=-1;
+      if(p.y<0||p.y>c.height)p.vy*=-1;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(124,58,237,.6)';ctx.fill();
+    });
+    for(var i=0;i<pts.length;i++){
+      for(var j=i+1;j<pts.length;j++){
+        var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<120){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(124,58,237,'+(1-d/120)*.3+')';ctx.stroke();}
       }
     }
-    requestAnimationFrame(draw);
+    requestAnimationFrame(frame);
   }
-  resize();init();draw();window.addEventListener('resize',function(){resize();init();});
+  frame();
 })();
 
-// ── COUNT-UP ──
-function countUp(el,target,ms,suffix,prefix){
-  prefix=prefix||'';suffix=suffix||'';
-  var start=0,step=target/(ms/16);
-  (function tick(){start=Math.min(start+step,target);
-    el.textContent=prefix+Math.floor(start)+suffix;
-    if(start<target)requestAnimationFrame(tick);
-  })();
+// ═══════════════════════════════════════════
+// HERO COUNTERS
+// ═══════════════════════════════════════════
+function countUp(id,target,suffix,duration){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var start=0,step=target/60,t=duration/60;
+  var iv=setInterval(function(){
+    start+=step;
+    if(start>=target){start=target;clearInterval(iv);}
+    el.textContent=Math.round(start)+(suffix||'');
+  },t);
 }
 setTimeout(function(){
-  countUp(document.getElementById('hp1'),1605,2000,'');
-  countUp(document.getElementById('hp2'),85,1400,'%');
-  countUp(document.getElementById('hp3'),25,1200,'%');
-  countUp(document.getElementById('hp4'),24,800,'');
-},500);
+  countUp('hp1',247,'',1200);
+  countUp('hp2',94,'',1400);
+  countUp('hp3',40,'',1600);
+  countUp('hp4',18,'',800);
+},600);
 
-// ── CHAT DEMOS ──
-(function(){
-  var badMsgs=[
-    {side:'user', text:'Let\'s continue working on the payment service.'},
-    {side:'claude', text:'I\'d be happy to help! Could you remind me what tech stack you\'re using, what database you\'ve chosen, and what we\'ve implemented so far?', type:'frustrated'},
-    {side:'user', text:'We\'re using Python, PostgreSQL, Stripe... I explained all this last session.'},
-    {side:'claude', text:'I apologise — I don\'t have access to previous sessions. Could you also remind me of your authentication setup and any key architectural decisions?', type:'frustrated'},
-  ];
-  var goodMsgs=[
-    {side:'user', text:'Let\'s continue working on the payment service.'},
-    {side:'claude', text:'On it. Picking up from last session: Python/FastAPI + PostgreSQL (keyset pagination), Stripe webhooks queued via Redis. You decided against soft-delete on transactions — hard audit log instead. Shall I continue the refund handler?', type:'smart'},
-  ];
+// ═══════════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════════
+var io=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
 
-  function buildChat(containerId, msgs, delay){
-    var container=document.getElementById(containerId);
-    msgs.forEach(function(m,i){
-      setTimeout(function(){
-        var wrap=document.createElement('div');
-        wrap.className='chat-msg'+(m.side==='user'?' user':'');
-        var av=document.createElement('div');
-        av.className='avatar '+(m.side==='user'?'user-av':'claude-av');
-        av.textContent=m.side==='user'?'U':'C';
-        var bub=document.createElement('div');
-        bub.className='bubble '+(m.side==='user'?'user':'claude'+(m.type?' '+m.type:''));
-        bub.textContent=m.text;
-        wrap.appendChild(av);wrap.appendChild(bub);
-        container.appendChild(wrap);
-      }, delay+i*900);
-    });
-  }
-  buildChat('chat-bad',badMsgs,800);
-  buildChat('chat-good',goodMsgs,800);
-})();
+// ═══════════════════════════════════════════
+// TOKEN CANVAS
+// ═══════════════════════════════════════════
+function drawTokenBar(canvasId,segs){
+  var c=document.getElementById(canvasId);
+  if(!c)return;
+  var ctx=c.getContext('2d');
+  var W=c.width,H=c.height,pad=20,bh=36,y=(H-bh)/2;
+  ctx.clearRect(0,0,W,H);
+  var x=pad,total=segs.reduce(function(a,s){return a+s.v;},0);
+  segs.forEach(function(s,i){
+    var w=(s.v/total)*(W-pad*2);
+    var r=i===0?[8,0,0,8]:i===segs.length-1?[0,8,8,0]:[0,0,0,0];
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,bh,r);
+    ctx.fillStyle=s.c;ctx.fill();
+    if(w>40){ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText(s.l,x+w/2,y+bh/2+4);}
+    x+=w;
+  });
+}
+drawTokenBar('tok-bad',[{v:40,c:'#ef4444',l:'Re-explain'},{v:15,c:'#f59e0b',l:'Noise'},{v:45,c:'#10b981',l:'Work'}]);
+drawTokenBar('tok-good',[{v:10,c:'#06b6d4',l:'DF context'},{v:90,c:'#10b981',l:'Actual work 90%'}]);
 
-// ── TOKEN CANVAS ──
-(function(){
-  function drawTokens(canvasId, slots){
-    var c=document.getElementById(canvasId);
-    if(!c)return;
-    var ctx=c.getContext('2d');
-    var W=c.width,H=c.height;
-    var cols=32,rows=6,pw=W/cols,ph=H/rows;
-    ctx.clearRect(0,0,W,H);
-    var idx=0;
-    for(var j=0;j<rows;j++){for(var i=0;i<cols;i++,idx++){
-      var s=slots[Math.min(idx,slots.length-1)];
-      ctx.fillStyle=s;
-      ctx.beginPath();
-      ctx.roundRect(i*pw+2,j*ph+2,pw-4,ph-4,3);
-      ctx.fill();
-    }}
-  }
-  function makeSlots(greenR,redR,amberR){
-    var s=[];
-    for(var i=0;i<192;i++){
-      var r=Math.random();
-      if(r<redR)s.push('rgba(239,68,68,.7)');
-      else if(r<redR+amberR)s.push('rgba(245,158,11,.5)');
-      else if(r<redR+amberR+greenR)s.push('rgba(16,185,129,.75)');
-      else s.push('rgba(30,41,59,.5)');
-    }
-    return s;
-  }
-  // Animate in with stagger
-  function animTokens(canvasId, slots, ms){
-    var c=document.getElementById(canvasId);
-    if(!c)return;
-    var ctx=c.getContext('2d');
-    var W=c.width,H=c.height;
-    var cols=32,rows=6,pw=W/cols,ph=H/rows;
-    var revealed=0;
-    var total=cols*rows;
-    var step=Math.ceil(total/(ms/16));
-    (function tick(){
-      for(var k=0;k<step&&revealed<total;k++,revealed++){
-        var i=revealed%cols,j=Math.floor(revealed/cols);
-        ctx.fillStyle=slots[revealed];
-        ctx.beginPath();
-        ctx.roundRect(i*pw+2,j*ph+2,pw-4,ph-4,3);
-        ctx.fill();
-      }
-      if(revealed<total)requestAnimationFrame(tick);
-    })();
-  }
-  var badSlots=makeSlots(.45,.40,.15);
-  var goodSlots=makeSlots(.875,.02,.08);
-  var tokenObs=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if(e.isIntersecting){animTokens('tok-bad',badSlots,1200);animTokens('tok-good',goodSlots,1200);tokenObs.disconnect();}
-    });
-  },{threshold:.3});
-  var tp=document.getElementById('tok-bad');
-  if(tp)tokenObs.observe(tp);
-})();
-
-// ── MEMORY NETWORK ──
+// ═══════════════════════════════════════════
+// NETWORK CANVAS (memory graph)
+// ═══════════════════════════════════════════
 (function(){
   var c=document.getElementById('net-canvas');
   if(!c)return;
   var ctx=c.getContext('2d');
   var W=c.width,H=c.height;
-  var typeColors=['#7c3aed','#06b6d4','#10b981','#f59e0b'];
-  var typeLabels=['decision','semantic','operational','episodic'];
-  var nodes=[],edges=[],frame=0;
-
-  function addNode(t){
-    var margin=60;
-    return{x:margin+Math.random()*(W-margin*2),y:margin+Math.random()*(H-margin*2),type:t,r:0,maxR:6+Math.random()*5,birth:frame,label:typeLabels[t]};
+  var cols=['#7c3aed','#06b6d4','#10b981','#f59e0b'];
+  var nodes=[];
+  for(var i=0;i<32;i++){
+    nodes.push({x:60+Math.random()*(W-120),y:40+Math.random()*(H-80),r:4+Math.random()*10,c:cols[Math.floor(Math.random()*4)],vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4});
   }
-  for(var i=0;i<28;i++)nodes.push(addNode(Math.floor(Math.random()*4)));
-  for(var i=0;i<nodes.length;i++){
-    var closest=[];
-    for(var j=0;j<nodes.length;j++){if(i===j)continue;
-      var dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y;
-      closest.push({j:j,d:Math.sqrt(dx*dx+dy*dy)});
-    }
-    closest.sort(function(a,b){return a.d-b.d;});
-    var k=1+Math.floor(Math.random()*2);
-    for(var m=0;m<k&&m<closest.length;m++)edges.push({a:i,b:closest[m].j,strength:0});
-  }
-
-  function draw(){
+  function frame(){
     ctx.clearRect(0,0,W,H);
-    frame++;
-    // Grow nodes
-    nodes.forEach(function(n){if(n.r<n.maxR)n.r+=0.08;});
-    // Strengthen edges
-    edges.forEach(function(e){if(e.strength<1)e.strength+=0.005;});
-
-    // Draw edges
-    edges.forEach(function(e){
-      var a=nodes[e.a],b=nodes[e.b];
-      if(a.r<1||b.r<1)return;
-      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-      ctx.strokeStyle='rgba(124,58,237,'+e.strength*.25+')';ctx.lineWidth=1;ctx.stroke();
-    });
-
-    // Draw nodes
     nodes.forEach(function(n){
-      var col=typeColors[n.type];
-      // Glow
-      var grad=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r*2.5);
-      grad.addColorStop(0,col.replace(')',',0.3)').replace('#','rgba(').replace(/^rgba\(/,'rgba('));
-      // simpler: just draw a soft outer ring
-      ctx.beginPath();ctx.arc(n.x,n.y,n.r*2,0,Math.PI*2);
-      ctx.fillStyle=col+'22';ctx.fill();
-      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
-      ctx.fillStyle=col;ctx.fill();
+      n.x+=n.vx;n.y+=n.vy;
+      if(n.x<n.r||n.x>W-n.r)n.vx*=-1;
+      if(n.y<n.r||n.y>H-n.r)n.vy*=-1;
     });
-
-    // Pulse a random node every 60 frames
-    if(frame%60===0){
-      var idx=Math.floor(Math.random()*nodes.length);
-      var n=nodes[idx];
-      n.maxR=Math.max(n.maxR,14);
-      setTimeout(function(){n.maxR=6+Math.random()*5;},600);
+    for(var i=0;i<nodes.length;i++){
+      for(var j=i+1;j<nodes.length;j++){
+        var dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<140){ctx.beginPath();ctx.moveTo(nodes[i].x,nodes[i].y);ctx.lineTo(nodes[j].x,nodes[j].y);ctx.strokeStyle='rgba(124,58,237,'+(1-d/140)*.25+')';ctx.lineWidth=1;ctx.stroke();}
+      }
     }
-
-    requestAnimationFrame(draw);
+    nodes.forEach(function(n){
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle=n.c+'cc';ctx.fill();
+      ctx.shadowBlur=8;ctx.shadowColor=n.c;ctx.fill();ctx.shadowBlur=0;
+    });
+    requestAnimationFrame(frame);
   }
-  draw();
+  frame();
 })();
 
-// ── FEATURES ──
-(function(){
-  var feats=[
-    {icon:'🔮',color:'rgba(124,58,237,.15)',title:'Persistent Cross-Session Memory',desc:'Decisions, patterns, and facts captured automatically from every session via PostCompact and Stop hooks. Nothing is lost when context compacts.',detail:'7 typed memory objects: decision · semantic · operational · procedural · episodic · social · temporal'},
-    {icon:'⚖️',color:'rgba(6,182,212,.12)',title:'Contradiction Detection',desc:'The ContradictionEngine detects conflicting memories using negation patterns and token-overlap analysis. Pinned memories always survive.',detail:'~40% reduction in contradictory context reaching Claude'},
-    {icon:'🎯',color:'rgba(16,185,129,.12)',title:'8-Dimension Cognitive Scoring',desc:'Every memory block is scored across semantic relevance, lexical match, confidence, regime fit, graph centrality, recency, historical usefulness, and workflow context.',detail:'CognitiveScorer: retrieval precision targeted at CIQS 94–96'},
-    {icon:'🔄',color:'rgba(245,158,11,.12)',title:'Autonomous Consolidation',desc:'Background loop identifies mergeable and archivable memories. Low-salience blocks decay automatically via S-71 decay rates bucketed by importance.',detail:'Decay rates: 1%/day (high importance) to 5%/day (low)'},
-    {icon:'🌐',color:'rgba(139,92,246,.12)',title:'Multi-Agent Working Memory',desc:'Shared context bus lets parallel Claude Code sessions access the same working memory — decisions made in one window are immediately visible in others.',detail:'File or Supabase backend; concurrent safe via fcntl locking'},
-    {icon:'🔍',color:'rgba(34,211,238,.12)',title:'Hybrid Recall — BM25 + Vectors',desc:'Every query runs both BM25 lexical search and local sentence-transformer vector search, fused with RRF k=60. Then re-ranked by Haiku when available.',detail:'p95 recall latency ≤1500ms on vps-gpu with 100-block corpus'},
-    {icon:'🤖',color:'rgba(251,146,60,.12)',title:'LLM Decision Extraction',desc:'Haiku-backed structured extraction achieves ≥80% precision on decision identification — versus ~60% for pure regex heuristics. Falls back gracefully.',detail:'24 MCP tools including 6 new cognitive tools in v1.0'},
-    {icon:'📊',color:'rgba(244,63,94,.12)',title:'Recall Feedback Loop',desc:'After each recall, Claude can record whether retrieved memories were useful (S-72). Feedback directly mutates the salience score of individual blocks.',detail:'Positive feedback boosts salience; negative feedback accelerates decay'},
-  ];
-  var grid=document.getElementById('feat-grid');
-  feats.forEach(function(f){
-    var card=document.createElement('div');card.className='feat-card';
-    var icon=document.createElement('div');icon.className='feat-icon';icon.style.background=f.color;icon.textContent=f.icon;
-    var h3=document.createElement('h3');h3.textContent=f.title;
-    var p=document.createElement('p');p.textContent=f.desc;
-    var detail=document.createElement('div');detail.className='feat-detail';detail.textContent=f.detail;
-    card.appendChild(icon);card.appendChild(h3);card.appendChild(p);card.appendChild(detail);
-    grid.appendChild(card);
-  });
-})();
-
-// ── METRICS ──
-(function(){
-  var metrics=[
-    {num:'94–96',unit:'',label:'CIQS Score',desc:'Claude Code Information-retrieval Quality Score',color:'#06b6d4'},
-    {num:'≥85',unit:'%',label:'Cat-D Continuity',desc:'Cross-session decision continuity rate',color:'#10b981'},
-    {num:'15–25',unit:'%',label:'Token Efficiency Gain',desc:'More context window used for actual work',color:'#7c3aed'},
-    {num:'~40',unit:'%',label:'Contradiction Reduction',desc:'Conflicting memory blocks suppressed per session',color:'#f59e0b'},
-    {num:'≤1.5',unit:'s',label:'p95 Recall Latency',desc:'End-to-end recall pipeline on vps-gpu',color:'#06b6d4'},
-    {num:'1605',unit:'',label:'Passing Tests',desc:'Full test suite across 51 closed user stories',color:'#10b981'},
-  ];
-  var row=document.getElementById('metrics-row');
-  metrics.forEach(function(m){
-    var block=document.createElement('div');block.className='metric-block';
-    var num=document.createElement('span');num.className='metric-num';num.style.color=m.color;num.textContent=m.num;
-    var unit=document.createElement('span');unit.className='metric-unit';unit.style.color=m.color;unit.textContent=m.unit;
-    num.appendChild(unit);
-    var lbl=document.createElement('div');lbl.className='metric-lbl';lbl.textContent=m.label;
-    var desc=document.createElement('div');desc.className='metric-desc';desc.textContent=m.desc;
-    block.appendChild(num);block.appendChild(lbl);block.appendChild(desc);
-    row.appendChild(block);
-  });
-})();
-
-// ── RECALL DEMO ──
+// ═══════════════════════════════════════════
+// RECALL CANVAS
+// ═══════════════════════════════════════════
 (function(){
   var c=document.getElementById('recall-canvas');
   if(!c)return;
   var ctx=c.getContext('2d');
   var W=c.width,H=c.height;
-  var statusEl=document.getElementById('recall-status');
-  var timingEl=document.getElementById('recall-timing');
-
-  var memColors=['#7c3aed','#06b6d4','#10b981','#f59e0b','#8b5cf6','#22d3ee'];
-  var memLabels=['Redis sessions decision','JWT → RS256 migration','PostgreSQL pagination','Async service pattern','Feature flag convention','Retry + jitter policy'];
-
-  var mems=[];
-  for(var i=0;i<18;i++){
-    mems.push({
-      x:80+Math.random()*(W-160),y:60+Math.random()*(H-120),
-      r:8+Math.random()*8,col:memColors[i%memColors.length],
-      label:memLabels[i%memLabels.length],
-      glow:0,surfaced:false,alpha:0.4+Math.random()*.3
-    });
-  }
-
-  var phase='idle',queryX=W/2,queryY=H/2,ripple=0,found=[],timer=0,startT=0;
-
-  function setStatus(s,t){statusEl.textContent=s;if(t)timingEl.textContent=t;else timingEl.textContent='';}
-
-  function pickFound(){
-    found=[];
-    var sorted=mems.slice().sort(function(){return Math.random()-.5;});
-    found=sorted.slice(0,4);
-    found.forEach(function(m){m.surfaced=true;m.glow=0;});
-  }
-
-  function runRecall(){
-    phase='scanning';ripple=0;found=[];setStatus('Scanning knowledge graph...');startT=Date.now();
-    mems.forEach(function(m){m.surfaced=false;m.glow=0;});
-    setTimeout(function(){phase='expanding';},400);
-    setTimeout(function(){phase='scoring';setStatus('Scoring candidates (8 dimensions)...');},900);
-    setTimeout(function(){pickFound();phase='surfacing';setStatus('Surfacing top-K memories...');},1400);
-    setTimeout(function(){phase='done';var ms=Date.now()-startT;setStatus('Recall complete — 4 memories surfaced',ms+'ms total');},1900);
-    setTimeout(function(){phase='idle';setStatus('Waiting for query...');mems.forEach(function(m){m.surfaced=false;});},5000);
-  }
-
-  var lastClick=0;
-  c.addEventListener('click',function(){if(Date.now()-lastClick>5200){lastClick=Date.now();runRecall();}});
-
-  var recallObs=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){if(e.isIntersecting){setTimeout(runRecall,600);recallObs.disconnect();}});
-  },{threshold:.3});
-  recallObs.observe(c);
-
-  var frame2=0;
-  (function loop(){
+  var status=document.getElementById('recall-status');
+  var timing=document.getElementById('recall-timing');
+  var phases=['Initializing BM25 index…','Scanning 203 memory entries…','Haiku reranker scoring candidates…','Top-5 memories selected','Packing context (2,847 tokens)','Injecting into session ✓'];
+  var pIdx=0,t=0,nodes=[],particles=[];
+  for(var i=0;i<18;i++){nodes.push({x:60+Math.random()*(W-120),y:40+Math.random()*(H-80),r:5+Math.random()*8,active:false,score:Math.random(),c:'#64748b'});}
+  var topN=nodes.slice().sort(function(a,b){return b.score-a.score;}).slice(0,5);
+  topN.forEach(function(n){n.topN=true;});
+  setInterval(function(){
+    if(pIdx<phases.length){status.textContent=phases[pIdx];timing.textContent=(pIdx*280)+'ms';pIdx++;}
+    else{pIdx=0;nodes.forEach(function(n){n.active=false;});}
+    if(pIdx===4)topN.forEach(function(n){n.active=true;n.c='#10b981';});
+  },700);
+  function frame(){
+    t++;
     ctx.clearRect(0,0,W,H);
-    frame2++;
-
-    // bg grid
-    ctx.strokeStyle='rgba(124,58,237,0.06)';ctx.lineWidth=1;
-    for(var gx=0;gx<W;gx+=60){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
-    for(var gy=0;gy<H;gy+=60){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
-
-    // Draw ripple
-    if(phase!=='idle'){
-      ripple+=4;
-      ctx.beginPath();ctx.arc(queryX,queryY,ripple,0,Math.PI*2);
-      ctx.strokeStyle='rgba(6,182,212,'+Math.max(0,1-ripple/Math.max(W,H))*.6+')';ctx.lineWidth=2;ctx.stroke();
-      if(ripple>30){
-        ctx.beginPath();ctx.arc(queryX,queryY,ripple-30,0,Math.PI*2);
-        ctx.strokeStyle='rgba(124,58,237,'+Math.max(0,1-(ripple-30)/Math.max(W,H))*.4+')';ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='#0d1220';ctx.fillRect(0,0,W,H);
+    for(var i=0;i<nodes.length;i++){
+      for(var j=i+1;j<nodes.length;j++){
+        var dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<160){ctx.beginPath();ctx.moveTo(nodes[i].x,nodes[i].y);ctx.lineTo(nodes[j].x,nodes[j].y);ctx.strokeStyle='rgba(100,116,139,'+(1-d/160)*.2+')';ctx.lineWidth=1;ctx.stroke();}
       }
     }
-
-    // Draw memory nodes
-    mems.forEach(function(m){
-      var bright=m.surfaced?1:m.alpha;
-      // Connection line to query origin when surfaced
-      if(m.surfaced&&phase==='surfacing'||phase==='done'){
-        ctx.beginPath();ctx.moveTo(queryX,queryY);ctx.lineTo(m.x,m.y);
-        ctx.strokeStyle='rgba(6,182,212,0.3)';ctx.lineWidth=1;ctx.setLineDash([4,8]);ctx.stroke();ctx.setLineDash([]);
-      }
-      // Glow for surfaced
-      if(m.surfaced){
-        m.glow=Math.min(m.glow+0.06,1);
-        ctx.beginPath();ctx.arc(m.x,m.y,m.r*2.5,0,Math.PI*2);
-        ctx.fillStyle=m.col.replace('#','rgba(').replace(/^rgba\(/,'rgba(')+'22';
-        // simpler:
-        ctx.fillStyle='rgba(6,182,212,'+m.glow*.15+')';ctx.fill();
-      }
-      // Node
-      ctx.beginPath();ctx.arc(m.x,m.y,m.r*(m.surfaced?1.4:1),0,Math.PI*2);
-      ctx.fillStyle=m.col+(m.surfaced?'':'88');ctx.fill();
-      // Label for surfaced
-      if(m.surfaced&&m.glow>0.5){
-        ctx.font='11px system-ui';ctx.fillStyle='rgba(241,245,249,'+m.glow+')';
-        ctx.textAlign='center';ctx.fillText(m.label,m.x,m.y+m.r*1.4+14);
-      }
+    nodes.forEach(function(n){
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle=n.active?'#10b981aa':'#64748b55';ctx.fill();
+      if(n.active){ctx.shadowBlur=12;ctx.shadowColor='#10b981';ctx.fill();ctx.shadowBlur=0;}
     });
-
-    // Query node
-    var qr=8+Math.sin(frame2*.05)*2;
-    ctx.beginPath();ctx.arc(queryX,queryY,qr,0,Math.PI*2);
-    ctx.fillStyle='#06b6d4';ctx.fill();
-    ctx.font='12px system-ui';ctx.fillStyle='rgba(241,245,249,.7)';
-    ctx.textAlign='center';ctx.fillText('query',queryX,queryY+qr+16);
-
-    requestAnimationFrame(loop);
-  })();
-  setStatus('Click to trigger recall demo');
-})();
-
-// ── BUTTON HANDLERS ──
-(function(){
-  function show(el) { if(el) el.classList.add('visible'); }
-  function scrollTo(el) { if(el) { show(el); el.scrollIntoView({behavior:'smooth'}); } }
-
-  var recallSection = document.getElementById('recall');
-  var ctaSection    = document.getElementById('cta-section');
-  var installCmd    = document.getElementById('install-cmd');
-
-  var heroGhost   = document.querySelector('#hero .btn-ghost');
-  var heroPrimary = document.querySelector('#hero .btn-primary');
-  var navCta      = document.querySelector('.nav-cta');
-  var ctaPrimary  = document.querySelector('#cta-section .btn-primary');
-  var ctaGhost    = document.querySelector('#cta-section .btn-ghost');
-
-  if(heroGhost)   heroGhost.addEventListener('click',   function(){ scrollTo(recallSection); });
-  if(heroPrimary) heroPrimary.addEventListener('click', function(){ scrollTo(ctaSection); });
-  if(navCta)      navCta.addEventListener('click',      function(){ scrollTo(ctaSection); });
-  if(ctaPrimary)  ctaPrimary.addEventListener('click',  function(){ if(installCmd) installCmd.scrollIntoView({behavior:'smooth'}); });
-  if(ctaGhost)    ctaGhost.addEventListener('click',    function(){ window.open('https://github.com/gregdigittal/depthfusion','_blank'); });
-})();
-
-// ── TECH ARCH — PIPELINE ──
-(function(){
-  var wrap = document.getElementById('pipeline-wrap');
-  if(!wrap) return;
-  var stages = [
-    {label:'User Query',    color:'#7c3aed', ann:''},
-    {label:'BM25 Lexical',  color:'#06b6d4', ann:'w=0.18'},
-    {label:'Vector Search', color:'#10b981', ann:'MiniLM-L6-v2'},
-    {label:'RRF Fusion',    color:'#f59e0b', ann:'k=60'},
-    {label:'CognitiveScorer',color:'#8b5cf6', ann:'8 dims'},
-    {label:'Haiku Reranker',color:'#22d3ee', ann:'optional'},
-    {label:'Top-K Returned',color:'#10b981', ann:'≤1.5s p95'},
-  ];
-  var row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;justify-content:center;';
-  stages.forEach(function(s, i) {
-    var pill = document.createElement('div');
-    pill.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:.15rem;';
-    var box = document.createElement('div');
-    box.style.cssText = 'background:'+s.color+'22;border:1px solid '+s.color+'55;border-radius:24px;padding:.45rem .9rem;text-align:center;';
-    var name = document.createElement('span');
-    name.style.cssText = 'display:block;font-size:.82rem;font-weight:600;color:'+s.color+';white-space:nowrap;';
-    name.textContent = s.label;
-    box.appendChild(name);
-    if(s.ann) {
-      var ann = document.createElement('span');
-      ann.style.cssText = 'display:block;font-size:.68rem;color:var(--muted);';
-      ann.textContent = s.ann;
-      box.appendChild(ann);
-    }
-    pill.appendChild(box);
-    row.appendChild(pill);
-    if(i < stages.length - 1) {
-      var arrow = document.createElement('div');
-      arrow.style.cssText = 'color:var(--muted);font-size:1.1rem;flex-shrink:0;';
-      arrow.textContent = '→';
-      row.appendChild(arrow);
-    }
-  });
-  wrap.appendChild(row);
-})();
-
-// ── TECH ARCH — COGNITIVE SCORER CHART ──
-(function(){
-  var c = document.getElementById('cog-chart');
-  if(!c) return;
-  var ctx2 = c.getContext('2d');
-  var W = c.width, H = c.height;
-  var components = [
-    {name:'semantic',        weight:0.25, color:'#7c3aed'},
-    {name:'lexical',         weight:0.18, color:'#06b6d4'},
-    {name:'confidence',      weight:0.15, color:'#10b981'},
-    {name:'regime',          weight:0.12, color:'#f59e0b'},
-    {name:'graph',           weight:0.10, color:'#8b5cf6'},
-    {name:'recency',         weight:0.08, color:'#22d3ee'},
-    {name:'hist_usefulness', weight:0.07, color:'#fb923c'},
-    {name:'workflow',        weight:0.05, color:'#f43f5e'},
-  ];
-  var padL = 148, padR = 72, padT = 18, padB = 18;
-  var chartW = W - padL - padR;
-  var barH = 26, gap = 7;
-  var totalH = components.length * (barH + gap) - gap;
-  var offsetY = padT + (H - padT - padB - totalH) / 2;
-  var animP = 0;
-
-  function drawCog(p) {
-    ctx2.clearRect(0, 0, W, H);
-    components.forEach(function(comp, i) {
-      var y = offsetY + i * (barH + gap);
-      var maxW = chartW * (comp.weight / 0.25);
-      var fillW = maxW * p;
-      ctx2.font = '13px system-ui,sans-serif';
-      ctx2.fillStyle = 'rgba(241,245,249,0.6)';
-      ctx2.textAlign = 'right';
-      ctx2.fillText(comp.name, padL - 10, y + barH / 2 + 5);
-      ctx2.fillStyle = 'rgba(30,41,59,0.5)';
-      ctx2.beginPath();
-      ctx2.roundRect(padL, y, chartW, barH, 4);
-      ctx2.fill();
-      if(fillW > 0) {
-        ctx2.fillStyle = comp.color + 'cc';
-        ctx2.beginPath();
-        ctx2.roundRect(padL, y, fillW, barH, 4);
-        ctx2.fill();
-      }
-      if(p > 0.55) {
-        ctx2.font = '12px system-ui,sans-serif';
-        ctx2.fillStyle = 'rgba(241,245,249,0.85)';
-        ctx2.textAlign = 'left';
-        ctx2.fillText(Math.round(comp.weight * 100) + '%', padL + maxW + 6, y + barH / 2 + 5);
-      }
-    });
+    requestAnimationFrame(frame);
   }
+  frame();
+})();
 
-  drawCog(0);
-
-  function animCog() {
-    animP = Math.min(1, animP + 0.038);
-    drawCog(animP);
-    if(animP < 1) requestAnimationFrame(animCog);
+// ═══════════════════════════════════════════
+// DEMO STATE MACHINE
+// ═══════════════════════════════════════════
+var SCENARIOS=[
+  {
+    title:'Session Start',
+    stages:[
+      {icon:'🔍',name:'BM25 Search',detail:'keyword index'},
+      {icon:'🎯',name:'Haiku Rerank',detail:'semantic score'},
+      {icon:'📦',name:'ContextRouter',detail:'pack & trim'},
+      {icon:'✅',name:'Injected',detail:'session ready'}
+    ],
+    steps:[
+      {
+        term:['$ df-recall --session-start','  Searching 203 memory entries…'],
+        chat:[{t:'sys',m:'DepthFusion recall pipeline initializing'}],
+        pipe:-1,
+        graph:{nodes:[{id:'proj',x:210,y:100,r:24,color:'#7c3aed',label:'depthfusion'}],edges:[]}
+      },
+      {
+        term:['$ df-recall --session-start','  Searching 203 memory entries…','  BM25: 12 candidate memories found'],
+        chat:[{t:'sys',m:'DepthFusion recall pipeline initializing'},{t:'sys',m:'BM25 index scanned ✓ — 12 candidates'}],
+        pipe:0,
+        graph:{
+          nodes:[
+            {id:'proj',x:210,y:100,r:24,color:'#7c3aed',label:'depthfusion'},
+            {id:'m1',x:340,y:50,r:14,color:'#06b6d4',label:'S-70'},
+            {id:'m2',x:350,y:150,r:12,color:'#06b6d4',label:'recall arch'},
+            {id:'m3',x:85,y:55,r:11,color:'#475569',label:'E-26'},
+            {id:'m4',x:75,y:148,r:10,color:'#475569',label:'feedback'}
+          ],
+          edges:[{f:'proj',t:'m1'},{f:'proj',t:'m2'},{f:'proj',t:'m3',dim:true},{f:'proj',t:'m4',dim:true}]
+        }
+      },
+      {
+        term:['$ df-recall --session-start','  Searching 203 memory entries…','  BM25: 12 candidates found','  Haiku reranker scoring…','  Top-5 selected (score ≥ 0.72)'],
+        chat:[{t:'sys',m:'BM25 index scanned ✓ — 12 candidates'},{t:'sys',m:'Haiku reranker: top-5 memories selected ✓'}],
+        pipe:1,
+        graph:{
+          nodes:[
+            {id:'proj',x:210,y:100,r:24,color:'#7c3aed',label:'depthfusion'},
+            {id:'m1',x:340,y:50,r:18,color:'#10b981',label:'S-70 ★'},
+            {id:'m2',x:350,y:150,r:16,color:'#10b981',label:'recall arch'},
+            {id:'m3',x:85,y:55,r:9,color:'#334155',label:'E-26',dim:true},
+            {id:'m4',x:75,y:148,r:8,color:'#334155',label:'feedback',dim:true}
+          ],
+          edges:[{f:'proj',t:'m1'},{f:'proj',t:'m2'},{f:'proj',t:'m3',dim:true},{f:'proj',t:'m4',dim:true}]
+        }
+      },
+      {
+        term:['$ df-recall --session-start','  BM25: 12 candidates found','  Haiku reranker: top-5 selected','  Context packed: 2,847 tokens','  Session ready ✓'],
+        chat:[
+          {t:'sys',m:'Haiku reranker: top-5 memories selected ✓'},
+          {t:'sys',m:'Context injected — 2,847 tokens ✓'},
+          {t:'user',m:'What was the decision on the recall scoring formula?'},
+          {t:'claude',m:'You chose max(confidence) over mean — one high-signal memory outweighs a weak average. Rationale documented in S-70.'}
+        ],
+        pipe:4,
+        graph:{
+          nodes:[
+            {id:'proj',x:210,y:100,r:24,color:'#7c3aed',label:'depthfusion'},
+            {id:'m1',x:340,y:50,r:18,color:'#10b981',label:'S-70 ★'},
+            {id:'m2',x:350,y:150,r:16,color:'#10b981',label:'recall arch'},
+            {id:'ctx',x:210,y:22,r:14,color:'#f59e0b',label:'context'}
+          ],
+          edges:[{f:'proj',t:'m1'},{f:'proj',t:'m2'},{f:'m1',t:'ctx'},{f:'m2',t:'ctx'}]
+        }
+      }
+    ]
+  },
+  {
+    title:'Mid-session Compact',
+    stages:[
+      {icon:'📊',name:'Usage Check',detail:'87% full'},
+      {icon:'🗜',name:'Compressor',detail:'extract facts'},
+      {icon:'💾',name:'MemoryStore',detail:'write entries'},
+      {icon:'♻',name:'Context freed',detail:'34% reduction'}
+    ],
+    steps:[
+      {
+        term:['$ df-status','  Context: 87% full (174k / 200k tokens)','  Threshold exceeded — compacting…'],
+        chat:[{t:'sys',m:'⚠️ Context threshold reached (87%)'}],
+        pipe:-1,
+        graph:{
+          nodes:[
+            {id:'sess',x:210,y:100,r:32,color:'#ef4444',label:'session'},
+            {id:'t1',x:90,y:55,r:8,color:'#475569',label:''},{id:'t2',x:80,y:145,r:8,color:'#475569',label:''},
+            {id:'t3',x:330,y:48,r:8,color:'#475569',label:''},{id:'t4',x:335,y:152,r:8,color:'#475569',label:''}
+          ],
+          edges:[{f:'sess',t:'t1'},{f:'sess',t:'t2'},{f:'sess',t:'t3'},{f:'sess',t:'t4'}]
+        }
+      },
+      {
+        term:['$ df-status','  Context: 87% full (174k / 200k tokens)','  SessionCompressor running…','  Extracting: decisions, refs, tasks'],
+        chat:[{t:'sys',m:'⚠️ Context threshold reached (87%)'},{t:'sys',m:'SessionCompressor: extracting salient facts…'}],
+        pipe:1,
+        graph:{
+          nodes:[
+            {id:'sess',x:210,y:100,r:26,color:'#ef4444',label:'session'},
+            {id:'comp',x:210,y:100,r:14,color:'#f59e0b',label:'compress'}
+          ],
+          edges:[]
+        }
+      },
+      {
+        term:['$ df-status','  SessionCompressor running…','  Extracting: decisions, refs, tasks','  Writing 8 new memory entries…'],
+        chat:[
+          {t:'sys',m:'SessionCompressor: extracting salient facts…'},
+          {t:'sys',m:'8 memory entries written to DepthFusion store ✓'},
+          {t:'claude',m:"Compacted. I've preserved your decisions and open tasks. Context freed by 34%."}
+        ],
+        pipe:2,
+        graph:{
+          nodes:[
+            {id:'store',x:210,y:100,r:22,color:'#7c3aed',label:'store'},
+            {id:'d1',x:330,y:52,r:14,color:'#10b981',label:'decision'},
+            {id:'d2',x:90,y:52,r:14,color:'#10b981',label:'tasks'},
+            {id:'d3',x:335,y:150,r:12,color:'#10b981',label:'code ref'},
+            {id:'d4',x:85,y:150,r:12,color:'#10b981',label:'context'}
+          ],
+          edges:[{f:'store',t:'d1'},{f:'store',t:'d2'},{f:'store',t:'d3'},{f:'store',t:'d4'}]
+        }
+      },
+      {
+        term:['$ df-status','  8 entries written to store','  Context freed: 34% reduction ✓','  Continuing session normally'],
+        chat:[
+          {t:'sys',m:'8 memory entries written ✓'},
+          {t:'claude',m:'Compacted. Continuing with full context of your decisions.'},
+          {t:'user',m:"Good. Let's refactor the GraphTraversal module."},
+          {t:'claude',m:'On it — picking up from the traversal depth limit issue we noted earlier.'}
+        ],
+        pipe:4,
+        graph:{
+          nodes:[
+            {id:'store',x:210,y:100,r:22,color:'#7c3aed',label:'store'},
+            {id:'d1',x:330,y:52,r:14,color:'#10b981',label:'decision'},
+            {id:'d2',x:90,y:52,r:14,color:'#10b981',label:'tasks'},
+            {id:'d3',x:335,y:150,r:12,color:'#10b981',label:'code ref'},
+            {id:'d4',x:85,y:150,r:12,color:'#10b981',label:'context'},
+            {id:'free',x:210,y:22,r:12,color:'#06b6d4',label:'53k freed'}
+          ],
+          edges:[{f:'store',t:'d1'},{f:'store',t:'d2'},{f:'store',t:'d3'},{f:'store',t:'d4'},{f:'store',t:'free'}]
+        }
+      }
+    ]
+  },
+  {
+    title:'Cross-project Recall',
+    stages:[
+      {icon:'🌐',name:'CrossProjectIndex',detail:'4 projects'},
+      {icon:'🔗',name:'Graph Traverse',detail:'follow edges'},
+      {icon:'🎯',name:'Ranked Results',detail:'score 0.91'},
+      {icon:'✅',name:'Cross-linked',detail:'context merged'}
+    ],
+    steps:[
+      {
+        term:['$ df-recall --cross-project --query "JWT refresh"','  Scanning 4 registered projects…'],
+        chat:[{t:'user',m:'How did we handle JWT refresh in the social-media-agent project?'}],
+        pipe:-1,
+        graph:{
+          nodes:[
+            {id:'df',x:110,y:100,r:20,color:'#7c3aed',label:'depthfusion'},
+            {id:'sma',x:310,y:100,r:20,color:'#475569',label:'social-media'}
+          ],
+          edges:[{f:'df',t:'sma',dim:true}]
+        }
+      },
+      {
+        term:['$ df-recall --cross-project --query "JWT refresh"','  Scanning 4 registered projects…','  CrossProjectIndex: searching social-media-agent…','  Found 3 relevant memories (score > 0.65)'],
+        chat:[
+          {t:'user',m:'How did we handle JWT refresh in the social-media-agent project?'},
+          {t:'sys',m:'CrossProjectIndex: 3 matches in social-media-agent ✓'}
+        ],
+        pipe:0,
+        graph:{
+          nodes:[
+            {id:'df',x:110,y:100,r:20,color:'#7c3aed',label:'depthfusion'},
+            {id:'sma',x:310,y:100,r:20,color:'#06b6d4',label:'social-media'},
+            {id:'jwt',x:385,y:52,r:14,color:'#10b981',label:'JWT flow'},
+            {id:'pub',x:385,y:150,r:12,color:'#10b981',label:'publisher.ts'}
+          ],
+          edges:[{f:'df',t:'sma'},{f:'sma',t:'jwt'},{f:'sma',t:'pub'}]
+        }
+      },
+      {
+        term:['$ df-recall --cross-project --query "JWT refresh"','  Top match: S-23 JWT refresh (score: 0.91)','  Graph traversal: 2 hops'],
+        chat:[
+          {t:'user',m:'How did we handle JWT refresh in the social-media-agent project?'},
+          {t:'sys',m:'Top match: S-23 — score 0.91 ✓'},
+          {t:'claude',m:'In social-media-agent: session-scoped token refresh, 15 min expiry. Logic in src/services/publisher.ts inside callMcpTool().'}
+        ],
+        pipe:2,
+        graph:{
+          nodes:[
+            {id:'df',x:110,y:100,r:20,color:'#7c3aed',label:'depthfusion'},
+            {id:'sma',x:310,y:100,r:20,color:'#06b6d4',label:'social-media'},
+            {id:'jwt',x:390,y:50,r:16,color:'#10b981',label:'JWT ★'},
+            {id:'pub',x:390,y:152,r:14,color:'#10b981',label:'publisher'},
+            {id:'bridge',x:210,y:100,r:10,color:'#f59e0b',label:''}
+          ],
+          edges:[{f:'df',t:'bridge'},{f:'bridge',t:'sma'},{f:'sma',t:'jwt'},{f:'sma',t:'pub'},{f:'jwt',t:'df'}]
+        }
+      },
+      {
+        term:['$ df-recall --cross-project','  S-23 JWT refresh (score: 0.91) → linked','  Cross-project context merged ✓','  Continuity score: 94%'],
+        chat:[
+          {t:'sys',m:'Cross-project context merged ✓ — continuity 94%'},
+          {t:'claude',m:'In social-media-agent: session-scoped, 15 min TTL, per-call init in publisher.ts.'},
+          {t:'user',m:'Use the same pattern here.'},
+          {t:'claude',m:"Adapting the session-scoped token pattern to depthfusion's MCP client now."}
+        ],
+        pipe:4,
+        graph:{
+          nodes:[
+            {id:'df',x:110,y:100,r:20,color:'#7c3aed',label:'depthfusion'},
+            {id:'sma',x:310,y:100,r:20,color:'#06b6d4',label:'social-media'},
+            {id:'jwt',x:390,y:50,r:16,color:'#10b981',label:'JWT ★'},
+            {id:'pub',x:390,y:152,r:14,color:'#10b981',label:'publisher'},
+            {id:'new',x:45,y:50,r:14,color:'#8b5cf6',label:'new impl'},
+            {id:'score',x:40,y:155,r:10,color:'#f59e0b',label:'94%'}
+          ],
+          edges:[{f:'df',t:'sma'},{f:'sma',t:'jwt'},{f:'sma',t:'pub'},{f:'jwt',t:'df'},{f:'df',t:'new'},{f:'df',t:'score'}]
+        }
+      }
+    ]
   }
+];
 
-  var cogObs = new IntersectionObserver(function(entries) {
-    entries.forEach(function(e) {
-      if(e.isIntersecting) { requestAnimationFrame(animCog); cogObs.disconnect(); }
-    });
-  }, {threshold: 0.25});
-  cogObs.observe(c);
-})();
+var sc=0, step=-1;
+var termEl=document.getElementById('terminal-area');
+var chatEl=document.getElementById('chat-area');
+var pipEl=document.getElementById('pip-stages');
+var svgEl=document.getElementById('kg-svg');
+var nextBtn=document.getElementById('next-btn');
+var counterEl=document.getElementById('step-counter');
 
-// ── TECH ARCH — MEMORY TYPES ──
-(function(){
-  var grid = document.getElementById('mem-type-grid');
-  if(!grid) return;
-  var types = [
-    {name:'decision',    color:'#7c3aed', desc:'Architectural choices, technology selections, design patterns adopted'},
-    {name:'semantic',    color:'#06b6d4', desc:'Facts about the codebase, APIs, data models, and system topology'},
-    {name:'operational', color:'#10b981', desc:'Commands, workflows, scripts, and procedural knowledge'},
-    {name:'procedural',  color:'#8b5cf6', desc:'Step-by-step processes, runbooks, and repeatable sequences'},
-    {name:'episodic',    color:'#f59e0b', desc:'Specific past sessions, time-anchored events and experiences'},
-    {name:'social',      color:'#22d3ee', desc:'Team conventions, stakeholder preferences, communication patterns'},
-    {name:'temporal',    color:'#f43f5e', desc:'Time-sensitive facts, deadlines, and schedule-aware context'},
-  ];
-  types.forEach(function(t) {
-    var card = document.createElement('div');
-    card.style.cssText = 'background:'+t.color+'11;border:1px solid '+t.color+'33;border-radius:12px;padding:1rem;';
-    var badge = document.createElement('div');
-    badge.style.cssText = 'display:inline-block;background:'+t.color+'22;color:'+t.color+';font-size:.72rem;font-weight:700;letter-spacing:.06em;padding:.2rem .65rem;border-radius:9999px;text-transform:uppercase;margin-bottom:.55rem;';
-    badge.textContent = t.name;
-    var desc = document.createElement('p');
-    desc.style.cssText = 'font-size:.8rem;color:rgba(241,245,249,0.55);margin:0;line-height:1.5;';
-    desc.textContent = t.desc;
-    card.appendChild(badge);
-    card.appendChild(desc);
-    grid.appendChild(card);
-  });
-})();
+function clearEl(el){while(el.firstChild)el.removeChild(el.firstChild);}
 
-// ── TECH ARCH — DATA FLOW TIMELINE ──
-(function(){
-  var wrap = document.getElementById('flow-timeline');
-  if(!wrap) return;
-  var steps = [
-    {icon:'⏹', label:'Session ends',         desc:'PostCompact or Stop hook fires automatically'},
-    {icon:'🔧', label:'Extractor runs',       desc:'HeuristicExtractor or HaikuSummarizer processes the session transcript'},
-    {icon:'💾', label:'Indexed',              desc:'BM25 tokens + sentence-transformer embeddings stored in SQLite WAL'},
-    {icon:'📁', label:'Discovery written',    desc:'Markdown + YAML frontmatter saved to ~/.claude/shared/discoveries/'},
-    {icon:'🌐', label:'Available everywhere', desc:'All future sessions, any account, any client — via MCP or hook'},
-  ];
-  steps.forEach(function(s, i) {
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:flex-start;gap:.85rem;';
-    var left = document.createElement('div');
-    left.style.cssText = 'display:flex;flex-direction:column;align-items:center;flex-shrink:0;';
-    var dot = document.createElement('div');
-    dot.style.cssText = 'width:36px;height:36px;border-radius:50%;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;';
-    dot.textContent = s.icon;
-    left.appendChild(dot);
-    if(i < steps.length - 1) {
-      var line = document.createElement('div');
-      line.style.cssText = 'width:1px;height:28px;background:rgba(124,58,237,0.2);margin-top:3px;';
-      left.appendChild(line);
+function loadScenario(idx){
+  sc=idx; step=-1;
+  clearEl(termEl); clearEl(chatEl); clearEl(pipEl); clearEl(svgEl);
+  counterEl.textContent='Step 0 / '+SCENARIOS[sc].steps.length;
+  document.querySelectorAll('.scenario-tab').forEach(function(b){b.classList.toggle('active',parseInt(b.dataset.s)===sc);});
+  nextBtn.textContent='Start →';
+  renderPipe(-1);
+}
+
+function advance(){
+  var scenario=SCENARIOS[sc];
+  if(step>=scenario.steps.length-1){loadScenario((sc+1)%SCENARIOS.length);return;}
+  step++;
+  var s=scenario.steps[step];
+  counterEl.textContent='Step '+(step+1)+' / '+scenario.steps.length;
+  nextBtn.textContent=step<scenario.steps.length-1?'Next step →':'Next scenario ↻';
+  renderTerm(s.term);
+  renderChat(s.chat);
+  renderPipe(s.pipe);
+  renderGraph(s.graph);
+}
+
+function renderTerm(lines){
+  clearEl(termEl);
+  lines.forEach(function(line){
+    var row=document.createElement('div');
+    if(line.charAt(0)==='$'){
+      row.className='term-row';
+      var pr=document.createElement('span'); pr.className='term-prompt'; pr.textContent='$ '; row.appendChild(pr);
+      var cm=document.createElement('span'); cm.className='term-cmd'; cm.textContent=line.slice(2); row.appendChild(cm);
+    } else {
+      row.className='term-row term-out'; row.textContent=line;
     }
-    var right = document.createElement('div');
-    right.style.cssText = 'padding-top:.35rem;';
-    var lbl = document.createElement('div');
-    lbl.style.cssText = 'font-weight:600;font-size:.9rem;color:rgba(241,245,249,0.9);';
-    lbl.textContent = s.label;
-    var ddesc = document.createElement('div');
-    ddesc.style.cssText = 'font-size:.78rem;color:var(--muted);margin-top:.1rem;margin-bottom:.55rem;';
-    ddesc.textContent = s.desc;
-    right.appendChild(lbl);
-    right.appendChild(ddesc);
-    row.appendChild(left);
-    row.appendChild(right);
-    wrap.appendChild(row);
+    termEl.appendChild(row);
   });
-})();
+}
 
-// ── TECH ARCH — STORAGE TABLE ──
-(function(){
-  var wrap = document.getElementById('storage-table-wrap');
-  if(!wrap) return;
-  var rows = [
-    {layer:'Memory store',   tech:'SQLite WAL',                  path:'~/.claude/.depthfusion_memories.db'},
-    {layer:'Working memory', tech:'SQLite WAL',                  path:'~/.claude/.depthfusion_working_memory.db'},
-    {layer:'Event log',      tech:'JSONL (fcntl-safe)',          path:'~/.claude/shared/depthfusion-events.jsonl'},
-    {layer:'Discoveries',    tech:'Markdown + YAML frontmatter', path:'~/.claude/shared/discoveries/'},
-    {layer:'Context bus',    tech:'File-backed queue',           path:'~/.claude/context-bus/'},
-  ];
-  var table = document.createElement('table');
-  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:.85rem;max-width:860px;margin:0 auto;';
-  var thead = document.createElement('thead');
-  var hrow = document.createElement('tr');
-  ['Layer', 'Technology', 'Path'].forEach(function(h) {
-    var th = document.createElement('th');
-    th.style.cssText = 'text-align:left;padding:.6rem 1rem;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(124,58,237,0.25);';
-    th.textContent = h;
-    hrow.appendChild(th);
+function renderChat(messages){
+  clearEl(chatEl);
+  messages.forEach(function(msg){
+    var row=document.createElement('div');
+    if(msg.t==='sys'){
+      row.className='chat-sys'; row.textContent=msg.m;
+    } else if(msg.t==='user'){
+      row.className='chat-msg chat-user';
+      var av=document.createElement('div'); av.className='chat-avatar user-av'; av.textContent='G';
+      var b=document.createElement('div'); b.className='chat-bubble user-bubble'; b.textContent=msg.m;
+      row.appendChild(av); row.appendChild(b);
+    } else {
+      row.className='chat-msg';
+      var av=document.createElement('div'); av.className='chat-avatar claude-av'; av.textContent='⬡';
+      var b=document.createElement('div'); b.className='chat-bubble claude-bubble'; b.textContent=msg.m;
+      row.appendChild(av); row.appendChild(b);
+    }
+    chatEl.appendChild(row);
   });
-  thead.appendChild(hrow);
-  table.appendChild(thead);
-  var tbody = document.createElement('tbody');
-  rows.forEach(function(r, i) {
-    var tr = document.createElement('tr');
-    tr.style.background = i % 2 === 0 ? 'rgba(30,41,59,0.25)' : 'transparent';
-    [r.layer, r.tech, r.path].forEach(function(val, ci) {
-      var td = document.createElement('td');
-      td.style.cssText = 'padding:.6rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);';
-      if(ci === 0) { td.style.fontWeight = '600'; td.style.color = 'rgba(241,245,249,0.9)'; }
-      else if(ci === 2) { td.style.fontFamily = 'monospace'; td.style.fontSize = '.78rem'; td.style.color = '#06b6d4'; }
-      else { td.style.color = 'rgba(241,245,249,0.6)'; }
-      td.textContent = val;
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-})();
+  chatEl.scrollTop=chatEl.scrollHeight;
+}
 
-// ── SCROLL REVEAL ──
-(function(){
-  var els=document.querySelectorAll('.reveal');
-  var io=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}});
-  },{threshold:.08});
-  els.forEach(function(el){io.observe(el);});
-})();
+function renderPipe(activeIdx){
+  clearEl(pipEl);
+  var stages=SCENARIOS[sc].stages;
+  stages.forEach(function(stage,i){
+    var div=document.createElement('div');
+    var cls='pip-stage';
+    if(activeIdx===4||(activeIdx!==-1&&i<activeIdx)) cls+=' pip-done';
+    else if(i===activeIdx) cls+=' pip-active';
+    div.className=cls;
+    var ic=document.createElement('span'); ic.className='pip-icon'; ic.textContent=stage.icon; div.appendChild(ic);
+    var nm=document.createElement('span'); nm.className='pip-name'; nm.textContent=stage.name; div.appendChild(nm);
+    var dt=document.createElement('span'); dt.className='pip-detail'; dt.textContent=stage.detail; div.appendChild(dt);
+    pipEl.appendChild(div);
+    if(i<stages.length-1){var ar=document.createElement('div');ar.className='pip-arrow';ar.textContent='→';pipEl.appendChild(ar);}
+  });
+}
+
+function renderGraph(gdata){
+  clearEl(svgEl);
+  var ns='http://www.w3.org/2000/svg';
+  var defs=document.createElementNS(ns,'defs');
+  var marker=document.createElementNS(ns,'marker');
+  marker.setAttribute('id','arr'); marker.setAttribute('markerWidth','6'); marker.setAttribute('markerHeight','6');
+  marker.setAttribute('refX','5'); marker.setAttribute('refY','3'); marker.setAttribute('orient','auto');
+  var mp=document.createElementNS(ns,'path'); mp.setAttribute('d','M0,0 L0,6 L6,3 z'); mp.setAttribute('fill','rgba(100,116,139,0.5)');
+  marker.appendChild(mp); defs.appendChild(marker); svgEl.appendChild(defs);
+
+  var nodeMap={};
+  gdata.nodes.forEach(function(n){nodeMap[n.id]=n;});
+
+  gdata.edges.forEach(function(e){
+    var from=nodeMap[e.f], to=nodeMap[e.t];
+    if(!from||!to)return;
+    var line=document.createElementNS(ns,'line');
+    line.setAttribute('x1',from.x); line.setAttribute('y1',from.y);
+    line.setAttribute('x2',to.x); line.setAttribute('y2',to.y);
+    line.setAttribute('stroke',e.dim?'rgba(100,116,139,0.15)':'rgba(100,116,139,0.45)');
+    line.setAttribute('stroke-width',e.dim?'1':'1.5');
+    if(e.dash) line.setAttribute('stroke-dasharray','4 3');
+    line.setAttribute('marker-end','url(#arr)');
+    svgEl.appendChild(line);
+  });
+
+  gdata.nodes.forEach(function(n,i){
+    var g=document.createElementNS(ns,'g');
+    g.setAttribute('style','animation:nodeIn 0.35s ease '+(i*0.07)+'s both');
+    var circle=document.createElementNS(ns,'circle');
+    circle.setAttribute('cx',n.x); circle.setAttribute('cy',n.y); circle.setAttribute('r',n.r);
+    circle.setAttribute('fill',n.dim?'rgba(71,85,105,0.3)':n.color);
+    circle.setAttribute('fill-opacity',n.dim?'0.4':'0.88');
+    if(!n.dim) circle.setAttribute('filter','drop-shadow(0 0 '+(n.r*0.45)+'px '+n.color+')');
+    g.appendChild(circle);
+    if(n.label){
+      var txt=document.createElementNS(ns,'text');
+      txt.setAttribute('x',n.x); txt.setAttribute('y',n.y+n.r+11);
+      txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-size','9');
+      txt.setAttribute('fill',n.dim?'#475569':'#e2e8f0'); txt.setAttribute('font-family','monospace');
+      txt.textContent=n.label;
+      g.appendChild(txt);
+    }
+    svgEl.appendChild(g);
+  });
+}
+
+loadScenario(0);
+nextBtn.addEventListener('click',advance);
+document.querySelectorAll('.scenario-tab').forEach(function(b){
+  b.addEventListener('click',function(){loadScenario(parseInt(b.dataset.s));});
+});
+document.getElementById('hero-demo-btn').addEventListener('click',function(){
+  document.getElementById('demo').scrollIntoView({behavior:'smooth',block:'start'});
+});
 </script>
 </body>
 </html>

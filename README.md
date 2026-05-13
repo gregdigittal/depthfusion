@@ -38,7 +38,7 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 ## Architecture
 
 ```
-Install mode: DEPTHFUSION_MODE=local | vps-cpu | vps-gpu
+Install mode: DEPTHFUSION_MODE=local | vps-cpu | vps-gpu | mac-mlx
 
 local mode (laptop, zero API cost):
   query → BM25 (top-k) → results
@@ -53,6 +53,12 @@ vps-gpu mode (CUDA host, on-box Gemma via vLLM):
   LLM capabilities (extract / summarise / link / decision_extractor)
   route to on-box Gemma; embeddings route to local sentence-transformers.
   Haiku fallback via FallbackChain when DEPTHFUSION_API_KEY is set.
+
+mac-mlx mode (Apple Silicon, unified memory):
+  query → BM25 (top-10) + local embeddings → RRF fusion → Gemma/Qwen reranker → top-k
+  Uses mlx_lm.server (OpenAI-compatible) on port 8000.
+  Same quality chain as vps-gpu; haiku fallback when mlx_lm.server is not running.
+  Model options: gemma-3-12b (~7 GB), Qwen2.5-14B (~9 GB), Qwen2.5-32B (~20 GB).
 
 Auto-capture (vps-cpu / vps-gpu):
   PreCompact hook  → snapshot active state
@@ -128,6 +134,7 @@ DepthFusion has three install modes. Pick the one matching your target:
 | `local` | Laptop, zero API deps | Heuristics + BM25 only | `[local]` | inline below |
 | `vps-cpu` | Cloud VPS, no GPU | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
+| `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
@@ -142,6 +149,7 @@ The two quickstart guides are the canonical, fully-tested install procedures for
 - A working `~/.claude/` directory (Claude Code installed and run at least once)
 - For vps-cpu: `ANTHROPIC_API_KEY` available to set as `DEPTHFUSION_API_KEY` (separate variable)
 - For vps-gpu: CUDA 12.x + ≥ 20 GB VRAM + `nvidia-smi` on PATH
+- For mac-mlx: Apple Silicon Mac (M1 or later), macOS 13+, arm64 Python
 
 ### Clone & install
 
@@ -164,7 +172,8 @@ pip install -e '.[local]'
 python3 -m depthfusion.install.install --mode=local
 
 # Register with Claude Code (user scope = available in every project)
-claude mcp add depthfusion --scope user -- python3 -m depthfusion.mcp.server
+# If re-registering after reinstall: claude mcp remove depthfusion -s user
+claude mcp add depthfusion -s user ~/projects/depthfusion/scripts/mcp-server.sh
 
 # Verify
 claude mcp list | grep depthfusion         # should show "✓ Connected"
@@ -406,7 +415,7 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 
 | Env Var | Controls | Default |
 |---|---|---|
-| `DEPTHFUSION_MODE` | `local` / `vps-cpu` / `vps-gpu` | `local` |
+| `DEPTHFUSION_MODE` | `local` / `vps-cpu` / `vps-gpu` / `mac-mlx` | `local` |
 | `DEPTHFUSION_API_KEY` | API key for Haiku features (use **instead of** `ANTHROPIC_API_KEY`) | — |
 | `DEPTHFUSION_TIER_THRESHOLD` | Session count for Tier 2 promotion | `500` |
 | `DEPTHFUSION_TIER_AUTOPROMOTE` | Auto-promote on threshold crossing | `true` (vps) |
@@ -479,6 +488,7 @@ The `tests/conftest.py` autouse fixture redirects bare `MetricsCollector()` call
 - `chromadb` ≥ 0.4 — `[vps-cpu]` and `[vps-gpu]` extras; required for Tier 2 vector retrieval
 - `sentence-transformers` ≥ 2.2 — `[vps-gpu]` extra; local embeddings
 - `fastapi` + `uvicorn` — `[vps-cpu]` and `[vps-gpu]` extras; required for `DEPTHFUSION_REST_API`
+- `mlx-lm` ≥ 0.18 — `[mac-mlx]` extra; Apple Silicon LLM inference via mlx_lm.server
 - `vllm` — `[vps-gpu]`-adjacent; installed separately via the vps-gpu quickstart (see runbook)
 - `rlm` — optional; install from source for recursive LLM support
 
@@ -486,6 +496,7 @@ The `tests/conftest.py` autouse fixture redirects bare `MetricsCollector()` call
 pip install -e '.[local]'     # Laptop, zero external deps
 pip install -e '.[vps-cpu]'   # Cloud VPS, Haiku API + FastAPI REST
 pip install -e '.[vps-gpu]'   # CUDA host, local Gemma + embeddings + FastAPI REST
+pip install -e '.[mac-mlx]'   # Apple Silicon, local GPU inference (arm64 macOS only)
 ```
 
 The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S-57). Use the three-mode extras above.
