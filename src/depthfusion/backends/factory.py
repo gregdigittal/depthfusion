@@ -69,6 +69,15 @@ _QUALITY_CHAINS: dict[tuple[str, str], list[str]] = {
     ("vps-gpu", "summariser"):         ["gemma", "haiku", "null"],
     ("vps-gpu", "embedding"):          ["local", "null"],
     ("vps-gpu", "decision_extractor"): ["gemma", "haiku", "null"],
+    # mac-mlx: Apple Silicon GPU via mlx_lm.server (OpenAI-compatible endpoint).
+    # GemmaBackend talks to it identically to vLLM — only the server process
+    # differs. haiku is the fallback when mlx_lm.server is not running.
+    ("mac-mlx", "reranker"):           ["gemma", "haiku", "null"],
+    ("mac-mlx", "extractor"):          ["gemma", "haiku", "null"],
+    ("mac-mlx", "linker"):             ["gemma", "haiku", "null"],
+    ("mac-mlx", "summariser"):         ["gemma", "haiku", "null"],
+    ("mac-mlx", "embedding"):          ["local", "null"],
+    ("mac-mlx", "decision_extractor"): ["gemma", "haiku", "null"],
 }
 
 # v0.5 compatibility alias: the legacy single "vps" mode maps to vps-cpu.
@@ -201,7 +210,9 @@ def _try_construct(name: str, capability: str) -> LLMBackend | None:
     known = {"null", "haiku", "gemma", "local"}
     raise ValueError(
         f"Unknown backend: {name!r} for capability {capability!r}. "
-        f"Known backends: {sorted(known)}"
+        f"Known backends: {sorted(known)}. "
+        f"(If you see 'mac-mlx' here, the mode is correct but the chain "
+        f"entry is missing — check _QUALITY_CHAINS in factory.py.)"
     )
 
 

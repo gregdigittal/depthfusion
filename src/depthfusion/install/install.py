@@ -29,7 +29,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from depthfusion.install.gpu_probe import detect_gpu
+from depthfusion.install.gpu_probe import (
+    detect_apple_silicon,
+    detect_gpu,
+    recommended_mlx_models,
+)
 
 
 def _hooks_dir() -> Path:
@@ -73,7 +77,21 @@ _VPS_GPU_ENV_LINES = [
     "DEPTHFUSION_EMBEDDING_BACKEND=local",
 ]
 
-# Keys that the installer owns across all three modes. When merging with an
+# mac-mlx: Apple Silicon GPU via mlx_lm.server (OpenAI-compatible, same
+# interface as vLLM). GEMMA_URL and GEMMA_MODEL are set by install_mac_mlx()
+# after detecting available unified memory — the defaults below are overridden.
+_MAC_MLX_ENV_LINES = [
+    "DEPTHFUSION_MODE=mac-mlx",
+    "DEPTHFUSION_TIER_AUTOPROMOTE=true",
+    "DEPTHFUSION_RERANKER_ENABLED=true",
+    "DEPTHFUSION_GRAPH_ENABLED=true",
+    "DEPTHFUSION_EMBEDDING_BACKEND=local",
+    "DEPTHFUSION_GEMMA_URL=http://127.0.0.1:8000/v1",
+    # DEPTHFUSION_GEMMA_MODEL is appended by install_mac_mlx() with the
+    # RAM-appropriate model ID detected at install time.
+]
+
+# Keys that the installer owns across all modes. When merging with an
 # existing env file, only these keys are ever updated; all others are treated
 # as user-authored and preserved verbatim.  (S-68 AC-2)
 _INSTALLER_MANAGED_KEYS: frozenset[str] = frozenset({
@@ -83,6 +101,8 @@ _INSTALLER_MANAGED_KEYS: frozenset[str] = frozenset({
     "DEPTHFUSION_GRAPH_ENABLED",
     "DEPTHFUSION_EMBEDDING_BACKEND",
     "DEPTHFUSION_TIER_THRESHOLD",
+    "DEPTHFUSION_GEMMA_URL",
+    "DEPTHFUSION_GEMMA_MODEL",
 })
 
 # Substrings that identify documented placeholder API-key values. The
@@ -259,6 +279,95 @@ def install_vps_gpu(
         "(see scripts/vllm-gemma.service for systemd).",
         dry_run,
     )
+    return 0
+
+
+def install_mac_mlx(
+    dry_run: bool = False,
+    tier_threshold: int = 500,
+    skip_silicon_check: bool = False,
+) -> int:
+    """Install the mac-mlx mode for Apple Silicon GPU acceleration.
+
+    Uses mlx_lm.server — an OpenAI-compatible server that runs on the
+    Apple Silicon Metal GPU via the MLX framework. GemmaBackend connects
+    to it identically to vLLM; only the server process differs.
+
+    Model is selected based on detected unified memory to leave adequate
+    headroom for macOS and other applications.
+
+    Returns:
+        0 on success (or dry-run)
+        2 on refusal (not Apple Silicon) — mirrors install_vps_gpu convention
+    """
+    _print_step("Probing for Apple Silicon...", dry_run)
+
+    if not skip_silicon_check:
+        info = detect_apple_silicon()
+        if not info.has_apple_silicon:
+            print("[ERROR] mac-mlx mode requires Apple Silicon (arm64 macOS).")
+            print(f"        Reason: {info.reason}")
+            print("")
+            print("Remediation:")
+            print("  1. This mode is for MacBooks / Mac Studios / Mac Pros with M-series chips.")
+            print("  2. On Linux or Intel Mac, use --mode=vps-gpu (NVIDIA) or --mode=vps-cpu instead.")
+            return 2
+        _print_step(f"  {info.reason}", dry_run)
+    else:
+        info = detect_apple_silicon()  # still probe for model selection even when check skipped
+        _print_step("  (--skip-silicon-check) — Apple Silicon probe bypassed", dry_run)
+
+    # Select model based on available unified memory
+    memory_gb = info.memory_gb if info.has_apple_silicon else 8.0
+    options = recommended_mlx_models(memory_gb)
+    # Default: highest-quality option that fits the detected memory
+    selected_model = options[-1]
+
+    _print_step(
+        f"Configuring DepthFusion for MAC-MLX mode "
+        f"(tier threshold: {tier_threshold})",
+        dry_run,
+    )
+    _print_step("  - BM25 retrieval: enabled", dry_run)
+    _print_step(
+        f"  - MLX backend: {selected_model.description} (recommended for "
+        f"{memory_gb:.0f} GB unified memory)",
+        dry_run,
+    )
+    _print_step("  - LocalEmbeddingBackend: sentence-transformers", dry_run)
+    _print_step(
+        f"  - ChromaDB vector store (Tier 2): enabled at {tier_threshold}+ sessions",
+        dry_run,
+    )
+    _print_step("  - PreCompact + PostCompact auto-capture hooks: enabled", dry_run)
+
+    if not dry_run:
+        env_lines = _MAC_MLX_ENV_LINES.copy()
+        env_lines.append(f"DEPTHFUSION_GEMMA_MODEL={selected_model.model_id}")
+        env_lines.append(f"DEPTHFUSION_TIER_THRESHOLD={tier_threshold}")
+        _write_env_config(env_lines)
+        _register_hooks()
+        _register_mcp_server()
+        _check_mlx_lm_installed()
+        _check_sentence_transformers_installed()
+
+    _print_step("MAC-MLX install complete.", dry_run)
+    _print_step(
+        "To serve the model locally: `bash scripts/mlx-serve.sh` "
+        "(starts mlx_lm.server on port 8000)",
+        dry_run,
+    )
+    _print_step(
+        f"  Default model: {selected_model.model_id}",
+        dry_run,
+    )
+    print("")
+    print("  Available model options for your hardware:")
+    for opt in options:
+        marker = "→" if opt.model_id == selected_model.model_id else " "
+        print(f"  {marker} {opt.description}")
+        print(f"      {opt.model_id}")
+    print("")
     return 0
 
 
@@ -465,6 +574,22 @@ def _check_depthfusion_api_key() -> None:
         )
 
 
+def _check_mlx_lm_installed() -> None:
+    """mac-mlx expects mlx_lm for GPU inference. Warn if absent."""
+    import importlib.util
+    if importlib.util.find_spec("mlx_lm") is None:
+        print(
+            "  Warning: mlx_lm is not installed. "
+            "Install the mac-mlx extras: `pip install -e .[mac-mlx]`"
+        )
+        print(
+            "  Without it, run `bash scripts/mlx-serve.sh` will fail. "
+            "DepthFusion will fall back to the Haiku backend until the server is running."
+        )
+    else:
+        print("  mlx_lm installed — Apple Silicon GPU inference ready.")
+
+
 def _check_sentence_transformers_installed() -> None:
     """vps-gpu expects sentence-transformers for local embeddings. Warn if absent."""
     import importlib.util
@@ -485,21 +610,33 @@ def _check_sentence_transformers_installed() -> None:
 def _recommend_mode_from_gpu() -> tuple[str, str]:
     """Return (recommended_mode, human_reason).
 
-    v0.5.2 S-62 / T-195: called from the interactive path when no
-    `--mode` arg is supplied. Probes the host, picks the mode that
-    matches the detected hardware, and returns both the recommendation
-    and a one-sentence explanation for the banner.
+    Priority order:
+      1. Apple Silicon (mac-mlx) — checked first; an M-series Mac won't
+         have nvidia-smi, so probing NVIDIA first would waste time and
+         always produce a misleading "no GPU" message.
+      2. NVIDIA GPU (vps-gpu)
+      3. API key available (vps-cpu)
+      4. BM25-only fallback (local)
     """
-    info = detect_gpu()
-    if info.has_gpu:
+    # 1. Apple Silicon
+    apple = detect_apple_silicon()
+    if apple.has_apple_silicon:
+        options = recommended_mlx_models(apple.memory_gb)
+        best = options[-1]
+        return "mac-mlx", (
+            f"{apple.reason}. "
+            f"mac-mlx runs {best.description} on the Apple GPU via MLX."
+        )
+
+    # 2. NVIDIA GPU
+    nvidia = detect_gpu()
+    if nvidia.has_gpu:
         return "vps-gpu", (
-            f"NVIDIA GPU detected ({info.gpu_name}, {info.vram_gb} GB VRAM). "
+            f"NVIDIA GPU detected ({nvidia.gpu_name}, {nvidia.vram_gb} GB VRAM). "
             "vps-gpu runs Gemma + local embeddings on-box for lowest latency."
         )
-    # No GPU — the choice between local and vps-cpu depends on whether the
-    # user has a real DEPTHFUSION_API_KEY configured. A placeholder value is
-    # treated as no key: recommending vps-cpu when only a placeholder is set
-    # would produce an install that silently runs in NullBackend mode.
+
+    # 3. API key for Haiku reranker
     key = os.environ.get("DEPTHFUSION_API_KEY")
     if key and not _is_placeholder_key(key):
         return "vps-cpu", (
@@ -512,6 +649,8 @@ def _recommend_mode_from_gpu() -> tuple[str, str]:
             "runs BM25-only until you replace the key with a real one. "
             "Re-run the installer after setting it to upgrade to vps-cpu."
         )
+
+    # 4. Bare local
     return "local", (
         "No GPU, no DEPTHFUSION_API_KEY — local mode runs BM25-only with "
         "zero external dependencies. Upgrade to vps-cpu later by setting "
@@ -531,9 +670,10 @@ def _print_mode_banner(recommendation: str, reason: str) -> None:
     print("  Available modes:")
     print("    [1] local    — BM25 only, no API calls, no GPU dependencies")
     print("    [2] vps-cpu  — Haiku reranker + optional ChromaDB (Tier 2)")
-    print("    [3] vps-gpu  — Gemma on-box + local embeddings (needs GPU)")
+    print("    [3] vps-gpu  — Gemma on-box + local embeddings (NVIDIA GPU)")
+    print("    [4] mac-mlx  — MLX local inference (Apple Silicon GPU)")
     print("")
-    marker = {"local": "1", "vps-cpu": "2", "vps-gpu": "3"}[recommendation]
+    marker = {"local": "1", "vps-cpu": "2", "vps-gpu": "3", "mac-mlx": "4"}[recommendation]
     print(f"  Recommended for this host: [{marker}] {recommendation}")
     print("")
 
@@ -557,7 +697,9 @@ def _read_mode_choice(recommendation: str) -> str:
             return "vps-cpu"
         if raw in ("3", "vps-gpu"):
             return "vps-gpu"
-        print(f"  '{raw}' isn't a valid choice — enter 1, 2, 3, or Enter.")
+        if raw in ("4", "mac-mlx", "mlx"):
+            return "mac-mlx"
+        print(f"  '{raw}' isn't a valid choice — enter 1, 2, 3, 4, or Enter.")
     print(f"  Too many invalid choices; accepting recommendation: {recommendation}")
     return recommendation
 
@@ -571,11 +713,12 @@ def main(argv: list[str] | None = None) -> int:
     # interactive probe + recommendation (v0.5.2 S-62).
     parser.add_argument(
         "--mode",
-        choices=["local", "vps-cpu", "vps-gpu"],
+        choices=["local", "vps-cpu", "vps-gpu", "mac-mlx"],
         default=None,
         help=(
             "Install mode: 'local' (BM25 only), 'vps-cpu' (Haiku reranker), "
-            "'vps-gpu' (Gemma on-box + local embeddings). "
+            "'vps-gpu' (Gemma on-box, NVIDIA GPU), "
+            "'mac-mlx' (MLX inference, Apple Silicon GPU). "
             "When omitted, the installer auto-detects your hardware and "
             "prompts you to confirm the recommended mode."
         ),
@@ -603,6 +746,13 @@ def main(argv: list[str] | None = None) -> int:
             "CI only — real installs should not use this."
         ),
     )
+    parser.add_argument(
+        "--skip-silicon-check", action="store_true",
+        help=(
+            "Skip the Apple Silicon probe on mac-mlx mode. "
+            "CI only — real installs should not use this."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # Resolve mode: explicit --mode wins; otherwise auto-detect and
@@ -623,12 +773,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
     # Warn if --skip-gpu-check is passed to a mode that doesn't use it.
-    # Silent acceptance is a footgun: a CI script that shifts from vps-gpu to
-    # vps-cpu without removing the flag should see a signal, not silence.
     if args.skip_gpu_check and mode != "vps-gpu":
         print(
             f"[WARNING] --skip-gpu-check has no effect for --mode={mode}; "
             "the flag applies only to --mode=vps-gpu. Remove it to silence this warning.",
+            file=sys.stderr,
+        )
+    if args.skip_silicon_check and mode != "mac-mlx":
+        print(
+            f"[WARNING] --skip-silicon-check has no effect for --mode={mode}; "
+            "the flag applies only to --mode=mac-mlx. Remove it to silence this warning.",
             file=sys.stderr,
         )
 
@@ -643,6 +797,12 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             tier_threshold=args.tier_threshold,
             skip_gpu_check=args.skip_gpu_check,
+        )
+    if mode == "mac-mlx":
+        return install_mac_mlx(
+            dry_run=args.dry_run,
+            tier_threshold=args.tier_threshold,
+            skip_silicon_check=args.skip_silicon_check,
         )
     # argparse choices guard makes this unreachable, but keep the branch explicit.
     return 1

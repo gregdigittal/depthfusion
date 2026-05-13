@@ -38,6 +38,18 @@ vps-gpu = [
     "uvicorn>=0.23",
 ]
 
+# `mac-mlx` mode: Apple Silicon GPU inference via mlx_lm.server.
+# mlx-lm serves an OpenAI-compatible endpoint on port 8000; GemmaBackend
+# connects to it identically to vLLM. sentence-transformers provides local
+# embeddings (runs on CPU; MLX embedding support is opt-in via mlx-lm extras).
+mac-mlx = [
+    "mlx-lm>=0.18",
+    "sentence-transformers>=2.2",
+    "chromadb>=0.4",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+]
+
 rlm = ["rlms"]
 
 dev = [

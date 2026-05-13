@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Team MCP Setup Guide</title>
+<style>
+:root {
+  --bg:#050810; --surface:#0d1220; --surface2:#141d30; --surface3:#1a2540;
+  --accent:#7c3aed; --accent2:#06b6d4; --accent3:#8b5cf6;
+  --green:#10b981; --red:#ef4444; --amber:#f59e0b;
+  --text:#f1f5f9; --muted:#64748b;
+  --border:rgba(255,255,255,.08); --border2:rgba(124,58,237,.3);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;font-size:15px;}
+
+/* ── Layout ── */
+.page-wrap{max-width:940px;margin:0 auto;padding:2rem 1.5rem 6rem;}
+
+/* ── Topbar ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.5rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:100;}
+.topbar-logo{font-size:1.2rem;font-weight:800;background:linear-gradient(135deg,var(--accent3),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.topbar-title{font-size:.88rem;color:var(--muted);}
+.topbar-right{margin-left:auto;display:flex;gap:.5rem;align-items:center;}
+.topbar-badge{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:var(--green);border-radius:999px;padding:.18rem .7rem;font-size:.72rem;font-weight:700;}
+
+/* ── Hero ── */
+.hero{text-align:center;padding:3.5rem 1rem 2.5rem;}
+.hero-eyebrow{font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent3);margin-bottom:.75rem;font-weight:700;}
+.hero h1{font-size:clamp(1.9rem,4vw,2.7rem);font-weight:800;line-height:1.15;margin-bottom:1rem;}
+.hero h1 span{background:linear-gradient(135deg,var(--accent3),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hero p{font-size:1rem;color:var(--muted);max-width:580px;margin:0 auto 2rem;line-height:1.75;}
+.badge-row{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;}
+.badge{border-radius:999px;padding:.28rem .9rem;font-size:.76rem;font-weight:700;}
+.badge-purple{background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);color:var(--accent3);}
+.badge-cyan{background:rgba(6,182,212,.2);border:1px solid rgba(6,182,212,.4);color:var(--accent2);}
+.badge-green{background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:var(--green);}
+.badge-amber{background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4);color:var(--amber);}
+
+/* ── Architecture diagram ── */
+.arch-box{background:var(--surface);border:1px solid var(--border2);border-radius:1.25rem;padding:2rem;margin:2rem 0;}
+.arch-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.75rem;font-weight:700;}
+.arch-diagram{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;align-items:center;}
+@media(max-width:640px){.arch-diagram{grid-template-columns:1fr;gap:1rem;}.arch-arrow{transform:rotate(90deg);}.arch-hub{order:-1;}}
+.arch-clients{display:flex;flex-direction:column;gap:.75rem;}
+.arch-client{background:var(--surface2);border:1px solid var(--border);border-radius:.75rem;padding:.85rem 1rem;display:flex;align-items:center;gap:.75rem;}
+.arch-client-icon{font-size:1.3rem;flex-shrink:0;}
+.arch-client-name{font-weight:700;font-size:.9rem;}
+.arch-client-sub{font-size:.75rem;color:var(--muted);}
+.arch-arrow{display:flex;flex-direction:column;align-items:center;gap:.25rem;color:var(--accent3);font-size:.7rem;font-weight:700;}
+.arch-arrow-line{width:2px;height:28px;background:linear-gradient(to bottom,var(--accent),var(--accent2));margin:0 auto;}
+.arch-arrow-bi{display:flex;flex-direction:column;align-items:center;}
+.arch-hub{background:linear-gradient(145deg,rgba(124,58,237,.2),rgba(6,182,212,.1));border:2px solid rgba(124,58,237,.5);border-radius:1rem;padding:1.25rem 1rem;text-align:center;}
+.arch-hub-icon{font-size:2rem;margin-bottom:.5rem;}
+.arch-hub-name{font-weight:800;font-size:1rem;margin-bottom:.25rem;}
+.arch-hub-sub{font-size:.78rem;color:var(--muted);line-height:1.5;}
+.arch-hub-tag{display:inline-block;background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.35);color:var(--green);border-radius:999px;padding:.15rem .6rem;font-size:.7rem;font-weight:700;margin-top:.5rem;}
+.arch-note{margin-top:1.25rem;font-size:.82rem;color:var(--muted);text-align:center;line-height:1.6;}
+.arch-note strong{color:var(--accent2);}
+
+/* ── TOC ── */
+.toc{background:var(--surface);border:1px solid var(--border2);border-radius:1rem;padding:1.5rem 1.75rem;margin:2rem 0;}
+.toc-heading{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem;font-weight:700;}
+.toc-cols{display:grid;grid-template-columns:1fr 1fr;gap:.5rem 2rem;}
+@media(max-width:500px){.toc-cols{grid-template-columns:1fr;}}
+.toc-section{font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .35rem;grid-column:1/-1;}
+.toc a{color:var(--accent3);text-decoration:none;font-size:.875rem;display:flex;align-items:baseline;gap:.4rem;}
+.toc a:hover{color:var(--text);}
+.toc a::before{content:attr(data-n);color:var(--muted);font-size:.72rem;font-weight:700;min-width:1.2rem;flex-shrink:0;}
+
+/* ── Part headers ── */
+.part-banner{border-radius:1rem;padding:1.25rem 1.5rem;margin:3rem 0 0;display:flex;align-items:center;gap:1rem;}
+.part-banner.admin{background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(139,92,246,.08));border:1px solid rgba(124,58,237,.3);}
+.part-banner.dev{background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(16,185,129,.07));border:1px solid rgba(6,182,212,.3);}
+.part-banner.info{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(245,158,11,.05));border:1px solid rgba(245,158,11,.25);}
+.part-banner.mac{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(6,182,212,.08));border:1px solid rgba(16,185,129,.3);}
+.part-icon{font-size:2rem;flex-shrink:0;}
+.part-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700;opacity:.7;margin-bottom:.2rem;}
+.part-title{font-size:1.2rem;font-weight:800;}
+.part-sub{font-size:.85rem;opacity:.75;margin-top:.2rem;}
+
+/* ── Steps ── */
+.step-header{display:flex;align-items:flex-start;gap:1rem;margin:2.5rem 0 1.1rem;}
+.step-num{flex-shrink:0;width:2.3rem;height:2.3rem;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent3));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;box-shadow:0 0 16px rgba(124,58,237,.35);margin-top:.1rem;}
+.step-num.cyan{background:linear-gradient(135deg,var(--accent2),var(--green));}
+.step-title{font-size:1.2rem;font-weight:700;}
+.step-sub{font-size:.83rem;color:var(--muted);margin-top:.12rem;}
+
+/* ── Callouts ── */
+.callout{border-radius:.75rem;padding:1rem 1.2rem;margin:1rem 0;display:flex;gap:.8rem;align-items:flex-start;}
+.callout-icon{font-size:1.2rem;flex-shrink:0;line-height:1.5;}
+.callout-body{flex:1;font-size:.88rem;line-height:1.65;}
+.callout-title{font-weight:700;margin-bottom:.25rem;font-size:.92rem;}
+.callout.info{background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);}
+.callout.info .callout-title{color:var(--accent2);}
+.callout.warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);}
+.callout.warn .callout-title{color:var(--amber);}
+.callout.danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);}
+.callout.danger .callout-title{color:var(--red);}
+.callout.success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);}
+.callout.success .callout-title{color:var(--green);}
+
+/* ── Code ── */
+.code-wrap{margin:.85rem 0;position:relative;}
+.code-label{background:var(--surface2);border:1px solid var(--border);border-bottom:none;border-radius:.6rem .6rem 0 0;padding:.38rem 1rem;font-size:.73rem;color:var(--muted);font-family:monospace;display:flex;justify-content:space-between;align-items:center;}
+.code-dots{display:flex;gap:.35rem;align-items:center;}
+.dot{width:.45rem;height:.45rem;border-radius:50%;}
+.dot-r{background:#ef4444;}.dot-y{background:#f59e0b;}.dot-g{background:#10b981;}
+pre{background:#060e1c;border:1px solid var(--border);border-radius:0 0 .6rem .6rem;padding:1rem 1.2rem;overflow-x:auto;font-size:.83rem;font-family:'JetBrains Mono','Fira Code',monospace;line-height:1.65;}
+.standalone pre{border-radius:.6rem;}
+.prompt{color:var(--accent2);font-weight:700;user-select:none;}
+.cmt{color:#4a5568;font-style:italic;}
+.cmd{color:#61afef;}.arg{color:#e5c07b;}.val{color:#98c379;}.kw{color:#c678dd;}
+.out{color:var(--muted);}
+.hl{display:block;background:rgba(124,58,237,.18);border-left:3px solid var(--accent3);padding-left:.5rem;margin-left:-.25rem;}
+code{background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:.3rem;padding:.08rem .38rem;font-size:.82em;font-family:'JetBrains Mono',monospace;color:var(--accent3);}
+
+/* ── Tables ── */
+.table-wrap{overflow-x:auto;margin:1rem 0;}
+table{width:100%;border-collapse:collapse;font-size:.87rem;}
+th{background:var(--surface2);color:var(--muted);font-weight:600;font-size:.73rem;text-transform:uppercase;letter-spacing:.06em;padding:.6rem 1rem;text-align:left;border-bottom:1px solid var(--border);}
+td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+.tag{border-radius:999px;padding:.1rem .6rem;font-size:.72rem;font-weight:700;white-space:nowrap;}
+.tag-green{background:rgba(16,185,129,.15);color:var(--green);}
+.tag-amber{background:rgba(245,158,11,.15);color:var(--amber);}
+.tag-blue{background:rgba(6,182,212,.15);color:var(--accent2);}
+.tag-gray{background:rgba(100,116,139,.15);color:var(--muted);}
+.tag-red{background:rgba(239,68,68,.15);color:var(--red);}
+
+/* ── Who does what cards ── */
+.audience-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0;}
+@media(max-width:540px){.audience-grid{grid-template-columns:1fr;}}
+.audience-card{border-radius:.9rem;padding:1.25rem;border:1px solid var(--border);}
+.audience-card.admin-card{background:rgba(124,58,237,.08);border-color:rgba(124,58,237,.3);}
+.audience-card.dev-card{background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.3);}
+.audience-card-head{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;}
+.audience-card-icon{font-size:1.6rem;}
+.audience-card-name{font-weight:800;font-size:.95rem;}
+.audience-card-role{font-size:.78rem;color:var(--muted);}
+.audience-card ul{list-style:none;}
+.audience-card ul li{font-size:.85rem;padding:.3rem 0;border-bottom:1px solid var(--border);display:flex;gap:.5rem;align-items:baseline;}
+.audience-card ul li:last-child{border-bottom:none;}
+.audience-card ul li::before{content:"→";color:var(--accent3);font-size:.75rem;flex-shrink:0;}
+
+/* ── Flow bullets ── */
+.flow{list-style:none;margin:1rem 0;}
+.flow li{display:flex;gap:.85rem;padding:.55rem 0;border-bottom:1px solid var(--border);font-size:.9rem;align-items:flex-start;}
+.flow li:last-child{border-bottom:none;}
+.flow-icon{flex-shrink:0;font-size:1rem;margin-top:.05rem;}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:2.5rem 0;}
+
+/* ── Path chip ── */
+.path{display:inline-flex;align-items:center;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25);border-radius:.35rem;padding:.1rem .6rem;font-family:monospace;font-size:.8rem;color:var(--accent2);}
+
+/* ── Verify panel ── */
+.verify-panel{background:var(--surface);border:1px solid var(--border);border-radius:.9rem;overflow:hidden;margin:1rem 0;}
+.verify-header{background:var(--surface2);padding:.65rem 1.2rem;font-size:.78rem;color:var(--muted);display:flex;gap:.5rem;align-items:center;}
+.verify-body{padding:1.2rem;}
+
+/* ── Copy hint ── */
+.copy-hint{font-size:.73rem;color:var(--muted);text-align:right;margin-top:.2rem;}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <span class="topbar-logo">DepthFusion</span>
+  <span class="topbar-title">Team Setup Guide — Shared Memory + Apple Silicon GPU Inference</span>
+  <div class="topbar-right">
+    <span class="topbar-badge">v1.0.0</span>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+<!-- ── Hero ── -->
+<div class="hero">
+  <div class="hero-eyebrow">Installation &amp; Team Onboarding Guide</div>
+  <h1>One <span>shared brain</span> for<br>every developer, every machine</h1>
+  <p>DepthFusion runs one central memory server on your VPS. Every Claude Code session — your Mac, a teammate's laptop, a CI server, any account — reads from and writes to the same knowledge base automatically. Mac users with Apple Silicon can also enable local GPU inference for faster, private reranking — while still syncing memory to the shared team hub.</p>
+  <div class="badge-row">
+    <span class="badge badge-purple">Central VPS hub</span>
+    <span class="badge badge-cyan">HTTP/SSE transport</span>
+    <span class="badge badge-green">Cross-machine · Cross-account</span>
+    <span class="badge badge-amber">Team-ready</span>
+    <span class="badge badge-green">Apple Silicon GPU</span>
+  </div>
+</div>
+
+<!-- ── KEY CONCEPT: Architecture ── -->
+<div class="arch-box">
+  <div class="arch-title">How It Works — The Hub and Spoke Model</div>
+  <div class="arch-diagram">
+
+    <!-- Left: clients -->
+    <div class="arch-clients">
+      <div class="arch-client">
+        <div class="arch-client-icon">💻</div>
+        <div>
+          <div class="arch-client-name">Your MacBook</div>
+          <div class="arch-client-sub">Claude Code → MCP → VPS</div>
+        </div>
+      </div>
+      <div class="arch-client">
+        <div class="arch-client-icon">🖥️</div>
+        <div>
+          <div class="arch-client-name">Your VPS</div>
+          <div class="arch-client-sub">Claude Code → MCP → local server</div>
+        </div>
+      </div>
+      <div class="arch-client">
+        <div class="arch-client-icon">👩‍💻</div>
+        <div>
+          <div class="arch-client-name">Developer A</div>
+          <div class="arch-client-sub">Their machine → MCP → VPS</div>
+        </div>
+      </div>
+      <div class="arch-client">
+        <div class="arch-client-icon">👨‍💻</div>
+        <div>
+          <div class="arch-client-name">Developer B</div>
+          <div class="arch-client-sub">Their machine → MCP → VPS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle: arrows -->
+    <div class="arch-arrow">
+      <div class="arch-arrow-bi">
+        <span style="color:var(--accent3);font-size:.8rem;">▲</span>
+        <div class="arch-arrow-line"></div>
+        <span style="color:var(--accent2);font-size:.8rem;">▼</span>
+      </div>
+      <div style="margin-top:.4rem;text-align:center;line-height:1.4;">
+        <div>HTTPS</div>
+        <div>port 7301</div>
+      </div>
+    </div>
+
+    <!-- Right: hub -->
+    <div class="arch-hub">
+      <div class="arch-hub-icon">🧠</div>
+      <div class="arch-hub-name">DepthFusion VPS</div>
+      <div class="arch-hub-sub">
+        Single shared memory store<br>
+        <span class="path" style="font-size:.72rem;margin-top:.4rem;display:inline-block;">~/.claude/shared/discoveries/</span>
+      </div>
+      <div><span class="arch-hub-tag">Always running · Token protected</span></div>
+    </div>
+
+  </div>
+  <div class="arch-note">
+    <strong>Key principle:</strong> The VPS holds the memory. Every machine just <em>connects</em> to it. No developer needs to install DepthFusion locally — they run one command and they're sharing memory instantly. <strong>Apple Silicon Mac users</strong> can optionally enable <strong>mac-mlx mode</strong> (Part E) to run a local GPU model for reranking and extraction — on-device speed with no API calls, while still writing to the shared VPS hub.
+  </div>
+</div>
+
+<!-- ── Who does what ── -->
+<div class="audience-grid">
+  <div class="audience-card admin-card">
+    <div class="audience-card-head">
+      <div class="audience-card-icon">🔧</div>
+      <div>
+        <div class="audience-card-name">Admin / You</div>
+        <div class="audience-card-role">Do this once, ever</div>
+      </div>
+    </div>
+    <ul>
+      <li>Install DepthFusion on the VPS</li>
+      <li>Generate a shared bearer token</li>
+      <li>Start the HTTP server as a service</li>
+      <li>Open port 7301 in the firewall</li>
+      <li>Give developers the token + URL</li>
+    </ul>
+  </div>
+  <div class="audience-card dev-card">
+    <div class="audience-card-head">
+      <div class="audience-card-icon">👩‍💻</div>
+      <div>
+        <div class="audience-card-name">Each Developer</div>
+        <div class="audience-card-role">One command, then done forever</div>
+      </div>
+    </div>
+    <ul>
+      <li>Run <code>claude mcp add</code> with the VPS URL</li>
+      <li>Restart Claude Code</li>
+      <li>Memory sharing is automatic from that point</li>
+      <li>No local install needed at all</li>
+      <li>Works on any OS</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── TOC ── -->
+<div class="toc">
+  <div class="toc-heading">Contents</div>
+  <div class="toc-cols">
+    <div class="toc-section">Part A — VPS Setup (Admin, once)</div>
+    <a href="#a1" data-n="A1">Prerequisites &amp; install on VPS</a>
+    <a href="#a2" data-n="A2">Generate the bearer token</a>
+    <a href="#a3" data-n="A3">Configure the server</a>
+    <a href="#a4" data-n="A4">Start as a systemd service</a>
+    <a href="#a5" data-n="A5">Open the firewall port</a>
+    <a href="#a6" data-n="A6">Test the server is reachable</a>
+    <div class="toc-section">Part B — Developer Onboarding (each dev)</div>
+    <a href="#b1" data-n="B1">Connect Claude Code to the VPS</a>
+    <a href="#b2" data-n="B2">Verify the connection works</a>
+    <a href="#b3" data-n="B3">First recall test</a>
+    <div class="toc-section">Part C — What Syncs Automatically</div>
+    <a href="#c1" data-n="C1">Automatic data flow</a>
+    <a href="#c2" data-n="C2">Project-scoped vs global recall</a>
+    <div class="toc-section">Part D — Troubleshooting</div>
+    <a href="#d1" data-n="D1">Common errors &amp; fixes</a>
+    <div class="toc-section">Part E — Mac Local GPU (Apple Silicon)</div>
+    <a href="#e1" data-n="E1">Prerequisites &amp; install</a>
+    <a href="#e2" data-n="E2">Run the mac-mlx installer</a>
+    <a href="#e3" data-n="E3">Start the model server</a>
+    <a href="#e4" data-n="E4">Combining with VPS hub</a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PART A — VPS SETUP
+══════════════════════════════════════════════════ -->
+<div class="part-banner admin">
+  <div class="part-icon">🔧</div>
+  <div>
+    <div class="part-label">Part A</div>
+    <div class="part-title">VPS Setup — Done Once by the Admin</div>
+    <div class="part-sub">Estimated time: 15–20 minutes. You need SSH access to your VPS.</div>
+  </div>
+</div>
+
+<!-- A1 -->
+<div id="a1">
+  <div class="step-header">
+    <div class="step-num">A1</div>
+    <div>
+      <div class="step-title">Prerequisites and Install on the VPS</div>
+      <div class="step-sub">SSH into your VPS and run these checks first</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS terminal — check prerequisites</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">python3 --version</span>    <span class="cmt"># Must be 3.10, 3.11, or 3.12</span>
+<span class="prompt">$</span> <span class="cmd">git --version</span>         <span class="cmt"># Must be installed</span></pre>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">Python 3.10+ required</div>
+      Ubuntu 20.04 ships Python 3.8. If that's what you have:<br>
+      <code>sudo apt install python3.11 python3.11-venv python3-pip</code>
+    </div>
+  </div>
+
+  <p>Clone the repository and install:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — clone, create venv, install</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">cd ~/projects</span>
+<span class="prompt">$</span> <span class="cmd">git clone https://github.com/gregdigittal/depthfusion.git</span>
+<span class="prompt">$</span> <span class="cmd">cd depthfusion</span>
+<span class="prompt">$</span> <span class="cmd">python3.11 -m venv .venv</span>
+<span class="prompt">$</span> <span class="cmd">source .venv/bin/activate</span>
+<span class="prompt">(.venv) $</span> <span class="cmd">pip install -e .</span>
+<span class="prompt">(.venv) $</span> <span class="cmd">pip install -e ".[vps-cpu]"</span>   <span class="cmt"># fastapi + uvicorn for the HTTP server</span></pre>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Already installed?</div>
+      If DepthFusion is already on your VPS, just make sure the vps-cpu extras are installed:
+      <code>source ~/projects/depthfusion/.venv/bin/activate &amp;&amp; pip install -e ".[vps-cpu]"</code>
+    </div>
+  </div>
+
+  <p>Run the installer to write the config file and register hooks:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — run the installer</span></div>
+    <pre><span class="prompt">(.venv) $</span> <span class="cmd">python3 -m depthfusion.install.install --mode vps-cpu</span>
+
+<span class="out">[INSTALL] Configuring DepthFusion for VPS-CPU mode</span>
+<span class="out">[INSTALL]   Wrote config: /home/gregmorris/.claude/depthfusion.env</span>
+<span class="out">[INSTALL]   Registered PreCompact hook</span>
+<span class="out">[INSTALL]   Registered PostCompact hook</span>
+<span class="out">[INSTALL] VPS-CPU install complete.</span></pre>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- A2 -->
+<div id="a2">
+  <div class="step-header">
+    <div class="step-num">A2</div>
+    <div>
+      <div class="step-title">Generate the Bearer Token</div>
+      <div class="step-sub">This is the password every developer will use to connect. Keep it secret.</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — generate a cryptographically secure token</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">openssl rand -hex 32</span>
+<span class="out">a3f9c2b1d8e7f4a2c6b9d3e1f8a2b4c7d9e3f1a2b4c6d8e1f3a5b7c9d2e4f6</span>
+<span class="cmt"># ↑ Copy this. You will need it in the next step AND to share with developers.</span></pre>
+  </div>
+
+  <div class="callout danger">
+    <span class="callout-icon">🛑</span>
+    <div class="callout-body">
+      <div class="callout-title">Anyone with this token can read and write your team's memory</div>
+      Share it only over a secure channel (encrypted message, password manager, etc.). Do not put it in Slack, email, or any git repository.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- A3 -->
+<div id="a3">
+  <div class="step-header">
+    <div class="step-num">A3</div>
+    <div>
+      <div class="step-title">Configure the Server</div>
+      <div class="step-sub">Edit the env file to enable the public HTTP server with your token</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — open the config file</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">nano ~/.claude/depthfusion.env</span></pre>
+  </div>
+
+  <p>The file already exists from the installer. Add or uncomment these four lines at the bottom:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>~/.claude/depthfusion.env — add these lines</span></div>
+    <pre><span class="cmt"># HTTP/SSE transport — enables remote access for all machines</span>
+<span class="hl"><span class="val">DEPTHFUSION_MCP_HTTP_ENABLED=true</span></span>
+<span class="hl"><span class="val">DEPTHFUSION_MCP_PUBLIC=1</span></span>
+<span class="hl"><span class="val">DEPTHFUSION_MCP_PORT=7301</span></span>
+<span class="hl"><span class="val">DEPTHFUSION_MCP_TOKEN=a3f9c2b1d8e7f4a2c6b9d3e1f8a2b4c7d9e3f1a2b4c6d8e1f3a5b7c9d2e4f6</span></span>
+<span class="cmt"># ↑ Replace with your actual token from Step A2</span></pre>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">DEPTHFUSION_MCP_TOKEN is mandatory when DEPTHFUSION_MCP_PUBLIC=1</div>
+      The server refuses to start if <code>DEPTHFUSION_MCP_PUBLIC=1</code> is set without a token. This is a safety guard — the token must be set before the server will bind to a public interface.
+    </div>
+  </div>
+
+  <p>Save and close the file (<code>Ctrl+O</code>, <code>Enter</code>, <code>Ctrl+X</code> in nano).</p>
+</div>
+
+<hr class="divider">
+
+<!-- A4 -->
+<div id="a4">
+  <div class="step-header">
+    <div class="step-num">A4</div>
+    <div>
+      <div class="step-title">Start the HTTP Server as a systemd Service</div>
+      <div class="step-sub">This keeps the server running 24/7, surviving reboots and crashes automatically</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — create the systemd unit file</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">sudo nano /etc/systemd/system/depthfusion-mcp.service</span></pre>
+  </div>
+
+  <p>Paste this exactly, replacing <code>gregmorris</code> with your VPS username:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>/etc/systemd/system/depthfusion-mcp.service</span></div>
+    <pre><span class="val">[Unit]</span>
+Description=DepthFusion MCP HTTP Server
+After=network.target
+
+<span class="val">[Service]</span>
+User=<span class="arg">gregmorris</span>
+WorkingDirectory=/home/<span class="arg">gregmorris</span>/projects/depthfusion
+EnvironmentFile=/home/<span class="arg">gregmorris</span>/.claude/depthfusion.env
+ExecStart=/home/<span class="arg">gregmorris</span>/projects/depthfusion/.venv/bin/python3 \
+    -m depthfusion.mcp.http_server
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+<span class="val">[Install]</span>
+WantedBy=multi-user.target</pre>
+  </div>
+
+  <p>Save, then enable and start the service:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — enable and start</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">sudo systemctl daemon-reload</span>
+<span class="prompt">$</span> <span class="cmd">sudo systemctl enable depthfusion-mcp</span>
+<span class="prompt">$</span> <span class="cmd">sudo systemctl start depthfusion-mcp</span>
+
+<span class="cmt"># Confirm it is running:</span>
+<span class="prompt">$</span> <span class="cmd">sudo systemctl status depthfusion-mcp</span>
+<span class="out">● depthfusion-mcp.service - DepthFusion MCP HTTP Server</span>
+<span class="out">   Active: <span style="color:var(--green);">active (running)</span> since ...   ← must say this</span></pre>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Checking logs if something goes wrong</div>
+      <code>sudo journalctl -u depthfusion-mcp -f</code> shows live logs. The most common startup error is a missing or commented-out <code>DEPTHFUSION_MCP_TOKEN</code> — check the env file if you see <code>ValueError</code>.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- A5 -->
+<div id="a5">
+  <div class="step-header">
+    <div class="step-num">A5</div>
+    <div>
+      <div class="step-title">Open the Firewall Port</div>
+      <div class="step-sub">Port 7301 must be reachable from each developer's machine</div>
+    </div>
+  </div>
+
+  <p>Run the command that matches your VPS setup:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — open port 7301 (pick one)</span></div>
+    <pre><span class="cmt"># Option 1: ufw (Ubuntu/Debian default)</span>
+<span class="prompt">$</span> <span class="cmd">sudo ufw allow 7301/tcp</span>
+
+<span class="cmt"># Option 2: iptables</span>
+<span class="prompt">$</span> <span class="cmd">sudo iptables -A INPUT -p tcp --dport 7301 -j ACCEPT</span>
+
+<span class="cmt"># Option 3: Cloud provider security group</span>
+<span class="cmt"># → AWS: EC2 → Security Groups → Inbound Rules → Add TCP 7301</span>
+<span class="cmt"># → Hetzner: Firewall → Add Rule → TCP 7301</span>
+<span class="cmt"># → DigitalOcean: Networking → Firewalls → Add Rule → TCP 7301</span></pre>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">The bearer token is your security — the port can be open</div>
+      Port 7301 is protected by the bearer token. No valid token = no access to memory. That said, for extra security you can restrict the inbound rule to specific IP ranges (your office network, developer home IPs) instead of <code>0.0.0.0/0</code>.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- A6 -->
+<div id="a6">
+  <div class="step-header">
+    <div class="step-num">A6</div>
+    <div>
+      <div class="step-title">Test the Server Is Reachable</div>
+      <div class="step-sub">Run this from your local machine (not the VPS) to confirm it's publicly accessible</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Your local machine — test from outside the VPS</span></div>
+    <pre><span class="cmt"># Health check — no token required</span>
+<span class="prompt">$</span> <span class="cmd">curl http://YOUR_VPS_IP:7301/health</span>
+<span class="out">{"status":"ok","transport":"sse","version":"1.0.0"}   ← success</span>
+
+<span class="cmt"># Authenticated check — must return 200, not 401</span>
+<span class="prompt">$</span> <span class="cmd">curl -H "Authorization: Bearer YOUR_TOKEN" \</span>
+     <span class="arg">http://YOUR_VPS_IP:7301/sse</span>
+<span class="out">event: endpoint</span>
+<span class="out">data: /messages?sessionId=...   ← success (Ctrl+C to stop)</span></pre>
+  </div>
+
+  <div class="callout danger">
+    <span class="callout-icon">🛑</span>
+    <div class="callout-body">
+      <div class="callout-title">curl: Connection refused?</div>
+      Either the firewall is still blocking port 7301, or the service isn't running. Check:<br>
+      1. <code>sudo systemctl status depthfusion-mcp</code> on the VPS<br>
+      2. <code>sudo ufw status</code> on the VPS — confirm 7301 is listed<br>
+      3. Your cloud provider's security group / firewall rules in the web console
+    </div>
+  </div>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <div class="callout-body">
+      <div class="callout-title">VPS setup is complete</div>
+      The server is running and reachable. You can now onboard developers — share the VPS IP address and the bearer token with each person.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PART B — DEVELOPER ONBOARDING
+══════════════════════════════════════════════════ -->
+<div class="part-banner dev">
+  <div class="part-icon">👩‍💻</div>
+  <div>
+    <div class="part-label">Part B</div>
+    <div class="part-title">Developer Onboarding — One Command Per Machine</div>
+    <div class="part-sub">Each developer runs this on their own machine. Takes under 2 minutes. No local install of DepthFusion needed.</div>
+  </div>
+</div>
+
+<!-- B1 -->
+<div id="b1">
+  <div class="step-header">
+    <div class="step-num cyan">B1</div>
+    <div>
+      <div class="step-title">Connect Claude Code to the VPS</div>
+      <div class="step-sub">Run this on every machine and every Claude account you want to connect</div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">What you need from the admin</div>
+      Before running this, get two things from the admin:<br>
+      1. The VPS IP address or hostname (e.g. <code>176.9.147.206</code> or <code>memory.yourcompany.com</code>)<br>
+      2. The bearer token
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Developer's machine — register the shared memory server</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">claude mcp add depthfusion \</span>
+    <span class="arg">--transport sse \</span>
+    <span class="arg">--header "Authorization: Bearer YOUR_TOKEN_HERE" \</span>
+    <span class="val">http://YOUR_VPS_IP:7301/sse</span>
+
+<span class="cmt"># Confirm it registered:</span>
+<span class="prompt">$</span> <span class="cmd">claude mcp list</span>
+<span class="out">depthfusion   ← must appear here</span></pre>
+  </div>
+
+  <p style="margin-top:1.1rem;">Then <strong>restart Claude Code</strong> (quit and reopen, or start a fresh <code>claude</code> session in the terminal). The connection is established at session start.</p>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Multiple accounts on the same machine</div>
+      Run the same <code>claude mcp add</code> command for each Claude account. The <code>--scope user</code> flag (added automatically) ties the registration to the current user profile. Each account that runs this command gains access to the shared memory.
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Already registered a local (stdio) DepthFusion?</div>
+      Remove it first and replace with the remote endpoint:<br>
+      <code>claude mcp remove depthfusion</code><br>
+      Then re-run the <code>claude mcp add</code> command above.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- B2 -->
+<div id="b2">
+  <div class="step-header">
+    <div class="step-num cyan">B2</div>
+    <div>
+      <div class="step-title">Verify the Connection Works</div>
+      <div class="step-sub">Run these checks in order — each confirms a different layer</div>
+    </div>
+  </div>
+
+  <div class="verify-panel">
+    <div class="verify-header"><span>🔬</span> Check 1 — MCP is listed</div>
+    <div class="verify-body">
+      <div class="code-wrap"><div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div></div>
+        <pre><span class="prompt">$</span> <span class="cmd">claude mcp list</span>
+<span class="out">depthfusion   ← must appear</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="verify-panel">
+    <div class="verify-header"><span>🔬</span> Check 2 — Health endpoint reachable from this machine</div>
+    <div class="verify-body">
+      <div class="code-wrap"><div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div></div>
+        <pre><span class="prompt">$</span> <span class="cmd">curl http://YOUR_VPS_IP:7301/health</span>
+<span class="out">{"status":"ok","transport":"sse","version":"1.0.0"}</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="verify-panel">
+    <div class="verify-header"><span>🔬</span> Check 3 — Live MCP tool call from Claude Code</div>
+    <div class="verify-body">
+      <p style="font-size:.88rem;margin-bottom:.75rem;">Open a new Claude Code session and type:</p>
+      <div class="code-wrap standalone"><pre>Can you call depthfusion_status and show me the output?</pre></div>
+      <div class="callout success" style="margin-top:.75rem;">
+        <span class="callout-icon">✅</span>
+        <div class="callout-body"><div class="callout-title">Successful response</div>Claude replies with component status, active mode, bus backend, graph node/edge counts, and engaged features. This confirms the full MCP round-trip is working.</div>
+      </div>
+      <div class="callout danger" style="margin-top:.75rem;">
+        <span class="callout-icon">🛑</span>
+        <div class="callout-body"><div class="callout-title">Claude says the tool is unavailable?</div>The MCP server didn't connect. Go back to Step B1 — check the URL has no typo, the token matches exactly, and that you restarted Claude Code after registering.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- B3 -->
+<div id="b3">
+  <div class="step-header">
+    <div class="step-num cyan">B3</div>
+    <div>
+      <div class="step-title">First Recall Test</div>
+      <div class="step-sub">Confirm that past sessions are actually being retrieved</div>
+    </div>
+  </div>
+
+  <p>In any Claude Code session, ask:</p>
+
+  <div class="code-wrap standalone">
+    <pre>Call depthfusion_recall_relevant with query "recent work" and show me the blocks returned.</pre>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Getting 0 blocks on a fresh install?</div>
+      That is normal. The memory store builds up as sessions are captured. The first blocks appear after the first context compaction (<code>/compact</code> in Claude Code) or after the auto-compress job runs. After a few sessions you'll see relevant context loading automatically at every session start.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PART C — WHAT SYNCS
+══════════════════════════════════════════════════ -->
+<div class="part-banner info">
+  <div class="part-icon">🔄</div>
+  <div>
+    <div class="part-label">Part C</div>
+    <div class="part-title">What Syncs Automatically</div>
+    <div class="part-sub">Nothing extra to configure — this happens once the server is running and all machines are connected.</div>
+  </div>
+</div>
+
+<!-- C1 -->
+<div id="c1">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--amber),var(--red));box-shadow:0 0 16px rgba(245,158,11,.3);">C1</div>
+    <div>
+      <div class="step-title">Automatic Data Flow</div>
+      <div class="step-sub">Every session on every connected machine contributes to and benefits from the shared store</div>
+    </div>
+  </div>
+
+  <ul class="flow">
+    <li>
+      <span class="flow-icon">🚀</span>
+      <div><strong>Session start:</strong> DepthFusion queries the VPS for the most relevant past context and injects it before Claude responds to your first message. This works on every machine — no action needed from the developer.</div>
+    </li>
+    <li>
+      <span class="flow-icon">💾</span>
+      <div><strong>Pre-compact:</strong> Before Claude Code compresses its context window, a snapshot of the active session is saved locally on the VPS at <span class="path">~/.claude/.depthfusion-compact-snapshot.json</span></div>
+    </li>
+    <li>
+      <span class="flow-icon">🧠</span>
+      <div><strong>Post-compact:</strong> After each compaction, the session transcript is analysed. Significant decisions, code patterns, conventions, and preferences are extracted and stored as discovery files at <span class="path">~/.claude/shared/discoveries/</span> on the VPS — where every connected machine can recall them.</div>
+    </li>
+    <li>
+      <span class="flow-icon">📊</span>
+      <div><strong>Knowledge graph:</strong> When <code>DEPTHFUSION_GRAPH_ENABLED=true</code>, entities (projects, tools, decisions, people) and their relationships are extracted and stored in a graph database. The <code>depthfusion_graph_traverse</code> tool lets you explore connections across the team's entire work history.</div>
+    </li>
+    <li>
+      <span class="flow-icon">⏳</span>
+      <div><strong>Memory decay:</strong> Stale memories fade automatically. High-importance items lose 1%/day of salience. Low-importance items lose 5%/day. Items that drop below 0.05 salience move to an archive folder — never deleted, always recoverable. This keeps the memory store lean and relevant.</div>
+    </li>
+    <li>
+      <span class="flow-icon">🔁</span>
+      <div><strong>Recall feedback:</strong> When Claude retrieves context and uses it, calling <code>depthfusion_recall_feedback</code> increases the salience of useful chunks. Things the team keeps finding valuable rise to the top over time.</div>
+    </li>
+  </ul>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <div class="callout-body">
+      <div class="callout-title">Cross-machine flow in practice</div>
+      Developer A decides on an architecture approach in a Monday session on their MacBook. That decision is captured in the VPS after their first compaction. On Tuesday, Developer B opens a Claude session on their laptop about the same project — DepthFusion automatically injects the relevant context from Developer A's session at the start of the conversation.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- C2 -->
+<div id="c2">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--amber),var(--red));box-shadow:0 0 16px rgba(245,158,11,.3);">C2</div>
+    <div>
+      <div class="step-title">Project-Scoped vs Global Recall</div>
+      <div class="step-sub">Control whether recall searches one project or all projects across the whole team</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Scope</th><th>What it searches</th><th>How to set it</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag tag-blue">project</span></td>
+          <td>Only sessions and discoveries tagged with the current project slug.</td>
+          <td>Default. Automatically detected from the git repo name in the current directory.</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-amber">cross_project</span></td>
+          <td>All projects this developer has worked on.</td>
+          <td>Tell Claude: <em>"Call depthfusion_set_scope with scope=cross_project"</em></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-green">global</span></td>
+          <td>The entire team's memory across every project ever captured.</td>
+          <td>Tell Claude: <em>"Call depthfusion_set_scope with scope=global"</em></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <div class="callout-title">Recommended for team use</div>
+      Start new sessions with <code>cross_project</code> scope. It surfaces architectural patterns and conventions from across the codebase, not just the one file you're editing. Switch to <code>project</code> when you need focused, noise-free recall.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PART D — TROUBLESHOOT
+══════════════════════════════════════════════════ -->
+<div class="part-banner" style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);margin-top:3rem;">
+  <div class="part-icon">🔍</div>
+  <div>
+    <div class="part-label">Part D</div>
+    <div class="part-title">Troubleshooting</div>
+    <div class="part-sub">Error messages, their causes, and exact fixes.</div>
+  </div>
+</div>
+
+<div id="d1" style="margin-top:1.5rem;">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Service fails to start — <code>ValueError: DEPTHFUSION_MCP_TOKEN must be set</code></td>
+          <td><code>DEPTHFUSION_MCP_PUBLIC=1</code> is set but <code>DEPTHFUSION_MCP_TOKEN</code> is missing or commented out</td>
+          <td>Open <code>~/.claude/depthfusion.env</code> on the VPS and add the token line. Then restart: <code>sudo systemctl restart depthfusion-mcp</code></td>
+        </tr>
+        <tr>
+          <td><code>curl: (7) Failed to connect — Connection refused</code></td>
+          <td>Firewall is blocking port 7301, or service isn't running</td>
+          <td>1. Check service: <code>sudo systemctl status depthfusion-mcp</code><br>2. Check firewall: <code>sudo ufw status</code><br>3. Check cloud security group in the web console</td>
+        </tr>
+        <tr>
+          <td>curl returns <code>{"detail":"Unauthorized"}</code></td>
+          <td>Token in the request doesn't match <code>DEPTHFUSION_MCP_TOKEN</code></td>
+          <td>Confirm the token in your <code>claude mcp add</code> command exactly matches the value in <code>~/.claude/depthfusion.env</code> on the VPS. Tokens are case-sensitive.</td>
+        </tr>
+        <tr>
+          <td>Claude Code says depthfusion tool is unavailable</td>
+          <td>MCP not registered, wrong URL, or Claude Code not restarted after registering</td>
+          <td>Run <code>claude mcp list</code>. If missing, re-run the <code>claude mcp add</code> command. If present, quit and reopen Claude Code completely.</td>
+        </tr>
+        <tr>
+          <td><code>recall_relevant</code> always returns 0 blocks</td>
+          <td>No sessions captured yet, or captures are storing to a different path</td>
+          <td>Normal on fresh install. Trigger <code>/compact</code> in Claude Code to force the first capture. Check <code>ls ~/.claude/shared/discoveries/</code> on the VPS to confirm files are being written.</td>
+        </tr>
+        <tr>
+          <td>One developer's sessions don't appear in another developer's recall</td>
+          <td>Each developer's Claude Code is writing to a different user's home directory on the VPS, or the service is running as the wrong user</td>
+          <td>All sessions must write to the same <span class="path">~/.claude/shared/discoveries/</span>. Confirm <code>User=gregmorris</code> in the systemd unit matches the user whose home directory holds the discoveries folder. If developers need isolated memory, run separate DepthFusion instances on different ports.</td>
+        </tr>
+        <tr>
+          <td>Server crashes every few hours</td>
+          <td>Memory leak or OOM on a small VPS</td>
+          <td>Add <code>MemoryMax=512M</code> to the <code>[Service]</code> section of the systemd unit. The service restarts automatically (<code>Restart=always</code>) so no data is lost.</td>
+        </tr>
+        <tr>
+          <td><code>ModuleNotFoundError: No module named 'fastapi'</code></td>
+          <td>vps-cpu extras not installed in the venv</td>
+          <td><code>source ~/projects/depthfusion/.venv/bin/activate &amp;&amp; pip install -e ".[vps-cpu]"</code> then restart the service.</td>
+        </tr>
+        <tr>
+          <td><code>ModuleNotFoundError: No module named 'mlx_lm'</code></td>
+          <td>mac-mlx extras not installed in the venv</td>
+          <td><code>pip install -e ".[mac-mlx]"</code> inside the depthfusion venv, then restart Claude Code. Mac only — see Part E.</td>
+        </tr>
+        <tr>
+          <td>GemmaBackend unhealthy — mac-mlx reranking falls back to Haiku</td>
+          <td>mlx_lm.server is not running on port 8000</td>
+          <td>Start the model server before your Claude session: <code>bash ~/projects/depthfusion/scripts/mlx-serve.sh</code></td>
+        </tr>
+        <tr>
+          <td>First <code>mlx-serve.sh</code> run stalls for 10–20 minutes</td>
+          <td>mlx_lm is downloading the model from HuggingFace (7–20 GB depending on model)</td>
+          <td>Expected on first run. Subsequent starts load from cache and complete in under 30 seconds.</td>
+        </tr>
+        <tr>
+          <td>mac-mlx installer fails with "not running on Apple Silicon"</td>
+          <td>Intel Mac, Linux, or non-macOS system — arm64 macOS required</td>
+          <td>Use <code>--mode local</code> (BM25-only) or <code>--mode vps-cpu</code> (Haiku reranker via API) on non-Apple-Silicon machines.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Quick diagnostic -->
+  <div class="callout info" style="margin-top:1.5rem;">
+    <span class="callout-icon">🔧</span>
+    <div class="callout-body">
+      <div class="callout-title">All-in-one diagnostic — run this on the VPS when something feels wrong</div>
+      <div class="code-wrap" style="margin-top:.7rem;">
+        <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>VPS — diagnostic commands</span></div>
+        <pre><span class="cmt"># 1. Is the service running?</span>
+<span class="prompt">$</span> <span class="cmd">sudo systemctl status depthfusion-mcp</span>
+
+<span class="cmt"># 2. What did it log?</span>
+<span class="prompt">$</span> <span class="cmd">sudo journalctl -u depthfusion-mcp -n 30 --no-pager</span>
+
+<span class="cmt"># 3. Is port 7301 actually listening?</span>
+<span class="prompt">$</span> <span class="cmd">ss -tlnp | grep 7301</span>
+
+<span class="cmt"># 4. How many discovery files exist?</span>
+<span class="prompt">$</span> <span class="cmd">ls ~/.claude/shared/discoveries/ | wc -l</span>
+
+<span class="cmt"># 5. Does the Python stack load cleanly?</span>
+<span class="prompt">$</span> <span class="cmd">source ~/projects/depthfusion/.venv/bin/activate</span>
+<span class="prompt">(.venv) $</span> <span class="cmd">python3 -c "from depthfusion.mcp.http_server import app; print('OK')"</span>
+<span class="out">OK</span></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PART E — MAC LOCAL GPU
+══════════════════════════════════════════════════ -->
+<div class="part-banner mac">
+  <div class="part-icon">🍎</div>
+  <div>
+    <div class="part-label">Part E — Optional · Apple Silicon Macs only</div>
+    <div class="part-title">Local GPU Inference via MLX</div>
+    <div class="part-sub">Run Gemma or Qwen on your Mac's Metal GPU for reranking, extraction, and summarisation — no API calls, no latency, no cost. Works alongside the VPS hub.</div>
+  </div>
+</div>
+
+<div class="callout info" style="margin-top:1.5rem;">
+  <span class="callout-icon">💡</span>
+  <div class="callout-body">
+    <div class="callout-title">What mac-mlx adds on top of the base VPS setup</div>
+    Without mac-mlx: reranking is done by Haiku via the Anthropic API (or skipped in local mode). With mac-mlx: a local Qwen or Gemma model runs on your Mac's Metal GPU. DepthFusion sends reranking and extraction tasks to this model — instant responses, fully private, and free. Shared memory still flows to and from the VPS hub unchanged.
+  </div>
+</div>
+
+<!-- E1 -->
+<div id="e1">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--green),var(--accent2));box-shadow:0 0 16px rgba(16,185,129,.35);">E1</div>
+    <div>
+      <div class="step-title">Prerequisites and Install</div>
+      <div class="step-sub">Apple Silicon (M1/M2/M3/M4) required — Intel Macs are not supported by mlx_lm</div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">Apple Silicon only</div>
+      mac-mlx mode requires an arm64 macOS machine. Run <code>uname -m</code> — it must return <code>arm64</code>. The installer refuses on Intel Macs and non-macOS systems. Use <code>--mode vps-cpu</code> on Intel Macs instead.
+    </div>
+  </div>
+
+  <p>Clone or update the repository on your Mac, then install the mac-mlx extras:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — install mac-mlx extras</span></div>
+    <pre><span class="cmt"># Navigate to your local depthfusion clone</span>
+<span class="prompt">$</span> <span class="cmd">cd ~/projects/depthfusion</span>
+
+<span class="cmt"># Create or activate your venv</span>
+<span class="prompt">$</span> <span class="cmd">python3 -m venv .venv</span>
+<span class="prompt">$</span> <span class="cmd">source .venv/bin/activate</span>
+
+<span class="cmt"># Install mac-mlx extras (mlx-lm + sentence-transformers + fastapi)</span>
+<span class="prompt">(.venv) $</span> <span class="cmd">pip install -e ".[mac-mlx]"</span>
+
+<span class="cmt"># Confirm mlx_lm is available</span>
+<span class="prompt">(.venv) $</span> <span class="cmd">python3 -c "import mlx_lm; print('mlx_lm OK')"</span>
+<span class="out">mlx_lm OK</span></pre>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <div class="callout-title">Already have a local DepthFusion install?</div>
+      Just re-run pip inside your existing venv: <code>pip install -e ".[mac-mlx]"</code>. No other changes needed — the extras add mlx-lm and sentence-transformers without removing anything.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- E2 -->
+<div id="e2">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--green),var(--accent2));box-shadow:0 0 16px rgba(16,185,129,.35);">E2</div>
+    <div>
+      <div class="step-title">Run the mac-mlx Installer</div>
+      <div class="step-sub">Writes the config file and registers hooks for Apple Silicon GPU mode</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — run the installer</span></div>
+    <pre><span class="prompt">(.venv) $</span> <span class="cmd">python3 -m depthfusion.install.install --mode mac-mlx</span>
+
+<span class="out">[INSTALL] Apple Silicon detected: Apple M3 Max (36 GB unified memory)</span>
+<span class="out">[INSTALL] Recommended model: mlx-community/Qwen2.5-32B-Instruct-4bit</span>
+<span class="out">          (leaves ~16 GB headroom on 36 GB machine)</span>
+<span class="out">[INSTALL] Configuring DepthFusion for mac-mlx mode</span>
+<span class="out">[INSTALL]   Wrote config: ~/.claude/depthfusion.env</span>
+<span class="out">[INSTALL]   Registered PreCompact hook</span>
+<span class="out">[INSTALL]   Registered PostCompact hook</span>
+<span class="out">[INSTALL] mac-mlx install complete.</span>
+<span class="out">[INSTALL] Next step: start the model server with:</span>
+<span class="out">    bash scripts/mlx-serve.sh</span></pre>
+  </div>
+
+  <p>The installer writes these settings to <span class="path">~/.claude/depthfusion.env</span>:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Key</th><th>Value set</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>DEPTHFUSION_MODE</code></td>
+          <td><code>mac-mlx</code></td>
+          <td>Activates the Apple Silicon GPU quality chain for all capabilities</td>
+        </tr>
+        <tr>
+          <td><code>DEPTHFUSION_GEMMA_URL</code></td>
+          <td><code>http://127.0.0.1:8000/v1</code></td>
+          <td>Points GemmaBackend at mlx_lm.server's OpenAI-compatible endpoint</td>
+        </tr>
+        <tr>
+          <td><code>DEPTHFUSION_GEMMA_MODEL</code></td>
+          <td><span class="tag tag-green">auto-selected</span></td>
+          <td>Best model for your unified memory (see model table in E3)</td>
+        </tr>
+        <tr>
+          <td><code>DEPTHFUSION_RERANKER_ENABLED</code></td>
+          <td><code>true</code></td>
+          <td>Enables GPU-accelerated reranking of recall results</td>
+        </tr>
+        <tr>
+          <td><code>DEPTHFUSION_EMBEDDING_BACKEND</code></td>
+          <td><code>local</code></td>
+          <td>Uses sentence-transformers for local embeddings (no API cost)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">If you also want team shared memory (recommended)</div>
+      After running the mac-mlx installer, follow Part B to register the VPS as your MCP server. The mac-mlx mode provides local GPU inference; the VPS provides shared team memory. They are independent layers that complement each other — the Mac's model handles reranking quality while team discoveries flow to and from the VPS hub.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- E3 -->
+<div id="e3">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--green),var(--accent2));box-shadow:0 0 16px rgba(16,185,129,.35);">E3</div>
+    <div>
+      <div class="step-title">Start the Model Server</div>
+      <div class="step-sub">mlx_lm.server binds an OpenAI-compatible endpoint on port 8000 — start it before each Claude session</div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — interactive model selection</span></div>
+    <pre><span class="prompt">$</span> <span class="cmd">bash ~/projects/depthfusion/scripts/mlx-serve.sh</span>
+
+<span class="out">  DepthFusion — MLX model selection</span>
+<span class="out">  Detected unified memory: 36 GB</span>
+<span class="out"></span>
+<span class="out">  Available models (4-bit quantized, via mlx-community on HuggingFace):</span>
+<span class="out"></span>
+<span class="out">    [1] mlx-community/Qwen2.5-32B-Instruct-4bit  (~20 GB)  highest quality</span>
+<span class="out">    [2] mlx-community/Qwen2.5-14B-Instruct-4bit  (~9 GB)   balanced</span>
+<span class="out">    [3] mlx-community/gemma-3-12b-it-4bit         (~7 GB)   fast, efficient</span>
+<span class="out"></span>
+<span class="out">  Recommended for 36 GB: [1] Qwen2.5-32B (leaves ~16 GB headroom)</span>
+<span class="out"></span>
+<span class="out">  Choose [1/2/3] or press Enter for recommended: </span></pre>
+  </div>
+
+  <p>Press <strong>Enter</strong> to accept the recommended model, or type a number to choose another. Once started:</p>
+
+  <div class="code-wrap standalone">
+    <pre><span class="out">INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)</span>
+<span class="cmt">          ↑ Keep this terminal open while using Claude Code</span></pre>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⏳</span>
+    <div class="callout-body">
+      <div class="callout-title">First run downloads the model — allow 10–20 minutes</div>
+      The model is downloaded from HuggingFace and cached in <span class="path">~/.cache/huggingface/hub/</span>. Qwen2.5-32B is ~20 GB; Qwen2.5-14B is ~9 GB; Gemma 12B is ~7 GB. Subsequent starts load from the local cache and are fast (under 30 seconds).
+    </div>
+  </div>
+
+  <p style="margin-top:1.1rem;">You can also specify the model directly to skip the menu:</p>
+
+  <div class="code-wrap">
+    <div class="code-label"><div class="code-dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div><span>Mac terminal — specify model directly</span></div>
+    <pre><span class="cmt"># Use the --model flag:</span>
+<span class="prompt">$</span> <span class="cmd">bash scripts/mlx-serve.sh --model mlx-community/Qwen2.5-32B-Instruct-4bit</span>
+
+<span class="cmt"># Or set the env var:</span>
+<span class="prompt">$</span> <span class="cmd">DEPTHFUSION_GEMMA_MODEL=mlx-community/gemma-3-12b-it-4bit \</span>
+    <span class="arg">bash scripts/mlx-serve.sh</span></pre>
+  </div>
+
+  <div style="margin-top:1.5rem;">
+    <p style="font-size:.88rem;color:var(--muted);margin-bottom:.75rem;">Model recommendations by unified memory — the script auto-selects based on detected RAM:</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Unified Memory</th><th>Recommended model</th><th>Model size</th><th>Free headroom</th><th>Quality</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Less than 16 GB</td>
+            <td><code>mlx-community/gemma-3-12b-it-4bit</code></td>
+            <td>~7 GB</td>
+            <td>~9 GB</td>
+            <td><span class="tag tag-amber">Good</span></td>
+          </tr>
+          <tr>
+            <td>16–31 GB</td>
+            <td><code>mlx-community/Qwen2.5-14B-Instruct-4bit</code></td>
+            <td>~9 GB</td>
+            <td>~7–22 GB</td>
+            <td><span class="tag tag-blue">Better</span></td>
+          </tr>
+          <tr>
+            <td>32+ GB <span class="tag tag-green" style="margin-left:.4rem;">36 GB ★</span></td>
+            <td><code>mlx-community/Qwen2.5-32B-Instruct-4bit</code></td>
+            <td>~20 GB</td>
+            <td>~16 GB</td>
+            <td><span class="tag tag-green">Best</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="copy-hint">★ Your machine (36 GB) — Qwen2.5-32B is the automatic recommendation, leaving ~16 GB for the OS and other apps</div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- E4 -->
+<div id="e4">
+  <div class="step-header">
+    <div class="step-num" style="background:linear-gradient(135deg,var(--green),var(--accent2));box-shadow:0 0 16px rgba(16,185,129,.35);">E4</div>
+    <div>
+      <div class="step-title">Using mac-mlx Alongside the VPS Hub</div>
+      <div class="step-sub">Local GPU intelligence + shared team memory — two independent layers that compose cleanly</div>
+    </div>
+  </div>
+
+  <ul class="flow">
+    <li>
+      <span class="flow-icon">🔥</span>
+      <div><strong>Local inference layer (mac-mlx):</strong> When mlx_lm.server is running on port 8000, DepthFusion routes reranking, extraction, summarisation, and linking to your Mac's GPU via GemmaBackend. Results are instant, private, and cost nothing. If the server is not running, GemmaBackend is unhealthy and the factory chain falls back to HaikuBackend (Anthropic API) automatically — no manual intervention needed.</div>
+    </li>
+    <li>
+      <span class="flow-icon">🌐</span>
+      <div><strong>Shared memory layer (VPS hub):</strong> The MCP server registered in Part B continues to read and write discoveries to the VPS hub over SSE. Teammates' sessions remain visible in recall. The mac-mlx reranker improves <em>how</em> those shared memories are scored and returned — it does not change <em>where</em> they live or who can access them.</div>
+    </li>
+    <li>
+      <span class="flow-icon">🔄</span>
+      <div><strong>Fallback chain:</strong> The factory quality chain for mac-mlx mode is <code>gemma → haiku → null</code>. GemmaBackend (local MLX model) is tried first; if unhealthy, HaikuBackend (API) is tried next; if that is also unavailable, NullBackend returns empty results gracefully. Your session never crashes.</div>
+    </li>
+    <li>
+      <span class="flow-icon">💡</span>
+      <div><strong>Solo use without a VPS:</strong> mac-mlx works without the VPS hub. Memory is read from and written to your local <span class="path">~/.claude/shared/discoveries/</span> only. Local GPU inference still works fully — you just don't share memory with teammates. Useful for solo developers or air-gapped environments.</div>
+    </li>
+  </ul>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <div class="callout-body">
+      <div class="callout-title">Full stack on a 36 GB Mac</div>
+      With <code>DEPTHFUSION_MODE=mac-mlx</code> and Qwen2.5-32B running on port 8000: reranking latency drops to under 500 ms, extraction runs locally with no API cost, and all results still sync to the VPS hub for team recall. You get both layers — local GPU speed and shared team memory.
+    </div>
+  </div>
+</div>
+
+<!-- ── Summary card ── -->
+<hr class="divider">
+<div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));border:1px solid rgba(124,58,237,.3);border-radius:1.25rem;padding:2rem;margin-top:1rem;">
+  <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem;font-weight:700;">Quick Reference — Share With New Developers</div>
+  <p style="font-size:.9rem;color:var(--muted);margin-bottom:1.25rem;">Give each developer the VPS IP and token, then ask them to run one command:</p>
+  <div class="code-wrap standalone">
+    <pre><span class="prompt">$</span> <span class="cmd">claude mcp add depthfusion \</span>
+    <span class="arg">--transport sse \</span>
+    <span class="arg">--header "Authorization: Bearer TOKEN" \</span>
+    <span class="val">http://VPS_IP:7301/sse</span>
+
+<span class="cmt"># Then restart Claude Code. Done.</span></pre>
+  </div>
+  <p style="font-size:.85rem;color:var(--muted);margin-top:1rem;">No local install. No Python. No config files. Works on Mac, Windows, Linux, any Claude account.</p>
+</div>
+
+</div><!-- /page-wrap -->
+</body>
+</html>
