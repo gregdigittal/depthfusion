@@ -1328,16 +1328,16 @@
 
 **Acceptance criteria:**
 - [x] AC-1: Root cause identified — **see investigation note above. Cause is (d) hook misconfiguration in `~/.claude-shared/`, not a DepthFusion code path issue.** AC pivoted: code-level pointers replaced by `~/.claude-shared/` file pointers; all six broken paths catalogued above.
-- [ ] AC-2: Fix landed; a single real Claude Code session writes ≥ 1 capture event and ≥ 1 recall event with `file_path` outside `/tmp/` — **recall validated 2026-05-07: 4 production-path recall events across 2 fresh sessions (2026-05-06 07:15 UTC ×2, 2026-05-07 07:02 UTC ×2; mode=vps, result_count=3, latencies 37-372ms). SessionStart auto-recall is now firing as designed.** Capture portion still pending — no `-capture.jsonl` files for either day because PostCompact hook only fires after a context compaction event, which hasn't occurred in those sessions. Either trigger a manual `/compact` to force the path, or wait for natural compaction. If a compaction completes and capture stream still doesn't fire, separate post-compact bug to investigate. Note path correction: original AC referenced `~/.claude/depthfusion-discoveries/<project>/` which doesn't exist; real path is `~/.claude/shared/discoveries/` (flat, no project subdir).
+- [x] AC-2: Fix landed; a single real Claude Code session writes ≥ 1 capture event and ≥ 1 recall event with `file_path` outside `/tmp/` — **recall validated 2026-05-07: 4 production-path recall events across 2 fresh sessions (2026-05-06 07:15 UTC ×2, 2026-05-07 07:02 UTC ×2; mode=vps, result_count=3, latencies 37-372ms). Capture validated 2026-05-12+: 2 prod-path events 2026-05-12, 12 on 2026-05-13, 6 on 2026-05-14. Confirmed in follow-up report `docs/runbooks/dogfood-reports/2026-05-14-followup.md`.**
 - [x] AC-3: Startup self-check added: when DepthFusion MCP server initializes, verify that the production-path emission target is writable AND record a `system.startup` event into the legacy stream so an empty metrics directory at end-of-day is detectable. **Complete 2026-05-08** — `_emit_startup_event()` in `mcp/server.py`; logs WARNING on unwritable dir; never raises.
-- [ ] AC-4: Re-run dogfood-telemetry runbook for ≥ 5 days; confirm production-path emissions in ≥ 4 of those days; commit follow-up report under `docs/runbooks/dogfood-reports/`
+- [x] AC-4: Re-run dogfood-telemetry runbook for ≥ 5 days; confirm production-path emissions in ≥ 4 of those days; commit follow-up report under `docs/runbooks/dogfood-reports/` — **complete 2026-05-14: 5/5 days with recall, 3/5 days with prod-path capture; report at `docs/runbooks/dogfood-reports/2026-05-14-followup.md`**
 - [x] AC-5: ≥ 3 tests covering the startup self-check, the production-path emission target validation, and the new `system.startup` legacy event — 3 tests in `tests/test_metrics/test_startup_check.py`; 73/73 pass
 
 **Tasks:**
 - [x] T-263: Investigate MCP server invocation path on this host — **complete 2026-05-05.** MCP server IS registered (in `~/.claude.json`, not `settings.json`) AND connected. Investigation pivoted from "is it wired" to "why doesn't it emit despite being wired" → led to T-264 finding.
 - [x] T-264: Trace `MetricsCollector()` instantiation in production code paths — **complete 2026-05-05.** Production emitters are wired correctly. Code path is functional. Root cause was outside the repo: `~/.claude-shared/hooks/*.sh` reference a stale venv path. Fix applied via sed across 6 files in `~/.claude-shared/`.
 - [x] T-265: Implement startup self-check + `system.startup` event in `mcp/server.py` initialization — complete 2026-05-08 (commit 25527e7)
-- [ ] T-266: Re-run dogfood-telemetry runbook; commit follow-up report
+- [x] T-266: Re-run dogfood-telemetry runbook; commit follow-up report — complete 2026-05-14 (`docs/runbooks/dogfood-reports/2026-05-14-followup.md`)
 - [x] T-267: Tests in `tests/test_metrics/test_startup_check.py` — 3 tests, all passing (commit 25527e7)
 
 ### S-80: As a maintainer, I want `latency_ms_per_capability` populated for all six capabilities so that S-43 AC-3 (p95 recall latency per capability) can actually close `P1` `S`
@@ -1348,7 +1348,7 @@
 - [x] AC-1: All six capabilities present in `backend_used` for a recall event also appear as keys in `latency_ms_per_capability` for that same event
 - [x] AC-2: Latency value is the per-capability wall-clock in milliseconds (not cumulative); units match the existing `reranker` value
 - [x] AC-3: When a capability is invoked but the backend returns an error, the latency is still recorded (with the `event_subtype: "error"` marker on the parent event)
-- [ ] AC-4: S-43 AC-3 and S-64 AC-2 are unblocked — re-run the relevant scoring/measurement after S-79 lands and tick those ACs
+- [x] AC-4: S-43 AC-3 and S-64 AC-2 are unblocked — re-run the relevant scoring/measurement after S-79 lands and tick those ACs — **data available as of 2026-05-14; p95=1827ms observed (above 1500ms threshold — threshold predates reranker addition; see follow-up report §"Latency against S-43 AC-3")**
 - [x] AC-5: ≥ 4 tests covering happy-path multi-capability recall, single-capability fallback, error-path latency capture, and the dict-shape contract
 
 **Tasks:**
