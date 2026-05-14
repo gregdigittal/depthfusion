@@ -1906,4 +1906,109 @@
 
 - **Sequencing inversion (resolved 2026-04-16):** Build plan sequenced v0.3.1 before v0.4.0. Initial backlog review (2026-04-15) concluded v0.3.1 was unlanded. However, RECALL via the 2026-03-28 discovery file revealed that v0.3.1 scoring fixes *were* implemented inline in `mcp/server.py` during a prior `/goal` run — they just weren't separate commits. Code review on 2026-04-16 confirmed BM25 normalization, 1500-char snippets, source weights, directory-based classification, recency tie-breaker, and both SessionStart + PostCompact hooks are all operational.
 - **`MEMPALACE DEPTHFUSION ANALYSIS PROMPT.pdf`** in `docs/` is untracked; unclear whether it is a draft epic, analysis input, or reference. Triage before next backlog update.
+
+---
+
+## E-32: DepthFusion Query REST API [backlog]
+
+> Expose a standard REST/JSON query API so that BI tools (Metabase, Grafana, Power BI, n8n)
+> and agent-ops can query DepthFusion data directly — without going through the MCP protocol.
+> Bind loopback; expose via SSH tunnel or Cloudflare Tunnel for remote BI tools.
+
+### S-104: As a BI analyst, I want REST query endpoints so that I can connect standard BI tools to DepthFusion data `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Endpoint groups: `GET /query/discoveries`, `GET /query/sessions`, `GET /query/aggregate` — each supports `project`, `agent`, `from`, `to`, `tags` filter params
+- [ ] AC-2: All endpoints bind loopback (`127.0.0.1`) — no public bind without auth + firewall (per `infra-exposure.md`)
+- [ ] AC-3: API key authentication middleware (key sourced from env, never hardcoded)
+- [ ] AC-4: Pagination via `cursor` + `limit` params; max 1000 rows per page
+- [ ] AC-5: OpenAPI 3.1 spec generated and served at `GET /openapi.json`
+- [ ] AC-6: Integration tests covering filter combinations and pagination
+
+**Tasks:**
+- [ ] T-346: Define OpenAPI 3.1 spec for query endpoints (`docs/api/query-api.yaml`)
+- [ ] T-347: Implement `GET /query/discoveries` and `GET /query/sessions` in `api/rest.py` (extends E-29/S-100)
+- [ ] T-348: Implement API key auth middleware
+- [ ] T-349: Implement cursor-based pagination
+- [ ] T-350: Integration tests for all filter combinations
+
+### S-105: As an operator, I want BI tool connectivity documented so that the team can connect Metabase and Grafana without custom code `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `docs/bi-connectivity.md` covers SSH tunnel setup, API key configuration, and sample queries for Metabase, Grafana, and Power BI
+- [ ] AC-2: Sample Metabase dashboard JSON for the telemetry data views
+
+**Tasks:**
+- [ ] T-351: Write `docs/bi-connectivity.md`
+- [ ] T-352: Export sample Metabase dashboard JSON
+
+---
+
+## E-33: Telemetry Data Platform [backlog]
+
+> Add per-tool-call telemetry storage and aggregation to DepthFusion — the data source for
+> timesheets, cost reporting, and pivot-table analytics across human and agent sessions.
+
+### S-106: As a developer, I want a df_record_telemetry MCP tool so that Claude Code PostToolUse hooks can log structured telemetry events `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: New `df_record_telemetry` MCP tool accepts: `session_id`, `agent`, `project`, `tool_name`, `duration_ms`, `tokens_in`, `tokens_out`, `cost_usd_estimate`
+- [ ] AC-2: Events stored in a dedicated `telemetry_events` table (PostgreSQL) — separate from discovery/memory tables
+- [ ] AC-3: New `df_query_telemetry` MCP tool: aggregate by `project`, `agent`, `story_id`, `sprint`, `period`
+- [ ] AC-4: Full unit + integration test coverage
+
+**Tasks:**
+- [ ] T-353: Define `TelemetryEvent` Pydantic model + DB migration for `telemetry_events` table
+- [ ] T-354: Implement `df_record_telemetry` MCP tool
+- [ ] T-355: Implement `df_query_telemetry` MCP tool (aggregation by project/agent/tool/period)
+- [ ] T-356: Unit tests + integration tests
+
+### S-107: As an analyst, I want rollup aggregations and cost estimation in the query API so that I can build timesheets and cost reports without custom SQL `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `GET /query/aggregate` supports `group_by: [project, agent, story_id, sprint, date]` and `metrics: [duration_ms, tokens, cost_usd]`
+- [ ] AC-2: Model pricing table in `config/model-pricing.json` used for `cost_usd` estimation
+- [ ] AC-3: Human "think time" derived from gap between consecutive tool calls in human-initiated sessions
+- [ ] AC-4: Human sessions distinguishable from agent sessions via `session_type: human|agent` field
+
+**Tasks:**
+- [ ] T-357: Implement `GET /query/aggregate` endpoint with group_by + metrics support
+- [ ] T-358: Create `config/model-pricing.json` with pricing for all supported models
+- [ ] T-359: Human think-time derivation logic (gap analysis on sequential telemetry events)
+
+---
+
+## E-34: Time-Machine Analytics Query Layer [backlog]
+
+> Extend the DepthFusion query API with date-range and filter endpoints that power the
+> agent-ops Time-Machine UI, and surface recurring patterns as SkillForge candidate skills
+> via the learning loop.
+
+### S-108: As a developer, I want date-range and filter query endpoints so that agent-ops can render a Time-Machine view of project and agent history `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `GET /query/sessions?project=&agent=&from=&to=&limit=&cursor=` returns paginated session summaries
+- [ ] AC-2: `GET /query/discoveries?project=&tags=&from=&to=&limit=&cursor=` returns paginated discoveries
+- [ ] AC-3: Response includes session metadata, tool-call summary, total tokens, total cost
+- [ ] AC-4: Dates are ISO-8601; timezone-aware (UTC storage, user-local display)
+
+**Tasks:**
+- [ ] T-360: Implement `GET /query/sessions` with full filter + pagination (extends T-347)
+- [ ] T-361: Implement `GET /query/discoveries` with full filter + pagination (extends T-347)
+- [ ] T-362: ISO-8601 timezone-aware date parsing across all query endpoints
+
+### S-109: As the learning loop, I want candidate skill surfacing so that frequently-recurring patterns are automatically drafted in SkillForge for human approval `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `df_surface_skill_candidates` MCP tool: queries telemetry + discovery data for patterns exceeding `learning_loop.auto_draft_threshold` (default: seen 3+ times across sessions)
+- [ ] AC-2: On threshold breach: POST candidate to SkillForge draft endpoint (HTTP; URL + API key from env, never hardcoded)
+- [ ] AC-3: Promotion status tracked in `candidate_skills` table: `pending | approved | rejected` — no duplicate submissions
+- [ ] AC-4: SkillForge POST uses retry (3 attempts, exponential backoff); failure logged, not thrown
+
+**Tasks:**
+- [ ] T-363: Implement `df_surface_skill_candidates` MCP tool with threshold logic
+- [ ] T-364: HTTP client for SkillForge draft endpoint (env-configured URL + API key)
+- [ ] T-365: `candidate_skills` table migration + promotion status tracking
+
+---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
