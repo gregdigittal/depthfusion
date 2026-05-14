@@ -1756,16 +1756,16 @@
 ### S-106: As a developer, I want a df_record_telemetry MCP tool so that Claude Code PostToolUse hooks can log structured telemetry events `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: New `df_record_telemetry` MCP tool accepts: `session_id`, `agent`, `project`, `tool_name`, `duration_ms`, `tokens_in`, `tokens_out`, `cost_usd_estimate`
-- [ ] AC-2: Events stored in a dedicated `telemetry_events` table (PostgreSQL) — separate from discovery/memory tables
-- [ ] AC-3: New `df_query_telemetry` MCP tool: aggregate by `project`, `agent`, `story_id`, `sprint`, `period`
-- [ ] AC-4: Full unit + integration test coverage
+- [x] AC-1: New `df_record_telemetry` MCP tool accepts: `session_id`, `agent`, `project`, `tool_name`, `duration_ms`, `tokens_in`, `tokens_out`, `cost_usd_estimate`
+- [x] AC-2: Events stored in a dedicated `telemetry_events` table (SQLite) — separate from discovery/memory tables
+- [x] AC-3: New `df_query_telemetry` MCP tool: aggregate by `project`, `agent`, `story_id`, `sprint`, `period`
+- [x] AC-4: Full unit + integration test coverage (11 tests)
 
 **Tasks:**
-- [ ] T-353: Define `TelemetryEvent` Pydantic model + DB migration for `telemetry_events` table
-- [ ] T-354: Implement `df_record_telemetry` MCP tool
-- [ ] T-355: Implement `df_query_telemetry` MCP tool (aggregation by project/agent/tool/period)
-- [ ] T-356: Unit tests + integration tests
+- [x] T-353: Define `TelemetryStore` SQLite model + `telemetry_events` table with indexes
+- [x] T-354: Implement `df_record_telemetry` MCP tool
+- [x] T-355: Implement `df_query_telemetry` MCP tool (aggregation by project/agent/tool/period)
+- [x] T-356: Unit tests + integration tests
 
 ### S-107: As an analyst, I want rollup aggregations and cost estimation in the query API so that I can build timesheets and cost reports without custom SQL `P2` `M`
 

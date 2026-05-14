@@ -141,6 +141,29 @@ TOOLS: dict[str, str] = {
         "Args: project_id (str). Response: {project_id, total_memories, "
         "active_memories, total_events, feature_flags}."
     ),
+    # E-33 telemetry tools
+    "depthfusion_record_telemetry": (
+        "Log a per-tool-call telemetry event for cost, latency, and usage analytics (E-33 S-106). "
+        "Args: session_id (str, required), tool_name (str, required), "
+        "agent (str, optional), project (str, optional), "
+        "story_id (str, optional — backlog story ID e.g. S-106), "
+        "sprint (str, optional — sprint label e.g. '2026-Q2-S1'), "
+        "duration_ms (float, optional), tokens_in (int, optional), "
+        "tokens_out (int, optional), cost_usd_estimate (float, optional), "
+        "recorded_at (str, optional — ISO-8601 timestamp; defaults to now). "
+        "Response: {ok: true, event_id: int}."
+    ),
+    "depthfusion_query_telemetry": (
+        "Aggregate telemetry events by project, agent, story, sprint, or period (E-33 S-106). "
+        "Args: project (str, optional), agent (str, optional), "
+        "story_id (str, optional), sprint (str, optional), "
+        "tool_name (str, optional), "
+        "period (str, optional — 'day' | 'week' | 'month'; omit for totals), "
+        "from_dt (str, optional — ISO-8601), to_dt (str, optional — ISO-8601). "
+        "Response: {rows: [{period, event_count, session_count, "
+        "total_duration_ms, avg_duration_ms, total_tokens_in, total_tokens_out, "
+        "total_cost_usd}], row_count: int}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -170,6 +193,9 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_mark_superseded": "operational_memory",
     "depthfusion_report_outcome": "operational_memory",
     "depthfusion_get_cognitive_state": None,      # always enabled
+    # E-33 telemetry tools
+    "depthfusion_record_telemetry": None,         # always enabled (E-33 S-106)
+    "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
 }
 
 
@@ -391,6 +417,36 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["project_id"],
     },
+    # E-33 telemetry tools
+    "depthfusion_record_telemetry": {
+        "properties": {
+            "session_id": {"type": "string"},
+            "tool_name": {"type": "string"},
+            "agent": {"type": "string"},
+            "project": {"type": "string"},
+            "story_id": {"type": "string"},
+            "sprint": {"type": "string"},
+            "duration_ms": {"type": "number"},
+            "tokens_in": {"type": "integer"},
+            "tokens_out": {"type": "integer"},
+            "cost_usd_estimate": {"type": "number"},
+            "recorded_at": {"type": "string"},
+        },
+        "required": ["session_id", "tool_name"],
+    },
+    "depthfusion_query_telemetry": {
+        "properties": {
+            "project": {"type": "string"},
+            "agent": {"type": "string"},
+            "story_id": {"type": "string"},
+            "sprint": {"type": "string"},
+            "tool_name": {"type": "string"},
+            "period": {"type": "string", "enum": ["day", "week", "month"]},
+            "from_dt": {"type": "string"},
+            "to_dt": {"type": "string"},
+        },
+        "required": [],
+    },
 }
 
 
@@ -494,6 +550,10 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_report_outcome(arguments, config)
     elif tool_name == "depthfusion_get_cognitive_state":
         return _tool_get_cognitive_state(arguments, config)
+    elif tool_name == "depthfusion_record_telemetry":
+        return _tool_record_telemetry(arguments, config)
+    elif tool_name == "depthfusion_query_telemetry":
+        return _tool_query_telemetry(arguments, config)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -2293,6 +2353,42 @@ def main() -> None:
             print(json.dumps(error_response), flush=True)
         except Exception as exc:
             logger.error(f"Unhandled error: {exc}")
+
+
+def _tool_record_telemetry(arguments: dict, config: Any) -> str:
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(config.telemetry_store_path)
+    event_id = store.record(
+        session_id=arguments.get("session_id", ""),
+        tool_name=arguments.get("tool_name", ""),
+        agent=arguments.get("agent", ""),
+        project=arguments.get("project", ""),
+        story_id=arguments.get("story_id", ""),
+        sprint=arguments.get("sprint", ""),
+        duration_ms=arguments.get("duration_ms"),
+        tokens_in=arguments.get("tokens_in"),
+        tokens_out=arguments.get("tokens_out"),
+        cost_usd_estimate=arguments.get("cost_usd_estimate"),
+        recorded_at=arguments.get("recorded_at"),
+    )
+    return json.dumps({"ok": True, "event_id": event_id})
+
+
+def _tool_query_telemetry(arguments: dict, config: Any) -> str:
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(config.telemetry_store_path)
+    result = store.aggregate(
+        project=arguments.get("project"),
+        agent=arguments.get("agent"),
+        story_id=arguments.get("story_id"),
+        sprint=arguments.get("sprint"),
+        period=arguments.get("period"),
+        from_dt=arguments.get("from_dt"),
+        to_dt=arguments.get("to_dt"),
+    )
+    return json.dumps(result)
 
 
 if __name__ == "__main__":

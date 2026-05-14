@@ -206,5 +206,14 @@ class DepthFusionConfig:
         return Path.home() / ".claude" / ".depthfusion_memories.db"
 
     @property
+    def telemetry_store_path(self) -> Path:
+        return Path(
+            os.environ.get(
+                "DEPTHFUSION_TELEMETRY_DB",
+                str(Path.home() / ".claude" / ".depthfusion_telemetry.db"),
+            )
+        ).expanduser()
+
+    @property
     def working_memory_path(self) -> Path:
         return Path.home() / ".claude" / ".depthfusion_working_memory.db"
