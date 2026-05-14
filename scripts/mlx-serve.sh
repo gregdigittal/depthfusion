@@ -140,7 +140,7 @@ fi
 # Launch
 # ---------------------------------------------------------------------------
 
-echo "[mlx-serve] starting mlx_lm.server"
+echo "[mlx-serve] starting server"
 echo "  model:  ${MODEL}"
 echo "  host:   ${HOST}"
 echo "  port:   ${PORT}"
@@ -151,9 +151,13 @@ echo ""
 echo "  Press Ctrl+C to stop the server."
 echo ""
 
+# Use mlx-serve-direct.py instead of mlx_lm.server — the upstream server
+# hangs loading the model from a background thread on macOS (Metal threading
+# constraint). The direct wrapper loads the model on the main thread instead.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # shellcheck disable=SC2086
-exec python3 -m mlx_lm.server \
+exec python3 "${SCRIPT_DIR}/mlx-serve-direct.py" \
     --model "${MODEL}" \
     --host "${HOST}" \
-    --port "${PORT}" \
-    ${EXTRA_ARGS}
+    --port "${PORT}"
