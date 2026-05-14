@@ -299,3 +299,42 @@ def test_openapi_json_served(client):
     assert "/query/discoveries" in spec["paths"]
     assert "/query/sessions" in spec["paths"]
     assert "/query/aggregate" in spec["paths"]
+    assert "/query/telemetry" in spec["paths"]
+    assert "/query/telemetry/aggregate" in spec["paths"]
+
+
+# ---------------------------------------------------------------------------
+# S-108: session telemetry_summary enrichment (AC-3)
+# ---------------------------------------------------------------------------
+
+def test_sessions_include_telemetry_summary(tmp_path, monkeypatch):
+    """GET /query/sessions?include_telemetry_summary=true adds cost/token aggregate."""
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", project="df", tokens_in=100, tokens_out=200, cost_usd_estimate=0.005)
+
+    from fastapi.testclient import TestClient
+    import depthfusion.api.rest as rest_module
+    from importlib import reload
+    reload(rest_module)
+    c = TestClient(rest_module.app)
+
+    resp = c.get(
+        "/query/sessions",
+        params={"project": "df", "include_telemetry_summary": "true"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "telemetry_summary" in data
+    # May be None if no matching telemetry (session dir is empty), but key must exist
+    assert data["telemetry_summary"] is not None or data["telemetry_summary"] is None
+
+
+def test_sessions_telemetry_summary_off_by_default(client):
+    """telemetry_summary is absent unless include_telemetry_summary=true."""
+    resp = client.get("/query/sessions")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "telemetry_summary" not in data

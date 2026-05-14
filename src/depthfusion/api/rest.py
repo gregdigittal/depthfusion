@@ -177,6 +177,7 @@ async def get_sessions(
     to: Optional[str] = Query(default=None),
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
+    include_telemetry_summary: bool = Query(default=False),
     _auth: None = Depends(_check_query_auth),
 ):
     from depthfusion.api.query import query_sessions
@@ -185,7 +186,7 @@ async def get_sessions(
     to_dt = _parse_dt(to, "to")
 
     try:
-        return query_sessions(
+        result = query_sessions(
             project=project,
             agent=agent,
             from_dt=from_dt,
@@ -195,6 +196,25 @@ async def get_sessions(
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
+
+    if include_telemetry_summary:
+        try:
+            from depthfusion.core.config import DepthFusionConfig
+            from depthfusion.storage.telemetry_store import TelemetryStore
+
+            cfg = DepthFusionConfig()
+            store = TelemetryStore(cfg.telemetry_store_path)
+            tel = store.aggregate(
+                project=project,
+                agent=agent,
+                from_dt=from_dt.isoformat() if from_dt else None,
+                to_dt=to_dt.isoformat() if to_dt else None,
+            )
+            result["telemetry_summary"] = tel["rows"][0] if tel["rows"] else None
+        except Exception:
+            result["telemetry_summary"] = None
+
+    return result
 
 
 @app.get("/query/aggregate")

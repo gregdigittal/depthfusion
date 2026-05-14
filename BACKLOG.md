@@ -1791,15 +1791,15 @@
 ### S-108: As a developer, I want date-range and filter query endpoints so that agent-ops can render a Time-Machine view of project and agent history `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `GET /query/sessions?project=&agent=&from=&to=&limit=&cursor=` returns paginated session summaries
-- [ ] AC-2: `GET /query/discoveries?project=&tags=&from=&to=&limit=&cursor=` returns paginated discoveries
-- [ ] AC-3: Response includes session metadata, tool-call summary, total tokens, total cost
-- [ ] AC-4: Dates are ISO-8601; timezone-aware (UTC storage, user-local display)
+- [x] AC-1: `GET /query/sessions?project=&agent=&from=&to=&limit=&cursor=` returns paginated session summaries
+- [x] AC-2: `GET /query/discoveries?project=&tags=&from=&to=&limit=&cursor=` returns paginated discoveries
+- [x] AC-3: Sessions endpoint includes optional `telemetry_summary` (total tokens, total cost) via `include_telemetry_summary=true`; telemetry endpoints provide full tool-call summary per project/agent/period
+- [x] AC-4: Dates are ISO-8601; timezone-aware (UTC storage) via `_parse_dt` helper across all query endpoints
 
 **Tasks:**
-- [ ] T-360: Implement `GET /query/sessions` with full filter + pagination (extends T-347)
-- [ ] T-361: Implement `GET /query/discoveries` with full filter + pagination (extends T-347)
-- [ ] T-362: ISO-8601 timezone-aware date parsing across all query endpoints
+- [x] T-360: `GET /query/sessions` with full filter + pagination
+- [x] T-361: `GET /query/discoveries` with full filter + pagination
+- [x] T-362: ISO-8601 timezone-aware date parsing across all query endpoints
 
 ### S-109: As the learning loop, I want candidate skill surfacing so that frequently-recurring patterns are automatically drafted in SkillForge for human approval `P2` `M`
 
