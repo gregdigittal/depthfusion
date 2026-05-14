@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.depthfusion.mlx-serve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/gregmorris/.venv-mlx/bin/python</string>
+        <string>REPO_PATH/scripts/mlx-serve-direct.py</string>
+        <string>--model</string>
+        <string>mlx-community/Qwen2.5-14B-Instruct-4bit</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>8000</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/gregmorris/Library/Logs/mlx-serve.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/gregmorris/Library/Logs/mlx-serve.log</string>
+</dict>
+</plist>
