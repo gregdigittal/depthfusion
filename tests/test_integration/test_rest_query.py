@@ -268,6 +268,29 @@ def test_invalid_date_returns_422(client):
     assert resp.status_code == 422
 
 
+def test_corrupt_cursor_returns_422(client, monkeypatch, discoveries_dir):
+    from depthfusion.api import query as q
+    monkeypatch.setattr(q, "_DISCOVERIES_DIR", discoveries_dir)
+    resp = client.get("/query/discoveries?cursor=notavalidcursor!!!")
+    assert resp.status_code == 422
+
+
+def test_corrupt_cursor_sessions_returns_422(client, monkeypatch, metrics_dir):
+    from depthfusion.api import query as q
+    monkeypatch.setattr(q, "_METRICS_DIR", metrics_dir)
+    resp = client.get("/query/sessions?cursor=notavalidcursor!!!")
+    assert resp.status_code == 422
+
+
+def test_public_bind_without_query_key_raises(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_API_PUBLIC", "1")
+    monkeypatch.setenv("DEPTHFUSION_API_TOKEN", "some-token")
+    monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
+    from depthfusion.api.rest import validate_public_bind_config
+    with pytest.raises(ValueError, match="DEPTHFUSION_QUERY_API_KEY"):
+        validate_public_bind_config()
+
+
 def test_openapi_json_served(client):
     resp = client.get("/openapi.json")
     assert resp.status_code == 200

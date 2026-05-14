@@ -32,13 +32,17 @@ def get_bind_host() -> str:
 
 
 def validate_public_bind_config() -> None:
-    if os.getenv("DEPTHFUSION_API_PUBLIC", "0") == "1" and not os.getenv(
-        "DEPTHFUSION_API_TOKEN", ""
-    ):
-        raise ValueError(
-            "DEPTHFUSION_API_TOKEN must be set when DEPTHFUSION_API_PUBLIC=1. "
-            "Public bind without bearer token authentication is forbidden."
-        )
+    if os.getenv("DEPTHFUSION_API_PUBLIC", "0") == "1":
+        if not os.getenv("DEPTHFUSION_API_TOKEN", ""):
+            raise ValueError(
+                "DEPTHFUSION_API_TOKEN must be set when DEPTHFUSION_API_PUBLIC=1. "
+                "Public bind without bearer token authentication is forbidden."
+            )
+        if not os.getenv("DEPTHFUSION_QUERY_API_KEY", ""):
+            raise ValueError(
+                "DEPTHFUSION_QUERY_API_KEY must be set when DEPTHFUSION_API_PUBLIC=1. "
+                "Public bind exposes /query/* endpoints which require an API key."
+            )
 
 
 def _check_auth(authorization: Optional[str] = Header(default=None)) -> None:
@@ -150,15 +154,18 @@ async def get_discoveries(
     to_dt = _parse_dt(to, "to")
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
 
-    return query_discoveries(
-        project=project,
-        agent=agent,
-        from_dt=from_dt,
-        to_dt=to_dt,
-        tags=tag_list,
-        cursor=cursor,
-        limit=limit,
-    )
+    try:
+        return query_discoveries(
+            project=project,
+            agent=agent,
+            from_dt=from_dt,
+            to_dt=to_dt,
+            tags=tag_list,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid cursor")
 
 
 @app.get("/query/sessions")
@@ -176,14 +183,17 @@ async def get_sessions(
     from_dt = _parse_dt(from_, "from")
     to_dt = _parse_dt(to, "to")
 
-    return query_sessions(
-        project=project,
-        agent=agent,
-        from_dt=from_dt,
-        to_dt=to_dt,
-        cursor=cursor,
-        limit=limit,
-    )
+    try:
+        return query_sessions(
+            project=project,
+            agent=agent,
+            from_dt=from_dt,
+            to_dt=to_dt,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid cursor")
 
 
 @app.get("/query/aggregate")

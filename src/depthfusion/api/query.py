@@ -28,13 +28,14 @@ def _encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(str(offset).encode()).decode()
 
 
-def _decode_cursor(cursor: Optional[str]) -> int:
+def _decode_cursor(cursor: Optional[str]) -> Optional[int]:
+    """Decode cursor; returns None if cursor is non-empty but invalid."""
     if not cursor:
         return 0
     try:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except Exception:
-        return 0
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +92,6 @@ def _discovery_record(filepath: Path) -> dict[str, Any]:
         "tags": tags,
         "title": filepath.stem,
         "content_preview": preview,
-        "file_path": str(filepath),
         "size_bytes": stat.st_size,
     }
 
@@ -147,6 +147,8 @@ def query_discoveries(
         records.append(rec)
 
     offset = _decode_cursor(cursor)
+    if offset is None:
+        raise ValueError("invalid_cursor")
     page = records[offset : offset + limit]
     next_offset = offset + len(page)
     next_cursor = _encode_cursor(next_offset) if next_offset < len(records) else None
@@ -236,6 +238,8 @@ def query_sessions(
             continue
 
     offset = _decode_cursor(cursor)
+    if offset is None:
+        raise ValueError("invalid_cursor")
     page = all_events[offset : offset + limit]
     next_offset = offset + len(page)
     next_cursor = _encode_cursor(next_offset) if next_offset < len(all_events) else None
@@ -257,15 +261,60 @@ def query_aggregate(
     to_dt: Optional[datetime] = None,
     metrics_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
-    """Return aggregated statistics over recall session events."""
-    result = query_sessions(
-        from_dt=from_dt,
-        to_dt=to_dt,
-        limit=10_000,
-        metrics_dir=metrics_dir,
-    )
-    events = result["items"]
-    if not events:
+    """Return aggregated statistics over recall session events.
+
+    Streams directly from JSONL files — does not materialise all events in
+    memory. The latency p95 sample list is capped at 100k values to avoid
+    unbounded memory growth on very large datasets.
+    """
+    base = metrics_dir or _METRICS_DIR
+    recall_files = _recall_files_in_range(base, from_dt, to_dt)
+
+    total = 0
+    modes: dict[str, int] = {}
+    versions: dict[str, int] = {}
+    latencies: list[float] = []
+    result_counts: list[int] = []
+    _LAT_SAMPLE_CAP = 100_000
+
+    for fp in recall_files:
+        try:
+            for line in fp.read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts_str = ev.get("timestamp", "")
+                if ts_str:
+                    try:
+                        ts = datetime.fromisoformat(ts_str)
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
+                        if from_dt and ts < from_dt:
+                            continue
+                        if to_dt and ts > to_dt:
+                            continue
+                    except ValueError:
+                        pass
+                total += 1
+                m = ev.get("mode", "unknown")
+                modes[m] = modes.get(m, 0) + 1
+                v = ev.get("config_version_id", "")
+                if v:
+                    versions[v] = versions.get(v, 0) + 1
+                lat = ev.get("total_latency_ms")
+                if lat is not None and len(latencies) < _LAT_SAMPLE_CAP:
+                    latencies.append(lat)
+                rc = ev.get("result_count")
+                if rc is not None:
+                    result_counts.append(rc)
+        except Exception:
+            continue
+
+    if total == 0:
         return {
             "total_events": 0,
             "total_latency_ms": 0.0,
@@ -276,30 +325,17 @@ def query_aggregate(
             "config_versions": {},
         }
 
-    latencies = sorted(
-        [e["total_latency_ms"] for e in events if "total_latency_ms" in e]
-    )
-    p95 = latencies[int(len(latencies) * 0.95)] if len(latencies) > 20 else (latencies[-1] if latencies else None)
-
-    modes: dict[str, int] = {}
-    versions: dict[str, int] = {}
-    result_counts: list[int] = []
-    for ev in events:
-        m = ev.get("mode", "unknown")
-        modes[m] = modes.get(m, 0) + 1
-        v = ev.get("config_version_id", "")
-        if v:
-            versions[v] = versions.get(v, 0) + 1
-        rc = ev.get("result_count")
-        if rc is not None:
-            result_counts.append(rc)
+    latencies.sort()
+    p95: Optional[float] = None
+    if latencies:
+        p95 = latencies[int(len(latencies) * 0.95)] if len(latencies) > 20 else latencies[-1]
 
     total_lat = sum(latencies)
-    avg_lat = total_lat / len(latencies) if latencies else None
-    avg_rc = sum(result_counts) / len(result_counts) if result_counts else None
+    avg_lat: Optional[float] = total_lat / len(latencies) if latencies else None
+    avg_rc: Optional[float] = sum(result_counts) / len(result_counts) if result_counts else None
 
     return {
-        "total_events": len(events),
+        "total_events": total,
         "total_latency_ms": round(total_lat, 3),
         "avg_latency_ms": round(avg_lat, 3) if avg_lat is not None else None,
         "p95_latency_ms": round(p95, 3) if p95 is not None else None,
