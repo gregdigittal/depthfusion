@@ -1782,7 +1782,7 @@
 
 ---
 
-## E-34: Time-Machine Analytics Query Layer [backlog]
+## E-34: Time-Machine Analytics Query Layer [done]
 
 > Extend the DepthFusion query API with date-range and filter endpoints that power the
 > agent-ops Time-Machine UI, and surface recurring patterns as SkillForge candidate skills
@@ -1804,15 +1804,15 @@
 ### S-109: As the learning loop, I want candidate skill surfacing so that frequently-recurring patterns are automatically drafted in SkillForge for human approval `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `df_surface_skill_candidates` MCP tool: queries telemetry + discovery data for patterns exceeding `learning_loop.auto_draft_threshold` (default: seen 3+ times across sessions)
-- [ ] AC-2: On threshold breach: POST candidate to SkillForge draft endpoint (HTTP; URL + API key from env, never hardcoded)
-- [ ] AC-3: Promotion status tracked in `candidate_skills` table: `pending | approved | rejected` — no duplicate submissions
-- [ ] AC-4: SkillForge POST uses retry (3 attempts, exponential backoff); failure logged, not thrown
+- [x] AC-1: `df_surface_skill_candidates` MCP tool: queries telemetry + discovery data for patterns exceeding `learning_loop.auto_draft_threshold` (default: seen 3+ times across sessions)
+- [x] AC-2: On threshold breach: POST candidate to SkillForge draft endpoint (HTTP; URL + API key from env, never hardcoded)
+- [x] AC-3: Promotion status tracked in `candidate_skills` table: `pending | approved | rejected` — no duplicate submissions
+- [x] AC-4: SkillForge POST uses retry (3 attempts, exponential backoff); failure logged, not thrown
 
 **Tasks:**
-- [ ] T-363: Implement `df_surface_skill_candidates` MCP tool with threshold logic
-- [ ] T-364: HTTP client for SkillForge draft endpoint (env-configured URL + API key)
-- [ ] T-365: `candidate_skills` table migration + promotion status tracking
+- [x] T-363: Implement `df_surface_skill_candidates` MCP tool with threshold logic
+- [x] T-364: HTTP client for SkillForge draft endpoint (env-configured URL + API key)
+- [x] T-365: `candidate_skills` table migration + promotion status tracking
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

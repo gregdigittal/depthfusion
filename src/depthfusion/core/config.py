@@ -128,6 +128,9 @@ class DepthFusionConfig:
     mcp_http_port: int = 7301        # DEPTHFUSION_MCP_PORT
     mcp_http_token: str = ""         # DEPTHFUSION_MCP_TOKEN
 
+    # E-34 S-109 skill surfacing
+    auto_draft_threshold: int = 3    # min distinct sessions before candidate is drafted
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -191,6 +194,7 @@ class DepthFusionConfig:
             mcp_http_enabled=_env_bool("DEPTHFUSION_MCP_HTTP_ENABLED", False),
             mcp_http_port=_env_int("DEPTHFUSION_MCP_PORT", 7301),
             mcp_http_token=os.environ.get("DEPTHFUSION_MCP_TOKEN", ""),
+            auto_draft_threshold=_env_int("DEPTHFUSION_AUTO_DRAFT_THRESHOLD", 3),
         )
 
     @property

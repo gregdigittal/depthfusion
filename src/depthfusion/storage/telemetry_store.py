@@ -7,6 +7,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+_CANDIDATE_DDL = """
+CREATE TABLE IF NOT EXISTS candidate_skills (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern_key  TEXT    NOT NULL UNIQUE,
+    name         TEXT    NOT NULL,
+    description  TEXT    NOT NULL DEFAULT '',
+    status       TEXT    NOT NULL DEFAULT 'pending',
+    created_at   TEXT    NOT NULL,
+    skillforge_id TEXT
+);
+"""
+
 _DDL = """
 CREATE TABLE IF NOT EXISTS telemetry_events (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +55,7 @@ class TelemetryStore:
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_DDL)
+        self._conn.executescript(_CANDIDATE_DDL)
         # Migrate pre-S-107 DBs that lack session_type column.
         try:
             self._conn.execute(_MIGRATION)
@@ -226,6 +239,58 @@ class TelemetryStore:
             rows = [dict(zip(cols, row)) for row in cur.fetchall()]
 
         return {"rows": rows, "row_count": len(rows)}
+
+    def get_recurring_patterns(self, threshold: int = 3) -> list[dict[str, Any]]:
+        """Return tool_name values seen in >= threshold distinct sessions."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT tool_name, COUNT(DISTINCT session_id) AS session_count
+                   FROM telemetry_events
+                   GROUP BY tool_name
+                   HAVING session_count >= ?
+                   ORDER BY session_count DESC""",
+                (threshold,),
+            )
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    def add_candidate(
+        self, pattern_key: str, name: str, description: str = ""
+    ) -> int | None:
+        """Insert a candidate skill; returns row id or None if already exists."""
+        ts = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            cur = self._conn.execute(
+                """INSERT OR IGNORE INTO candidate_skills
+                   (pattern_key, name, description, status, created_at)
+                   VALUES (?, ?, ?, 'pending', ?)""",
+                (pattern_key, name, description, ts),
+            )
+            self._conn.commit()
+            return cur.lastrowid if cur.rowcount else None
+
+    def update_candidate_skillforge_id(
+        self, pattern_key: str, skillforge_id: str
+    ) -> None:
+        """Record the SkillForge draft ID returned after a successful POST."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE candidate_skills SET skillforge_id = ? WHERE pattern_key = ?",
+                (skillforge_id, pattern_key),
+            )
+            self._conn.commit()
+
+    def get_candidates(self, status: Optional[str] = None) -> list[dict[str, Any]]:
+        """Return candidate skills, optionally filtered by status."""
+        where = "WHERE status = ?" if status else ""
+        params = [status] if status else []
+        with self._lock:
+            cur = self._conn.execute(
+                f"SELECT * FROM candidate_skills {where} ORDER BY created_at DESC",
+                params,
+            )
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
 def compute_think_times(events: list[dict[str, Any]]) -> list[dict[str, Any]]:

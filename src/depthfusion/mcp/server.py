@@ -165,6 +165,14 @@ TOOLS: dict[str, str] = {
         "total_duration_ms, avg_duration_ms, total_tokens_in, total_tokens_out, "
         "total_cost_usd}], row_count: int}."
     ),
+    # E-34 S-109 skill surfacing
+    "depthfusion_surface_skill_candidates": (
+        "Scan telemetry for recurring tool patterns and draft candidate skills in SkillForge (E-34 S-109). "
+        "Args: threshold (int, optional — min distinct sessions, default from config, usually 3), "
+        "dry_run (bool, optional — default false; if true, returns candidates without POSTing to SkillForge). "
+        "Response: {candidates_found: int, candidates_drafted: int, "
+        "already_tracked: int, items: [{pattern_key, name, session_count, drafted, skillforge_id}]}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -197,6 +205,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     # E-33 telemetry tools
     "depthfusion_record_telemetry": None,         # always enabled (E-33 S-106)
     "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
+    # E-34 skill surfacing
+    "depthfusion_surface_skill_candidates": None, # always enabled (E-34 S-109)
 }
 
 
@@ -450,6 +460,14 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": [],
     },
+    # E-34 S-109
+    "depthfusion_surface_skill_candidates": {
+        "properties": {
+            "threshold": {"type": "integer", "description": "Min distinct sessions (default from config)"},
+            "dry_run": {"type": "boolean", "default": False},
+        },
+        "required": [],
+    },
 }
 
 
@@ -557,6 +575,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_record_telemetry(arguments, config)
     elif tool_name == "depthfusion_query_telemetry":
         return _tool_query_telemetry(arguments, config)
+    elif tool_name == "depthfusion_surface_skill_candidates":
+        return _tool_surface_skill_candidates(arguments, config)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -2394,6 +2414,82 @@ def _tool_query_telemetry(arguments: dict, config: Any) -> str:
         to_dt=arguments.get("to_dt"),
     )
     return json.dumps(result)
+
+
+def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    from depthfusion.mcp.skillforge_client import post_skill_draft
+
+    threshold = arguments.get("threshold") or getattr(config, "auto_draft_threshold", 3)
+    dry_run: bool = bool(arguments.get("dry_run", False))
+
+    store = TelemetryStore(config.telemetry_store_path)
+    patterns = store.get_recurring_patterns(threshold=threshold)
+
+    items = []
+    candidates_drafted = 0
+    already_tracked = 0
+
+    for pattern in patterns:
+        tool_name = pattern["tool_name"]
+        session_count = pattern["session_count"]
+        pattern_key = f"tool:{tool_name}"
+        name = f"Auto-use: {tool_name}"
+        description = (
+            f"Tool '{tool_name}' used across {session_count} distinct sessions. "
+            "Candidate for skill extraction."
+        )
+
+        row_id = store.add_candidate(pattern_key, name, description)
+        if row_id is None:
+            # Already tracked (INSERT OR IGNORE returned 0 rows)
+            already_tracked += 1
+            items.append(
+                {
+                    "pattern_key": pattern_key,
+                    "name": name,
+                    "session_count": session_count,
+                    "drafted": False,
+                    "skillforge_id": None,
+                    "already_tracked": True,
+                }
+            )
+            continue
+
+        skillforge_id: str | None = None
+        if not dry_run:
+            result = post_skill_draft(
+                name=name,
+                description=description,
+                pattern_key=pattern_key,
+                session_count=session_count,
+            )
+            if result and isinstance(result, dict):
+                skillforge_id = str(result.get("id") or result.get("skill_id") or "")
+                if skillforge_id:
+                    store.update_candidate_skillforge_id(pattern_key, skillforge_id)
+
+        candidates_drafted += 1
+        items.append(
+            {
+                "pattern_key": pattern_key,
+                "name": name,
+                "session_count": session_count,
+                "drafted": True,
+                "skillforge_id": skillforge_id,
+                "already_tracked": False,
+            }
+        )
+
+    return json.dumps(
+        {
+            "candidates_found": len(patterns),
+            "candidates_drafted": candidates_drafted,
+            "already_tracked": already_tracked,
+            "dry_run": dry_run,
+            "items": items,
+        }
+    )
 
 
 if __name__ == "__main__":

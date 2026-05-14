@@ -419,3 +419,125 @@ def test_rest_telemetry_aggregate_by_period(telemetry_client, tmp_path, monkeypa
 def test_rest_telemetry_aggregate_invalid_period(telemetry_client):
     resp = telemetry_client.get("/query/telemetry/aggregate", params={"period": "quarter"})
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# S-109: candidate_skills table + df_surface_skill_candidates MCP tool
+# ---------------------------------------------------------------------------
+
+def test_get_recurring_patterns_empty(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    assert store.get_recurring_patterns(threshold=3) == []
+
+
+def test_get_recurring_patterns_threshold(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(4):
+        store.record(f"sess-{i}", "Read")
+    for i in range(2):
+        store.record(f"sess-b{i}", "Write")
+
+    patterns = store.get_recurring_patterns(threshold=3)
+    names = [p["tool_name"] for p in patterns]
+    assert "Read" in names
+    assert "Write" not in names
+
+
+def test_add_candidate_dedup(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    row1 = store.add_candidate("tool:Read", "Auto-use: Read", "desc")
+    row2 = store.add_candidate("tool:Read", "Auto-use: Read", "desc")
+    assert row1 is not None
+    assert row2 is None  # duplicate returns None
+
+    candidates = store.get_candidates()
+    assert len(candidates) == 1
+    assert candidates[0]["status"] == "pending"
+
+
+def test_update_candidate_skillforge_id(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.add_candidate("tool:Bash", "Auto-use: Bash", "")
+    store.update_candidate_skillforge_id("tool:Bash", "sf-42")
+    candidates = store.get_candidates()
+    assert candidates[0]["skillforge_id"] == "sf-42"
+
+
+def test_mcp_surface_skill_candidates_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _dispatch_tool
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    cfg = DepthFusionConfig()
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(3):
+        store.record(f"s{i}", "Bash")
+
+    result = json.loads(
+        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
+    )
+    assert result["candidates_found"] == 1
+    assert result["candidates_drafted"] == 1
+    assert result["dry_run"] is True
+    assert result["items"][0]["pattern_key"] == "tool:Bash"
+    assert result["items"][0]["skillforge_id"] is None
+
+
+def test_mcp_surface_skill_candidates_below_threshold(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _dispatch_tool
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    cfg = DepthFusionConfig()
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(2):
+        store.record(f"s{i}", "Glob")
+
+    result = json.loads(
+        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
+    )
+    assert result["candidates_found"] == 0
+    assert result["candidates_drafted"] == 0
+
+
+def test_mcp_surface_skill_candidates_no_duplicate_draft(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _dispatch_tool
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    cfg = DepthFusionConfig()
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(3):
+        store.record(f"s{i}", "Read")
+
+    r1 = json.loads(
+        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
+    )
+    assert r1["candidates_drafted"] == 1
+    assert r1["already_tracked"] == 0
+
+    r2 = json.loads(
+        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
+    )
+    assert r2["candidates_drafted"] == 0
+    assert r2["already_tracked"] == 1
+
+
+def test_skillforge_client_no_url(monkeypatch):
+    """When DEPTHFUSION_SKILLFORGE_URL is unset, post_skill_draft returns None without error."""
+    monkeypatch.delenv("DEPTHFUSION_SKILLFORGE_URL", raising=False)
+    from depthfusion.mcp.skillforge_client import post_skill_draft
+
+    result = post_skill_draft("Test", "desc", "tool:Test", 5)
+    assert result is None

@@ -8,9 +8,9 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_twenty_six_entries():
-    """Total tool count: 26 (E-33 S-106/S-107 added 2 telemetry tools)."""
-    assert len(TOOLS) == 26
+def test_tools_dict_has_twenty_seven_entries():
+    """Total tool count: 27 (E-34 S-109 added surface_skill_candidates)."""
+    assert len(TOOLS) == 27
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -38,6 +38,7 @@ def test_tools_dict_has_twenty_six_entries():
         "depthfusion_get_cognitive_state",        # E-31 / S-99
         "depthfusion_record_telemetry",           # E-33 / S-106/S-107
         "depthfusion_query_telemetry",            # E-33 / S-106/S-107
+        "depthfusion_surface_skill_candidates",   # E-34 / S-109
     }
     assert set(TOOLS.keys()) == expected
 
@@ -49,23 +50,23 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 26
+    assert len(enabled) == 27
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
-    # 16 always-on + 1 router (rlm off, graph off, cognitive defaults off) = 17
-    assert len(enabled) == 17
+    # 17 always-on + 1 router (rlm off, graph off, cognitive defaults off) = 18
+    assert len(enabled) == 18
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 16 always-on + 1 rlm (router off, graph off, cognitive defaults off) = 17
-    assert len(enabled) == 17
+    # 17 always-on + 1 rlm (router off, graph off, cognitive defaults off) = 18
+    assert len(enabled) == 18
 
 
 def test_get_enabled_tools_both_disabled():
@@ -73,8 +74,8 @@ def test_get_enabled_tools_both_disabled():
     enabled = get_enabled_tools(config)
     assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    # 16 always-on (rlm off, router off, graph off, cognitive defaults off) = 16
-    assert len(enabled) == 16
+    # 17 always-on (rlm off, router off, graph off, cognitive defaults off) = 17
+    assert len(enabled) == 17
 
 
 def test_core_tools_always_enabled():
