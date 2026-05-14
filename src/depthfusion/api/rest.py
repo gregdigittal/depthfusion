@@ -9,6 +9,7 @@ auth controlled by DEPTHFUSION_QUERY_API_KEY env var.
 """
 from __future__ import annotations
 
+import base64
 import os
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -208,3 +209,104 @@ async def get_aggregate(
     to_dt = _parse_dt(to, "to")
 
     return query_aggregate(from_dt=from_dt, to_dt=to_dt)
+
+
+def _decode_telemetry_cursor(cursor: Optional[str]) -> int:
+    """Decode cursor → integer offset; raises HTTPException 422 on invalid non-empty cursor."""
+    if not cursor:
+        return 0
+    try:
+        return int(base64.urlsafe_b64decode(cursor.encode()).decode())
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid cursor")
+
+
+def _encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(str(offset).encode()).decode()
+
+
+# ---------------------------------------------------------------------------
+# Telemetry query endpoints — /query/telemetry, /query/telemetry/aggregate
+# ---------------------------------------------------------------------------
+
+@app.get("/query/telemetry")
+async def get_telemetry(
+    project: Optional[str] = Query(default=None),
+    agent: Optional[str] = Query(default=None),
+    session_type: Optional[str] = Query(default=None),
+    story_id: Optional[str] = Query(default=None),
+    sprint: Optional[str] = Query(default=None),
+    tool_name: Optional[str] = Query(default=None),
+    from_: Optional[str] = Query(default=None, alias="from"),
+    to: Optional[str] = Query(default=None),
+    cursor: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    include_think_time: bool = Query(default=False),
+    _auth: None = Depends(_check_query_auth),
+):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.storage.telemetry_store import TelemetryStore, compute_think_times
+
+    from_dt = _parse_dt(from_, "from")
+    to_dt = _parse_dt(to, "to")
+    offset = _decode_telemetry_cursor(cursor)
+
+    cfg = DepthFusionConfig()
+    store = TelemetryStore(cfg.telemetry_store_path)
+    rows = store.query(
+        project=project,
+        agent=agent,
+        session_type=session_type,
+        story_id=story_id,
+        sprint=sprint,
+        tool_name=tool_name,
+        from_dt=from_dt.isoformat() if from_dt else None,
+        to_dt=to_dt.isoformat() if to_dt else None,
+        limit=limit + 1,
+        offset=offset,
+    )
+
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+
+    if include_think_time:
+        rows = compute_think_times(rows)
+
+    next_cursor = _encode_cursor(offset + limit) if has_more else None
+    return {"rows": rows, "row_count": len(rows), "next_cursor": next_cursor}
+
+
+@app.get("/query/telemetry/aggregate")
+async def get_telemetry_aggregate(
+    project: Optional[str] = Query(default=None),
+    agent: Optional[str] = Query(default=None),
+    session_type: Optional[str] = Query(default=None),
+    story_id: Optional[str] = Query(default=None),
+    sprint: Optional[str] = Query(default=None),
+    period: Optional[str] = Query(default=None),
+    from_: Optional[str] = Query(default=None, alias="from"),
+    to: Optional[str] = Query(default=None),
+    _auth: None = Depends(_check_query_auth),
+):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    if period and period not in ("day", "week", "month"):
+        raise HTTPException(status_code=422, detail="period must be 'day', 'week', or 'month'")
+
+    from_dt = _parse_dt(from_, "from")
+    to_dt = _parse_dt(to, "to")
+
+    cfg = DepthFusionConfig()
+    store = TelemetryStore(cfg.telemetry_store_path)
+    return store.aggregate(
+        project=project,
+        agent=agent,
+        session_type=session_type,
+        story_id=story_id,
+        sprint=sprint,
+        period=period,
+        from_dt=from_dt.isoformat() if from_dt else None,
+        to_dt=to_dt.isoformat() if to_dt else None,
+    )

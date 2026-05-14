@@ -9,25 +9,30 @@ from typing import Any, Optional
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS telemetry_events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  TEXT    NOT NULL,
-    agent       TEXT    NOT NULL DEFAULT '',
-    project     TEXT    NOT NULL DEFAULT '',
-    story_id    TEXT    NOT NULL DEFAULT '',
-    sprint      TEXT    NOT NULL DEFAULT '',
-    tool_name   TEXT    NOT NULL,
-    duration_ms REAL,
-    tokens_in   INTEGER,
-    tokens_out  INTEGER,
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id       TEXT    NOT NULL,
+    session_type     TEXT    NOT NULL DEFAULT 'agent',
+    agent            TEXT    NOT NULL DEFAULT '',
+    project          TEXT    NOT NULL DEFAULT '',
+    story_id         TEXT    NOT NULL DEFAULT '',
+    sprint           TEXT    NOT NULL DEFAULT '',
+    tool_name        TEXT    NOT NULL,
+    duration_ms      REAL,
+    tokens_in        INTEGER,
+    tokens_out       INTEGER,
     cost_usd_estimate REAL,
-    recorded_at TEXT    NOT NULL
+    recorded_at      TEXT    NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_tel_session  ON telemetry_events(session_id);
-CREATE INDEX IF NOT EXISTS idx_tel_project  ON telemetry_events(project);
-CREATE INDEX IF NOT EXISTS idx_tel_agent    ON telemetry_events(agent);
-CREATE INDEX IF NOT EXISTS idx_tel_tool     ON telemetry_events(tool_name);
-CREATE INDEX IF NOT EXISTS idx_tel_recorded ON telemetry_events(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_tel_session      ON telemetry_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_tel_session_type ON telemetry_events(session_type);
+CREATE INDEX IF NOT EXISTS idx_tel_project      ON telemetry_events(project);
+CREATE INDEX IF NOT EXISTS idx_tel_agent        ON telemetry_events(agent);
+CREATE INDEX IF NOT EXISTS idx_tel_tool         ON telemetry_events(tool_name);
+CREATE INDEX IF NOT EXISTS idx_tel_recorded     ON telemetry_events(recorded_at);
 """
+
+# Migrate existing DBs that predate the session_type column (S-107).
+_MIGRATION = "ALTER TABLE telemetry_events ADD COLUMN session_type TEXT NOT NULL DEFAULT 'agent'"
 
 
 class TelemetryStore:
@@ -38,6 +43,12 @@ class TelemetryStore:
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_DDL)
+        # Migrate pre-S-107 DBs that lack session_type column.
+        try:
+            self._conn.execute(_MIGRATION)
+            self._conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists.
         self._conn.commit()
 
     def record(
@@ -45,6 +56,7 @@ class TelemetryStore:
         session_id: str,
         tool_name: str,
         *,
+        session_type: str = "agent",
         agent: str = "",
         project: str = "",
         story_id: str = "",
@@ -60,11 +72,13 @@ class TelemetryStore:
         with self._lock:
             cur = self._conn.execute(
                 """INSERT INTO telemetry_events
-                   (session_id, agent, project, story_id, sprint, tool_name,
-                    duration_ms, tokens_in, tokens_out, cost_usd_estimate, recorded_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                   (session_id, session_type, agent, project, story_id, sprint,
+                    tool_name, duration_ms, tokens_in, tokens_out,
+                    cost_usd_estimate, recorded_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     session_id,
+                    session_type,
                     agent,
                     project,
                     story_id,
@@ -84,12 +98,14 @@ class TelemetryStore:
         self,
         project: Optional[str] = None,
         agent: Optional[str] = None,
+        session_type: Optional[str] = None,
         story_id: Optional[str] = None,
         sprint: Optional[str] = None,
         tool_name: Optional[str] = None,
         from_dt: Optional[str] = None,
         to_dt: Optional[str] = None,
         limit: int = 500,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         """Return matching telemetry rows as dicts, ordered by recorded_at desc."""
         clauses: list[str] = []
@@ -101,6 +117,9 @@ class TelemetryStore:
         if agent:
             clauses.append("agent = ?")
             params.append(agent)
+        if session_type:
+            clauses.append("session_type = ?")
+            params.append(session_type)
         if story_id:
             clauses.append("story_id = ?")
             params.append(story_id)
@@ -118,14 +137,14 @@ class TelemetryStore:
             params.append(to_dt)
 
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-        params.append(limit)
+        params.extend([limit, offset])
         with self._lock:
             cur = self._conn.execute(
-                f"""SELECT id, session_id, agent, project, story_id, sprint,
-                           tool_name, duration_ms, tokens_in, tokens_out,
-                           cost_usd_estimate, recorded_at
+                f"""SELECT id, session_id, session_type, agent, project,
+                           story_id, sprint, tool_name, duration_ms, tokens_in,
+                           tokens_out, cost_usd_estimate, recorded_at
                     FROM telemetry_events {where}
-                    ORDER BY recorded_at DESC LIMIT ?""",
+                    ORDER BY recorded_at DESC LIMIT ? OFFSET ?""",
                 params,
             )
             cols = [d[0] for d in cur.description]
@@ -135,6 +154,7 @@ class TelemetryStore:
         self,
         project: Optional[str] = None,
         agent: Optional[str] = None,
+        session_type: Optional[str] = None,
         story_id: Optional[str] = None,
         sprint: Optional[str] = None,
         period: Optional[str] = None,
@@ -155,6 +175,9 @@ class TelemetryStore:
         if agent:
             clauses.append("agent = ?")
             params.append(agent)
+        if session_type:
+            clauses.append("session_type = ?")
+            params.append(session_type)
         if story_id:
             clauses.append("story_id = ?")
             params.append(story_id)
@@ -203,3 +226,46 @@ class TelemetryStore:
             rows = [dict(zip(cols, row)) for row in cur.fetchall()]
 
         return {"rows": rows, "row_count": len(rows)}
+
+
+def compute_think_times(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Annotate telemetry rows with inter-tool think_time_ms for human sessions.
+
+    For each consecutive pair in the same session (ordered by recorded_at),
+    think_time_ms = gap between end of previous tool call and start of the next.
+    The first event in a session has think_time_ms=None.
+
+    Only meaningful for session_type='human'. Operates on the output of
+    TelemetryStore.query() — dicts must have recorded_at (ISO-8601 str) and
+    optionally duration_ms.
+    """
+    from datetime import datetime, timezone
+
+    def _parse(ts: str) -> datetime:
+        dt = datetime.fromisoformat(ts)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    by_session: dict[str, list[dict[str, Any]]] = {}
+    for ev in events:
+        by_session.setdefault(ev["session_id"], []).append(ev)
+
+    result: list[dict[str, Any]] = []
+    for session_events in by_session.values():
+        ordered = sorted(session_events, key=lambda e: e["recorded_at"])
+        for i, ev in enumerate(ordered):
+            ev = dict(ev)
+            if i == 0:
+                ev["think_time_ms"] = None
+            else:
+                prev = ordered[i - 1]
+                try:
+                    prev_start = _parse(prev["recorded_at"])
+                    prev_dur = float(prev.get("duration_ms") or 0)
+                    prev_end_ms = prev_start.timestamp() * 1000 + prev_dur
+                    cur_start_ms = _parse(ev["recorded_at"]).timestamp() * 1000
+                    gap = max(0.0, cur_start_ms - prev_end_ms)
+                    ev["think_time_ms"] = round(gap, 1)
+                except (ValueError, TypeError):
+                    ev["think_time_ms"] = None
+            result.append(ev)
+    return result

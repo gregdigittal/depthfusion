@@ -143,8 +143,9 @@ TOOLS: dict[str, str] = {
     ),
     # E-33 telemetry tools
     "depthfusion_record_telemetry": (
-        "Log a per-tool-call telemetry event for cost, latency, and usage analytics (E-33 S-106). "
+        "Log a per-tool-call telemetry event for cost, latency, and usage analytics (E-33 S-106/S-107). "
         "Args: session_id (str, required), tool_name (str, required), "
+        "session_type (str, optional — 'agent' (default) | 'human'), "
         "agent (str, optional), project (str, optional), "
         "story_id (str, optional — backlog story ID e.g. S-106), "
         "sprint (str, optional — sprint label e.g. '2026-Q2-S1'), "
@@ -422,6 +423,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "session_id": {"type": "string"},
             "tool_name": {"type": "string"},
+            "session_type": {"type": "string", "enum": ["agent", "human"], "default": "agent"},
             "agent": {"type": "string"},
             "project": {"type": "string"},
             "story_id": {"type": "string"},
@@ -438,6 +440,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "project": {"type": "string"},
             "agent": {"type": "string"},
+            "session_type": {"type": "string", "enum": ["agent", "human"]},
             "story_id": {"type": "string"},
             "sprint": {"type": "string"},
             "tool_name": {"type": "string"},
@@ -2362,6 +2365,7 @@ def _tool_record_telemetry(arguments: dict, config: Any) -> str:
     event_id = store.record(
         session_id=arguments.get("session_id", ""),
         tool_name=arguments.get("tool_name", ""),
+        session_type=arguments.get("session_type", "agent"),
         agent=arguments.get("agent", ""),
         project=arguments.get("project", ""),
         story_id=arguments.get("story_id", ""),
@@ -2382,6 +2386,7 @@ def _tool_query_telemetry(arguments: dict, config: Any) -> str:
     result = store.aggregate(
         project=arguments.get("project"),
         agent=arguments.get("agent"),
+        session_type=arguments.get("session_type"),
         story_id=arguments.get("story_id"),
         sprint=arguments.get("sprint"),
         period=arguments.get("period"),

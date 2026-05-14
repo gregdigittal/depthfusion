@@ -194,3 +194,228 @@ def test_mcp_record_telemetry_missing_required(mcp_config):
     # Should still succeed (empty strings are stored) — the schema validation
     # is done by the MCP layer, not the handler itself.
     assert result["ok"] is True
+
+
+# ---------------------------------------------------------------------------
+# S-107 additions: session_type, offset pagination, compute_think_times,
+# aggregate session_type filter, REST telemetry endpoints
+# ---------------------------------------------------------------------------
+
+def test_query_filter_by_session_type(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", session_type="human", project="df")
+    store.record("s2", "Write", session_type="agent", project="df")
+    human = store.query(session_type="human")
+    assert len(human) == 1
+    assert human[0]["session_type"] == "human"
+    agent = store.query(session_type="agent")
+    assert len(agent) == 1
+    assert agent[0]["session_type"] == "agent"
+
+
+def test_query_offset_pagination(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(5):
+        store.record(f"s{i}", "Read", recorded_at=f"2026-05-0{i+1}T00:00:00Z")
+    first_page = store.query(limit=2, offset=0)
+    second_page = store.query(limit=2, offset=2)
+    assert len(first_page) == 2
+    assert len(second_page) == 2
+    # Pages should not overlap
+    first_ids = {r["id"] for r in first_page}
+    second_ids = {r["id"] for r in second_page}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_aggregate_filter_by_session_type(tmp_path):
+    from depthfusion.storage.telemetry_store import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", session_type="human", cost_usd_estimate=0.01)
+    store.record("s2", "Write", session_type="agent", cost_usd_estimate=0.02)
+    result = store.aggregate(session_type="human")
+    assert result["rows"][0]["event_count"] == 1
+    assert result["rows"][0]["total_cost_usd"] == pytest.approx(0.01)
+
+
+def test_compute_think_times_basic(tmp_path):
+    from depthfusion.storage.telemetry_store import compute_think_times
+
+    events = [
+        {"session_id": "s1", "recorded_at": "2026-05-01T10:00:00Z", "duration_ms": 1000.0},
+        {"session_id": "s1", "recorded_at": "2026-05-01T10:00:02Z", "duration_ms": 500.0},
+        {"session_id": "s1", "recorded_at": "2026-05-01T10:00:03.5Z", "duration_ms": 200.0},
+    ]
+    result = compute_think_times(events)
+    by_ts = {r["recorded_at"]: r for r in result}
+    assert by_ts["2026-05-01T10:00:00Z"]["think_time_ms"] is None
+    # gap = 2000ms start - (0ms start + 1000ms dur) = 1000ms
+    assert by_ts["2026-05-01T10:00:02Z"]["think_time_ms"] == pytest.approx(1000.0, abs=1.0)
+    # gap = 3500ms - (2000ms + 500ms) = 1000ms
+    assert by_ts["2026-05-01T10:00:03.5Z"]["think_time_ms"] == pytest.approx(1000.0, abs=1.0)
+
+
+def test_compute_think_times_multi_session():
+    from depthfusion.storage.telemetry_store import compute_think_times
+
+    events = [
+        {"session_id": "s1", "recorded_at": "2026-05-01T10:00:00Z", "duration_ms": 500.0},
+        {"session_id": "s2", "recorded_at": "2026-05-01T10:00:01Z", "duration_ms": 200.0},
+        {"session_id": "s1", "recorded_at": "2026-05-01T10:00:02Z", "duration_ms": 100.0},
+    ]
+    result = compute_think_times(events)
+    s1_events = sorted([r for r in result if r["session_id"] == "s1"], key=lambda e: e["recorded_at"])
+    assert s1_events[0]["think_time_ms"] is None
+    assert s1_events[1]["think_time_ms"] is not None
+    s2_events = [r for r in result if r["session_id"] == "s2"]
+    assert s2_events[0]["think_time_ms"] is None
+
+
+def test_mcp_record_telemetry_session_type(mcp_config):
+    import importlib
+    server = importlib.import_module("depthfusion.mcp.server")
+    result = json.loads(
+        server._tool_record_telemetry(
+            {"session_id": "s-human", "tool_name": "Read", "session_type": "human"},
+            mcp_config,
+        )
+    )
+    assert result["ok"] is True
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(mcp_config.telemetry_store_path)
+    rows = store.query(session_type="human")
+    assert len(rows) == 1
+
+
+def test_mcp_query_telemetry_session_type_filter(mcp_config):
+    import importlib
+    server = importlib.import_module("depthfusion.mcp.server")
+    server._tool_record_telemetry(
+        {"session_id": "s1", "tool_name": "Read", "session_type": "human", "cost_usd_estimate": 0.005},
+        mcp_config,
+    )
+    server._tool_record_telemetry(
+        {"session_id": "s2", "tool_name": "Write", "session_type": "agent", "cost_usd_estimate": 0.010},
+        mcp_config,
+    )
+    result = json.loads(
+        server._tool_query_telemetry({"session_type": "human"}, mcp_config)
+    )
+    assert result["rows"][0]["event_count"] == 1
+    assert result["rows"][0]["total_cost_usd"] == pytest.approx(0.005)
+
+
+# ---------------------------------------------------------------------------
+# REST endpoint tests for /query/telemetry and /query/telemetry/aggregate
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def telemetry_client(tmp_path, monkeypatch):
+    """Test client with telemetry store routed to a temp DB."""
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    monkeypatch.delenv("DEPTHFUSION_API_PUBLIC", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
+    from depthfusion.api.rest import app
+    return TestClient(app)
+
+
+def test_rest_get_telemetry_empty(telemetry_client):
+    resp = telemetry_client.get("/query/telemetry")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rows"] == []
+    assert data["row_count"] == 0
+    assert data["next_cursor"] is None
+
+
+def test_rest_get_telemetry_with_data(telemetry_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", session_type="human", project="df", duration_ms=100.0)
+    store.record("s2", "Write", session_type="agent", project="df", duration_ms=200.0)
+
+    resp = telemetry_client.get("/query/telemetry", params={"session_type": "human"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["row_count"] == 1
+    assert data["rows"][0]["session_type"] == "human"
+
+
+def test_rest_get_telemetry_pagination(telemetry_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    for i in range(5):
+        store.record(f"s{i}", "Bash", recorded_at=f"2026-05-0{i+1}T00:00:00Z")
+
+    resp = telemetry_client.get("/query/telemetry", params={"limit": 2})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["row_count"] == 2
+    assert data["next_cursor"] is not None
+
+    resp2 = telemetry_client.get("/query/telemetry", params={"limit": 2, "cursor": data["next_cursor"]})
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["row_count"] == 2
+    first_ids = {r["id"] for r in data["rows"]}
+    second_ids = {r["id"] for r in data2["rows"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_rest_get_telemetry_invalid_cursor(telemetry_client):
+    resp = telemetry_client.get("/query/telemetry", params={"cursor": "not-valid-base64!!!"})
+    assert resp.status_code == 422
+
+
+def test_rest_get_telemetry_include_think_time(telemetry_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", recorded_at="2026-05-01T10:00:00Z", duration_ms=500.0)
+    store.record("s1", "Write", recorded_at="2026-05-01T10:00:01Z", duration_ms=100.0)
+
+    resp = telemetry_client.get("/query/telemetry", params={"include_think_time": "true"})
+    assert resp.status_code == 200
+    data = resp.json()
+    think_times = [r.get("think_time_ms") for r in data["rows"]]
+    assert None in think_times  # first event in session has no think time
+
+
+def test_rest_telemetry_aggregate(telemetry_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", project="df", cost_usd_estimate=0.001)
+    store.record("s2", "Write", project="df", cost_usd_estimate=0.002)
+    store.record("s3", "Bash", project="other", cost_usd_estimate=0.005)
+
+    resp = telemetry_client.get("/query/telemetry/aggregate", params={"project": "df"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rows"][0]["event_count"] == 2
+    assert data["rows"][0]["total_cost_usd"] == pytest.approx(0.003)
+
+
+def test_rest_telemetry_aggregate_by_period(telemetry_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
+    from depthfusion.storage.telemetry_store import TelemetryStore
+    store = TelemetryStore(tmp_path / "tel.db")
+    store.record("s1", "Read", recorded_at="2026-05-01T00:00:00Z")
+    store.record("s1", "Read", recorded_at="2026-05-14T00:00:00Z")
+
+    resp = telemetry_client.get("/query/telemetry/aggregate", params={"period": "day"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["row_count"] == 2
+
+
+def test_rest_telemetry_aggregate_invalid_period(telemetry_client):
+    resp = telemetry_client.get("/query/telemetry/aggregate", params={"period": "quarter"})
+    assert resp.status_code == 422

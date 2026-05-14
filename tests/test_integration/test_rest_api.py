@@ -59,6 +59,7 @@ def test_api_public_bind_requires_token(monkeypatch):
 def test_api_public_bind_with_token_does_not_raise(monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_API_PUBLIC", "1")
     monkeypatch.setenv("DEPTHFUSION_API_TOKEN", "s3cret-t0ken")
+    monkeypatch.setenv("DEPTHFUSION_QUERY_API_KEY", "query-key-123")
     from importlib import reload
     import depthfusion.api.rest as rest_module
     reload(rest_module)

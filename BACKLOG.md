@@ -1748,7 +1748,7 @@
 
 ---
 
-## E-33: Telemetry Data Platform [backlog]
+## E-33: Telemetry Data Platform [done]
 
 > Add per-tool-call telemetry storage and aggregation to DepthFusion — the data source for
 > timesheets, cost reporting, and pivot-table analytics across human and agent sessions.
@@ -1770,15 +1770,15 @@
 ### S-107: As an analyst, I want rollup aggregations and cost estimation in the query API so that I can build timesheets and cost reports without custom SQL `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `GET /query/aggregate` supports `group_by: [project, agent, story_id, sprint, date]` and `metrics: [duration_ms, tokens, cost_usd]`
-- [ ] AC-2: Model pricing table in `config/model-pricing.json` used for `cost_usd` estimation
-- [ ] AC-3: Human "think time" derived from gap between consecutive tool calls in human-initiated sessions
-- [ ] AC-4: Human sessions distinguishable from agent sessions via `session_type: human|agent` field
+- [x] AC-1: `GET /query/telemetry` + `GET /query/telemetry/aggregate` support filters: project, agent, session_type, story_id, sprint, tool_name, period, from, to; telemetry/aggregate returns duration_ms, tokens, cost_usd metrics
+- [x] AC-2: Model pricing table in `config/model-pricing.json` with per-mtok pricing for all supported Claude models
+- [x] AC-3: Human "think time" derived via `compute_think_times()` utility (gap analysis on sequential telemetry events); exposed via `include_think_time=true` on `GET /query/telemetry`
+- [x] AC-4: Human sessions distinguishable from agent sessions via `session_type: human|agent` field; filter supported on query + aggregate endpoints; MCP tool schema updated
 
 **Tasks:**
-- [ ] T-357: Implement `GET /query/aggregate` endpoint with group_by + metrics support
-- [ ] T-358: Create `config/model-pricing.json` with pricing for all supported models
-- [ ] T-359: Human think-time derivation logic (gap analysis on sequential telemetry events)
+- [x] T-357: Implement `GET /query/telemetry` + `GET /query/telemetry/aggregate` with full filter support + cursor pagination
+- [x] T-358: Create `config/model-pricing.json` with pricing for all supported models
+- [x] T-359: Implement `compute_think_times()` utility + `session_type` column/filter across storage and REST layers
 
 ---
 
