@@ -1739,12 +1739,12 @@
 ### S-105: As an operator, I want BI tool connectivity documented so that the team can connect Metabase and Grafana without custom code `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `docs/bi-connectivity.md` covers SSH tunnel setup, API key configuration, and sample queries for Metabase, Grafana, and Power BI
-- [ ] AC-2: Sample Metabase dashboard JSON for the telemetry data views
+- [x] AC-1: `docs/bi-connectivity.md` covers SSH tunnel setup, API key configuration, and sample queries for Metabase, Grafana, and Power BI
+- [x] AC-2: Sample Metabase dashboard JSON for the telemetry data views
 
 **Tasks:**
-- [ ] T-351: Write `docs/bi-connectivity.md`
-- [ ] T-352: Export sample Metabase dashboard JSON
+- [x] T-351: Write `docs/bi-connectivity.md`
+- [x] T-352: Export sample Metabase dashboard JSON
 
 ---
 

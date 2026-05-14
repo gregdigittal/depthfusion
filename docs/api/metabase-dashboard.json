@@ -1,0 +1,171 @@
+{
+  "name": "DepthFusion Recall Telemetry",
+  "description": "Overview of recall session events from the DepthFusion query API",
+  "parameters": [
+    {
+      "id": "date_from",
+      "name": "From Date",
+      "type": "date/single",
+      "slug": "date_from",
+      "default": "past30days"
+    },
+    {
+      "id": "date_to",
+      "name": "To Date",
+      "type": "date/single",
+      "slug": "date_to",
+      "default": "today"
+    }
+  ],
+  "cards": [
+    {
+      "id": 1,
+      "name": "Total Recall Events",
+      "display": "scalar",
+      "description": "Total number of recall query events in the selected date range",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/aggregate?from={{date_from}}&to={{date_to}}",
+          "result_path": "total_events"
+        }
+      },
+      "visualization_settings": {
+        "scalar.field": "total_events"
+      },
+      "size_x": 4,
+      "size_y": 2,
+      "col": 0,
+      "row": 0
+    },
+    {
+      "id": 2,
+      "name": "p95 Latency (ms)",
+      "display": "scalar",
+      "description": "95th percentile end-to-end recall latency",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/aggregate?from={{date_from}}&to={{date_to}}",
+          "result_path": "p95_latency_ms"
+        }
+      },
+      "visualization_settings": {
+        "scalar.field": "p95_latency_ms",
+        "scalar.decimals": 0
+      },
+      "size_x": 4,
+      "size_y": 2,
+      "col": 4,
+      "row": 0
+    },
+    {
+      "id": 3,
+      "name": "Avg Latency (ms)",
+      "display": "scalar",
+      "description": "Mean end-to-end recall latency",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/aggregate?from={{date_from}}&to={{date_to}}",
+          "result_path": "avg_latency_ms"
+        }
+      },
+      "visualization_settings": {
+        "scalar.field": "avg_latency_ms",
+        "scalar.decimals": 0
+      },
+      "size_x": 4,
+      "size_y": 2,
+      "col": 8,
+      "row": 0
+    },
+    {
+      "id": 4,
+      "name": "Mode Distribution",
+      "display": "pie",
+      "description": "Breakdown of recall events by agent mode (vps, vps-gpu, mac-mlx, etc.)",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/aggregate?from={{date_from}}&to={{date_to}}",
+          "result_path": "modes",
+          "transform": "object_to_rows",
+          "columns": [
+            {"name": "mode", "type": "text"},
+            {"name": "count", "type": "integer"}
+          ]
+        }
+      },
+      "visualization_settings": {
+        "pie.dimension": "mode",
+        "pie.metric": "count"
+      },
+      "size_x": 6,
+      "size_y": 4,
+      "col": 0,
+      "row": 2
+    },
+    {
+      "id": 5,
+      "name": "Config Version Distribution",
+      "display": "bar",
+      "description": "Breakdown of recall events by config_version_id",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/aggregate?from={{date_from}}&to={{date_to}}",
+          "result_path": "config_versions",
+          "transform": "object_to_rows",
+          "columns": [
+            {"name": "version", "type": "text"},
+            {"name": "count", "type": "integer"}
+          ]
+        }
+      },
+      "visualization_settings": {
+        "graph.dimensions": ["version"],
+        "graph.metrics": ["count"]
+      },
+      "size_x": 6,
+      "size_y": 4,
+      "col": 6,
+      "row": 2
+    },
+    {
+      "id": 6,
+      "name": "Recent Sessions",
+      "display": "table",
+      "description": "Most recent recall session events",
+      "query": {
+        "type": "native",
+        "native": {
+          "query": "GET /query/sessions?from={{date_from}}&to={{date_to}}&limit=100",
+          "result_path": "items",
+          "columns": [
+            {"name": "timestamp", "type": "datetime"},
+            {"name": "mode", "type": "text"},
+            {"name": "total_latency_ms", "type": "float"},
+            {"name": "result_count", "type": "integer"},
+            {"name": "event_subtype", "type": "text"},
+            {"name": "config_version_id", "type": "text"}
+          ]
+        }
+      },
+      "visualization_settings": {
+        "table.column_widths": {
+          "timestamp": 180,
+          "mode": 100,
+          "total_latency_ms": 120,
+          "result_count": 80,
+          "event_subtype": 100,
+          "config_version_id": 120
+        }
+      },
+      "size_x": 12,
+      "size_y": 6,
+      "col": 0,
+      "row": 6
+    }
+  ]
+}
