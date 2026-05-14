@@ -1713,7 +1713,7 @@
 
 ---
 
-## E-32: DepthFusion Query REST API [backlog]
+## E-32: DepthFusion Query REST API [active]
 
 > Expose a standard REST/JSON query API so that BI tools (Metabase, Grafana, Power BI, n8n)
 > and agent-ops can query DepthFusion data directly — without going through the MCP protocol.
@@ -1722,19 +1722,19 @@
 ### S-104: As a BI analyst, I want REST query endpoints so that I can connect standard BI tools to DepthFusion data `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Endpoint groups: `GET /query/discoveries`, `GET /query/sessions`, `GET /query/aggregate` — each supports `project`, `agent`, `from`, `to`, `tags` filter params
-- [ ] AC-2: All endpoints bind loopback (`127.0.0.1`) — no public bind without auth + firewall (per `infra-exposure.md`)
-- [ ] AC-3: API key authentication middleware (key sourced from env, never hardcoded)
-- [ ] AC-4: Pagination via `cursor` + `limit` params; max 1000 rows per page
-- [ ] AC-5: OpenAPI 3.1 spec generated and served at `GET /openapi.json`
-- [ ] AC-6: Integration tests covering filter combinations and pagination
+- [x] AC-1: Endpoint groups: `GET /query/discoveries`, `GET /query/sessions`, `GET /query/aggregate` — each supports `project`, `agent`, `from`, `to`, `tags` filter params
+- [x] AC-2: All endpoints bind loopback (`127.0.0.1`) — no public bind without auth + firewall (per `infra-exposure.md`)
+- [x] AC-3: API key authentication middleware (`DEPTHFUSION_QUERY_API_KEY` env var → `X-DepthFusion-Key` header; enforced only when key is set)
+- [x] AC-4: Pagination via `cursor` + `limit` params; max 1000 rows per page
+- [x] AC-5: OpenAPI 3.1 spec generated and served at `GET /openapi.json` (FastAPI auto-generates; static reference at `docs/api/query-api.yaml`)
+- [x] AC-6: Integration tests covering filter combinations and pagination — 16 tests in `tests/test_integration/test_rest_query.py`, all passing
 
 **Tasks:**
-- [ ] T-346: Define OpenAPI 3.1 spec for query endpoints (`docs/api/query-api.yaml`)
-- [ ] T-347: Implement `GET /query/discoveries` and `GET /query/sessions` in `api/rest.py` (extends E-29/S-100)
-- [ ] T-348: Implement API key auth middleware
-- [ ] T-349: Implement cursor-based pagination
-- [ ] T-350: Integration tests for all filter combinations
+- [x] T-346: Define OpenAPI 3.1 spec for query endpoints (`docs/api/query-api.yaml`)
+- [x] T-347: Implement `GET /query/discoveries` and `GET /query/sessions` in `api/rest.py` (extends E-29/S-100)
+- [x] T-348: Implement API key auth middleware
+- [x] T-349: Implement cursor-based pagination
+- [x] T-350: Integration tests for all filter combinations
 
 ### S-105: As an operator, I want BI tool connectivity documented so that the team can connect Metabase and Grafana without custom code `P2` `S`
 

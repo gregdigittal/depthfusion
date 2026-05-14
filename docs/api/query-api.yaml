@@ -1,0 +1,294 @@
+openapi: "3.1.0"
+info:
+  title: DepthFusion Query API
+  version: "1.0.0"
+  description: |
+    REST query endpoints for BI tools (Metabase, Grafana, Power BI, n8n).
+    Binds loopback (127.0.0.1:7300) by default; expose via SSH tunnel or
+    Cloudflare Tunnel for remote access.
+
+    Authentication: set DEPTHFUSION_QUERY_API_KEY env var and pass
+    X-DepthFusion-Key header on every request.
+
+servers:
+  - url: http://127.0.0.1:7300
+    description: Local (loopback) — access via SSH tunnel for remote BI
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-DepthFusion-Key
+      description: |
+        Required when DEPTHFUSION_QUERY_API_KEY is set. Omit for
+        loopback-only localhost access without the env var configured.
+
+  schemas:
+    Cursor:
+      type: string
+      description: Opaque pagination cursor. Pass as `cursor=` on the next request.
+
+    DiscoveryRecord:
+      type: object
+      properties:
+        filename:
+          type: string
+          example: "2026-05-13-depthfusion-foo.md"
+        date:
+          type: string
+          format: date
+          example: "2026-05-13"
+        project:
+          type: string
+          example: "depthfusion"
+        agent:
+          type: string
+          example: ""
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["foo", "bar"]
+        title:
+          type: string
+        content_preview:
+          type: string
+          maxLength: 300
+        file_path:
+          type: string
+        size_bytes:
+          type: integer
+
+    SessionRecord:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        event:
+          type: string
+          example: "recall_query"
+        event_subtype:
+          type: string
+          example: "ok"
+        mode:
+          type: string
+          example: "vps"
+        result_count:
+          type: integer
+        total_latency_ms:
+          type: number
+        config_version_id:
+          type: string
+        latency_ms_per_capability:
+          type: object
+          additionalProperties:
+            type: number
+        backend_used:
+          type: object
+          additionalProperties:
+            type: string
+        backend_fallback_chain:
+          type: object
+
+    PagedDiscoveries:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscoveryRecord"
+        total:
+          type: integer
+        count:
+          type: integer
+        next_cursor:
+          $ref: "#/components/schemas/Cursor"
+          nullable: true
+
+    PagedSessions:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionRecord"
+        total:
+          type: integer
+        count:
+          type: integer
+        next_cursor:
+          $ref: "#/components/schemas/Cursor"
+          nullable: true
+
+    AggregateResult:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        total_latency_ms:
+          type: number
+        avg_latency_ms:
+          type: number
+          nullable: true
+        p95_latency_ms:
+          type: number
+          nullable: true
+        avg_result_count:
+          type: number
+          nullable: true
+        modes:
+          type: object
+          additionalProperties:
+            type: integer
+        config_versions:
+          type: object
+          additionalProperties:
+            type: integer
+
+paths:
+  /query/discoveries:
+    get:
+      summary: Query discovery files
+      description: |
+        Return paginated records from ~/.claude/shared/discoveries/*.md files.
+        YAML frontmatter fields (date, project, tags) are used for filtering.
+      parameters:
+        - name: project
+          in: query
+          schema:
+            type: string
+          description: Filter by project slug (from frontmatter)
+        - name: agent
+          in: query
+          schema:
+            type: string
+          description: Filter by agent slug (from frontmatter)
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date (ISO-8601, inclusive)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date (ISO-8601, inclusive)
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: Comma-separated tag filter (all must match)
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor from previous response
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Paged discovery records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedDiscoveries"
+        "401":
+          description: Invalid or missing API key
+        "422":
+          description: Invalid parameter (e.g. malformed date)
+
+  /query/sessions:
+    get:
+      summary: Query recall session events
+      description: |
+        Return paginated recall query events from
+        ~/.claude/depthfusion-metrics/YYYY-MM-DD-recall.jsonl files.
+        The `agent` parameter maps to the `mode` field (e.g. vps, vps-gpu).
+      parameters:
+        - name: project
+          in: query
+          schema:
+            type: string
+          description: "Reserved for future use (recall events don't carry project field yet)"
+        - name: agent
+          in: query
+          schema:
+            type: string
+          description: Filter by mode (e.g. vps, vps-gpu, mac-mlx)
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start datetime (ISO-8601)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End datetime (ISO-8601)
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Paged session event records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedSessions"
+        "401":
+          description: Invalid or missing API key
+        "422":
+          description: Invalid parameter
+
+  /query/aggregate:
+    get:
+      summary: Aggregate session statistics
+      description: |
+        Return count, latency statistics, mode distribution, and config version
+        distribution over recall events in the given date range.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start datetime (ISO-8601)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End datetime (ISO-8601)
+      responses:
+        "200":
+          description: Aggregated statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AggregateResult"
+        "401":
+          description: Invalid or missing API key
+        "422":
+          description: Invalid parameter
