@@ -72,6 +72,16 @@ class ChromaDBStore:
                 metadatas=[metadata],
             )
         else:
+            try:
+                _nonempty = int(self.count()) > 0
+            except (TypeError, ValueError):
+                _nonempty = False
+            if _nonempty:
+                logger.warning(
+                    "Embedding backend unavailable during add_document — falling back to "
+                    "Chroma auto-embedding on a non-empty collection; embedding space "
+                    "mismatch is possible if the backend was healthy during prior indexing."
+                )
             self._collection.upsert(
                 ids=[doc_id],
                 documents=[content],
@@ -91,6 +101,11 @@ class ChromaDBStore:
         if embedding is not None:
             results = self._collection.query(query_embeddings=[embedding[0]], n_results=n)
         else:
+            logger.warning(
+                "Embedding backend unavailable during query — falling back to Chroma "
+                "auto-embedding; results may be inconsistent if documents were indexed "
+                "with a different embedding backend."
+            )
             results = self._collection.query(query_texts=[query_text], n_results=n)
         # The Chroma return types for distances/documents/metadatas are
         # `list[...] | None` — narrow once so mypy + runtime both treat

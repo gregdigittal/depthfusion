@@ -93,14 +93,18 @@ class RecallPipeline:
     def from_env(cls) -> "RecallPipeline":
         """Build pipeline from environment variables.
 
-        Reads DEPTHFUSION_MODE (local|vps-cpu|vps-gpu; 'vps' is a deprecated
-        alias for 'vps-cpu') and queries TierManager when in vps-cpu/vps-gpu mode.
-        Falls back to VPS_TIER1 if TierManager is unavailable.
+        Reads DEPTHFUSION_MODE (local|vps-cpu|vps-gpu|mac-mlx; 'vps' is a
+        deprecated alias for 'vps-cpu') and queries TierManager when in
+        vps-cpu/vps-gpu mode.  mac-mlx uses VPS_TIER1 (BM25 + Haiku reranker)
+        with its local LLM backend.  Falls back to VPS_TIER1 if TierManager is
+        unavailable.
         """
         from depthfusion.utils.mode import normalise_mode
         install_mode = normalise_mode(os.environ.get("DEPTHFUSION_MODE"))
         if install_mode == "local":
             return cls(mode=PipelineMode.LOCAL)
+        if install_mode == "mac-mlx":
+            return cls(mode=PipelineMode.VPS_TIER1)
         if not _TIER_MANAGER_AVAILABLE or TierManager is None:
             return cls(mode=PipelineMode.VPS_TIER1)
         try:

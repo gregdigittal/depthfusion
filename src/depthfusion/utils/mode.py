@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import warnings
 
-_CANONICAL_MODES = frozenset({"local", "vps-cpu", "vps-gpu"})
+_CANONICAL_MODES = frozenset({"local", "vps-cpu", "vps-gpu", "mac-mlx"})
 _ALIAS_MAP = {"vps": "vps-cpu"}  # legacy alias
 
 
 def normalise_mode(raw: str | None) -> str:
     """Return canonical mode string from raw env value.
 
-    Canonical outputs: "local", "vps-cpu", "vps-gpu".
+    Canonical outputs: "local", "vps-cpu", "vps-gpu", "mac-mlx".
     Legacy "vps" maps to "vps-cpu" with a DeprecationWarning.
     Unknown values fall back to "local" with a warning.
     """
