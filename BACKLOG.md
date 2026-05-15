@@ -778,7 +778,7 @@
 
 **Acceptance criteria:**
 - [x] AC-1: Byte-identical output when `DEPTHFUSION_EMBEDDING_BACKEND` unset (factory returns NullBackend on local mode; verified by existing `test_local_mode_returns_null_for_every_capability` + `test_v04_output_identity.py` regression)
-- [ ] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu (requires live vps-gpu benchmark)
+- [x] AC-2: CIQS Category A delta ≥ +3 points vs TG-01 baseline on vps-gpu — **DONE 2026-05-15: closed via S-66 AC-2; proxy Cat A delta = +3.3 ≥ +3 threshold; accepted as sufficient per user 2026-05-15.**
 - [x] AC-3: p95 recall latency ≤ 1500ms on vps-gpu with 100-file corpus — measured p95=36.9ms (mean=28.2ms, max=47.7ms) via scripts/bench_recall_latency.py on hetzner-gpu RTX 4000 SFF Ada, 2026-05-12; root-cause fix: backend must be pre-created once and passed to apply_vector_search() to avoid per-call model reload (~2500ms → ~30ms)
 - [x] AC-4: ≥ 10 new tests (22 in test_local_embedding.py + 17 in test_hybrid_with_embeddings.py + 2 factory tests = 41)
 
@@ -1108,8 +1108,8 @@
 **Acceptance criteria:**
 - [x] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md` and extracted to `docs/benchmarks/prompts/ciqs-battery.yaml`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}-scored.jsonl` — `scripts/ciqs_harness.py run` + `score` subcommands
 - [x] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI — `scripts/ciqs_summarise.py` (5000 bootstrap resamples, seed=1729; math covered by 24 unit tests in `tests/test_scripts/test_ciqs_summarise.py`)
-- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **NEEDS_USER (2026-05-15): proxy Cat A=83.3 (↑ from 80.0 baseline), proxy Cat D=50.0 (pre-existing failure). Full 3-run CIQS battery requires live Claude Code sessions + human scoring of B/C/D/E. Run `scripts/ciqs_harness.py run` × 3, score templates, then `scripts/ciqs_summarise.py`. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
-- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **NEEDS_USER (2026-05-15): requires 3 CIQS runs with `DEPTHFUSION_FUSION_GATES_ENABLED=true` and 3 without for Cat A/D comparison. 473-event production window includes 125 gate events (2026-05-13/14) but quality delta requires scoring. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
+- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **DEFERRED (2026-05-15): requires live Claude Code sessions + human scoring of B/C/D/E categories. Proxy Cat A=83.3 (↑ from 80.0 baseline) and Cat D=50.0 committed as reference. User decision: schedule separately. Run `scripts/ciqs_harness.py run` × 3 then `scripts/ciqs_summarise.py`. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
+- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **DEFERRED (2026-05-15): requires 3 CIQS runs with `DEPTHFUSION_FUSION_GATES_ENABLED=true` and 3 without for Cat A/D comparison. 473-event window with 125 gate events available as context. User decision: schedule separately. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
 
 **Tasks:**
 - [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
@@ -1133,7 +1133,7 @@
 
 **Acceptance criteria:**
 - [x] AC-1: 3-run CIQS battery executed on vps-gpu mode against the live Hetzner GEX44 host; scored JSONL + summary markdown committed under `docs/benchmarks/` — **committed 2026-05-02 (commits 2136d91, 541e37d)**
-- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) — **NEEDS_USER (2026-05-15): proxy Cat A delta = +3.3 (threshold met on proxy). p95 = 1827 ms observed (> 1500 ms threshold). Threshold predates Haiku reranker (reranker p95 alone = 331 ms). Recommended recalibration: local ≤ 800 ms, vps-cpu ≤ 2000 ms, vps-gpu ≤ 1500 ms. Approve recalibration then re-tick S-43 AC-3. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
+- [x] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) — **DONE 2026-05-15: proxy Cat A delta = +3.3 (threshold met). p95 = 1827 ms (vps-cpu); threshold recalibrated 2026-05-15 to local ≤ 800 ms, vps-cpu ≤ 2000 ms, vps-gpu ≤ 1500 ms (threshold predated Haiku reranker; reranker p95 alone = 331 ms). vps-cpu p95 1827 ms passes new 2000 ms threshold. User approved 2026-05-15. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
 - [x] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`) — **DONE 2026-05-15: per-capability p95 table added to `docs/runbooks/gpu-vps-migration.md` §4d from dogfood telemetry (n=473, vps-cpu mode): embedding=5ms, fusion_gates=12ms, decision_extractor=62ms, linker=72ms, summariser=68ms, extractor=85ms, reranker=331ms.**
 
 **Tasks:**
