@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-15 (E-29, E-32, E-33, E-34 marked done; E-26 deferred ACs pending post-dogfood data)
+> Last updated: 2026-05-15 (S-110 web install UI + S-111 Windows compat added to E-05; E-29/E-32/E-33/E-34 done; E-26 deferred)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -114,7 +114,7 @@
 
 ---
 
-## E-05: Claude Code Compatibility & Installer [done]
+## E-05: Claude Code Compatibility & Installer [active]
 
 > C1-C11 compatibility envelope protecting the host Claude Code installation.
 
@@ -143,6 +143,45 @@
 **Tasks:**
 - [x] T-31: Implement all 11 compatibility checks
 - [x] T-32: Resolve C4 YELLOW (postcss node_modules false positive)
+
+### S-110: As a first-time operator, I want a guided web install UI so that I can configure DepthFusion's mode, external dependencies, and Claude Code hooks from a browser without reading docs or memorising CLI flags `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `GET /install` serves a multi-step wizard at `127.0.0.1:7300/install`; launched via `python -m depthfusion.install.install --ui` or standalone `python -m depthfusion.install.ui_server`
+- [ ] AC-2: Step 1 — Mode selection: local / vps-cpu / vps-gpu / mac-mlx; each option shows its dependency list and a "recommended for your hardware" badge (auto-detected via `gpu_probe.py`)
+- [ ] AC-3: Step 2 — System checks: GPU presence, Apple Silicon, Python version, disk space, CUDA; each check shows pass/warn/fail with a one-line explanation
+- [ ] AC-4: Step 3 — Python deps: lists required pip extras for chosen mode; shows installed/missing status per package; "Install missing" button runs `pip install -e ".[<mode>]"` and streams output to the browser via SSE
+- [ ] AC-5: Step 4 — API keys & env vars: guided input for mode-relevant vars (e.g. `ANTHROPIC_API_KEY`); values masked in the UI and written only to `~/.claude/depthfusion.env`; never logged or sent anywhere
+- [ ] AC-6: Step 5 — Hooks & MCP: shows a diff of what will be written to `~/.claude/settings.json` and `~/.claude/hooks/`; "Apply" delegates to existing `install.py` logic (no duplication)
+- [ ] AC-7: Step 6 — Confirmation: dry-run summary then "Finish" runs real install; completion page shows next-steps instructions
+- [ ] AC-8: All wizard endpoints bind `127.0.0.1` only — never `0.0.0.0`; no auth required (loopback-only)
+- [ ] AC-9: ≥ 8 tests covering server startup, each step endpoint, SSE install stream, env-var write (no plaintext in response), dry-run summary, and `--ui` flag
+
+**Tasks:**
+- [ ] T-366: `install/ui_server.py` — FastAPI app with step endpoints + SSE streaming for pip installs
+- [ ] T-367: `install/static/` — single-page HTML/JS wizard (vanilla JS; steps driven by fetch calls to T-366 endpoints)
+- [ ] T-368: Wire system-check and dep-status logic into step API responses (reuse `gpu_probe.py`; add `dep_checker.py`)
+- [ ] T-369: Step 4 env-var write — extend `install.py` `_write_env()` to accept key/value dict from wizard; validate no secrets in logs or HTTP responses
+- [ ] T-370: Wire Step 5 to existing `install.py` hook/MCP logic (programmatic call, not subprocess)
+- [ ] T-371: `--ui` CLI flag in `install.py` that starts uvicorn at `127.0.0.1:7300`
+- [ ] T-372: Tests in `tests/test_install/test_ui_server.py`
+
+### S-111: As a Windows operator, I want DepthFusion to install correctly on Windows so that the tool is usable without WSL for local and vps-cpu modes `P2` `M`
+
+> `vps-gpu` requires vLLM which is Linux/WSL-only; `mac-mlx` is Apple Silicon only. Windows support targets `local` and `vps-cpu` modes. Hook scripts need PowerShell equivalents; the rest of the Python package already uses cross-platform `Path` APIs.
+
+**Acceptance criteria:**
+- [ ] AC-1: `install.py` detects `sys.platform == "win32"` and writes `.ps1` hook scripts instead of `.sh`; `settings.json` entries use `powershell -File <script>.ps1`
+- [ ] AC-2: `vps-gpu` and `mac-mlx` modes are blocked on Windows with a clear error message; `local` and `vps-cpu` install and operate correctly
+- [ ] AC-3: `dep_checker.py` (from S-110 T-368) correctly reports installed packages on Windows (no Unix-only assumptions in package detection)
+- [ ] AC-4: All hardcoded `bash scripts/...` references in installer print statements are gated behind a platform check
+- [ ] AC-5: ≥ 4 tests covering Windows path detection, `.ps1` hook generation, mode-blocking on win32, and idempotent re-install
+
+**Tasks:**
+- [ ] T-373: Platform detection + `.ps1` hook script templates (PowerShell equivalents of pre/post-compact hooks)
+- [ ] T-374: Update `_register_hooks()` to emit correct command per platform
+- [ ] T-375: Block `vps-gpu` and `mac-mlx` on Windows with clear error; audit all `bash` references in print strings
+- [ ] T-376: Tests in `tests/test_install/test_windows_compat.py` (use `monkeypatch` to fake `sys.platform`)
 
 ---
 
