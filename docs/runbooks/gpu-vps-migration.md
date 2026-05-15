@@ -274,6 +274,34 @@ Compare to `~/depthfusion-migration-backup/pre-migration-backend-summary.json`. 
 
 If p95 is > 1500 ms on any capability, **do not proceed to §4e**. Investigate — likely causes: vLLM on CPU not GPU, sentence-transformers falling back to CPU, network hop between processes.
 
+#### Observed per-capability p95 latency (2026-05-10 → 2026-05-14 dogfood pass)
+
+Source: `docs/runbooks/dogfood-reports/2026-05-14-followup.md` (n=473 recall events,
+predominantly vps-cpu mode). Records **S-44 AC-2** (closes S-66 AC-3 in BACKLOG).
+
+| Capability | avg (ms) | p95 (ms) | Notes |
+|---|---|---|---|
+| embedding | 1.5 | 5 | LocalEmbeddingBackend — very fast |
+| fusion_gates | 3.4 | 12 | Present in 125/473 events (gates enabled) |
+| decision_extractor | 41.5 | 62 | Haiku-backed |
+| linker | 44.1 | 72 | Haiku-backed |
+| summariser | 42.8 | 68 | Haiku-backed |
+| extractor | 46.5 | 85 | Haiku-backed |
+| reranker | 225.8 | 331 | Haiku-backed; dominant latency contributor |
+| **total recall** | — | **1827** | Above the original 1500 ms threshold |
+
+> **Note (S-43 AC-3 threshold):** The p95 total recall latency (1827 ms) exceeds the
+> original 1500 ms threshold set before the Haiku reranker was added. Removing reranker
+> latency from the total yields ~1500 ms. The threshold should be recalibrated to reflect
+> the full v0.5.x pipeline (recommended: 2000 ms for vps-cpu/vps-gpu with reranker enabled,
+> 800 ms for local mode). See NEEDS_USER note in `docs/benchmarks/2026-05-15-post-dogfood.md`.
+>
+> **Note on vps-gpu specificity:** The above data is from vps-cpu mode (GemmaBackend not
+> in use). On vps-gpu, `reranker` / `extractor` / `linker` / `summariser` route to Gemma
+> (local inference) rather than Haiku (API call). Expected vps-gpu p95 for those
+> capabilities: significantly lower than the Haiku values above (Gemma on-box eliminates
+> network latency). Re-run §4d on the GEX44 host to obtain vps-gpu–specific numbers.
+
 ### 4e. CIQS baseline (optional but recommended)
 
 Run the benchmark harness for a Category A baseline on vps-gpu:

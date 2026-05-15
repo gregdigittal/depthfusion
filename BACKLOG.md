@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-15 (S-110 web install UI + S-111 Windows compat added to E-05; E-29/E-32/E-33/E-34 done; E-26 deferred)
+> Last updated: 2026-05-15 (E-05 done — S-110 web install UI + S-111 Windows compat shipped; 91 tests green; E-26 S-63 AC-3/AC-4 + S-66 AC-2 NEEDS_USER — p95 threshold recalibration required)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -114,7 +114,7 @@
 
 ---
 
-## E-05: Claude Code Compatibility & Installer [active]
+## E-05: Claude Code Compatibility & Installer [done]
 
 > C1-C11 compatibility envelope protecting the host Claude Code installation.
 
@@ -147,41 +147,41 @@
 ### S-110: As a first-time operator, I want a guided web install UI so that I can configure DepthFusion's mode, external dependencies, and Claude Code hooks from a browser without reading docs or memorising CLI flags `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `GET /install` serves a multi-step wizard at `127.0.0.1:7300/install`; launched via `python -m depthfusion.install.install --ui` or standalone `python -m depthfusion.install.ui_server`
-- [ ] AC-2: Step 1 — Mode selection: local / vps-cpu / vps-gpu / mac-mlx; each option shows its dependency list and a "recommended for your hardware" badge (auto-detected via `gpu_probe.py`)
-- [ ] AC-3: Step 2 — System checks: GPU presence, Apple Silicon, Python version, disk space, CUDA; each check shows pass/warn/fail with a one-line explanation
-- [ ] AC-4: Step 3 — Python deps: lists required pip extras for chosen mode; shows installed/missing status per package; "Install missing" button runs `pip install -e ".[<mode>]"` and streams output to the browser via SSE
-- [ ] AC-5: Step 4 — API keys & env vars: guided input for mode-relevant vars (e.g. `ANTHROPIC_API_KEY`); values masked in the UI and written only to `~/.claude/depthfusion.env`; never logged or sent anywhere
-- [ ] AC-6: Step 5 — Hooks & MCP: shows a diff of what will be written to `~/.claude/settings.json` and `~/.claude/hooks/`; "Apply" delegates to existing `install.py` logic (no duplication)
-- [ ] AC-7: Step 6 — Confirmation: dry-run summary then "Finish" runs real install; completion page shows next-steps instructions
-- [ ] AC-8: All wizard endpoints bind `127.0.0.1` only — never `0.0.0.0`; no auth required (loopback-only)
-- [ ] AC-9: ≥ 8 tests covering server startup, each step endpoint, SSE install stream, env-var write (no plaintext in response), dry-run summary, and `--ui` flag
+- [x] AC-1: `GET /install` serves a multi-step wizard at `127.0.0.1:7300/install`; launched via `python -m depthfusion.install.install --ui` or standalone `python -m depthfusion.install.ui_server`
+- [x] AC-2: Step 1 — Mode selection: local / vps-cpu / vps-gpu / mac-mlx; each option shows its dependency list and a "recommended for your hardware" badge (auto-detected via `gpu_probe.py`)
+- [x] AC-3: Step 2 — System checks: GPU presence, Apple Silicon, Python version, disk space, CUDA; each check shows pass/warn/fail with a one-line explanation
+- [x] AC-4: Step 3 — Python deps: lists required pip extras for chosen mode; shows installed/missing status per package; "Install missing" button runs `pip install -e ".[<mode>]"` and streams output to the browser via SSE
+- [x] AC-5: Step 4 — API keys & env vars: guided input for mode-relevant vars (e.g. `ANTHROPIC_API_KEY`); values masked in the UI and written only to `~/.claude/depthfusion.env`; never logged or sent anywhere
+- [x] AC-6: Step 5 — Hooks & MCP: shows a diff of what will be written to `~/.claude/settings.json` and `~/.claude/hooks/`; "Apply" delegates to existing `install.py` logic (no duplication)
+- [x] AC-7: Step 6 — Confirmation: dry-run summary then "Finish" runs real install; completion page shows next-steps instructions
+- [x] AC-8: All wizard endpoints bind `127.0.0.1` only — never `0.0.0.0`; no auth required (loopback-only)
+- [x] AC-9: ≥ 8 tests covering server startup, each step endpoint, SSE install stream, env-var write (no plaintext in response), dry-run summary, and `--ui` flag
 
 **Tasks:**
-- [ ] T-366: `install/ui_server.py` — FastAPI app with step endpoints + SSE streaming for pip installs
-- [ ] T-367: `install/static/` — single-page HTML/JS wizard (vanilla JS; steps driven by fetch calls to T-366 endpoints)
-- [ ] T-368: Wire system-check and dep-status logic into step API responses (reuse `gpu_probe.py`; add `dep_checker.py`)
-- [ ] T-369: Step 4 env-var write — extend `install.py` `_write_env()` to accept key/value dict from wizard; validate no secrets in logs or HTTP responses
-- [ ] T-370: Wire Step 5 to existing `install.py` hook/MCP logic (programmatic call, not subprocess)
-- [ ] T-371: `--ui` CLI flag in `install.py` that starts uvicorn at `127.0.0.1:7300`
-- [ ] T-372: Tests in `tests/test_install/test_ui_server.py`
+- [x] T-366: `install/ui_server.py` — FastAPI app with step endpoints + SSE streaming for pip installs
+- [x] T-367: `install/static/` — single-page HTML/JS wizard (vanilla JS; steps driven by fetch calls to T-366 endpoints)
+- [x] T-368: Wire system-check and dep-status logic into step API responses (reuse `gpu_probe.py`; add `dep_checker.py`)
+- [x] T-369: Step 4 env-var write — extend `install.py` `_write_env()` to accept key/value dict from wizard; validate no secrets in logs or HTTP responses
+- [x] T-370: Wire Step 5 to existing `install.py` hook/MCP logic (programmatic call, not subprocess)
+- [x] T-371: `--ui` CLI flag in `install.py` that starts uvicorn at `127.0.0.1:7300`
+- [x] T-372: Tests in `tests/test_install/test_ui_server.py`
 
 ### S-111: As a Windows operator, I want DepthFusion to install correctly on Windows so that the tool is usable without WSL for local and vps-cpu modes `P2` `M`
 
 > `vps-gpu` requires vLLM which is Linux/WSL-only; `mac-mlx` is Apple Silicon only. Windows support targets `local` and `vps-cpu` modes. Hook scripts need PowerShell equivalents; the rest of the Python package already uses cross-platform `Path` APIs.
 
 **Acceptance criteria:**
-- [ ] AC-1: `install.py` detects `sys.platform == "win32"` and writes `.ps1` hook scripts instead of `.sh`; `settings.json` entries use `powershell -File <script>.ps1`
-- [ ] AC-2: `vps-gpu` and `mac-mlx` modes are blocked on Windows with a clear error message; `local` and `vps-cpu` install and operate correctly
-- [ ] AC-3: `dep_checker.py` (from S-110 T-368) correctly reports installed packages on Windows (no Unix-only assumptions in package detection)
-- [ ] AC-4: All hardcoded `bash scripts/...` references in installer print statements are gated behind a platform check
-- [ ] AC-5: ≥ 4 tests covering Windows path detection, `.ps1` hook generation, mode-blocking on win32, and idempotent re-install
+- [x] AC-1: `install.py` detects `sys.platform == "win32"` and writes `.ps1` hook scripts instead of `.sh`; `settings.json` entries use `powershell -File <script>.ps1`
+- [x] AC-2: `vps-gpu` and `mac-mlx` modes are blocked on Windows with a clear error message; `local` and `vps-cpu` install and operate correctly
+- [x] AC-3: `dep_checker.py` (from S-110 T-368) correctly reports installed packages on Windows (no Unix-only assumptions in package detection)
+- [x] AC-4: All hardcoded `bash scripts/...` references in installer print statements are gated behind a platform check
+- [x] AC-5: ≥ 4 tests covering Windows path detection, `.ps1` hook generation, mode-blocking on win32, and idempotent re-install
 
 **Tasks:**
-- [ ] T-373: Platform detection + `.ps1` hook script templates (PowerShell equivalents of pre/post-compact hooks)
-- [ ] T-374: Update `_register_hooks()` to emit correct command per platform
-- [ ] T-375: Block `vps-gpu` and `mac-mlx` on Windows with clear error; audit all `bash` references in print strings
-- [ ] T-376: Tests in `tests/test_install/test_windows_compat.py` (use `monkeypatch` to fake `sys.platform`)
+- [x] T-373: Platform detection + `.ps1` hook script templates (PowerShell equivalents of pre/post-compact hooks)
+- [x] T-374: Update `_register_hooks()` to emit correct command per platform
+- [x] T-375: Block `vps-gpu` and `mac-mlx` on Windows with clear error; audit all `bash` references in print strings
+- [x] T-376: Tests in `tests/test_install/test_windows_compat.py` (use `monkeypatch` to fake `sys.platform`)
 
 ---
 
@@ -1108,8 +1108,8 @@
 **Acceptance criteria:**
 - [x] AC-1: Harness script drives the 5-category CIQS battery (defined in `docs/performance-measurement-prompt.md` and extracted to `docs/benchmarks/prompts/ciqs-battery.yaml`) through a configurable backend (local / vps-cpu / vps-gpu) and logs per-prompt scores to `docs/benchmarks/{YYYY-MM-DD}-{mode}-run{N}-scored.jsonl` — `scripts/ciqs_harness.py run` + `score` subcommands
 - [x] AC-2: 3-run aggregate produces mean + stddev per category with bootstrapped 95% CI — `scripts/ciqs_summarise.py` (5000 bootstrap resamples, seed=1729; math covered by 24 unit tests in `tests/test_scripts/test_ciqs_summarise.py`)
-- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **deferred to post-dogfood (S-65): scoring templates require human judgment; index is currently sparse (session tombstones only); meaningful scores require ≥7 days of real discovery content (2026-05-02)**
-- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **deferred to post-dogfood (S-65): same dependency as AC-3**
+- [ ] AC-3: Closes S-30 ACs (3 pre-fix + 3 post-fix runs committed under `docs/benchmarks/`, post-fix ≥ 88 overall with Category D ≥ 55) — **NEEDS_USER (2026-05-15): proxy Cat A=83.3 (↑ from 80.0 baseline), proxy Cat D=50.0 (pre-existing failure). Full 3-run CIQS battery requires live Claude Code sessions + human scoring of B/C/D/E. Run `scripts/ciqs_harness.py run` × 3, score templates, then `scripts/ciqs_summarise.py`. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
+- [ ] AC-4: Closes S-50 AC-3 (Category D ≥ +2 points from PRECEDED_BY edges) and S-51 AC-1 (Category A ≥ +2 on vps-cpu, ≥ +3 on vps-gpu) — **NEEDS_USER (2026-05-15): requires 3 CIQS runs with `DEPTHFUSION_FUSION_GATES_ENABLED=true` and 3 without for Cat A/D comparison. 473-event production window includes 125 gate events (2026-05-13/14) but quality delta requires scoring. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
 
 **Tasks:**
 - [x] T-199: Author `scripts/ciqs_harness.py` — argparse-driven runner with `run`/`score` subcommands, YAML battery, Category A auto-retrieval via `depthfusion.mcp.server._tool_recall`, scoring-template emission for B/C/D/E
@@ -1133,8 +1133,8 @@
 
 **Acceptance criteria:**
 - [x] AC-1: 3-run CIQS battery executed on vps-gpu mode against the live Hetzner GEX44 host; scored JSONL + summary markdown committed under `docs/benchmarks/` — **committed 2026-05-02 (commits 2136d91, 541e37d)**
-- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) — **deferred to post-dogfood (S-65): scoring sparse; p95 latency requires harness instrumentation**
-- [ ] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`) — **deferred: same blocker as AC-2**
+- [ ] AC-2: Closes S-43 AC-2 (CIQS Category A delta ≥ +3 points vs v0.5.0 baseline) and S-43 AC-3 (p95 recall latency ≤ 1500 ms with 100-file corpus) — **NEEDS_USER (2026-05-15): proxy Cat A delta = +3.3 (threshold met on proxy). p95 = 1827 ms observed (> 1500 ms threshold). Threshold predates Haiku reranker (reranker p95 alone = 331 ms). Recommended recalibration: local ≤ 800 ms, vps-cpu ≤ 2000 ms, vps-gpu ≤ 1500 ms. Approve recalibration then re-tick S-43 AC-3. See `docs/benchmarks/2026-05-15-post-dogfood.md`.**
+- [x] AC-3: Closes S-44 AC-2 (p95 latency per capability recorded in the Phase 4 section of `docs/runbooks/gpu-vps-migration.md`) — **DONE 2026-05-15: per-capability p95 table added to `docs/runbooks/gpu-vps-migration.md` §4d from dogfood telemetry (n=473, vps-cpu mode): embedding=5ms, fusion_gates=12ms, decision_extractor=62ms, linker=72ms, summariser=68ms, extractor=85ms, reranker=331ms.**
 
 **Tasks:**
 - [x] T-206: Execute 3-run baseline via `scripts/ciqs_harness.py --mode vps-gpu` after §4e of the GPU migration runbook

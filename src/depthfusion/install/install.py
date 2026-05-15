@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -34,6 +35,8 @@ from depthfusion.install.gpu_probe import (
     detect_gpu,
     recommended_mlx_models,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def _hooks_dir() -> Path:
@@ -201,6 +204,12 @@ def install_vps_gpu(
         2 on refusal (no GPU detected) — mirrors common CLI convention
           where 2 signals "precondition not met".
     """
+    if sys.platform == "win32":
+        raise SystemExit(
+            "Error: vps-gpu mode requires vLLM which is not supported on Windows.\n"
+            "Use local or vps-cpu mode on Windows, or run under WSL for GPU support."
+        )
+
     _print_step("Probing for NVIDIA GPU...", dry_run)
 
     if not skip_gpu_check:
@@ -274,11 +283,17 @@ def install_vps_gpu(
                 dry_run,
             )
     _print_step("VPS-GPU install complete.", dry_run)
-    _print_step(
-        "To serve Gemma locally: `bash scripts/vllm-serve-gemma.sh` "
-        "(see scripts/vllm-gemma.service for systemd).",
-        dry_run,
-    )
+    if sys.platform != "win32":
+        _print_step(
+            "To serve Gemma locally: `bash scripts/vllm-serve-gemma.sh` "
+            "(see scripts/vllm-gemma.service for systemd).",
+            dry_run,
+        )
+    else:
+        _print_step(
+            "vps-gpu is not supported on native Windows. Use WSL for GPU inference.",
+            dry_run,
+        )
     return 0
 
 
@@ -300,6 +315,11 @@ def install_mac_mlx(
         0 on success (or dry-run)
         2 on refusal (not Apple Silicon) — mirrors install_vps_gpu convention
     """
+    if sys.platform == "win32":
+        raise SystemExit(
+            "Error: mac-mlx mode requires Apple Silicon hardware and is not supported on Windows."
+        )
+
     _print_step("Probing for Apple Silicon...", dry_run)
 
     if not skip_silicon_check:
@@ -310,7 +330,10 @@ def install_mac_mlx(
             print("")
             print("Remediation:")
             print("  1. This mode is for MacBooks / Mac Studios / Mac Pros with M-series chips.")
-            print("  2. On Linux or Intel Mac, use --mode=vps-gpu (NVIDIA) or --mode=vps-cpu instead.")
+            print(
+                "  2. On Linux or Intel Mac, use --mode=vps-gpu (NVIDIA)"
+                " or --mode=vps-cpu instead."
+            )
             return 2
         _print_step(f"  {info.reason}", dry_run)
     else:
@@ -352,11 +375,12 @@ def install_mac_mlx(
         _check_sentence_transformers_installed()
 
     _print_step("MAC-MLX install complete.", dry_run)
-    _print_step(
-        "To serve the model locally: `bash scripts/mlx-serve.sh` "
-        "(starts mlx_lm.server on port 8000)",
-        dry_run,
-    )
+    if sys.platform != "win32":
+        _print_step(
+            "To serve the model locally: `bash scripts/mlx-serve.sh` "
+            "(starts mlx_lm.server on port 8000)",
+            dry_run,
+        )
     _print_step(
         f"  Default model: {selected_model.model_id}",
         dry_run,
@@ -445,6 +469,108 @@ def _write_env_config(lines: list[str]) -> None:
     print(f"  Updated config: {env_file}")
 
 
+def write_env_from_dict(values: dict[str, str]) -> None:
+    """Write key=value pairs to ~/.claude/depthfusion.env (merge).
+
+    Merges with existing file — existing keys not in `values` are preserved.
+    Never logs values. Never raises — on error, logs a warning and returns.
+    """
+    try:
+        env_file = Path.home() / ".claude" / "depthfusion.env"
+        env_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if not env_file.exists():
+            lines = [f"{k}={v}" for k, v in values.items()]
+            env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            _logger.info("Wrote env file with %d keys", len(values))
+            return
+
+        old_mode = env_file.stat().st_mode
+        parsed = _parse_env_file(env_file)
+        out_lines: list[str] = []
+        placed: set[str] = set()
+
+        for key, _old_val, raw in parsed:
+            if key is None:
+                out_lines.append(raw)
+            elif key in values:
+                _logger.info("Updating key: %s", key)
+                out_lines.append(f"{key}={values[key]}")
+                placed.add(key)
+            else:
+                out_lines.append(raw)
+
+        for k, v in values.items():
+            if k not in placed:
+                _logger.info("Adding key: %s", k)
+                out_lines.append(f"{k}={v}")
+
+        env_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+        os.chmod(env_file, old_mode)
+        _logger.info("Updated env file (%d keys written)", len(values))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("write_env_from_dict failed: %s", exc)
+
+
+def get_hooks_diff(mode: str) -> dict:  # noqa: ARG001  # mode reserved for future use
+    """Return what would be written to settings.json and hooks dir (dry-run data).
+
+    Returns:
+        {
+          "settings_json_path": str,
+          "hooks_dir": str,
+          "hooks_to_register": list[{"event": str, "script": str, "already_registered": bool}],
+          "env_path": str,
+        }
+    """
+    hooks_dir = _hooks_dir()
+    settings_path = _settings_path()
+    env_path = str(Path.home() / ".claude" / "depthfusion.env")
+
+    is_windows = sys.platform == "win32"
+    pre_script = "depthfusion-pre-compact.ps1" if is_windows else "depthfusion-pre-compact.sh"
+    post_script = "depthfusion-post-compact.ps1" if is_windows else "depthfusion-post-compact.sh"
+    hook_pairs = [
+        ("PreCompact", pre_script),
+        ("PostCompact", post_script),
+    ]
+
+    registered_cmds: set[str] = set()
+    if settings_path.exists():
+        try:
+            with open(settings_path) as f:
+                settings = json.load(f)
+            for event, _ in hook_pairs:
+                for h in settings.get("hooks", {}).get(event, []):
+                    if "command" in h:
+                        registered_cmds.add(h["command"])
+                    for ih in h.get("hooks", []):
+                        if "command" in ih:
+                            registered_cmds.add(ih["command"])
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    hooks_to_register = []
+    for event, script in hook_pairs:
+        script_path = hooks_dir / script
+        cmd = (
+            f"powershell -File '{script_path}'" if is_windows
+            else f"bash {script_path}"
+        )
+        hooks_to_register.append({
+            "event": event,
+            "script": str(script_path),
+            "already_registered": cmd in registered_cmds,
+        })
+
+    return {
+        "settings_json_path": str(settings_path),
+        "hooks_dir": str(hooks_dir),
+        "hooks_to_register": hooks_to_register,
+        "env_path": env_path,
+    }
+
+
 def _register_mcp_server(dry_run: bool = False) -> None:
     """Register the DepthFusion MCP server with the Claude CLI.  (S-67)
 
@@ -509,25 +635,97 @@ def _register_mcp_server(dry_run: bool = False) -> None:
         )
 
 
+def _hook_scripts_for_platform() -> list[tuple[str, str]]:
+    """Return (filename, content) pairs for the current platform's hook scripts.
+
+    On Windows: returns .ps1 scripts.
+    On Unix: returns .sh scripts (existing behaviour, unchanged).
+    """
+    if sys.platform == "win32":
+        return [
+            (
+                "depthfusion-pre-compact.ps1",
+                "# DepthFusion pre-compact hook (Windows)\n"
+                '$python = Join-Path $PSScriptRoot ".." ".." ".venv" "Scripts" "python.exe"\n'
+                'if (-not (Test-Path $python)) { $python = "python" }\n'
+                "& $python -m depthfusion.capture.auto_learn --pre-compact 2>&1\n",
+            ),
+            (
+                "depthfusion-post-compact.ps1",
+                "# DepthFusion post-compact hook (Windows)\n"
+                '$python = Join-Path $PSScriptRoot ".." ".." ".venv" "Scripts" "python.exe"\n'
+                'if (-not (Test-Path $python)) { $python = "python" }\n'
+                "& $python -m depthfusion.capture.auto_learn --post-compact 2>&1\n",
+            ),
+        ]
+    return [
+        (
+            "depthfusion-pre-compact.sh",
+            "#!/bin/bash\n"
+            "# DepthFusion pre-compact hook\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "VENV_PYTHON=\"$SCRIPT_DIR/../../.venv/bin/python3\"\n"
+            "if [ -x \"$VENV_PYTHON\" ]; then\n"
+            "    \"$VENV_PYTHON\" -m depthfusion.capture.auto_learn --pre-compact 2>&1 || exit 0\n"
+            "else\n"
+            "    python3 -m depthfusion.capture.auto_learn --pre-compact 2>&1 || exit 0\n"
+            "fi\n",
+        ),
+        (
+            "depthfusion-post-compact.sh",
+            "#!/bin/bash\n"
+            "# DepthFusion post-compact hook\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "VENV_PYTHON=\"$SCRIPT_DIR/../../.venv/bin/python3\"\n"
+            "if [ -x \"$VENV_PYTHON\" ]; then\n"
+            "    \"$VENV_PYTHON\" -m depthfusion.capture.auto_learn --post-compact 2>&1 || exit 0\n"
+            "else\n"
+            "    python3 -m depthfusion.capture.auto_learn --post-compact 2>&1 || exit 0\n"
+            "fi\n",
+        ),
+    ]
+
+
 def _register_hooks() -> None:
     settings_path = _settings_path()
     hooks_dir = _hooks_dir()
     if not settings_path.exists():
         print(f"  Warning: {settings_path} not found, skipping hook registration")
         return
+
+    # Write platform-appropriate hook scripts if they don't already exist.
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    is_windows = sys.platform == "win32"
+    for filename, content in _hook_scripts_for_platform():
+        script_path = hooks_dir / filename
+        if not script_path.exists():
+            script_path.write_text(content, encoding="utf-8")
+            if not is_windows:
+                script_path.chmod(0o755)
+            print(f"  Wrote hook script: {filename}")
+
     with open(settings_path) as f:
         settings = json.load(f)
     hooks = settings.setdefault("hooks", {})
     for event, script in [
-        ("PreCompact", "depthfusion-pre-compact.sh"),
-        ("PostCompact", "depthfusion-post-compact.sh"),
+        (
+            "PreCompact",
+            "depthfusion-pre-compact.ps1" if is_windows else "depthfusion-pre-compact.sh",
+        ),
+        (
+            "PostCompact",
+            "depthfusion-post-compact.ps1" if is_windows else "depthfusion-post-compact.sh",
+        ),
     ]:
         script_path = hooks_dir / script
         if not script_path.exists():
             print(f"  Warning: {script_path} not found — skipping {event} hook")
             continue
         existing = hooks.get(event, [])
-        cmd = f"bash {script_path}"
+        cmd = (
+            f"powershell -File '{script_path}'" if is_windows
+            else f"bash {script_path}"
+        )
         already_registered = any(
             h.get("command") == cmd or
             any(ih.get("command") == cmd for ih in h.get("hooks", []))
@@ -753,7 +951,18 @@ def main(argv: list[str] | None = None) -> int:
             "CI only — real installs should not use this."
         ),
     )
+    parser.add_argument(
+        "--ui", action="store_true",
+        help="Launch the guided web install UI at http://127.0.0.1:7300/install",
+    )
     args = parser.parse_args(argv)
+
+    if args.ui:
+        print("Opening DepthFusion install wizard at http://127.0.0.1:7300/install")
+        import uvicorn  # noqa: PLC0415,I001
+        from depthfusion.install.ui_server import app  # noqa: PLC0415
+        uvicorn.run(app, host="127.0.0.1", port=7300, log_level="warning")
+        return 0
 
     # Resolve mode: explicit --mode wins; otherwise auto-detect and
     # optionally prompt.

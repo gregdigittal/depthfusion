@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DepthFusion Install Wizard</title>
+  <style>
+    :root {
+      --blue:    #2563eb; --blue-dk: #1d4ed8;
+      --green:   #16a34a; --green-dk: #15803d;
+      --red:     #dc2626; --orange:  #d97706;
+      --g50:     #f9fafb; --g100: #f3f4f6; --g200: #e5e7eb;
+      --g400:    #9ca3af; --g600: #4b5563; --g800: #1f2937;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono: 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font); background: var(--g50); color: var(--g800);
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 32px 16px 48px;
+    }
+    .wizard {
+      width: 100%; max-width: 840px; background: #fff;
+      border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08), 0 6px 24px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .wizard-header { padding: 22px 32px 0; border-bottom: 1px solid var(--g200); }
+    .brand { font-size: 18px; font-weight: 700; margin-bottom: 18px; letter-spacing: -.01em; }
+    .brand em { font-style: normal; color: var(--blue); }
+    .step-bar { display: flex; list-style: none; margin-bottom: -1px; }
+    .step-bar li {
+      flex: 1; display: flex; align-items: center; gap: 7px; padding: 10px 6px;
+      font-size: 12px; color: var(--g400); border-bottom: 3px solid transparent;
+      white-space: nowrap; overflow: hidden; cursor: default; user-select: none;
+    }
+    .step-bar li.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+    .step-bar li.done   { color: var(--green); }
+    .sn {
+      flex-shrink: 0; width: 21px; height: 21px; border-radius: 50%;
+      background: var(--g200); color: var(--g600); font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-bar li.active .sn { background: var(--blue);  color: #fff; }
+    .step-bar li.done   .sn { background: var(--green); color: #fff; }
+    .wizard-body { padding: 28px 32px; min-height: 400px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .ph { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
+    .ps { font-size: 13px; color: var(--g600); margin-bottom: 22px; line-height: 1.5; }
+    .loading {
+      display: flex; align-items: center; gap: 10px;
+      padding: 36px 0; color: var(--g400); font-size: 14px;
+    }
+    .empty { color: var(--g400); text-align: center; padding: 36px 0; font-size: 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 20px; height: 20px; border: 3px solid var(--g200);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .65s linear infinite; flex-shrink: 0;
+    }
+    .alert {
+      display: flex; gap: 9px; align-items: flex-start;
+      padding: 10px 14px; border-radius: 7px; font-size: 13px; line-height: 1.5;
+    }
+    .ae { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .as { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .aw { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .ai { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+    .mode-card {
+      position: relative; border: 2px solid var(--g200); border-radius: 9px; padding: 16px;
+      cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; outline: none;
+    }
+    .mode-card:hover, .mode-card:focus-visible { border-color: var(--blue); }
+    .mode-card.selected {
+      border-color: var(--blue); background: #eff6ff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .mc-name { font-weight: 700; font-size: 14px; margin-bottom: 5px; }
+    .mc-desc { font-size: 12px; color: var(--g600); margin-bottom: 10px; line-height: 1.55; }
+    .tag { display: inline-block; background: var(--g100); color: var(--g600); font-size: 11px; border-radius: 4px; padding: 2px 6px; margin: 2px 2px 0 0; }
+    .badge-rec {
+      position: absolute; top: 10px; right: 10px; background: var(--blue); color: #fff;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .dt th {
+      text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--g600); background: var(--g50);
+      padding: 8px 12px; border-bottom: 1px solid var(--g200);
+    }
+    .dt td { padding: 9px 12px; border-bottom: 1px solid var(--g100); vertical-align: middle; }
+    .dt tbody tr:last-child td { border-bottom: none; }
+    .dt code { font-family: var(--mono); font-size: 12px; }
+    .sp { color: var(--green);  font-weight: 600; }
+    .sw { color: var(--orange); font-weight: 600; }
+    .sf { color: var(--red);    font-weight: 600; }
+    .so { color: var(--green);  font-weight: 600; }
+    .sm { color: var(--red);    font-weight: 600; }
+    .sd { color: var(--orange); font-weight: 600; }
+    .sk { color: var(--g400); }
+    .sc { color: var(--blue);   font-weight: 600; }
+    .su { color: var(--orange); font-weight: 600; }
+    .bi {
+      display: inline-block; background: #dcfce7; color: #166534;
+      font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    }
+    .install-log {
+      font-family: var(--mono); font-size: 12px; background: var(--g800); color: #d1fae5;
+      border-radius: 7px; padding: 12px 14px; height: 168px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all; margin-top: 12px;
+    }
+    .fg { margin-bottom: 18px; }
+    .fl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .fl .req { color: var(--red); margin-left: 2px; }
+    .fl .opt { font-weight: 400; color: var(--g400); font-size: 12px; margin-left: 5px; }
+    .iw { position: relative; display: flex; }
+    .fi {
+      flex: 1; padding: 9px 12px; font-size: 14px; font-family: var(--font);
+      border: 1px solid var(--g200); border-radius: 7px; outline: none;
+      transition: border-color .15s; min-width: 0;
+    }
+    .fi:focus   { border-color: var(--blue); }
+    .fi.invalid { border-color: var(--red);  }
+    .tpw {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 14px;
+      color: var(--g400); padding: 2px 3px; line-height: 1;
+    }
+    .tpw:hover { color: var(--g800); }
+    .diff-block {
+      font-family: var(--mono); font-size: 12px; background: var(--g50);
+      border: 1px solid var(--g200); border-radius: 7px; overflow: auto; max-height: 190px;
+    }
+    .dl  { display: block; padding: 2px 14px; white-space: pre; }
+    .da  { background: #dcfce7; color: #15803d; }
+    .dc  { color: var(--g600); }
+    .sec { margin-bottom: 22px; }
+    .st  { font-size: 13px; font-weight: 700; color: var(--g800); margin-bottom: 9px; }
+    .finish-box { text-align: center; padding: 16px 0 24px; }
+    .fi-icon  { font-size: 56px; margin-bottom: 10px; }
+    .fi-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; }
+    .fi-sub   { font-size: 14px; color: var(--g600); margin-bottom: 22px; }
+    .fi-meta {
+      display: inline-block; background: var(--g50); border: 1px solid var(--g200);
+      border-radius: 9px; padding: 14px 22px; font-size: 13px; text-align: left; margin-bottom: 20px;
+    }
+    .fi-meta dt {
+      font-size: 11px; font-weight: 600; color: var(--g600); text-transform: uppercase;
+      letter-spacing: .05em; margin-top: 8px;
+    }
+    .fi-meta dt:first-child { margin-top: 0; }
+    .fi-meta dd { margin: 2px 0 0 0; color: var(--g800); }
+    .ns-box {
+      display: inline-block; background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: 9px; padding: 14px 20px; text-align: left; max-width: 480px;
+    }
+    .ns-box h4 { font-size: 13px; color: #166534; margin-bottom: 8px; }
+    .ns-box ol { padding-left: 18px; font-size: 13px; line-height: 1.85; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px;
+      font-size: 14px; font-family: var(--font); font-weight: 600; border-radius: 7px;
+      border: none; cursor: pointer; transition: background .14s, opacity .14s; white-space: nowrap;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .bp { background: var(--blue);  color: #fff; }
+    .bp:hover:not(:disabled) { background: var(--blue-dk); }
+    .bse { background: #fff; color: var(--g600); border: 1px solid var(--g200); }
+    .bse:hover:not(:disabled) { background: var(--g100); }
+    .bsu { background: var(--green); color: #fff; }
+    .bsu:hover:not(:disabled) { background: var(--green-dk); }
+    .bsm { padding: 6px 13px; font-size: 13px; }
+    .wizard-footer {
+      padding: 14px 32px; border-top: 1px solid var(--g200); background: var(--g50);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .fst { font-size: 13px; color: var(--red); flex: 1; text-align: center; }
+    .ar  { display: flex; gap: 10px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+<div class="wizard" role="main" aria-label="DepthFusion installation wizard">
+  <header class="wizard-header">
+    <div class="brand">&#9889; <em>DepthFusion</em> Install Wizard</div>
+    <ol class="step-bar" id="stepBar" aria-label="Installation progress">
+      <li class="active" id="tab-1"><span class="sn" aria-hidden="true">1</span>Mode</li>
+      <li id="tab-2"><span class="sn" aria-hidden="true">2</span>System</li>
+      <li id="tab-3"><span class="sn" aria-hidden="true">3</span>Deps</li>
+      <li id="tab-4"><span class="sn" aria-hidden="true">4</span>API Keys</li>
+      <li id="tab-5"><span class="sn" aria-hidden="true">5</span>Hooks &amp; MCP</li>
+      <li id="tab-6"><span class="sn" aria-hidden="true">6</span>Finish</li>
+    </ol>
+  </header>
+  <div class="wizard-body">
+    <section class="panel active" id="step-1" aria-labelledby="h1">
+      <div class="ph" id="h1">Choose Installation Mode</div>
+      <div class="ps">Select the mode that best matches your hardware. A <strong>Recommended</strong> badge marks the best fit for your detected hardware.</div>
+      <div class="mode-grid" id="modeGrid" role="radiogroup" aria-label="Installation mode">
+        <div class="loading"><div class="spinner"></div>Loading modes&#8230;</div>
+      </div>
+      <div id="s1err" class="alert ae" style="display:none;margin-top:10px"></div>
+    </section>
+    <section class="panel" id="step-2" aria-labelledby="h2">
+      <div class="ph" id="h2">System Checks</div>
+      <div class="ps">Verifying prerequisites for <strong id="s2mode"></strong> mode.</div>
+      <div id="checksWrap"><div class="loading"><div class="spinner"></div>Running checks&#8230;</div></div>
+    </section>
+    <section class="panel" id="step-3" aria-labelledby="h3">
+      <div class="ph" id="h3">Python Dependencies</div>
+      <div class="ps">Packages required for <strong id="s3mode"></strong> mode.</div>
+      <div id="depsWrap"><div class="loading"><div class="spinner"></div>Loading&#8230;</div></div>
+      <div id="logWrap" style="display:none">
+        <div class="st" style="margin-top:14px">Install log</div>
+        <pre class="install-log" id="installLog" aria-live="polite" aria-label="Package install output"></pre>
+      </div>
+      <div id="s3err" class="alert ae" style="display:none;margin-top:12px"></div>
+    </section>
+    <section class="panel" id="step-4" aria-labelledby="h4">
+      <div class="ph" id="h4">API Keys &amp; Environment Variables</div>
+      <div class="ps">Configure credentials for <strong id="s4mode"></strong> mode.</div>
+      <div class="alert ai" style="margin-bottom:20px">&#128274; Values are written only to <code>~/.claude/depthfusion.env</code> &#8212; never transmitted beyond localhost.</div>
+      <form id="envForm" autocomplete="off" novalidate>
+        <div id="fieldsWrap"><div class="loading"><div class="spinner"></div>Loading&#8230;</div></div>
+      </form>
+      <div id="s4err" class="alert ae" style="display:none;margin-top:12px"></div>
+    </section>
+    <section class="panel" id="step-5" aria-labelledby="h5">
+      <div class="ph" id="h5">Hooks &amp; MCP Configuration</div>
+      <div class="ps">Review changes that will be written to your system before applying.</div>
+      <div id="reviewWrap"><div class="loading"><div class="spinner"></div>Loading&#8230;</div></div>
+      <div id="s5err" class="alert ae" style="display:none;margin-top:12px"></div>
+      <div id="s5ok"  class="alert as" style="display:none;margin-top:12px"></div>
+    </section>
+    <section class="panel" id="step-6" aria-labelledby="h6">
+      <div class="ph" id="h6">Confirm &amp; Finish</div>
+      <div class="ps">Installing DepthFusion with your selected configuration.</div>
+      <div id="finishWrap"><div class="loading"><div class="spinner"></div>Installing&#8230;</div></div>
+    </section>
+  </div>
+  <footer class="wizard-footer">
+    <button class="btn bse" id="btnBack" disabled aria-label="Go to previous step">&#8592; Back</button>
+    <span class="fst" id="fst" role="status" aria-live="polite"></span>
+    <button class="btn bp"  id="btnNext" aria-label="Go to next step">Next &#8594;</button>
+  </footer>
+</div>
+<script>
+'use strict';
+
+// ── Stub/live toggle. Flip to false when be signals endpoints are live ──
+const USE_STUB = false;
+
+// ── Stub responses ──────────────────────────────────────────────────────
+function s5stub() {
+  return {
+    files: [
+      { path: '~/.claude/depthfusion.env',         action: 'create' },
+      { path: '~/.config/depthfusion/config.toml', action: 'create' },
+      { path: '~/.claude/settings.json',           action: 'update' },
+    ],
+    hooks_to_register: [
+      { name: 'session-start.sh', description: 'Load session context at startup', already_installed: false },
+      { name: 'session-end.sh',   description: 'Save session context on exit',    already_installed: true  },
+      { name: 'compress.sh',      description: 'Compress long context sessions',  already_installed: false },
+    ],
+    diff_lines: [
+      '  "hooks": {',
+      '+   "PreToolUse": [{"matcher":"Bash(git commit*)","hooks":[{"type":"command","command":"session-start.sh"}]}],',
+      '+   "PostToolUse": [{"matcher":"Bash(*)","hooks":[{"type":"command","command":"session-end.sh"}]}]',
+      '  }',
+    ],
+  };
+}
+
+const STUBS = {
+  '/install/api/steps/1': {
+    modes: [
+      { id: 'local',   name: 'Local (BM25)',    description: 'Pure BM25 retrieval. Works fully offline, no API keys required.', deps: ['No extra packages'] },
+      { id: 'vps-cpu', name: 'VPS CPU (Haiku)', description: 'Anthropic Haiku as a semantic reranker. Requires ANTHROPIC_API_KEY.', deps: ['anthropic>=0.25.0'] },
+      { id: 'vps-gpu', name: 'VPS GPU (vLLM)',  description: 'On-box GPU inference via vLLM. Requires an NVIDIA GPU with CUDA.', deps: ['vllm>=0.4.0', 'torch>=2.1.0'] },
+      { id: 'mac-mlx', name: 'Mac MLX',         description: 'Apple Silicon GPU inference via MLX. Requires M1 / M2 / M3 chip.', deps: ['mlx>=0.12.0', 'mlx-lm>=0.8.0'] },
+    ],
+  },
+  '/install/api/hardware': { recommended: 'local' },
+  '/install/api/steps/2?mode=local':    { checks: [{ name:'Python >= 3.10', status:'pass', explanation:'Python 3.11.9 found' }, { name:'pip available', status:'pass', explanation:'pip 24.0' }, { name:'Disk space >= 200 MB', status:'pass', explanation:'47 GB available' }, { name:'Write access to ~/.claude/', status:'pass', explanation:'Writable' }] },
+  '/install/api/steps/2?mode=vps-cpu':  { checks: [{ name:'Python >= 3.10', status:'pass', explanation:'Python 3.11.9 found' }, { name:'pip available', status:'pass', explanation:'pip 24.0' }, { name:'Disk space >= 2 GB', status:'pass', explanation:'47 GB available' }, { name:'Internet connectivity', status:'pass', explanation:'api.anthropic.com reachable' }] },
+  '/install/api/steps/2?mode=vps-gpu':  { checks: [{ name:'Python >= 3.10', status:'pass', explanation:'Python 3.11.9 found' }, { name:'pip available', status:'pass', explanation:'pip 24.0' }, { name:'Disk space >= 10 GB', status:'warn', explanation:'8.1 GB available — vLLM models may need more' }, { name:'NVIDIA GPU detected', status:'fail', explanation:'No NVIDIA GPU found (nvidia-smi exit code 1)' }, { name:'CUDA >= 11.8', status:'fail', explanation:'Cannot check: no GPU detected' }] },
+  '/install/api/steps/2?mode=mac-mlx': { checks: [{ name:'Python >= 3.10', status:'pass', explanation:'Python 3.11.9 found' }, { name:'pip available', status:'pass', explanation:'pip 24.0' }, { name:'Apple Silicon detected', status:'pass', explanation:'Apple M2 Pro' }, { name:'macOS >= 13.3 (Ventura)', status:'pass', explanation:'macOS 14.4.1' }, { name:'Disk space >= 5 GB', status:'pass', explanation:'112 GB available' }] },
+  '/install/api/steps/3?mode=local':   { packages: [], message: 'No additional packages required for local mode. Ready.' },
+  '/install/api/steps/3?mode=vps-cpu': { packages: [{ name:'anthropic', required:'>=0.25.0', installed:null, status:'missing' }, { name:'httpx', required:'>=0.24.0', installed:'0.24.1', status:'installed' }] },
+  '/install/api/steps/3?mode=vps-gpu': { packages: [{ name:'vllm', required:'>=0.4.0', installed:null, status:'missing' }, { name:'torch', required:'>=2.1.0', installed:'2.0.1', status:'outdated' }, { name:'transformers', required:'>=4.40.0', installed:null, status:'missing' }] },
+  '/install/api/steps/3?mode=mac-mlx': { packages: [{ name:'mlx', required:'>=0.12.0', installed:'0.12.2', status:'installed' }, { name:'mlx-lm', required:'>=0.8.0', installed:null, status:'missing' }] },
+  '/install/api/steps/4?mode=local':   { fields: [{ key:'DEPTHFUSION_SKILLFORGE_URL', label:'SkillForge URL', required:false, pw:false, placeholder:'https://...' }, { key:'DEPTHFUSION_SKILLFORGE_API_KEY', label:'SkillForge API Key', required:false, pw:true }] },
+  '/install/api/steps/4?mode=vps-cpu': { fields: [{ key:'ANTHROPIC_API_KEY', label:'Anthropic API Key', required:true, pw:true, placeholder:'sk-ant-...' }, { key:'DEPTHFUSION_SKILLFORGE_URL', label:'SkillForge URL', required:false, pw:false, placeholder:'https://...' }, { key:'DEPTHFUSION_SKILLFORGE_API_KEY', label:'SkillForge API Key', required:false, pw:true }] },
+  '/install/api/steps/4?mode=vps-gpu': { fields: [{ key:'DEPTHFUSION_SKILLFORGE_URL', label:'SkillForge URL', required:false, pw:false, placeholder:'https://...' }, { key:'DEPTHFUSION_SKILLFORGE_API_KEY', label:'SkillForge API Key', required:false, pw:true }] },
+  '/install/api/steps/4?mode=mac-mlx': { fields: [{ key:'DEPTHFUSION_SKILLFORGE_URL', label:'SkillForge URL', required:false, pw:false, placeholder:'https://...' }, { key:'DEPTHFUSION_SKILLFORGE_API_KEY', label:'SkillForge API Key', required:false, pw:true }] },
+  '/install/api/steps/5?mode=local':   s5stub(),
+  '/install/api/steps/5?mode=vps-cpu': s5stub(),
+  '/install/api/steps/5?mode=vps-gpu': s5stub(),
+  '/install/api/steps/5?mode=mac-mlx': s5stub(),
+  '/install/api/install/finish': { ok: true, env_file: '~/.claude/depthfusion.env', next_steps: ['Verify with: depthfusion status', 'Start a new claude session — hooks load automatically', 'Check logs at: ~/.claude/depthfusion.log'] },
+};
+
+const STUB_LOG = [
+  'Resolving package versions...',
+  'Collecting missing packages...',
+  '  Downloading anthropic-0.25.0.whl (342 kB)',
+  '     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 342.1 kB/342.1 kB',
+  'Installing collected packages: anthropic',
+  '',
+  'Successfully installed anthropic-0.25.0',
+];
+
+// ── API helpers ─────────────────────────────────────────────────────────
+function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+async function apiGet(path) {
+  if (USE_STUB) { await delay(260); return STUBS[path] != null ? STUBS[path] : {}; }
+  const r = await fetch(path);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  if (body === undefined) body = {};
+  if (USE_STUB) {
+    await delay(520);
+    if (path === '/install/api/steps/4') return { ok: true }; // never echo key values
+    return STUBS[path] != null ? STUBS[path] : { ok: true };
+  }
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function* apiStream(path, body) {
+  if (body === undefined) body = {};
+  if (USE_STUB) {
+    for (const line of STUB_LOG) { await delay(360); yield { event: 'log', data: line }; }
+    await delay(480);
+    yield { event: 'complete', data: 'done' };
+    return;
+  }
+  const resp = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!resp.ok) throw new Error('Stream request failed: ' + resp.status);
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let remainder = '';
+  while (true) {
+    const { done: streamDone, value } = await reader.read();
+    if (streamDone) break;
+    remainder += decoder.decode(value, { stream: true });
+    const parts = remainder.split('\n\n');
+    remainder = parts.pop() ?? '';
+    for (const part of parts) {
+      const line = part.startsWith('data: ') ? part.slice(6) : part.trim();
+      if (!line) continue;
+      if (line.startsWith('[EXIT:')) { yield { event: 'complete', data: line }; return; }
+      yield { event: 'log', data: line };
+    }
+  }
+}
+
+// ── State ───────────────────────────────────────────────────────────────
+const state = { step: 1, mode: null, checksBlocked: false, envFields: [], dryRunOk: false, applyOk: false };
+const TOTAL = 6;
+
+// ── DOM ─────────────────────────────────────────────────────────────────
+const btnBack = document.getElementById('btnBack');
+const btnNext = document.getElementById('btnNext');
+const fst     = document.getElementById('fst');
+
+// ── Navigation ──────────────────────────────────────────────────────────
+btnBack.addEventListener('click', function() { if (state.step > 1) goTo(state.step - 1); });
+btnNext.addEventListener('click', handleNext);
+
+async function handleNext() {
+  fst.textContent = '';
+  if (!(await canAdvance())) return;
+  if (state.step < TOTAL) goTo(state.step + 1);
+}
+
+async function canAdvance() {
+  if (state.step === 1 && !state.mode)           { showSt('Please select a mode before continuing.'); return false; }
+  if (state.step === 2 && state.checksBlocked)   { showSt('Resolve failing checks before continuing.'); return false; }
+  if (state.step === 4) { if (!validateEnv()) return false; return submitEnv(); }
+  if (state.step === 5 && !state.applyOk)        { showSt('Click "Confirm & Apply" before finishing.'); return false; }
+  return true;
+}
+
+function showSt(msg) {
+  fst.textContent = msg;
+  setTimeout(function() { if (fst.textContent === msg) fst.textContent = ''; }, 4000);
+}
+
+function goTo(n) {
+  document.getElementById('step-' + state.step).classList.remove('active');
+  const oldTab = document.getElementById('tab-' + state.step);
+  oldTab.classList.remove('active');
+  if (n > state.step) oldTab.classList.add('done');
+  state.step = n;
+  document.getElementById('step-' + state.step).classList.add('active');
+  syncTabs(); syncNav(); initStep(state.step);
+}
+
+function syncTabs() {
+  for (let i = 1; i <= TOTAL; i++) {
+    const t = document.getElementById('tab-' + i);
+    t.classList.remove('active', 'done');
+    if (i === state.step)    t.classList.add('active');
+    else if (i < state.step) t.classList.add('done');
+  }
+}
+
+function syncNav() {
+  btnBack.disabled = (state.step === 1);
+  if (state.step === TOTAL) { btnNext.style.display = 'none'; }
+  else { btnNext.style.display = ''; btnNext.disabled = false; btnNext.textContent = state.step === 5 ? 'Finish →' : 'Next →'; }
+}
+
+// ── Escape helpers ──────────────────────────────────────────────────────
+// All external data passes through h() before DOM insertion via textContent or createTextNode.
+// The DOM API (textContent, createTextNode) handles escaping automatically and cannot produce XSS.
+function h(s) { return s == null ? '' : String(s); }
+
+// makeEl: create element, set attrs and text safely via DOM API (no innerHTML)
+function makeEl(tag, opts) {
+  opts = opts || {};
+  const el = document.createElement(tag);
+  if (opts.cls)   el.className   = opts.cls;
+  if (opts.id)    el.id          = opts.id;
+  if (opts.text)  el.textContent = h(opts.text);
+  if (opts.attrs) Object.keys(opts.attrs).forEach(function(k) { el.setAttribute(k, opts.attrs[k]); });
+  if (opts.html)  el.innerHTML   = opts.html; // only used for static trusted markup (no user data)
+  return el;
+}
+
+// Append multiple children
+function append(parent) {
+  const children = Array.prototype.slice.call(arguments, 1);
+  children.forEach(function(c) { if (c) parent.appendChild(c); });
+  return parent;
+}
+
+// Clear a container and replace its children
+function setChildren(parent, children) {
+  while (parent.firstChild) parent.removeChild(parent.firstChild);
+  (children || []).forEach(function(c) { if (c) parent.appendChild(c); });
+}
+
+// ── Step 1: Mode selection ──────────────────────────────────────────────
+async function initStep1() {
+  const grid = document.getElementById('modeGrid');
+  const err  = document.getElementById('s1err');
+  setChildren(grid, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>' + 'Loading modes…' })]);
+  err.style.display = 'none';
+  try {
+    const results = await Promise.all([apiGet('/install/api/steps/1'), apiGet('/install/api/hardware')]);
+    renderModes(results[0].modes || [], results[1].recommended || null);
+  } catch (e) {
+    setChildren(grid, []);
+    err.textContent = 'Failed to load modes: ' + h(e.message);
+    err.style.display = '';
+  }
+}
+
+function renderModes(modes, recommended) {
+  const grid = document.getElementById('modeGrid');
+  if (!modes.length) { setChildren(grid, [makeEl('div', { cls: 'empty', text: 'No modes available.' })]); return; }
+
+  const cards = modes.map(function(m) {
+    const card = makeEl('div', { cls: 'mode-card' + (state.mode === m.id ? ' selected' : '') });
+    card.dataset.mode = m.id;
+    card.setAttribute('role', 'radio');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-checked', state.mode === m.id ? 'true' : 'false');
+    card.setAttribute('aria-label', h(m.name));
+
+    if (m.id === recommended) {
+      append(card, makeEl('span', { cls: 'badge-rec', text: 'Recommended' }));
+    }
+    append(card,
+      makeEl('div', { cls: 'mc-name', text: m.name }),
+      makeEl('div', { cls: 'mc-desc', text: m.description })
+    );
+    const depWrap = makeEl('div');
+    (m.deps || []).forEach(function(d) { append(depWrap, makeEl('span', { cls: 'tag', text: d })); });
+    append(card, depWrap);
+
+    card.addEventListener('click',   function() { pickMode(card); });
+    card.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickMode(card); } });
+    return card;
+  });
+  setChildren(grid, cards);
+}
+
+function pickMode(card) {
+  state.mode = card.dataset.mode;
+  document.querySelectorAll('.mode-card').forEach(function(c) {
+    const sel = c === card;
+    c.classList.toggle('selected', sel);
+    c.setAttribute('aria-checked', String(sel));
+  });
+}
+
+// ── Step 2: System checks ───────────────────────────────────────────────
+async function initStep2() {
+  document.getElementById('s2mode').textContent = h(state.mode) || '—';
+  const wrap = document.getElementById('checksWrap');
+  setChildren(wrap, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>Running checks…' })]);
+  try {
+    const data = await apiGet('/install/api/steps/2?mode=' + state.mode);
+    renderChecks(data.checks || []);
+  } catch (e) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert ae', text: 'Failed to load checks: ' + h(e.message) })]);
+  }
+}
+
+function renderChecks(checks) {
+  const wrap    = document.getElementById('checksWrap');
+  const hasFail = checks.some(function(c) { return c.status === 'fail'; });
+  const hasWarn = checks.some(function(c) { return c.status === 'warn'; });
+  state.checksBlocked = hasFail;
+
+  if (!checks.length) { setChildren(wrap, [makeEl('div', { cls: 'empty', text: 'No checks required.' })]); return; }
+
+  const tbl = makeEl('table', { cls: 'dt', attrs: { 'aria-label': 'System check results' } });
+  const thead = makeEl('thead');
+  const hRow  = makeEl('tr');
+  ['Check', 'Status', 'Details'].forEach(function(t) { append(hRow, makeEl('th', { text: t })); });
+  append(thead, hRow); append(tbl, thead);
+  const tbody = makeEl('tbody');
+  checks.forEach(function(c) {
+    const tr = makeEl('tr');
+    const stCls = { pass: 'sp', warn: 'sw', fail: 'sf' }[c.status] || '';
+    const stLbl = { pass: '✓ Pass', warn: '⚠ Warn', fail: '✗ Fail' }[c.status] || h(c.status);
+    const stTd = makeEl('td', { cls: stCls }); stTd.textContent = stLbl;
+    append(tr, makeEl('td', { text: c.name }), stTd, makeEl('td', { text: c.explanation }));
+    append(tbody, tr);
+  });
+  append(tbl, tbody);
+  const children = [tbl];
+  if (hasFail) children.push(makeEl('div', { cls: 'alert ae', text: 'One or more checks failed. Resolve the issues above before continuing.', attrs: { style: 'margin-top:12px' } }));
+  else if (hasWarn) children.push(makeEl('div', { cls: 'alert aw', text: 'Warnings detected. You can continue, but some features may not work as expected.', attrs: { style: 'margin-top:12px' } }));
+  setChildren(wrap, children);
+}
+
+// ── Step 3: Python deps ─────────────────────────────────────────────────
+async function initStep3() {
+  document.getElementById('s3mode').textContent = h(state.mode) || '—';
+  const wrap = document.getElementById('depsWrap');
+  setChildren(wrap, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>Loading…' })]);
+  document.getElementById('logWrap').style.display  = 'none';
+  document.getElementById('installLog').textContent = '';
+  document.getElementById('s3err').style.display    = 'none';
+  try {
+    const data = await apiGet('/install/api/steps/3?mode=' + state.mode);
+    renderDeps(data);
+  } catch (e) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert ae', text: 'Failed to load dependencies: ' + h(e.message) })]);
+  }
+}
+
+function renderDeps(data) {
+  const wrap     = document.getElementById('depsWrap');
+  const pkgs     = data.packages || [];
+
+  if (data.message && !pkgs.length) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert as', text: h(data.message) })]);
+    return;
+  }
+
+  const hasMissing = pkgs.some(function(p) { return p.status !== 'installed'; });
+  const tbl = makeEl('table', { cls: 'dt', attrs: { 'aria-label': 'Python package requirements' } });
+  const thead = makeEl('thead'); const hRow = makeEl('tr');
+  ['Package', 'Required', 'Installed', 'Status'].forEach(function(t) { append(hRow, makeEl('th', { text: t })); });
+  append(thead, hRow); append(tbl, thead);
+  const tbody = makeEl('tbody');
+  pkgs.forEach(function(p) {
+    const tr  = makeEl('tr', { id: 'deprow-' + p.name });
+    const stCls = { installed: 'so', missing: 'sm', outdated: 'sd' }[p.status] || '';
+    const stLbl = { installed: '✓ Installed', missing: '✗ Missing', outdated: '⚠ Outdated' }[p.status] || h(p.status);
+    const code  = makeEl('code'); code.textContent = h(p.name);
+    const nameTd = makeEl('td'); append(nameTd, code);
+    const stTd  = makeEl('td', { cls: stCls, id: 'depst-' + p.name }); stTd.textContent = stLbl;
+    append(tr, nameTd, makeEl('td', { text: p.required }), makeEl('td', { text: p.installed || '—' }), stTd);
+    append(tbody, tr);
+  });
+  append(tbl, tbody);
+  const children = [tbl];
+  if (hasMissing) {
+    const btn = makeEl('div', { attrs: { style: 'margin-top:14px' } });
+    const ib  = makeEl('button', { cls: 'btn bp bsm', id: 'btnInstall', text: 'Install / update packages' });
+    ib.addEventListener('click', runInstall);
+    append(btn, ib);
+    children.push(btn);
+  } else {
+    children.push(makeEl('div', { cls: 'alert as', text: 'All packages are up to date. ✓', attrs: { style: 'margin-top:12px' } }));
+  }
+  setChildren(wrap, children);
+}
+
+async function runInstall() {
+  const btn   = document.getElementById('btnInstall');
+  const log   = document.getElementById('installLog');
+  const errEl = document.getElementById('s3err');
+  btn.disabled = true; btn.textContent = 'Installing…';
+  document.getElementById('logWrap').style.display = '';
+  log.textContent = ''; errEl.style.display = 'none';
+  try {
+    for await (const ev of apiStream('/install/api/install/deps', { mode: state.mode })) {
+      if (ev.event === 'log') {
+        log.textContent += ev.data + '\n'; log.scrollTop = log.scrollHeight;
+      } else if (ev.event === 'complete') {
+        log.textContent += '\n✓ Installation complete.\n'; log.scrollTop = log.scrollHeight;
+        document.querySelectorAll('[id^="depst-"]').forEach(function(td) { td.textContent = '✓ Installed'; td.className = 'so'; });
+        btn.style.display = 'none';
+      } else if (ev.event === 'error') {
+        errEl.textContent = 'Install error: ' + h(ev.data); errEl.style.display = '';
+        btn.disabled = false; btn.textContent = 'Retry';
+      }
+    }
+  } catch (e) {
+    errEl.textContent = 'Install failed: ' + h(e.message); errEl.style.display = '';
+    btn.disabled = false; btn.textContent = 'Retry';
+  }
+}
+
+// ── Step 4: API keys ────────────────────────────────────────────────────
+async function initStep4() {
+  document.getElementById('s4mode').textContent = h(state.mode) || '—';
+  const wrap = document.getElementById('fieldsWrap');
+  setChildren(wrap, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>Loading…' })]);
+  document.getElementById('s4err').style.display = 'none';
+  state.envFields = [];
+  try {
+    const data = await apiGet('/install/api/steps/4?mode=' + state.mode);
+    state.envFields = data.fields || [];
+    renderEnvFields(state.envFields);
+  } catch (e) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert ae', text: 'Failed to load configuration: ' + h(e.message) })]);
+  }
+}
+
+function renderEnvFields(fields) {
+  const wrap = document.getElementById('fieldsWrap');
+  if (!fields.length) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert as', text: 'No additional configuration required for this mode. ✓' })]);
+    return;
+  }
+  const groups = fields.map(function(f) {
+    const grp  = makeEl('div', { cls: 'fg' });
+    const lbl  = makeEl('label', { cls: 'fl', attrs: { for: 'env-' + f.key } });
+    lbl.textContent = h(f.label) + ' ';
+    const badge = makeEl('span', { cls: f.required ? 'req' : 'opt', text: f.required ? '*' : '(optional)', attrs: f.required ? { 'aria-label': 'required' } : {} });
+    append(lbl, badge);
+    const iw  = makeEl('div', { cls: 'iw' });
+    const inp = makeEl('input', { cls: 'fi', id: 'env-' + f.key, attrs: { type: f.pw ? 'password' : 'text', name: f.key, placeholder: h(f.placeholder || ''), autocomplete: 'off', spellcheck: 'false' } });
+    if (f.required) inp.required = true;
+    append(iw, inp);
+    if (f.pw) {
+      const tog = makeEl('button', { cls: 'tpw', text: '👁', attrs: { type: 'button', 'aria-label': 'Toggle visibility for ' + h(f.label), 'data-target': 'env-' + f.key } });
+      tog.addEventListener('click', function() {
+        const t = document.getElementById(tog.dataset.target);
+        if (!t) return;
+        t.type = t.type === 'password' ? 'text' : 'password';
+        tog.textContent = t.type === 'password' ? '👁' : '🙈';
+      });
+      append(iw, tog);
+    }
+    append(grp, lbl, iw);
+    return grp;
+  });
+  setChildren(wrap, groups);
+}
+
+function validateEnv() {
+  let ok = true;
+  document.getElementById('s4err').style.display = 'none';
+  state.envFields.forEach(function(f) {
+    if (!f.required) return;
+    const inp = document.getElementById('env-' + f.key);
+    if (!inp) return;
+    if (!inp.value.trim()) { inp.classList.add('invalid'); ok = false; }
+    else inp.classList.remove('invalid');
+  });
+  if (!ok) { const e = document.getElementById('s4err'); e.textContent = 'Please fill in all required fields (marked with *).'; e.style.display = ''; }
+  return ok;
+}
+
+async function submitEnv() {
+  btnNext.disabled = true; btnNext.textContent = 'Saving…';
+  const vals = {};
+  state.envFields.forEach(function(f) { const i = document.getElementById('env-' + f.key); if (i && i.value.trim()) vals[f.key] = i.value; });
+  try {
+    await apiPost('/install/api/steps/4', vals);
+    btnNext.disabled = false; btnNext.textContent = 'Next →';
+    return true;
+  } catch (e) {
+    const el = document.getElementById('s4err'); el.textContent = 'Failed to save: ' + h(e.message); el.style.display = '';
+    btnNext.disabled = false; btnNext.textContent = 'Next →';
+    return false;
+  }
+}
+
+// ── Step 5: Hooks & MCP review ──────────────────────────────────────────
+async function initStep5() {
+  const wrap = document.getElementById('reviewWrap');
+  setChildren(wrap, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>Loading…' })]);
+  document.getElementById('s5err').style.display = 'none';
+  document.getElementById('s5ok').style.display  = 'none';
+  state.dryRunOk = false; state.applyOk = false;
+  try {
+    const data = await apiGet('/install/api/steps/5?mode=' + state.mode);
+    renderReview(data);
+  } catch (e) {
+    setChildren(wrap, [makeEl('div', { cls: 'alert ae', text: 'Failed to load review: ' + h(e.message) })]);
+  }
+}
+
+function renderReview(data) {
+  const wrap  = document.getElementById('reviewWrap');
+  const files = data.files || [];
+  const hooks = data.hooks_to_register || [];
+  const diff  = data.diff_lines || [];
+
+  // Files table
+  const ftbl = makeEl('table', { cls: 'dt', attrs: { 'aria-label': 'Files to be written' } });
+  const fth = makeEl('thead'); const fhr = makeEl('tr');
+  ['Path', 'Action'].forEach(function(t) { append(fhr, makeEl('th', { text: t })); });
+  append(fth, fhr); append(ftbl, fth);
+  const ftb = makeEl('tbody');
+  files.forEach(function(f) {
+    const tr = makeEl('tr');
+    const code = makeEl('code'); code.textContent = h(f.path);
+    const td1 = makeEl('td'); append(td1, code);
+    const acCls = { create: 'sc', update: 'su', skip: 'sk' }[f.action] || '';
+    append(tr, td1, makeEl('td', { cls: acCls, text: h(f.action) }));
+    append(ftb, tr);
+  });
+  append(ftbl, ftb);
+
+  // Hooks table
+  const htbl = makeEl('table', { cls: 'dt', attrs: { 'aria-label': 'Hooks to register' } });
+  const hth  = makeEl('thead'); const hhr = makeEl('tr');
+  ['Hook', 'Description', 'Status'].forEach(function(t) { append(hhr, makeEl('th', { text: t })); });
+  append(hth, hhr); append(htbl, hth);
+  const htb = makeEl('tbody');
+  hooks.forEach(function(hk) {
+    const tr  = makeEl('tr');
+    const c1  = makeEl('code'); c1.textContent = h(hk.name);
+    const td1 = makeEl('td'); append(td1, c1);
+    const std = makeEl('td');
+    if (hk.already_installed) {
+      append(std, makeEl('span', { cls: 'bi', text: 'already installed ✓' }));
+    } else {
+      append(std, makeEl('span', { cls: 'sc', text: 'will install' }));
+    }
+    append(tr, td1, makeEl('td', { text: hk.description }), std);
+    append(htb, tr);
+  });
+  append(htbl, htb);
+
+  // Diff block
+  const diffWrap = makeEl('div', { cls: 'diff-block', attrs: { 'aria-label': 'Proposed settings.json changes' } });
+  diff.forEach(function(line) {
+    const span = makeEl('span', { cls: 'dl ' + (line.startsWith('+') ? 'da' : 'dc') });
+    span.textContent = h(line);
+    append(diffWrap, span);
+  });
+
+  // Buttons
+  const dryBtn   = makeEl('button', { cls: 'btn bse bsm', id: 'btnDryRun', text: 'Preview (dry run)' });
+  const applyBtn = makeEl('button', { cls: 'btn bsu bsm', id: 'btnApply', text: 'Confirm & Apply' });
+  applyBtn.disabled = true;
+  const ar = makeEl('div', { cls: 'ar' });
+  append(ar, dryBtn, applyBtn);
+
+  // Sections
+  const sec1 = makeEl('div', { cls: 'sec' }); append(sec1, makeEl('div', { cls: 'st', text: 'Files that will be written' }), ftbl);
+  const sec2 = makeEl('div', { cls: 'sec' }); append(sec2, makeEl('div', { cls: 'st', text: 'Hooks to register' }), htbl);
+  const sec3 = makeEl('div', { cls: 'sec' }); append(sec3, makeEl('div', { cls: 'st', text: 'settings.json additions' }), diffWrap);
+
+  setChildren(wrap, [sec1, sec2, sec3, ar]);
+
+  dryBtn.addEventListener('click',   function() { runApply(true);  });
+  applyBtn.addEventListener('click', function() { runApply(false); });
+}
+
+async function runApply(dry) {
+  const dryBtn   = document.getElementById('btnDryRun');
+  const applyBtn = document.getElementById('btnApply');
+  const errEl    = document.getElementById('s5err');
+  const okEl     = document.getElementById('s5ok');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  dryBtn.disabled = true; applyBtn.disabled = true;
+  if (dry) dryBtn.textContent = 'Running preview…';
+  else     applyBtn.textContent = 'Applying…';
+  try {
+    await apiPost('/install/api/install/apply', { dry_run: dry, mode: state.mode });
+    if (dry) {
+      state.dryRunOk = true;
+      okEl.textContent = '✓ Dry run successful — no changes made. Click “Confirm & Apply” to proceed.';
+      okEl.style.display = '';
+      dryBtn.textContent = 'Preview (dry run)'; applyBtn.textContent = 'Confirm & Apply';
+      dryBtn.disabled = false; applyBtn.disabled = false;
+    } else {
+      state.applyOk = true;
+      okEl.textContent = '✓ Configuration applied. Click Finish to complete installation.';
+      okEl.style.display = '';
+      applyBtn.textContent = 'Applied ✓'; dryBtn.textContent = 'Preview (dry run)';
+      dryBtn.disabled = true; applyBtn.disabled = true;
+    }
+  } catch (e) {
+    errEl.textContent = 'Failed: ' + h(e.message); errEl.style.display = '';
+    dryBtn.textContent = 'Preview (dry run)'; applyBtn.textContent = 'Confirm & Apply';
+    dryBtn.disabled = false; applyBtn.disabled = !state.dryRunOk;
+  }
+}
+
+// ── Step 6: Finish ──────────────────────────────────────────────────────
+async function initStep6() {
+  const wrap = document.getElementById('finishWrap');
+  setChildren(wrap, [makeEl('div', { cls: 'loading', html: '<div class="spinner"></div>Installing…' })]);
+  try {
+    const data = await apiPost('/install/api/install/finish', { mode: state.mode });
+    if (data.ok) renderFinishOk(data); else renderFinishErr(h(data.error) || 'Unknown error');
+  } catch (e) { renderFinishErr(h(e.message)); }
+}
+
+function renderFinishOk(data) {
+  const wrap = document.getElementById('finishWrap');
+  const box  = makeEl('div', { cls: 'finish-box' });
+  append(box, makeEl('div', { cls: 'fi-icon', attrs: { 'aria-hidden': 'true' } })).lastChild.textContent = '✅';
+  append(box, makeEl('div', { cls: 'fi-title', text: 'DepthFusion installed successfully.' }));
+  append(box, makeEl('div', { cls: 'fi-sub',   text: 'Your environment is ready to use.' }));
+  const meta = makeEl('dl', { cls: 'fi-meta' });
+  append(meta, makeEl('dt', { text: 'Mode' }), makeEl('dd', { text: h(state.mode) || '—' }));
+  const envDd = makeEl('dd'); const envCode = makeEl('code'); envCode.textContent = h(data.env_file || '~/.claude/depthfusion.env'); append(envDd, envCode);
+  append(meta, makeEl('dt', { text: 'Env file' }), envDd);
+  append(box, meta);
+  const steps = data.next_steps || [];
+  if (steps.length) {
+    const nsBox = makeEl('div', { cls: 'ns-box' });
+    append(nsBox, makeEl('h4', { text: 'Next steps' }));
+    const ol = makeEl('ol');
+    steps.forEach(function(s) { append(ol, makeEl('li', { text: h(s) })); });
+    append(nsBox, ol); append(box, nsBox);
+  }
+  setChildren(wrap, [box]);
+}
+
+function renderFinishErr(msg) {
+  const wrap = document.getElementById('finishWrap');
+  const err  = makeEl('div', { cls: 'alert ae', text: 'Installation failed: ' + msg, attrs: { style: 'margin-bottom:14px' } });
+  const btn  = makeEl('button', { cls: 'btn bp bsm', id: 'btnRetry', text: 'Retry' });
+  btn.addEventListener('click', initStep6);
+  setChildren(wrap, [err, btn]);
+}
+
+// ── Step router ─────────────────────────────────────────────────────────
+function initStep(n) {
+  fst.textContent = '';
+  if (n === 1) initStep1();
+  else if (n === 2) initStep2();
+  else if (n === 3) initStep3();
+  else if (n === 4) initStep4();
+  else if (n === 5) initStep5();
+  else if (n === 6) initStep6();
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────
+syncNav();
+initStep(1);
+</script>
+</body>
+</html>
