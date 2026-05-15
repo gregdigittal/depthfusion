@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-12 (E-31 all tasks complete; E-16 marked done)
+> Last updated: 2026-05-15 (E-29, E-32, E-33, E-34 marked done; E-26 deferred ACs pending post-dogfood data)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1314,7 +1314,7 @@
 
 ---
 
-## E-29: v0.5.3 Polish — Dogfood-Surfaced Instrumentation Gaps [active]
+## E-29: v0.5.3 Polish — Dogfood-Surfaced Instrumentation Gaps [done]
 
 > Six stories surfaced by the 2026-05-04 dogfood pass (`docs/runbooks/dogfood-reports/2026-05-04-week1.md`). The headline finding is that 100% of telemetry over 13 days came from test fixtures — zero production-path emissions. The other five findings are field-level: missing per-capability latency, empty `config_version_id` everywhere, double-emission of fallback events, and a self-contradicting runbook §2.
 >
@@ -1713,7 +1713,7 @@
 
 ---
 
-## E-32: DepthFusion Query REST API [active]
+## E-32: DepthFusion Query REST API [done]
 
 > Expose a standard REST/JSON query API so that BI tools (Metabase, Grafana, Power BI, n8n)
 > and agent-ops can query DepthFusion data directly — without going through the MCP protocol.
