@@ -1884,19 +1884,19 @@
 ### S-111: As a developer, I want DepthFusion to automatically run a recall query at session start and inject the top results so that every session starts warm without needing a CLAUDE.md rule to enforce it `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `SessionStart` hook registered in `~/.claude/settings.json` by `depthfusion install`
-- [ ] AC-2: On session start, a `depthfusion_session_seed` call runs within 2 seconds, producing up to `auto_recall_top_k` ContextItems tagged `["session-seed", session_id]`
-- [ ] AC-3: Seed items have `importance=0.9`; they appear at top of `subscribe(tags=["session-seed"])` results
-- [ ] AC-4: `DEPTHFUSION_AUTO_RECALL_AT_SESSION_START=false` disables the hook
-- [ ] AC-5: Hook exits 0 when DepthFusion server is unreachable (graceful degradation)
-- [ ] AC-6: Tests: seed items created, correct tags/importance, graceful degradation on unreachable server
+- [x] AC-1: `SessionStart` hook registered in `~/.claude/settings.json` by `depthfusion install`
+- [x] AC-2: On session start, a `depthfusion_session_seed` call runs within 2 seconds, producing up to `auto_recall_top_k` ContextItems tagged `["session-seed", session_id]`
+- [x] AC-3: Seed items have `importance=0.9`; they appear at top of `subscribe(tags=["session-seed"])` results
+- [x] AC-4: `DEPTHFUSION_AUTO_RECALL_AT_SESSION_START=false` disables the hook
+- [x] AC-5: Hook exits 0 when DepthFusion server is unreachable (graceful degradation)
+- [x] AC-6: Tests: seed items created, correct tags/importance, graceful degradation on unreachable server
 
 **Tasks:**
-- [ ] T-372: Register `SessionStart` hook in install.py + shell script
-- [ ] T-373: Implement `session_start.py` — project detection + seed query construction
-- [ ] T-374: Add config flags (`auto_recall_at_session_start`, `auto_recall_top_k`, `auto_recall_snippet_len`)
-- [ ] T-375: Wire `depthfusion_session_seed` internal tool; add to MCP tool registry
-- [ ] T-376: Tests
+- [x] T-372: Register `SessionStart` hook in install.py + shell script
+- [x] T-373: Implement `session_start.py` — project detection + seed query construction
+- [x] T-374: Add config flags (`auto_recall_at_session_start`, `auto_recall_top_k`, `auto_recall_snippet_len`)
+- [x] T-375: Wire `depthfusion_session_seed` internal tool; add to MCP tool registry
+- [x] T-376: Tests
 
 ### S-112: As a developer, I want publish_context to accept structured observation fields so that retrieval can score and filter on typed fields rather than searching only the prose content blob `P2` `M`
 

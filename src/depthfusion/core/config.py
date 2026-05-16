@@ -135,6 +135,11 @@ class DepthFusionConfig:
     ambient_capture: bool = True
     ambient_skip_tools: list[str] = field(default_factory=list)
 
+    # E-35 S-111 session-start auto-recall
+    auto_recall_at_session_start: bool = True
+    auto_recall_top_k: int = 3
+    auto_recall_snippet_len: int = 800
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -205,6 +210,9 @@ class DepthFusionConfig:
                 for t in os.environ.get("DEPTHFUSION_AMBIENT_SKIP_TOOLS", "").split(",")
                 if t.strip()
             ],
+            auto_recall_at_session_start=_env_bool("DEPTHFUSION_AUTO_RECALL_AT_SESSION_START", True),
+            auto_recall_top_k=_env_int("DEPTHFUSION_AUTO_RECALL_TOP_K", 3),
+            auto_recall_snippet_len=_env_int("DEPTHFUSION_AUTO_RECALL_SNIPPET_LEN", 800),
         )
 
     @property

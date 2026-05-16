@@ -536,6 +536,7 @@ def get_hooks_diff(mode: str) -> dict:  # noqa: ARG001  # mode reserved for futu
     ]
     if not is_windows:
         hook_pairs.append(("PostToolUse", "depthfusion-post-tool-use.sh"))
+        hook_pairs.append(("SessionStart", "depthfusion-session-start.sh"))
 
     registered_cmds: set[str] = set()
     if settings_path.exists():
@@ -699,6 +700,20 @@ def _hook_scripts_for_platform() -> list[tuple[str, str]]:
             "    python3 -m depthfusion.hooks.post_tool_use 2>/dev/null || exit 0\n"
             "fi\n",
         ),
+        (
+            "depthfusion-session-start.sh",
+            "#!/bin/bash\n"
+            "# DepthFusion SessionStart auto-recall seed hook (S-111)\n"
+            "# Reads JSON from stdin (Claude Code hook protocol) and publishes\n"
+            "# top recall results as high-priority seed items. Always exits 0.\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "VENV_PYTHON=\"$SCRIPT_DIR/../../.venv/bin/python3\"\n"
+            "if [ -x \"$VENV_PYTHON\" ]; then\n"
+            "    \"$VENV_PYTHON\" -m depthfusion.hooks.session_start 2>/dev/null || exit 0\n"
+            "else\n"
+            "    python3 -m depthfusion.hooks.session_start 2>/dev/null || exit 0\n"
+            "fi\n",
+        ),
     ]
 
 
@@ -734,8 +749,9 @@ def _register_hooks() -> None:
         ),
     ]
     if not is_windows:
-        # PostToolUse: Unix-only for now (no .ps1 variant)
+        # PostToolUse + SessionStart: Unix-only for now (no .ps1 variants)
         hook_registrations.append(("PostToolUse", "depthfusion-post-tool-use.sh"))
+        hook_registrations.append(("SessionStart", "depthfusion-session-start.sh"))
     for event, script in hook_registrations:
         script_path = hooks_dir / script
         if not script_path.exists():

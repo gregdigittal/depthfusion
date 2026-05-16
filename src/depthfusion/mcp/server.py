@@ -177,6 +177,14 @@ TOOLS: dict[str, str] = {
         "already_tracked: int, items: [{pattern_key, name, session_count, "
         "drafted, skillforge_id}]}."
     ),
+    # E-35 S-111 session-start auto-recall seed
+    "depthfusion_session_seed": (
+        "Run a seed recall query at session start and publish results as high-priority "
+        "ContextItems tagged ['session-seed', session_id] (S-111). "
+        "Args: session_id (str, required), top_k (int, optional, default 3), "
+        "snippet_len (int, optional, default 800). "
+        "Response: {published: int, query: str, session_id: str}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -211,6 +219,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
     # E-34 skill surfacing
     "depthfusion_surface_skill_candidates": None, # always enabled (E-34 S-109)
+    # E-35 S-111 session-start auto-recall seed
+    "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
 }
 
 
@@ -515,6 +525,30 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": [],
     },
+    # E-35 S-111 session-start auto-recall seed
+    "depthfusion_session_seed": {
+        "properties": {
+            "session_id": {
+                "type": "string",
+                "description": "Claude Code session ID (from SessionStart hook payload)",
+            },
+            "top_k": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 3,
+                "description": "Maximum seed items to publish",
+            },
+            "snippet_len": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 2000,
+                "default": 800,
+                "description": "Maximum snippet length per seed item",
+            },
+        },
+        "required": ["session_id"],
+    },
 }
 
 
@@ -624,6 +658,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_query_telemetry(arguments, config)
     elif tool_name == "depthfusion_surface_skill_candidates":
         return _tool_surface_skill_candidates(arguments, config)
+    elif tool_name == "depthfusion_session_seed":
+        return _tool_session_seed(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -2594,6 +2630,33 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
             "items": items,
         }
     )
+
+
+def _tool_session_seed(arguments: dict) -> str:
+    """Publish top recall results as high-priority session-seed ContextItems (S-111)."""
+    from depthfusion.hooks.session_start import _recall_and_seed, _detect_project_name, _recent_git_messages, _build_seed_query
+    from pathlib import Path
+
+    session_id = arguments.get("session_id", "unknown")
+    top_k = int(arguments.get("top_k", 3))
+    snippet_len = int(arguments.get("snippet_len", 800))
+
+    if not session_id:
+        return json.dumps({"error": "session_id required", "published": 0})
+
+    try:
+        cwd = Path.cwd()
+        project_name = _detect_project_name(cwd)
+        git_messages = _recent_git_messages(cwd)
+        query = _build_seed_query(project_name, git_messages)
+        published = _recall_and_seed(session_id, top_k=top_k, snippet_len=snippet_len)
+        return json.dumps({
+            "published": published,
+            "query": query,
+            "session_id": session_id,
+        })
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "published": 0, "session_id": session_id})
 
 
 if __name__ == "__main__":
