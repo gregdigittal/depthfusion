@@ -308,6 +308,15 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     "priority": {"type": "integer"},
                     "ttl_seconds": {"type": "integer"},
                     "metadata": {"type": "object"},
+                    # S-112: structured observation fields (optional)
+                    "facts": {"type": "array", "items": {"type": "string"},
+                              "description": "Key facts captured in this context item"},
+                    "concepts": {"type": "array", "items": {"type": "string"},
+                                 "description": "Concepts / domain terms referenced"},
+                    "files_read": {"type": "array", "items": {"type": "string"},
+                                   "description": "Files read during this work unit"},
+                    "files_modified": {"type": "array", "items": {"type": "string"},
+                                       "description": "Files created or modified"},
                 },
                 "required": ["item_id", "content", "source_agent"],
             },
@@ -1042,7 +1051,18 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     corpus_tokens = [_tokenize_bm25(b["content"]) for b in raw_blocks]
     query_tokens = _tokenize_bm25(query)
     bm25 = _BM25(corpus_tokens)
-    bm25_ranked = bm25.rank_all(query_tokens)  # list of (idx, raw_bm25_score)
+    # S-112: field boost — tokenize per-block facts+concepts; empty for
+    # legacy markdown blocks (no boost), non-empty for ContextItem-derived
+    # blocks whose query terms match a structured field (1.2× lift).
+    _field_tokens: list[list[str]] = [
+        [
+            tok
+            for entry in ((b.get("facts") or []) + (b.get("concepts") or []))
+            for tok in _tokenize_bm25(str(entry))
+        ]
+        for b in raw_blocks
+    ]
+    bm25_ranked = bm25.rank_with_field_boost(query_tokens, _field_tokens)
 
     # Apply source-type weight to BM25 scores
     # S-92: per-block explain data (only populated when explain=True)
@@ -1261,6 +1281,11 @@ def _tool_publish_context(arguments: dict, config: Any = None) -> str:
             # ContextItem.__post_init__). Unsupplied → canonical defaults.
             importance=item_payload.get("importance"),
             salience=item_payload.get("salience"),
+            # S-112: structured observation fields (optional; default empty)
+            facts=list(item_payload.get("facts") or []),
+            concepts=list(item_payload.get("concepts") or []),
+            files_read=list(item_payload.get("files_read") or []),
+            files_modified=list(item_payload.get("files_modified") or []),
         )
     except (KeyError, TypeError) as exc:
         return json.dumps(

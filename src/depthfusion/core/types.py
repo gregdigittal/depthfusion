@@ -142,6 +142,12 @@ class ContextItem:
     legacy bus rows lacking these fields parse back to defaults on subscribe.
     These scalars are NOT part of ``content_hash`` (a retry with different
     score still dedupes), preserving S-78's exact-content idempotency.
+
+    The ``facts``, ``concepts``, ``files_read``, and ``files_modified``
+    fields (E-35 / S-112) are structured observation fields cherry-picked
+    from the claude-mem evaluation. They travel as top-level JSONL keys in
+    the bus and enable field-specific BM25 boosting at recall time. Legacy
+    rows lacking these keys reconstruct with empty lists (backward-compatible).
     """
     item_id: str
     content: str
@@ -153,6 +159,11 @@ class ContextItem:
     content_hash: Optional[str] = None
     importance: Optional[float] = None
     salience: Optional[float] = None
+    # S-112: structured observation fields (optional; default empty)
+    facts: list[str] = field(default_factory=list)
+    concepts: list[str] = field(default_factory=list)
+    files_read: list[str] = field(default_factory=list)
+    files_modified: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.content_hash is None:
@@ -169,6 +180,15 @@ class ContextItem:
             self.salience, DEFAULT_SALIENCE,
             _SALIENCE_MIN, _SALIENCE_MAX,
         )
+        # S-112: coerce structured fields to list in case caller passes None
+        if self.facts is None:  # type: ignore[comparison-overlap]
+            self.facts = []
+        if self.concepts is None:  # type: ignore[comparison-overlap]
+            self.concepts = []
+        if self.files_read is None:  # type: ignore[comparison-overlap]
+            self.files_read = []
+        if self.files_modified is None:  # type: ignore[comparison-overlap]
+            self.files_modified = []
 
 
 @dataclass

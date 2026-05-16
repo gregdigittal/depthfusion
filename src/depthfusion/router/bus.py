@@ -181,6 +181,12 @@ class FileBus:
                         # consumers can read them without a separate lookup.
                         "importance": item.importance,
                         "salience": item.salience,
+                        # S-112 — structured observation fields; absent on
+                        # legacy rows, reconstructed as empty lists on subscribe.
+                        "facts": item.facts,
+                        "concepts": item.concepts,
+                        "files_read": item.files_read,
+                        "files_modified": item.files_modified,
                     }
                     f.seek(0, os.SEEK_END)
                     # If a prior crash left a torn write (file ends mid-line, no
@@ -261,6 +267,12 @@ class FileBus:
                         # canonical defaults via ContextItem.__post_init__.
                         importance=record.get("importance"),
                         salience=record.get("salience"),
+                        # S-112: structured observation fields; legacy rows
+                        # lacking these keys reconstruct as empty lists.
+                        facts=record.get("facts") or [],
+                        concepts=record.get("concepts") or [],
+                        files_read=record.get("files_read") or [],
+                        files_modified=record.get("files_modified") or [],
                     ))
                 except (TypeError, ValueError):
                     continue

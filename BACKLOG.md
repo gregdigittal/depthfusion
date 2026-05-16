@@ -1854,4 +1854,103 @@
 - [x] T-365: `candidate_skills` table migration + promotion status tracking
 
 ---
+
+## E-35: Ambient Capture & Auto-Recall [active]
+
+> Cherry-pick the best of claude-mem's capture model into DepthFusion: unconditional
+> PostToolUse ambient capture, SessionStart auto-recall injection, structured observation
+> fields, progressive disclosure search, and SQLite FTS5 indexing.
+> Closes the dark-capture gap and passive-recall gap identified in the 2026-05-16 claude-mem evaluation.
+
+### S-110: As a developer, I want DepthFusion to automatically capture ambient session events via a PostToolUse hook so that session continuity persists even when I forget to call publish_context `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `PostToolUse` hook entry registered in `~/.claude/settings.json` by `depthfusion install`
+- [ ] AC-2: Each tool call produces a ContextItem with `tags=["ambient","tool-use",session_id]` and `importance=0.3`; item stored to FileBus and visible in `subscribe(tags=["ambient"])`
+- [ ] AC-3: Items in `DEPTHFUSION_AMBIENT_SKIP_TOOLS` list are not captured
+- [ ] AC-4: `DEPTHFUSION_AMBIENT_CAPTURE=false` disables all capture; no hook-related errors
+- [ ] AC-5: Ambient items do NOT appear in standard `recall_relevant` results; they DO appear in progressive disclosure timeline queries (S-113)
+- [ ] AC-6: Hook script exits 0 on all error paths (never blocks a Claude session)
+- [ ] AC-7: Unit tests + integration test covering capture, skip-list, and feature-flag behaviour
+
+**Tasks:**
+- [ ] T-366: Register `PostToolUse` hook in install.py + write hook shell script
+- [ ] T-367: Implement `post_tool_use.py` — parse tool name, extract file paths from metadata
+- [ ] T-368: Extend `auto_learn.py` with ambient item construction (no LLM, metadata-only)
+- [ ] T-369: Add config flags (`ambient_capture`, `ambient_skip_tools`)
+- [ ] T-370: Wire `depthfusion_auto_learn` MCP tool to new handler; add to tool registry
+- [ ] T-371: Tests (unit: capture logic, skip list, feature flag; integration: full hook → bus roundtrip)
+
+### S-111: As a developer, I want DepthFusion to automatically run a recall query at session start and inject the top results so that every session starts warm without needing a CLAUDE.md rule to enforce it `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `SessionStart` hook registered in `~/.claude/settings.json` by `depthfusion install`
+- [ ] AC-2: On session start, a `depthfusion_session_seed` call runs within 2 seconds, producing up to `auto_recall_top_k` ContextItems tagged `["session-seed", session_id]`
+- [ ] AC-3: Seed items have `importance=0.9`; they appear at top of `subscribe(tags=["session-seed"])` results
+- [ ] AC-4: `DEPTHFUSION_AUTO_RECALL_AT_SESSION_START=false` disables the hook
+- [ ] AC-5: Hook exits 0 when DepthFusion server is unreachable (graceful degradation)
+- [ ] AC-6: Tests: seed items created, correct tags/importance, graceful degradation on unreachable server
+
+**Tasks:**
+- [ ] T-372: Register `SessionStart` hook in install.py + shell script
+- [ ] T-373: Implement `session_start.py` — project detection + seed query construction
+- [ ] T-374: Add config flags (`auto_recall_at_session_start`, `auto_recall_top_k`, `auto_recall_snippet_len`)
+- [ ] T-375: Wire `depthfusion_session_seed` internal tool; add to MCP tool registry
+- [ ] T-376: Tests
+
+### S-112: As a developer, I want publish_context to accept structured observation fields so that retrieval can score and filter on typed fields rather than searching only the prose content blob `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion_publish_context` accepts optional `facts: list[str]`, `concepts: list[str]`, `files_read: list[str]`, `files_modified: list[str]`; all stored in item metadata
+- [ ] AC-2: `recall_relevant` returns items with structured fields intact in the response block
+- [ ] AC-3: BM25 applies 1.2× boost when query term matches a `facts` or `concepts` entry
+- [ ] AC-4: Existing `publish_context` calls without structured fields continue to work unchanged
+- [ ] AC-5: `depthfusion_describe_capabilities` output lists structured fields as supported
+- [ ] AC-6: Tests: publish with fields, round-trip retrieval, boost scoring, backward compat
+
+**Tasks:**
+- [ ] T-377: Extend ContextItem dataclass + serialisation (facts, concepts, files_read, files_modified)
+- [ ] T-378: Extend publish_context MCP tool schema + handler
+- [ ] T-379: BM25 field boost (1.2× for facts/concepts hits)
+- [ ] T-380: Extend post_tool_use.py (S-110) to populate files_read/files_modified automatically
+- [ ] T-381: Tests
+
+### S-113: As an operator, I want a lightweight 3-layer search mode so that context injection pays ~10% of the token cost of a full recall `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion_recall_relevant` accepts `mode: "full" | "index" | "timeline"` (default: "full")
+- [ ] AC-2: `mode="index"` returns item_id, title (≤80 chars), tags, timestamp, source; no full content; response tokens ≤10% of equivalent `mode="full"` result
+- [ ] AC-3: `mode="timeline"` returns index fields ordered by `created_at DESC`; includes ambient items (importance≥0.1)
+- [ ] AC-4: `mode="full"` behaviour is identical to current (backward compatible)
+- [ ] AC-5: `mode="index"` p95 latency ≤100ms in local mode
+- [ ] AC-6: Tests: all three modes, token count comparison, ambient item inclusion in timeline, ambient item exclusion from full mode
+
+**Tasks:**
+- [ ] T-382: Add `mode` parameter to recall_relevant MCP schema
+- [ ] T-383: Implement `index_pass()` in hybrid.py
+- [ ] T-384: Implement `timeline_pass()` in hybrid.py (sorted by recency, no scoring)
+- [ ] T-385: Wire mode branching in `_tool_recall_impl`
+- [ ] T-386: Tests
+
+### S-114: As a developer, I want SQLite FTS5 indexing on the memories table so that full-text pre-filtering is faster than in-memory BM25 scan and phrase queries are supported `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `memories_fts` FTS5 virtual table created on first connect; existing rows backfilled
+- [ ] AC-2: INSERT/UPDATE/DELETE triggers keep FTS index in sync with memories table
+- [ ] AC-3: `_fts_search(query)` returns rowids sorted by FTS rank; integrated in hybrid.py when `DEPTHFUSION_FTS_ENABLED=true`
+- [ ] AC-4: Phrase queries (`"exact phrase"`) work correctly via FTS5
+- [ ] AC-5: `facts_text` and `concepts_text` columns populated from metadata on write; FTS ranks matches in these columns higher than prose content
+- [ ] AC-6: `DEPTHFUSION_FTS_ENABLED=false` falls through to existing in-memory BM25 path unchanged
+- [ ] AC-7: Migration idempotent — re-running on an already-migrated database is a no-op
+- [ ] AC-8: Tests: migration, triggers, phrase query, field weights, feature flag fallback, idempotency, performance (≥2× speedup on 500-row corpus)
+
+**Tasks:**
+- [ ] T-387: Write schema migration (FTS5 virtual table + 3 triggers); backfill logic
+- [ ] T-388: Implement `_fts_search()` helper in memory_store.py
+- [ ] T-389: Integrate FTS prefilter in hybrid.py pipeline
+- [ ] T-390: Populate `facts_text`/`concepts_text` at write time in memory_store.py
+- [ ] T-391: Config flag + feature-flag gate in hybrid pipeline
+- [ ] T-392: Tests (migration, triggers, phrase, field weights, flag fallback, perf)
+
+---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

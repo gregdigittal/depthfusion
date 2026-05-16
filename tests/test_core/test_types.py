@@ -77,6 +77,55 @@ class TestContextItem:
         item = ContextItem(item_id="i", content="x", source_agent="a", tags=[])
         assert item.priority == "normal"
 
+    # S-112: structured observation fields
+    def test_structured_fields_default_to_empty_lists(self):
+        item = ContextItem(item_id="i", content="x", source_agent="a", tags=[])
+        assert item.facts == []
+        assert item.concepts == []
+        assert item.files_read == []
+        assert item.files_modified == []
+
+    def test_structured_fields_stored_when_provided(self):
+        item = ContextItem(
+            item_id="i",
+            content="deployed the auth service",
+            source_agent="dev-agent",
+            tags=["depthfusion"],
+            facts=["auth service deployed to prod"],
+            concepts=["authentication", "deployment"],
+            files_read=["src/auth/middleware.py"],
+            files_modified=["src/auth/service.py"],
+        )
+        assert item.facts == ["auth service deployed to prod"]
+        assert item.concepts == ["authentication", "deployment"]
+        assert item.files_read == ["src/auth/middleware.py"]
+        assert item.files_modified == ["src/auth/service.py"]
+
+    def test_none_structured_fields_coerced_to_empty_list(self):
+        item = ContextItem(
+            item_id="i", content="x", source_agent="a", tags=[],
+            facts=None,       # type: ignore[arg-type]
+            concepts=None,    # type: ignore[arg-type]
+            files_read=None,  # type: ignore[arg-type]
+            files_modified=None,  # type: ignore[arg-type]
+        )
+        assert item.facts == []
+        assert item.concepts == []
+        assert item.files_read == []
+        assert item.files_modified == []
+
+    def test_structured_fields_not_part_of_content_hash(self):
+        """Identical content with different facts/concepts hashes the same (AC-5 analog)."""
+        item1 = ContextItem(
+            item_id="i1", content="same content", source_agent="a", tags=[],
+            facts=["fact A"],
+        )
+        item2 = ContextItem(
+            item_id="i2", content="same content", source_agent="a", tags=[],
+            facts=["fact B"],
+        )
+        assert item1.content_hash == item2.content_hash
+
 
 class TestFeedbackEntry:
     def test_required_fields(self):

@@ -63,3 +63,47 @@ class BM25:
         """Return (doc_idx, bm25_score) sorted descending."""
         scores = [(i, self.score(query_terms, i)) for i in range(self.N)]
         return sorted(scores, key=lambda x: -x[1])
+
+    def score_with_field_boost(
+        self,
+        query_terms: list[str],
+        doc_idx: int,
+        field_tokens: list[str],
+        boost: float = 1.2,
+    ) -> float:
+        """BM25 score with optional structured-field boost (S-112 AC-3).
+
+        Identical to score() when field_tokens is empty or no query term
+        appears there. When at least one query term matches a field token
+        (from a ContextItem's facts/concepts), the base score is multiplied
+        by boost. Field token hits signal higher semantic precision than
+        prose matches, warranting the 20% lift.
+        """
+        base = self.score(query_terms, doc_idx)
+        if not base or not field_tokens:
+            return base
+        field_set = set(field_tokens)
+        if any(t in field_set for t in query_terms):
+            return base * boost
+        return base
+
+    def rank_with_field_boost(
+        self,
+        query_terms: list[str],
+        field_tokens_per_doc: list[list[str]],
+        boost: float = 1.2,
+    ) -> list[tuple[int, float]]:
+        """rank_all() with per-doc field boost (S-112 AC-3).
+
+        field_tokens_per_doc must have len == self.N. Docs with an empty
+        inner list receive no boost. Returns (doc_idx, score) sorted desc.
+        """
+        scores = [
+            (i, self.score_with_field_boost(
+                query_terms, i,
+                field_tokens_per_doc[i] if i < len(field_tokens_per_doc) else [],
+                boost,
+            ))
+            for i in range(self.N)
+        ]
+        return sorted(scores, key=lambda x: -x[1])

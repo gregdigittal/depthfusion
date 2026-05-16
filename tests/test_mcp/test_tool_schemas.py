@@ -39,6 +39,23 @@ def test_confirm_discovery_has_content_required():
     assert "content" in schema["inputSchema"]["required"]
 
 
+def test_publish_context_has_s112_structured_fields():
+    """S-112 AC-1: publish_context schema exposes optional structured fields."""
+    schema = _make_tool_schema("depthfusion_publish_context", "desc")
+    props = schema["inputSchema"]["properties"]
+    item_props = props["item"]["properties"]
+    for field in ("facts", "concepts", "files_read", "files_modified"):
+        assert field in item_props, f"S-112: missing field '{field}' in publish_context schema"
+        assert item_props[field]["type"] == "array"
+        assert item_props[field]["items"]["type"] == "string"
+    # These fields are optional — not in required
+    required = schema["inputSchema"]["required"]
+    assert "item" in required
+    item_required = props["item"].get("required", [])
+    for field in ("facts", "concepts", "files_read", "files_modified"):
+        assert field not in item_required, f"S-112 field '{field}' must be optional"
+
+
 def test_pin_discovery_has_filename_required():
     schema = _make_tool_schema("depthfusion_pin_discovery", "desc")
     assert "filename" in schema["inputSchema"]["required"]
