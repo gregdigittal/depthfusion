@@ -53,9 +53,17 @@ _NEGATIVE_PATTERNS = [
     (r"(?:error|exception|traceback):\s*(.{10,200})", re.IGNORECASE),
     # Past-tense implementation openers — sentence-initial "Used/Implemented/Deployed X"
     # These catch descriptions of failed approaches written as "We used X. Problem: Y."
-    (r"^(?:Implemented|Used|Deployed|Introduced|Added|Set up|Enabled|Had|Stored)\s+(.{10,200}?)(?:[.,;]|\s+so\s+|\s+(?:to\s+\w+\s+){0,3}(?:Worked|Seemed|Appeared|Initially|But\s+it|Problem|Issue|The\s+issue)|$)", re.MULTILINE | re.IGNORECASE),
+    (
+        r"^(?:Implemented|Used|Deployed|Introduced|Added|Set up|Enabled|Had|Stored)"
+        r"\s+(.{10,200}?)(?:[.,;]|\s+so\s+|\s+(?:to\s+\w+\s+){0,3}"
+        r"(?:Worked|Seemed|Appeared|Initially|But\s+it|Problem|Issue|The\s+issue)|$)",
+        re.MULTILINE | re.IGNORECASE,
+    ),
     # "Evaluated/Investigated/Considered X" — considered-and-rejected approaches
-    (r"^(?:Evaluated|Investigated|Considered|Explored)\s+(.{10,200}?)(?:[.,;]|\s+so\s+|$)", re.MULTILINE | re.IGNORECASE),
+    (
+        r"^(?:Evaluated|Investigated|Considered|Explored)\s+(.{10,200}?)(?:[.,;]|\s+so\s+|$)",
+        re.MULTILINE | re.IGNORECASE,
+    ),
     # "Attempted/Proposed/Tried to migrate/use X"
     (r"^(?:Attempted|Proposed)\s+(?:to\s+)?(.{10,200}?)(?:[.,;]|$)", re.MULTILINE | re.IGNORECASE),
     # "Tried X" — tried-and-reverted opener; group 1 = what was tried
@@ -63,20 +71,39 @@ _NEGATIVE_PATTERNS = [
     # Inline "used X" (non-sentence-initial) — "design used JWTs with no server-side state"
     (r"\bused\s+(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
     # Explicit revert/abandon signals
-    (r"(?:reverted?|rolled back|abandoned|pulled back|switched away from)\s+(?:\S+\s+){0,3}(.{10,150}?)(?:[.,;]|$)", re.IGNORECASE),
+    (
+        r"(?:reverted?|rolled back|abandoned|pulled back|switched away from)"
+        r"\s+(?:\S+\s+){0,3}(.{10,150}?)(?:[.,;]|$)",
+        re.IGNORECASE,
+    ),
     # "hit the X limit/rate limit/quota"
-    (r"(.{10,100}?)\s+(?:hit|hits|hitting)\s+(?:the\s+)?(.{5,80}?(?:limit|quota|cap|ceiling))(?:[.,;]|$)", re.IGNORECASE),
+    (
+        r"(.{10,100}?)\s+(?:hit|hits|hitting)\s+(?:the\s+)?"
+        r"(.{5,80}?(?:limit|quota|cap|ceiling))(?:[.,;]|$)",
+        re.IGNORECASE,
+    ),
     # "X doesn't work / wasn't working"
-    (r"(.{10,120}?)\s+(?:doesn'?t|wasn'?t|stopped)\s+work(?:ing)?(?:\s+because\s+(.{5,150}))?(?:[.,;]|$)", re.IGNORECASE),
+    (
+        r"(.{10,120}?)\s+(?:doesn'?t|wasn'?t|stopped)\s+work(?:ing)?"
+        r"(?:\s+because\s+(.{5,150}))?(?:[.,;]|$)",
+        re.IGNORECASE,
+    ),
     # "X caused/led to/resulted in problems"
-    (r"(.{10,120}?)\s+(?:caused?|led to|resulted in)\s+(.{5,100}?(?:problem|issue|failure|error|timeout|crash|conflict))(?:[.,;]|$)", re.IGNORECASE),
+    (
+        r"(.{10,120}?)\s+(?:caused?|led to|resulted in)\s+"
+        r"(.{5,100}?(?:problem|issue|failure|error|timeout|crash|conflict))(?:[.,;]|$)",
+        re.IGNORECASE,
+    ),
     # "The problem (with X)?: Y"
     (r"[Tt]he problem(?:\s+(?:is|with\s+\S+)\s*)?:\s*(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
     # "X breaks when Y"
     (r"(.{10,100}?)\s+breaks?\s+(?:when|if|because)\s+(.{5,150}?)(?:[.,;]|$)", re.IGNORECASE),
     # "The codebase/system uses X" — legacy technology with implicit problems
     # Captures long-standing decisions the team is now questioning or replacing
-    (r"(?:codebase|system|application|service|team)\s+uses?\s+(.{10,200}?)(?:[.,;]|$)", re.IGNORECASE),
+    (
+        r"(?:codebase|system|application|service|team)\s+uses?\s+(.{10,200}?)(?:[.,;]|$)",
+        re.IGNORECASE,
+    ),
 ]
 
 _DEFAULT_CONFIDENCE = 0.70

@@ -101,7 +101,10 @@ _PROSE_PATTERNS: list[tuple[str, int]] = [
     (r"switch(?:ed|ing)\s+(?:from\s+\S+\s+)?to\s+(.{10,150}?)(?:[.;,\n]|$)", re.IGNORECASE),
     (r"^Replacing\s+(.{10,200}?)(?:[.;]|$)", re.MULTILINE | re.IGNORECASE),
     # Chosen-over comparisons — "X over Y because Z"
-    (r"(.{10,100}?)\s+over\s+\S.{5,80}?\s+(?:because|since|as)\s+.{5,100}?(?:[.;]|$)", re.IGNORECASE),
+    (
+        r"(.{10,100}?)\s+over\s+\S.{5,80}?\s+(?:because|since|as)\s+.{5,100}?(?:[.;]|$)",
+        re.IGNORECASE,
+    ),
 ]
 
 # Combined list kept for backwards-compat callers that reference _HEURISTIC_PATTERNS.

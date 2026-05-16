@@ -38,7 +38,10 @@ def post_skill_draft(
     api_key = os.getenv("DEPTHFUSION_SKILLFORGE_API_KEY", "")
 
     if not url:
-        logger.debug("DEPTHFUSION_SKILLFORGE_URL not set; skipping SkillForge draft for %s", pattern_key)
+        logger.debug(
+            "DEPTHFUSION_SKILLFORGE_URL not set; skipping SkillForge draft for %s",
+            pattern_key,
+        )
         return None
 
     endpoint = f"{url}/skills/draft"

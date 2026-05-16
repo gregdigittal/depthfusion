@@ -143,7 +143,8 @@ TOOLS: dict[str, str] = {
     ),
     # E-33 telemetry tools
     "depthfusion_record_telemetry": (
-        "Log a per-tool-call telemetry event for cost, latency, and usage analytics (E-33 S-106/S-107). "
+        "Log a per-tool-call telemetry event for cost, latency, and usage analytics "
+        "(E-33 S-106/S-107). "
         "Args: session_id (str, required), tool_name (str, required), "
         "session_type (str, optional — 'agent' (default) | 'human'), "
         "agent (str, optional), project (str, optional), "
@@ -167,11 +168,14 @@ TOOLS: dict[str, str] = {
     ),
     # E-34 S-109 skill surfacing
     "depthfusion_surface_skill_candidates": (
-        "Scan telemetry for recurring tool patterns and draft candidate skills in SkillForge (E-34 S-109). "
+        "Scan telemetry for recurring tool patterns and draft candidate skills in SkillForge "
+        "(E-34 S-109). "
         "Args: threshold (int, optional — min distinct sessions, default from config, usually 3), "
-        "dry_run (bool, optional — default false; if true, returns candidates without POSTing to SkillForge). "
+        "dry_run (bool, optional — default false; if true, returns candidates "
+        "without POSTing to SkillForge). "
         "Response: {candidates_found: int, candidates_drafted: int, "
-        "already_tracked: int, items: [{pattern_key, name, session_count, drafted, skillforge_id}]}."
+        "already_tracked: int, items: [{pattern_key, name, session_count, "
+        "drafted, skillforge_id}]}."
     ),
 }
 
@@ -236,7 +240,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "explain": {
                 "type": "boolean",
                 "default": False,
-                "description": "When true, include a structured explain block for each result showing individual scores used to rank it",
+                "description": (
+                    "When true, include a structured explain block for each result "
+                    "showing individual scores used to rank it"
+                ),
             },
         },
         "required": ["query"],
@@ -463,7 +470,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
     # E-34 S-109
     "depthfusion_surface_skill_candidates": {
         "properties": {
-            "threshold": {"type": "integer", "description": "Min distinct sessions (default from config)"},
+            "threshold": {
+                "type": "integer",
+                "description": "Min distinct sessions (default from config)",
+            },
             "dry_run": {"type": "boolean", "default": False},
         },
         "required": [],
