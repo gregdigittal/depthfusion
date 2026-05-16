@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-16 (E-35 S-112 done; S-113 done — progressive disclosure 3-layer recall; S-114 FTS5 index done; 1765 tests green)
+> Last updated: 2026-05-16 (E-35 complete — S-110/111/112/113/114 all done; 1765 tests green)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1855,7 +1855,7 @@
 
 ---
 
-## E-35: Ambient Capture & Auto-Recall [active]
+## E-35: Ambient Capture & Auto-Recall [done]
 
 > Cherry-pick the best of claude-mem's capture model into DepthFusion: unconditional
 > PostToolUse ambient capture, SessionStart auto-recall injection, structured observation
