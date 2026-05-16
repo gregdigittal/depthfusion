@@ -141,6 +141,10 @@ def benchmark_home(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_HAIKU_ENABLED", "false")
     monkeypatch.setenv("DEPTHFUSION_RERANKER_ENABLED", "false")
+    monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "false")
+    monkeypatch.setenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", "false")
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "false")
+    monkeypatch.setenv("DEPTHFUSION_COGNITIVE_SCORING", "false")
     return tmp_path
 
 
