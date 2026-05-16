@@ -88,3 +88,20 @@ def test_recall_relevant_has_explain_param():
     assert props["explain"]["default"] is False
     # explain is optional — must not be in required list
     assert "explain" not in schema["inputSchema"]["required"]
+
+
+def test_auto_learn_has_ambient_mode_fields():
+    """S-110 T-370: auto_learn schema exposes ambient mode parameters."""
+    schema = _make_tool_schema("depthfusion_auto_learn", "desc")
+    props = schema["inputSchema"]["properties"]
+    assert "mode" in props
+    assert props["mode"]["type"] == "string"
+    # ambient-specific fields
+    for field in ("tool_name", "session_id", "files_read", "files_modified"):
+        assert field in props, f"S-110: missing '{field}' in auto_learn schema"
+    # files_read and files_modified are arrays
+    assert props["files_read"]["type"] == "array"
+    assert props["files_modified"]["type"] == "array"
+    # mode and ambient fields are all optional
+    assert "mode" not in schema["inputSchema"]["required"]
+    assert "tool_name" not in schema["inputSchema"]["required"]

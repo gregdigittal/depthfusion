@@ -534,6 +534,8 @@ def get_hooks_diff(mode: str) -> dict:  # noqa: ARG001  # mode reserved for futu
         ("PreCompact", pre_script),
         ("PostCompact", post_script),
     ]
+    if not is_windows:
+        hook_pairs.append(("PostToolUse", "depthfusion-post-tool-use.sh"))
 
     registered_cmds: set[str] = set()
     if settings_path.exists():
@@ -683,6 +685,20 @@ def _hook_scripts_for_platform() -> list[tuple[str, str]]:
             "    python3 -m depthfusion.capture.auto_learn --post-compact 2>&1 || exit 0\n"
             "fi\n",
         ),
+        (
+            "depthfusion-post-tool-use.sh",
+            "#!/bin/bash\n"
+            "# DepthFusion PostToolUse ambient capture hook (S-110)\n"
+            "# Reads JSON from stdin (Claude Code hook protocol) and publishes\n"
+            "# a low-importance ContextItem to the FileBus. Always exits 0.\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "VENV_PYTHON=\"$SCRIPT_DIR/../../.venv/bin/python3\"\n"
+            "if [ -x \"$VENV_PYTHON\" ]; then\n"
+            "    \"$VENV_PYTHON\" -m depthfusion.hooks.post_tool_use 2>/dev/null || exit 0\n"
+            "else\n"
+            "    python3 -m depthfusion.hooks.post_tool_use 2>/dev/null || exit 0\n"
+            "fi\n",
+        ),
     ]
 
 
@@ -707,7 +723,7 @@ def _register_hooks() -> None:
     with open(settings_path) as f:
         settings = json.load(f)
     hooks = settings.setdefault("hooks", {})
-    for event, script in [
+    hook_registrations = [
         (
             "PreCompact",
             "depthfusion-pre-compact.ps1" if is_windows else "depthfusion-pre-compact.sh",
@@ -716,7 +732,11 @@ def _register_hooks() -> None:
             "PostCompact",
             "depthfusion-post-compact.ps1" if is_windows else "depthfusion-post-compact.sh",
         ),
-    ]:
+    ]
+    if not is_windows:
+        # PostToolUse: Unix-only for now (no .ps1 variant)
+        hook_registrations.append(("PostToolUse", "depthfusion-post-tool-use.sh"))
+    for event, script in hook_registrations:
         script_path = hooks_dir / script
         if not script_path.exists():
             print(f"  Warning: {script_path} not found — skipping {event} hook")

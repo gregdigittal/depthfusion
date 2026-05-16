@@ -14,9 +14,12 @@ DEPTHFUSION_API_KEY instead.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
+import secrets
+import time
 from pathlib import Path
 from typing import Any
 
@@ -460,3 +463,50 @@ def _link_session_temporally(
         edge.target_id = tgt_entity
         edge.edge_id = make_edge_id(src_entity, tgt_entity, edge.relationship)
         graph_store.upsert_edge(edge)
+
+
+# ---------------------------------------------------------------------------
+# S-110: Ambient capture helpers (PostToolUse hook path)
+# ---------------------------------------------------------------------------
+
+def build_ambient_item(
+    tool_name: str,
+    session_id: str,
+    files_read: list[str] | None = None,
+    files_modified: list[str] | None = None,
+    exit_status: int = 0,
+) -> "Any":  # returns ContextItem; avoids circular import at module level
+    """Construct a low-importance ContextItem for ambient PostToolUse capture.
+
+    No LLM call — metadata-only. Items are tagged ["ambient","tool-use",session_id]
+    with importance=0.3 so they stay below the standard recall threshold (0.8)
+    but appear in progressive disclosure timeline queries (S-113).
+    """
+    from depthfusion.core.types import ContextItem
+
+    fr = list(files_read or [])[:20]
+    fm = list(files_modified or [])[:20]
+
+    content_parts = [f"tool: {tool_name}"]
+    if fr:
+        content_parts.append(f"files_read: {', '.join(fr)}")
+    if fm:
+        content_parts.append(f"files_modified: {', '.join(fm)}")
+    if exit_status != 0:
+        content_parts.append(f"exit_status: {exit_status}")
+    content = "; ".join(content_parts)
+
+    ts_ms = int(time.time() * 1000)
+    nonce = secrets.token_hex(4)
+    suffix = hashlib.md5(f"{tool_name}{session_id}{ts_ms}{nonce}".encode()).hexdigest()[:8]
+    item_id = f"ambient-{session_id[:16]}-{suffix}"
+
+    return ContextItem(
+        item_id=item_id,
+        content=content,
+        source_agent="depthfusion-ambient",
+        tags=["ambient", "tool-use", session_id],
+        importance=0.3,
+        files_read=fr,
+        files_modified=fm,
+    )

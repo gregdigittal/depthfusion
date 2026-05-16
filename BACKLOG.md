@@ -1865,21 +1865,21 @@
 ### S-110: As a developer, I want DepthFusion to automatically capture ambient session events via a PostToolUse hook so that session continuity persists even when I forget to call publish_context `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `PostToolUse` hook entry registered in `~/.claude/settings.json` by `depthfusion install`
-- [ ] AC-2: Each tool call produces a ContextItem with `tags=["ambient","tool-use",session_id]` and `importance=0.3`; item stored to FileBus and visible in `subscribe(tags=["ambient"])`
-- [ ] AC-3: Items in `DEPTHFUSION_AMBIENT_SKIP_TOOLS` list are not captured
-- [ ] AC-4: `DEPTHFUSION_AMBIENT_CAPTURE=false` disables all capture; no hook-related errors
-- [ ] AC-5: Ambient items do NOT appear in standard `recall_relevant` results; they DO appear in progressive disclosure timeline queries (S-113)
-- [ ] AC-6: Hook script exits 0 on all error paths (never blocks a Claude session)
-- [ ] AC-7: Unit tests + integration test covering capture, skip-list, and feature-flag behaviour
+- [x] AC-1: `PostToolUse` hook entry registered in `~/.claude/settings.json` by `depthfusion install`
+- [x] AC-2: Each tool call produces a ContextItem with `tags=["ambient","tool-use",session_id]` and `importance=0.3`; item stored to FileBus and visible in `subscribe(tags=["ambient"])`
+- [x] AC-3: Items in `DEPTHFUSION_AMBIENT_SKIP_TOOLS` list are not captured
+- [x] AC-4: `DEPTHFUSION_AMBIENT_CAPTURE=false` disables all capture; no hook-related errors
+- [x] AC-5: Ambient items do NOT appear in standard `recall_relevant` results; they DO appear in progressive disclosure timeline queries (S-113)
+- [x] AC-6: Hook script exits 0 on all error paths (never blocks a Claude session)
+- [x] AC-7: Unit tests + integration test covering capture, skip-list, and feature-flag behaviour
 
 **Tasks:**
-- [ ] T-366: Register `PostToolUse` hook in install.py + write hook shell script
-- [ ] T-367: Implement `post_tool_use.py` — parse tool name, extract file paths from metadata
-- [ ] T-368: Extend `auto_learn.py` with ambient item construction (no LLM, metadata-only)
-- [ ] T-369: Add config flags (`ambient_capture`, `ambient_skip_tools`)
-- [ ] T-370: Wire `depthfusion_auto_learn` MCP tool to new handler; add to tool registry
-- [ ] T-371: Tests (unit: capture logic, skip list, feature flag; integration: full hook → bus roundtrip)
+- [x] T-366: Register `PostToolUse` hook in install.py + write hook shell script
+- [x] T-367: Implement `post_tool_use.py` — parse tool name, extract file paths from metadata
+- [x] T-368: Extend `auto_learn.py` with ambient item construction (no LLM, metadata-only)
+- [x] T-369: Add config flags (`ambient_capture`, `ambient_skip_tools`)
+- [x] T-370: Wire `depthfusion_auto_learn` MCP tool to new handler; add to tool registry
+- [x] T-371: Tests (unit: capture logic, skip list, feature flag; integration: full hook → bus roundtrip)
 
 ### S-111: As a developer, I want DepthFusion to automatically run a recall query at session start and inject the top results so that every session starts warm without needing a CLAUDE.md rule to enforce it `P1` `S`
 

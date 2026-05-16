@@ -6,7 +6,7 @@ to disable any component without touching hook or MCP code.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -131,6 +131,10 @@ class DepthFusionConfig:
     # E-34 S-109 skill surfacing
     auto_draft_threshold: int = 3    # min distinct sessions before candidate is drafted
 
+    # E-35 S-110 ambient capture
+    ambient_capture: bool = True
+    ambient_skip_tools: list[str] = field(default_factory=list)
+
     # v0.5.0 backend provider interface
     # Empty string = use mode default from backends.factory._DEFAULT_DISPATCH
     reranker_backend: str = ""           # null | haiku | gemma
@@ -195,6 +199,12 @@ class DepthFusionConfig:
             mcp_http_port=_env_int("DEPTHFUSION_MCP_PORT", 7301),
             mcp_http_token=os.environ.get("DEPTHFUSION_MCP_TOKEN", ""),
             auto_draft_threshold=_env_int("DEPTHFUSION_AUTO_DRAFT_THRESHOLD", 3),
+            ambient_capture=_env_bool("DEPTHFUSION_AMBIENT_CAPTURE", True),
+            ambient_skip_tools=[
+                t.strip()
+                for t in os.environ.get("DEPTHFUSION_AMBIENT_SKIP_TOOLS", "").split(",")
+                if t.strip()
+            ],
         )
 
     @property

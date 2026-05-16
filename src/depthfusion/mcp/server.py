@@ -348,6 +348,34 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "depthfusion_auto_learn": {
         "properties": {
             "max_files": {"type": "integer", "minimum": 1, "default": 10},
+            "mode": {
+                "type": "string",
+                "enum": ["session", "ambient"],
+                "default": "session",
+                "description": (
+                    "'session' (default): compress recent .tmp session files. "
+                    "'ambient': publish a low-importance ambient ContextItem "
+                    "(S-110 PostToolUse capture path)."
+                ),
+            },
+            "tool_name": {
+                "type": "string",
+                "description": "S-110 ambient mode: name of the tool that was called",
+            },
+            "session_id": {
+                "type": "string",
+                "description": "S-110 ambient mode: current session identifier",
+            },
+            "files_read": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "S-110 ambient mode: files read by the tool call",
+            },
+            "files_modified": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "S-110 ambient mode: files written/modified by the tool call",
+            },
         },
         "required": [],
     },
@@ -1354,7 +1382,11 @@ def _tool_tier_status() -> str:
 
 
 def _tool_auto_learn(arguments: dict) -> str:
-    """Trigger auto-learn extraction from recent .tmp session files."""
+    """Trigger auto-learn: session compression or ambient capture (S-110)."""
+    mode = arguments.get("mode", "session")
+    if mode == "ambient":
+        return _handle_ambient_capture(arguments)
+
     from pathlib import Path
     max_files = min(int(arguments.get("max_files", 5)), 50)
     project = arguments.get("project", "")
@@ -1391,6 +1423,38 @@ def _tool_auto_learn(arguments: dict) -> str:
         }, indent=2)
     except Exception as exc:
         return json.dumps({"error": str(exc), "compressed": 0})
+
+
+def _handle_ambient_capture(arguments: dict) -> str:
+    """S-110: publish a low-importance ambient ContextItem to the FileBus."""
+    tool_name = arguments.get("tool_name", "")
+    session_id = arguments.get("session_id", "unknown")
+    files_read = list(arguments.get("files_read") or [])
+    files_modified = list(arguments.get("files_modified") or [])
+
+    if not tool_name:
+        return json.dumps({"error": "tool_name required for ambient mode", "published": False})
+
+    try:
+        from depthfusion.capture.auto_learn import build_ambient_item
+        from depthfusion.router.bus import FileBus
+        from pathlib import Path
+
+        item = build_ambient_item(
+            tool_name=tool_name,
+            session_id=session_id,
+            files_read=files_read,
+            files_modified=files_modified,
+        )
+        bus_dir = Path(
+            os.environ.get("DEPTHFUSION_BUS_FILE_DIR", "~/.claude/context-bus")
+        ).expanduser()
+        bus_dir.mkdir(parents=True, exist_ok=True)
+        bus = FileBus(bus_dir=bus_dir)
+        result = bus.publish(item)
+        return json.dumps({"published": result.get("published", False), "item_id": item.item_id})
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "published": False})
 
 
 def _tool_compress_session(arguments: dict) -> str:
