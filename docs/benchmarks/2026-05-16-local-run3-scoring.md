@@ -218,7 +218,7 @@ retrieval-only: False
 - fix_quality: `score: `
 - false_positives: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -241,7 +241,7 @@ retrieval-only: False
 - fix_quality: `score: `
 - false_positives: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -264,7 +264,7 @@ retrieval-only: False
 - fix_quality: `score: `
 - false_positives: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -286,7 +286,7 @@ retrieval-only: False
 - prior_decision_recall: `score: `
 - completeness: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -308,7 +308,7 @@ retrieval-only: False
 - prior_decision_recall: `score: `
 - completeness: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -330,7 +330,7 @@ retrieval-only: False
 - prior_decision_recall: `score: `
 - completeness: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -351,7 +351,7 @@ retrieval-only: False
 - temporal_ordering: `score: `
 - coverage: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -372,7 +372,7 @@ retrieval-only: False
 - temporal_ordering: `score: `
 - coverage: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -393,7 +393,7 @@ retrieval-only: False
 - temporal_ordering: `score: `
 - coverage: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -414,7 +414,7 @@ retrieval-only: False
 - temporal_ordering: `score: `
 - coverage: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -434,7 +434,7 @@ retrieval-only: False
 - context_awareness: `score: `
 - prioritization: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -454,7 +454,7 @@ retrieval-only: False
 - context_awareness: `score: `
 - prioritization: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -474,7 +474,7 @@ retrieval-only: False
 - context_awareness: `score: `
 - prioritization: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -494,6 +494,6 @@ retrieval-only: False
 - context_awareness: `score: `
 - prioritization: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---

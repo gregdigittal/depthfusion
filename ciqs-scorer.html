@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIQS Scoring — DepthFusion post-fix 2026-05-16</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f13;--panel:#1a1a22;--border:#2e2e3a;
+  --accent:#6c63ff;--accent2:#00d4aa;
+  --text:#e0e0e8;--muted:#7878a0;
+  --ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;
+}
+body{background:var(--bg);color:var(--text);font:14px/1.5 'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Header */
+.hdr{background:var(--panel);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+.hdr h1{font-size:15px;font-weight:600;color:#fff;white-space:nowrap}
+.hdr .sub{color:var(--muted);font-size:12px;white-space:nowrap}
+.pbar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px}
+.pbar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+.plbl{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* Run tabs */
+.rtabs{display:flex;background:var(--panel);border-bottom:1px solid var(--border);padding:0 20px;gap:4px;flex-shrink:0}
+.rtab{padding:9px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.rtab:hover{color:var(--text)}
+.rtab.active{color:#fff;border-bottom-color:var(--accent)}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;margin-left:6px}
+.badge.c{background:var(--ok);color:#000}
+.badge.p{background:var(--warn);color:#000}
+.badge.e{background:var(--border);color:var(--muted)}
+
+/* Main */
+.main{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+.sb{width:210px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+.sb-sec{padding:8px 12px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.sb-item{display:flex;align-items:center;gap:7px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--muted);transition:all .12s;position:relative}
+.sb-item:hover{background:rgba(108,99,255,.07);color:var(--text)}
+.sb-item.active{background:rgba(108,99,255,.14);color:#fff}
+.sb-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:0 2px 2px 0}
+.sb-id{font-weight:700;font-size:11px;min-width:22px}
+.sb-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:var(--ok)}
+.dot-par{background:var(--warn)}
+.dot-em{background:var(--border)}
+
+/* Content */
+.cnt{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.card-hdr{padding:11px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-ttl{font-weight:600;font-size:14px;flex:1}
+.ctag{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.catB{background:rgba(239,68,68,.15);color:#fca5a5}
+.catC{background:rgba(245,158,11,.15);color:#fcd34d}
+.catD{background:rgba(34,197,94,.15);color:#86efac}
+.catE{background:rgba(108,99,255,.15);color:#a5b4fc}
+.card-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+/* Alert */
+.alert{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:6px;padding:9px 13px;font-size:12px;color:#fcd34d;line-height:1.6}
+.alert strong{color:#fbbf24}
+
+/* Prompt */
+.lbl{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.pbox{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:11px 12px;font-family:'Cascadia Code','Fira Code',monospace;font-size:12.5px;line-height:1.6;color:#c8d0e0;position:relative}
+.cpbtn{position:absolute;top:8px;right:8px;padding:3px 9px;background:var(--accent);border:none;border-radius:4px;color:#fff;font-size:11px;cursor:pointer;opacity:.9}
+.cpbtn:hover{opacity:1}
+.cpbtn.ok{background:var(--ok)}
+
+/* Response */
+.rlbl{font-size:12px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.rlbl span{background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;font-size:10px}
+textarea.resp{width:100%;min-height:90px;background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:6px;padding:9px;color:var(--text);font-size:13px;font-family:inherit;resize:vertical;transition:border-color .15s}
+textarea.resp:focus{outline:none;border-color:var(--accent)}
+
+/* Rubric */
+.rub-grid{display:flex;flex-direction:column;gap:12px}
+.rub-item{display:flex;flex-direction:column;gap:4px}
+.rub-row{display:flex;align-items:center;gap:10px}
+.rub-name{font-weight:600;font-size:13px;text-transform:capitalize;min-width:170px;cursor:help;border-bottom:1px dashed var(--border)}
+.slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--border);cursor:pointer}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);cursor:pointer;transition:transform .1s}
+.slider::-webkit-slider-thumb:hover{transform:scale(1.25)}
+.slider::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+.sval{font-size:20px;font-weight:700;min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+.hints{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);padding:0 1px}
+
+/* Notes */
+textarea.nt{width:100%;min-height:48px;background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical}
+textarea.nt:focus{outline:none;border-color:var(--accent)}
+
+/* Cat summary */
+.catscore{background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.18);border-radius:6px;padding:9px 13px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.catscore .cv{font-weight:700;font-size:17px;color:var(--accent2)}
+
+/* Footer */
+.ftr{background:var(--panel);border-top:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.fsums{display:flex;gap:14px;flex:1;flex-wrap:wrap}
+.schip{display:flex;align-items:center;gap:5px;font-size:12px}
+.schip .sl{color:var(--muted)}
+.schip .sv{font-weight:700}
+.nbtn{padding:6px 11px;background:var(--border);border:none;border-radius:4px;color:var(--text);cursor:pointer;font-size:12px}
+.nbtn:hover{background:rgba(108,99,255,.3)}
+.nbtn:disabled{opacity:.3;cursor:default}
+.expbtn{padding:7px 16px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.expbtn:hover{opacity:.85}
+.expall{padding:7px 16px;background:var(--accent2);border:none;border-radius:6px;color:#000;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.expall:hover{opacity:.85}
+
+/* Tooltip */
+[title]{cursor:help}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>CIQS Scoring</h1>
+  <div class="sub">DepthFusion post-fix &nbsp;·&nbsp; local mode &nbsp;·&nbsp; 2026-05-16</div>
+  <div class="pbar"><div class="pbar-fill" id="pfill" style="width:0%"></div></div>
+  <div class="plbl" id="plbl">0 / 42</div>
+</div>
+
+<div class="rtabs" id="rtabs"></div>
+
+<div class="main">
+  <div class="sb" id="sb"></div>
+  <div class="cnt" id="cnt"></div>
+</div>
+
+<div class="ftr">
+  <div class="fsums" id="fsums"></div>
+  <button class="nbtn" id="pbtn" onclick="nav(-1)">← Prev</button>
+  <button class="nbtn" id="nbtn" onclick="nav(1)">Next →</button>
+  <button class="expbtn" onclick="expRun(cur)">Export Run <span id="erlbl">1</span></button>
+  <button class="expall" onclick="expAll()">Export All (3 files)</button>
+</div>
+
+<script>
+const TMPLS = {"1": "# CIQS Scoring Template - local / run 1\n\n> Generated: 2026-05-16\n> DepthFusion version: unknown\n\nFill in an integer score (0-10) in each `score: ` line.\nCategories with `retrieval-only: true` have blocks from DepthFusion below the prompt.\nOther categories require running the prompt through Claude Code in a fresh session\nand scoring the response against the rubric.\n\n---\n\n## A / A1 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on TypeScript error handling in the SkillForge router. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=24.2888)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-15-depthfusion-session` (score=15.905)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n3. `session` / `2026-05-15-agent-ops-session` (score=14.7754)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-skillforge-session` (score=14.2066)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n5. `session` / `2026-05-15-digittal-ccrs-session` (score=13.3495)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n\n**Scores (0-10 each):**\n\n- relevance: `score: 2`\n- specificity: `score: 2`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** Only 1/5 blocks from target project (skillforge). That block covers SkillChain/UI work, not router error handling. Depthfusion sessions rank highest due to recency bias. Cross-project contamination is the primary issue here.\n\n---\n\n## A / A2 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on Adding new step types to the SkillForge Skill IR. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-15-skillforge-session` (score=21.225)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n2. `session` / `2026-05-16-depthfusion-session` (score=20.3675)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n3. `session` / `2026-05-15-agent-ops-session` (score=20.1791)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-depthfusion-session` (score=17.8914)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-16-skillforge-session` (score=16.1589)\n   > --- SESSION END at 09:54:40 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n\n**Scores (0-10 each):**\n\n- relevance: `score: 4`\n- specificity: `score: 4`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 3`\n\n**Notes:** 2/5 blocks from skillforge project. Block 1 (rank 1) is a SkillForge session that mentions YAML serializer/deserializer and SkillChain model \u2014 adjacent to Skill IR. Block 5 (rank 5) is also skillforge. Useful signal buried among off-topic blocks.\n\n---\n\n## A / A3 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on My preferences for commit message style and PR structure. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=22.0564)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-14-digittal-ccrs-session` (score=17.8621)\n   > --- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSIO\n3. `session` / `2026-05-15-digittal-ccrs-session` (score=17.1209)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n4. `session` / `2026-05-15-depthfusion-session` (score=15.8927)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-15-agent-ops-session` (score=14.2064)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n\n**Scores (0-10 each):**\n\n- relevance: `score: 1`\n- specificity: `score: 1`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.\n\n---\n\n## B / B1 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nFunction missing try/catch around external API call (security.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B2 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nSwitch on discriminated union missing a case (TypeScript exhaustiveness)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B3 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nN+1 query pattern in an endpoint (performance.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## C / C1 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to add a new OAuth provider to the auth module. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C2 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to refactor the feature-flag system to use typed keys. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C3 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to migrate from class components to hooks in the dashboard. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## D / D1 - Session Continuity\n\n**Prompt:**\n\n```\nWhat were the last three meaningful commits you made in this repo, and what do they accomplish together?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D2 - Session Continuity\n\n**Prompt:**\n\n```\nWhat was the most recent review-gate finding that resulted in a fix? What was the fix?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D3 - Session Continuity\n\n**Prompt:**\n\n```\nWhat is the current status of the benchmark harness work? What still needs to happen?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D4 - Session Continuity\n\n**Prompt:**\n\n```\nWhat decisions have I made about how we handle errors in this codebase?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## E / E1 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to quickly find all places a specific function is called across the codebase. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E2 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to review a large diff before committing. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E3 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to set up a new project with standard conventions. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E4 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to investigate an intermittent test failure. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n", "2": "# CIQS Scoring Template - local / run 2\n\n> Generated: 2026-05-16\n> DepthFusion version: unknown\n\nFill in an integer score (0-10) in each `score: ` line.\nCategories with `retrieval-only: true` have blocks from DepthFusion below the prompt.\nOther categories require running the prompt through Claude Code in a fresh session\nand scoring the response against the rubric.\n\n---\n\n## A / A1 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on TypeScript error handling in the SkillForge router. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=24.2888)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-15-depthfusion-session` (score=15.905)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n3. `session` / `2026-05-15-agent-ops-session` (score=14.7754)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-skillforge-session` (score=14.2066)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n5. `session` / `2026-05-15-digittal-ccrs-session` (score=13.3495)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n\n**Scores (0-10 each):**\n\n- relevance: `score: 2`\n- specificity: `score: 2`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** Only 1/5 blocks from target project (skillforge). That block covers SkillChain/UI work, not router error handling. Depthfusion sessions rank highest due to recency bias. Cross-project contamination is the primary issue here.\n\n---\n\n## A / A2 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on Adding new step types to the SkillForge Skill IR. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-15-skillforge-session` (score=21.225)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n2. `session` / `2026-05-16-depthfusion-session` (score=20.3675)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n3. `session` / `2026-05-15-agent-ops-session` (score=20.1791)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-depthfusion-session` (score=17.8914)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-16-skillforge-session` (score=16.1589)\n   > --- SESSION END at 09:54:40 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n\n**Scores (0-10 each):**\n\n- relevance: `score: 4`\n- specificity: `score: 4`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 3`\n\n**Notes:** 2/5 blocks from skillforge project. Block 1 (rank 1) is a SkillForge session that mentions YAML serializer/deserializer and SkillChain model \u2014 adjacent to Skill IR. Block 5 (rank 5) is also skillforge. Useful signal buried among off-topic blocks.\n\n---\n\n## A / A3 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on My preferences for commit message style and PR structure. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=22.0564)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-14-digittal-ccrs-session` (score=17.8621)\n   > --- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSIO\n3. `session` / `2026-05-15-digittal-ccrs-session` (score=17.1209)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n4. `session` / `2026-05-15-depthfusion-session` (score=15.8927)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-15-agent-ops-session` (score=14.2064)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n\n**Scores (0-10 each):**\n\n- relevance: `score: 1`\n- specificity: `score: 1`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.\n\n---\n\n## B / B1 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nFunction missing try/catch around external API call (security.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B2 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nSwitch on discriminated union missing a case (TypeScript exhaustiveness)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B3 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nN+1 query pattern in an endpoint (performance.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## C / C1 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to add a new OAuth provider to the auth module. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C2 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to refactor the feature-flag system to use typed keys. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C3 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to migrate from class components to hooks in the dashboard. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## D / D1 - Session Continuity\n\n**Prompt:**\n\n```\nWhat were the last three meaningful commits you made in this repo, and what do they accomplish together?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D2 - Session Continuity\n\n**Prompt:**\n\n```\nWhat was the most recent review-gate finding that resulted in a fix? What was the fix?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D3 - Session Continuity\n\n**Prompt:**\n\n```\nWhat is the current status of the benchmark harness work? What still needs to happen?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D4 - Session Continuity\n\n**Prompt:**\n\n```\nWhat decisions have I made about how we handle errors in this codebase?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## E / E1 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to quickly find all places a specific function is called across the codebase. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E2 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to review a large diff before committing. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E3 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to set up a new project with standard conventions. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E4 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to investigate an intermittent test failure. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n", "3": "# CIQS Scoring Template - local / run 3\n\n> Generated: 2026-05-16\n> DepthFusion version: unknown\n\nFill in an integer score (0-10) in each `score: ` line.\nCategories with `retrieval-only: true` have blocks from DepthFusion below the prompt.\nOther categories require running the prompt through Claude Code in a fresh session\nand scoring the response against the rubric.\n\n---\n\n## A / A1 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on TypeScript error handling in the SkillForge router. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=24.2888)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-15-depthfusion-session` (score=15.905)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n3. `session` / `2026-05-15-agent-ops-session` (score=14.7754)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-skillforge-session` (score=14.2066)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n5. `session` / `2026-05-15-digittal-ccrs-session` (score=13.3495)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n\n**Scores (0-10 each):**\n\n- relevance: `score: 2`\n- specificity: `score: 2`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** Only 1/5 blocks from target project (skillforge). That block covers SkillChain/UI work, not router error handling. Depthfusion sessions rank highest due to recency bias. Cross-project contamination is the primary issue here.\n\n---\n\n## A / A2 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on Adding new step types to the SkillForge Skill IR. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-15-skillforge-session` (score=21.225)\n   > --- SESSION END at 03:34:43 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n2. `session` / `2026-05-16-depthfusion-session` (score=20.3675)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n3. `session` / `2026-05-15-agent-ops-session` (score=20.1791)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n4. `session` / `2026-05-15-depthfusion-session` (score=17.8914)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-16-skillforge-session` (score=16.1589)\n   > --- SESSION END at 09:54:40 ---\nProject: skillforge\nDirectory: /home/gregmorris/projects/skillforge\nEnd Reason: {\"session_id\":\"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-\n\n**Scores (0-10 each):**\n\n- relevance: `score: 4`\n- specificity: `score: 4`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 3`\n\n**Notes:** 2/5 blocks from skillforge project. Block 1 (rank 1) is a SkillForge session that mentions YAML serializer/deserializer and SkillChain model \u2014 adjacent to Skill IR. Block 5 (rank 5) is also skillforge. Useful signal buried among off-topic blocks.\n\n---\n\n## A / A3 - Retrieval Quality\n\n**Prompt:**\n\n```\nI'm working on My preferences for commit message style and PR structure. Based on my prior work and session history, what are the most\nrelevant patterns, decisions, or warnings I should be aware of? Please be specific about\nwhat you recall and rate your confidence in each item.\n```\n\nretrieval-only: True\n\n**Retrieved 5 blocks:**\n\n1. `session` / `2026-05-16-depthfusion-session` (score=22.0564)\n   > # Session: 2026-05-16\n**Date:** 2026-05-16\n**Started:** 07:13\n**Last Updated:** 10:55\n**Project:** depthfusion\n**Branch:** main\n**Worktree:** /home/gregmorris/projects/depthfusion\n\n---\n\n\n--- SESSION END at 07:14:20 ---\nProject: depthfusion\n\n2. `session` / `2026-05-14-digittal-ccrs-session` (score=17.8621)\n   > --- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSION START at 02:44:49 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\n--- SESSIO\n3. `session` / `2026-05-15-digittal-ccrs-session` (score=17.1209)\n   > --- SESSION END at 03:35:03 ---\nProject: digittal-ccrs\nDirectory: /home/gregmorris/projects/agreement-automation\nEnd Reason: {\"session_id\":\"2079fc01-a61c-444f-bfb7-ec497f97a130\",\"transcript_path\":\"/home/gregmorris/.claude-acc1/projects/-hom\n4. `session` / `2026-05-15-depthfusion-session` (score=15.8927)\n   > --- COMPACTION EVENT at 08:12:16 ---\nProject: depthfusion\nDirectory: /home/gregmorris/projects/depthfusion\nTrigger: context limit reached\nHook Input: {\"session_id\":\"cb5c5db4-ceb5-4134-b8e7-1808787af076\",\"transcript_path\":\"/home/gregmorris/.\n5. `session` / `2026-05-15-agent-ops-session` (score=14.2064)\n   > --- SESSION END at 03:40:58 ---\nProject: agent-ops\nDirectory: /home/gregmorris/projects/agent-ops\nEnd Reason: {\"session_id\":\"b08f01a8-fbe1-4319-a143-3085c16dcb8d\",\"transcript_path\":\"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr\n\n**Scores (0-10 each):**\n\n- relevance: `score: 1`\n- specificity: `score: 1`\n- confidence_calibration: `score: 1`\n- novel_signal: `score: 1`\n\n**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.\n\n---\n\n## B / B1 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nFunction missing try/catch around external API call (security.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B2 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nSwitch on discriminated union missing a case (TypeScript exhaustiveness)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## B / B3 - Code Quality\n\n**Prompt:**\n\n```\nReview this code snippet and identify any issues. Be specific about severity:\n\nN+1 query pattern in an endpoint (performance.md violation)\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- issue_detection: `score: `\n- standards_citation: `score: `\n- fix_quality: `score: `\n- false_positives: `score: `\n\n**Notes:** \n\n---\n\n## C / C1 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to add a new OAuth provider to the auth module. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C2 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to refactor the feature-flag system to use typed keys. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## C / C3 - Planning Coherence\n\n**Prompt:**\n\n```\nI need to migrate from class components to hooks in the dashboard. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- file_accuracy: `score: `\n- dependency_ordering: `score: `\n- prior_decision_recall: `score: `\n- completeness: `score: `\n\n**Notes:** \n\n---\n\n## D / D1 - Session Continuity\n\n**Prompt:**\n\n```\nWhat were the last three meaningful commits you made in this repo, and what do they accomplish together?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D2 - Session Continuity\n\n**Prompt:**\n\n```\nWhat was the most recent review-gate finding that resulted in a fix? What was the fix?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D3 - Session Continuity\n\n**Prompt:**\n\n```\nWhat is the current status of the benchmark harness work? What still needs to happen?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## D / D4 - Session Continuity\n\n**Prompt:**\n\n```\nWhat decisions have I made about how we handle errors in this codebase?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- factual_accuracy: `score: `\n- specificity: `score: 1`\n- temporal_ordering: `score: `\n- coverage: `score: `\n\n**Notes:** \n\n---\n\n## E / E1 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to quickly find all places a specific function is called across the codebase. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E2 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to review a large diff before committing. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E3 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to set up a new project with standard conventions. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n\n## E / E4 - Tool Suggestion Quality\n\n**Prompt:**\n\n```\nI need to investigate an intermittent test failure. What's the best approach and what tools should I use?\n```\n\nretrieval-only: False\n\n**Scores (0-10 each):**\n\n- tool_relevance: `score: `\n- context_awareness: `score: `\n- prioritization: `score: `\n\n**Notes:** \n\n---\n"};
+
+const P = {
+  B1:{cat:'B',ttl:'Missing try/catch',   prompt:'Review this code snippet and identify any issues. Be specific about severity:\n\nFunction missing try/catch around external API call (security.md violation)',dims:['issue_detection','standards_citation','fix_quality','false_positives']},
+  B2:{cat:'B',ttl:'Missing union case',   prompt:'Review this code snippet and identify any issues. Be specific about severity:\n\nSwitch on discriminated union missing a case (TypeScript exhaustiveness)',dims:['issue_detection','standards_citation','fix_quality','false_positives']},
+  B3:{cat:'B',ttl:'N+1 query pattern',    prompt:'Review this code snippet and identify any issues. Be specific about severity:\n\nN+1 query pattern in an endpoint (performance.md violation)',dims:['issue_detection','standards_citation','fix_quality','false_positives']},
+  C1:{cat:'C',ttl:'OAuth provider plan',  prompt:'I need to add a new OAuth provider to the auth module. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.',dims:['file_accuracy','dependency_ordering','prior_decision_recall','completeness']},
+  C2:{cat:'C',ttl:'Feature flag refactor',prompt:'I need to refactor the feature-flag system to use typed keys. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.',dims:['file_accuracy','dependency_ordering','prior_decision_recall','completeness']},
+  C3:{cat:'C',ttl:'Class→hooks migration',prompt:'I need to migrate from class components to hooks in the dashboard. Produce a step-by-step plan with dependencies, touching\nthe relevant files in this project. Reference prior decisions where applicable.',dims:['file_accuracy','dependency_ordering','prior_decision_recall','completeness']},
+  D1:{cat:'D',ttl:'Last 3 commits',       prompt:'What were the last three meaningful commits you made in this repo, and what do they accomplish together?',dims:['factual_accuracy','specificity','temporal_ordering','coverage']},
+  D2:{cat:'D',ttl:'Last review-gate fix', prompt:'What was the most recent review-gate finding that resulted in a fix? What was the fix?',dims:['factual_accuracy','specificity','temporal_ordering','coverage']},
+  D3:{cat:'D',ttl:'Benchmark status',     prompt:'What is the current status of the benchmark harness work? What still needs to happen?',dims:['factual_accuracy','specificity','temporal_ordering','coverage']},
+  D4:{cat:'D',ttl:'Error handling decs',  prompt:'What decisions have I made about how we handle errors in this codebase?',dims:['factual_accuracy','specificity','temporal_ordering','coverage']},
+  E1:{cat:'E',ttl:'Find callers',         prompt:"I need to quickly find all places a specific function is called across the codebase. What's the best approach and what tools should I use?",dims:['tool_relevance','context_awareness','prioritization']},
+  E2:{cat:'E',ttl:'Review diff',          prompt:"I need to review a large diff before committing. What's the best approach and what tools should I use?",dims:['tool_relevance','context_awareness','prioritization']},
+  E3:{cat:'E',ttl:'New project setup',    prompt:"I need to set up a new project with standard conventions. What's the best approach and what tools should I use?",dims:['tool_relevance','context_awareness','prioritization']},
+  E4:{cat:'E',ttl:'Intermittent failure', prompt:"I need to investigate an intermittent test failure. What's the best approach and what tools should I use?",dims:['tool_relevance','context_awareness','prioritization']},
+};
+
+const RUB = {
+  issue_detection:      {0:'Misses all intentional issues',5:'Catches the obvious ones',10:'Catches all 3 with correct severity'},
+  standards_citation:   {0:'No mention of project conventions',5:'Mentions conventions generically',10:'Cites specific rule (e.g. security.md §2)'},
+  fix_quality:          {0:'Wrong fix or no fix',5:'Partial fix',10:'Correct fix with explanation'},
+  false_positives:      {0:'Flags many non-issues',5:'Some over-flagging',10:'Zero false positives'},
+  file_accuracy:        {0:"Names files that don't exist",5:'Mix of real and hallucinated',10:'All files exist and are relevant'},
+  dependency_ordering:  {0:'Random order or cyclical',5:'Mostly correct, 1-2 inversions',10:'Dependencies correct end-to-end'},
+  prior_decision_recall:{0:'Ignores relevant prior work',5:'Mentions vaguely',10:'Cites specific prior ADR/discovery'},
+  completeness:         {0:'Missing obvious steps',5:'Missing 1-2 steps',10:'Covers all necessary steps'},
+  factual_accuracy:     {0:'Confabulates content',5:'Some accurate, some invented',10:'Every claim verifiable'},
+  specificity:          {0:"Vague ('some work happened')",5:'Names concepts',10:'Cites commit SHAs, file paths, dates'},
+  temporal_ordering:    {0:'Wrong order or no order',5:'Approximately correct',10:'Exact chronology'},
+  coverage:             {0:'Answers one dimension',5:'Answers most dimensions',10:'Full answer with context'},
+  tool_relevance:       {0:'Suggests wrong tool class',5:'Right class, generic choice',10:'Specific project-appropriate tool'},
+  context_awareness:    {0:'Generic advice',5:'Some project awareness',10:'Cites specific project conventions'},
+  prioritization:       {0:'Lists tools without ranking',5:'Loose ordering',10:'Clear primary + alternatives with reasoning'},
+};
+
+const ORDER = ['B1','B2','B3','C1','C2','C3','D1','D2','D3','D4','E1','E2','E3','E4'];
+const SECS = {B:'Code Quality',C:'Planning Coherence',D:'Session Continuity',E:'Tool Suggestion'};
+const INSTR = {
+  B:'<strong>How to score:</strong> Open a fresh Claude Code session. Paste this prompt, then score the response.',
+  C:'<strong>How to score:</strong> Open a fresh Claude Code session in a project with real files. Paste this prompt and score the plan.',
+  D:'<strong>How to score:</strong> Open a fresh Claude Code session with DepthFusion active. Paste this prompt and score memory quality.',
+  E:'<strong>How to score:</strong> Open a fresh Claude Code session. Paste this prompt and score tool suggestion quality.',
+};
+
+// State (persisted in localStorage)
+const SC = {}; // SC[run][topic][dim] = number
+const NT = {}; // NT[run][topic] = string
+const RS = {}; // RS[run][topic] = string (response)
+[1,2,3].forEach(r=>{SC[r]={};NT[r]={};RS[r]={};});
+
+function save(){try{localStorage.setItem('ciqs26',JSON.stringify({SC,NT,RS}));}catch(e){}}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('ciqs26')||'{}');
+    if(d.SC)Object.keys(d.SC).forEach(r=>{Object.assign(SC[r],d.SC[r]);});
+    if(d.NT)Object.keys(d.NT).forEach(r=>{Object.assign(NT[r],d.NT[r]);});
+    if(d.RS)Object.keys(d.RS).forEach(r=>{Object.assign(RS[r],d.RS[r]);});
+  }catch(e){}
+}
+load();
+
+let cur=1, topic='B1';
+
+function gs(r,t,d){return SC[r]?.[t]?.[d]??null;}
+function ss(r,t,d,v){
+  if(!SC[r])SC[r]={};
+  if(!SC[r][t])SC[r][t]={};
+  SC[r][t][d]=v;
+  save();upd();
+}
+function complete(r,t){return P[t].dims.every(d=>gs(r,t,d)!==null);}
+function started(r,t){return P[t].dims.some(d=>gs(r,t,d)!==null);}
+function totalDone(){let n=0;[1,2,3].forEach(r=>ORDER.forEach(t=>{if(complete(r,t))n++;}));return n;}
+function catPct(r,cat){
+  const ts=ORDER.filter(t=>P[t].cat===cat);
+  let sum=0,max=0;
+  ts.forEach(t=>P[t].dims.forEach(d=>{const v=gs(r,t,d);if(v!==null){sum+=v;max+=10;}}));
+  return max>0?{sum,max,pct:Math.round(sum/max*100)}:null;
+}
+function scoreColor(v){return v===null?'var(--muted)':v<=3?'var(--danger)':v<=6?'var(--warn)':'var(--ok)';}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Render
+function renderTabs(){
+  document.getElementById('rtabs').innerHTML=[1,2,3].map(r=>{
+    const done=ORDER.filter(t=>complete(r,t)).length;
+    const cls=done===14?'c':done>0?'p':'e';
+    return `<div class="rtab${r===cur?' active':''}" onclick="swR(${r})">Run ${r}<span class="badge ${cls}">${done}/14</span></div>`;
+  }).join('');
+}
+
+function renderSB(){
+  let h='',prev='';
+  for(const t of ORDER){
+    const c=P[t].cat;
+    if(c!==prev){h+=`<div class="sb-sec">${SECS[c]}</div>`;prev=c;}
+    const dc=complete(cur,t)?'ok':started(cur,t)?'par':'em';
+    h+=`<div class="sb-item${t===topic?' active':''}" onclick="selT('${t}')">
+      <span class="sb-id">${t}</span><span class="sb-title">${P[t].ttl}</span>
+      <span class="dot dot-${dc}"></span>
+    </div>`;
+  }
+  document.getElementById('sb').innerHTML=h;
+}
+
+function renderCnt(){
+  const t=topic,r=cur,p=P[t];
+  const sv=p.dims.map(d=>gs(r,t,d));
+  const filled=sv.filter(v=>v!==null);
+  const sum=filled.reduce((a,b)=>a+b,0);
+  const maxS=p.dims.length*10;
+  const pct=filled.length===p.dims.length?Math.round(sum/maxS*100)+'%':`${filled.length}/${p.dims.length} dims`;
+  const cs=catPct(r,p.cat);
+
+  const rubs=p.dims.map(d=>{
+    const v=gs(r,t,d);
+    const disp=v!==null?v:'—';
+    const col=scoreColor(v);
+    const rub=RUB[d];
+    const tip=`0: ${rub[0]}\n5: ${rub[5]}\n10: ${rub[10]}`;
+    return `<div class="rub-item">
+      <div class="rub-row">
+        <span class="rub-name" title="${esc(tip)}">${d.replace(/_/g,' ')}</span>
+        <input type="range" class="slider" min="0" max="10" value="${v!==null?v:5}"
+          oninput="ss(${r},'${t}','${d}',+this.value);this.nextElementSibling.textContent=this.value;this.nextElementSibling.style.color=scoreColor(+this.value)"
+          id="sl-${r}-${t}-${d}">
+        <span class="sval" style="color:${col}" id="sv-${r}-${t}-${d}">${disp}</span>
+      </div>
+      <div class="hints">
+        <span>${rub[0].split(' ').slice(0,4).join(' ')}…</span>
+        <span>${rub[5].split(' ').slice(0,4).join(' ')}…</span>
+        <span>${rub[10].split(' ').slice(0,4).join(' ')}…</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const savedR=esc(RS[r]?.[t]||'');
+  const savedN=esc(NT[r]?.[t]||'');
+  const promptText=esc(p.prompt);
+
+  document.getElementById('cnt').innerHTML=`
+    <div class="alert">${INSTR[p.cat]}</div>
+    <div class="card">
+      <div class="card-hdr">
+        <span class="ctag cat${p.cat}">${p.cat}</span>
+        <span class="card-ttl">${t} — ${p.ttl}</span>
+        <span style="font-size:11px;color:var(--muted)">Run ${r}</span>
+      </div>
+      <div class="card-body">
+        <div>
+          <div class="lbl">Prompt — paste into fresh Claude Code session</div>
+          <div class="pbox">
+            <button class="cpbtn" id="cpbtn" onclick="cpPrompt()">Copy</button>
+            <pre style="white-space:pre-wrap;font-family:inherit">${promptText}</pre>
+          </div>
+        </div>
+        <div>
+          <div class="rlbl">Claude response <span>optional — paste for reference</span></div>
+          <textarea class="resp" placeholder="Paste Claude's response here (optional, for reference while scoring)…"
+            oninput="saveR(${r},'${t}',this.value)">${savedR}</textarea>
+        </div>
+        <div>
+          <div class="lbl">Rubric scores (0–10)</div>
+          <div class="rub-grid">${rubs}</div>
+        </div>
+        <div>
+          <div class="lbl">Notes</div>
+          <textarea class="nt" placeholder="Any observations about this response…"
+            oninput="saveN(${r},'${t}',this.value)">${savedN}</textarea>
+        </div>
+        <div class="catscore">
+          <span style="color:var(--muted)">Topic:</span>
+          <span class="cv">${sum}/${maxS}</span>
+          <span style="color:var(--muted)">${pct}</span>
+          <span style="flex:1"></span>
+          <span style="color:var(--muted)">Category ${p.cat}:</span>
+          ${cs?`<span class="cv">${cs.pct}%</span><span style="color:var(--muted)">(${cs.sum}/${cs.max})</span>`:'<span style="color:var(--muted)">—</span>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderFtr(){
+  const r=cur;
+  document.getElementById('fsums').innerHTML=['B','C','D','E'].map(c=>{
+    const cs=catPct(r,c);
+    return `<div class="schip"><span class="sl">Cat ${c}:</span><span class="sv">${cs?cs.pct+'%':'—'}</span></div>`;
+  }).join('');
+  const tot=totalDone();
+  document.getElementById('pfill').style.width=(tot/42*100)+'%';
+  document.getElementById('plbl').textContent=`${tot}/42`;
+  document.getElementById('erlbl').textContent=r;
+}
+
+function upd(){renderTabs();renderSB();renderCnt();renderFtr();
+  document.getElementById('pbtn').disabled=ORDER.indexOf(topic)===0;
+  document.getElementById('nbtn').disabled=ORDER.indexOf(topic)===ORDER.length-1;
+}
+
+// Actions
+function swR(r){cur=r;upd();}
+function selT(t){topic=t;upd();}
+function nav(d){const i=ORDER.indexOf(topic)+d;if(i>=0&&i<ORDER.length){topic=ORDER[i];upd();}}
+function saveR(r,t,v){if(!RS[r])RS[r]={};RS[r][t]=v;save();}
+function saveN(r,t,v){if(!NT[r])NT[r]={};NT[r][t]=v;save();}
+function cpPrompt(){
+  navigator.clipboard.writeText(P[topic].prompt).then(()=>{
+    const b=document.getElementById('cpbtn');
+    b.textContent='Copied!';b.classList.add('ok');
+    setTimeout(()=>{b.textContent='Copy';b.classList.remove('ok');},1500);
+  });
+}
+
+function genMd(run){
+  let md=TMPLS[String(run)];
+  for(const t of ORDER){
+    const p=P[t];
+    for(const d of p.dims){
+      const v=SC[run]?.[t]?.[d]??null;
+      if(v!==null){
+        const re=new RegExp(`(## ${p.cat} / ${t}[\\s\\S]*?- ${d}: \`score: )\``, 'm');
+        md=md.replace(re, `$1${v}\``);
+      }
+    }
+    const n=NT[run]?.[t];
+    if(n){
+      const re=new RegExp(`(## ${p.cat} / ${t}[\\s\\S]*?\\*\\*Notes:\\*\\* )`, 'm');
+      md=md.replace(re, `$1${n}\n`);
+    }
+  }
+  return md;
+}
+
+function expRun(r){
+  const md=genMd(r);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
+  a.download=`2026-05-16-local-run${r}-scoring.md`;
+  a.click();URL.revokeObjectURL(a.href);
+}
+function expAll(){[1,2,3].forEach(r=>expRun(r));}
+
+upd();
+</script>
+</body>
+</html>
