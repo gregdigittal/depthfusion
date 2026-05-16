@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-15 (E-05 done — S-110 web install UI + S-111 Windows compat shipped; 91 tests green; E-26 S-63 AC-3/AC-4 + S-66 AC-2 NEEDS_USER — p95 threshold recalibration required)
+> Last updated: 2026-05-16 (E-35 S-112 done — structured observation fields on ContextItem; S-114 FTS5 index done; 1753 tests green)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1901,19 +1901,19 @@
 ### S-112: As a developer, I want publish_context to accept structured observation fields so that retrieval can score and filter on typed fields rather than searching only the prose content blob `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion_publish_context` accepts optional `facts: list[str]`, `concepts: list[str]`, `files_read: list[str]`, `files_modified: list[str]`; all stored in item metadata
-- [ ] AC-2: `recall_relevant` returns items with structured fields intact in the response block
-- [ ] AC-3: BM25 applies 1.2× boost when query term matches a `facts` or `concepts` entry
-- [ ] AC-4: Existing `publish_context` calls without structured fields continue to work unchanged
-- [ ] AC-5: `depthfusion_describe_capabilities` output lists structured fields as supported
-- [ ] AC-6: Tests: publish with fields, round-trip retrieval, boost scoring, backward compat
+- [x] AC-1: `depthfusion_publish_context` accepts optional `facts: list[str]`, `concepts: list[str]`, `files_read: list[str]`, `files_modified: list[str]`; all stored in item metadata
+- [x] AC-2: `recall_relevant` returns items with structured fields intact in the response block
+- [x] AC-3: BM25 applies 1.2× boost when query term matches a `facts` or `concepts` entry
+- [x] AC-4: Existing `publish_context` calls without structured fields continue to work unchanged
+- [x] AC-5: `depthfusion_describe_capabilities` output lists structured fields as supported
+- [x] AC-6: Tests: publish with fields, round-trip retrieval, boost scoring, backward compat
 
 **Tasks:**
-- [ ] T-377: Extend ContextItem dataclass + serialisation (facts, concepts, files_read, files_modified)
-- [ ] T-378: Extend publish_context MCP tool schema + handler
-- [ ] T-379: BM25 field boost (1.2× for facts/concepts hits)
-- [ ] T-380: Extend post_tool_use.py (S-110) to populate files_read/files_modified automatically
-- [ ] T-381: Tests
+- [x] T-377: Extend ContextItem dataclass + serialisation (facts, concepts, files_read, files_modified)
+- [x] T-378: Extend publish_context MCP tool schema + handler
+- [x] T-379: BM25 field boost (1.2× for facts/concepts hits)
+- [x] T-380: Extend post_tool_use.py (S-110) to populate files_read/files_modified automatically
+- [x] T-381: Tests
 
 ### S-113: As an operator, I want a lightweight 3-layer search mode so that context injection pays ~10% of the token cost of a full recall `P2` `M`
 

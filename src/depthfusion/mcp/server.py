@@ -2006,6 +2006,9 @@ def _tool_describe_capabilities() -> str:
             "publish": ["file_bus" if router_enabled else "disabled"],
             "auto_learn": auto_learn_layers,
         },
+        "supported_features": {
+            "publish_context": ["structured_fields"],
+        },
     }, indent=2)
 
 
@@ -2238,13 +2241,32 @@ def _tool_retrieve_context(arguments: dict, config: Any) -> str:
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[:top_k]
 
+    def _memory_block(score: float, m: "Any") -> dict:
+        block: dict = {
+            "memory_id": m.id,
+            "type": m.type.value,
+            "content": m.content[:500],
+            "score": score,
+        }
+        # S-112 AC-2: include structured fields when present
+        facts = m.extra.get("facts") or []
+        concepts = m.extra.get("concepts") or []
+        files_read = m.extra.get("files_read") or []
+        files_modified = m.extra.get("files_modified") or []
+        if facts:
+            block["facts"] = facts
+        if concepts:
+            block["concepts"] = concepts
+        if files_read:
+            block["files_read"] = files_read
+        if files_modified:
+            block["files_modified"] = files_modified
+        return block
+
     return json.dumps({
         "query": query,
         "project_id": project_id,
-        "memories": [
-            {"memory_id": m.id, "type": m.type.value, "content": m.content[:500], "score": s}
-            for s, m in top
-        ],
+        "memories": [_memory_block(s, m) for s, m in top],
         "count": len(top),
     })
 
