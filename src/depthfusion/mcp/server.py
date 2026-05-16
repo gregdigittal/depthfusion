@@ -2204,6 +2204,7 @@ def _check_backend_health(mode: str) -> None:
 
 def _tool_retrieve_context(arguments: dict, config: Any) -> str:
     from depthfusion.cognitive.scorer import CognitiveScorer, ScoringContext
+    from depthfusion.retrieval.hybrid import fts_prefilter_memory_ids
     from depthfusion.storage.memory_store import MemoryStore
 
     project_id = arguments.get("project_id", "")
@@ -2212,11 +2213,20 @@ def _tool_retrieve_context(arguments: dict, config: Any) -> str:
     memory_types = arguments.get("memory_types")
 
     store = MemoryStore(config.memory_store_path)
-    memories = store.query(
-        project_id=project_id or None,
-        memory_type=memory_types[0] if memory_types and len(memory_types) == 1 else None,
-        limit=top_k * 4,
-    )
+
+    # S-114: use FTS5 prefilter when available to reduce the BM25/scoring
+    # candidate set. Falls through to full-table query when FTS is off or
+    # the query is empty.
+    fts_ids = fts_prefilter_memory_ids(store, query) if query else None
+    if fts_ids is not None:
+        # FTS returned a ranked candidate list; load only those IDs
+        memories = [m for mid in fts_ids if (m := store.get(mid)) is not None]
+    else:
+        memories = store.query(
+            project_id=project_id or None,
+            memory_type=memory_types[0] if memory_types and len(memory_types) == 1 else None,
+            limit=top_k * 4,
+        )
 
     scorer = CognitiveScorer()
     scored = []

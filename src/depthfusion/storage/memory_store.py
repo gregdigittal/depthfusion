@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from depthfusion.core.memory_object import MemoryObject
+
+logger = logging.getLogger(__name__)
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS memories (
@@ -28,6 +32,55 @@ CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
 """
 
+_FTS_MIGRATION_ID = "fts5_v1"
+
+# FTS5 standalone virtual table (no content= backing table).
+# Standalone tables store their own copy of indexed text — no column-mapping
+# constraint against the memories table.  facts_text and concepts_text are
+# denormalized from data_json at write time (T-390); triggers keep the index
+# in sync.  Storage overhead is negligible for typical memory corpus sizes.
+_FTS_TABLE_STMT = """
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+    content, summary, facts_text, concepts_text,
+    tokenize='porter unicode61'
+)
+"""
+
+# Triggers keep the FTS5 index in sync with the memories table.
+# The 'delete' special command removes a row from the inverted index.
+_FTS_TRIGGER_INSERT = """
+CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+    INSERT INTO memories_fts(rowid, content, summary, facts_text, concepts_text)
+    VALUES (new.rowid, new.content, new.summary,
+            COALESCE(json_extract(new.data_json, '$.facts_text'), ''),
+            COALESCE(json_extract(new.data_json, '$.concepts_text'), ''));
+END
+"""
+
+_FTS_TRIGGER_UPDATE = """
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+    DELETE FROM memories_fts WHERE rowid = old.rowid;
+    INSERT INTO memories_fts(rowid, content, summary, facts_text, concepts_text)
+    VALUES (new.rowid, new.content, new.summary,
+            COALESCE(json_extract(new.data_json, '$.facts_text'), ''),
+            COALESCE(json_extract(new.data_json, '$.concepts_text'), ''));
+END
+"""
+
+_FTS_TRIGGER_DELETE = """
+CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+    DELETE FROM memories_fts WHERE rowid = old.rowid;
+END
+"""
+
+_FTS_BACKFILL_SQL = """
+INSERT INTO memories_fts(rowid, content, summary, facts_text, concepts_text)
+SELECT rowid, content, summary,
+       COALESCE(json_extract(data_json, '$.facts_text'), ''),
+       COALESCE(json_extract(data_json, '$.concepts_text'), '')
+FROM memories
+"""
+
 
 class MemoryStore:
     def __init__(self, path: Path) -> None:
@@ -38,9 +91,47 @@ class MemoryStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_DDL)
         self._conn.commit()
+        self._apply_fts_migration()
+
+    def _apply_fts_migration(self) -> None:
+        """Create FTS5 virtual table + triggers; backfill existing rows once."""
+        try:
+            self._conn.execute(
+                "CREATE TABLE IF NOT EXISTS _df_schema_migrations "
+                "(migration_id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+            for stmt in (_FTS_TABLE_STMT, _FTS_TRIGGER_INSERT,
+                         _FTS_TRIGGER_UPDATE, _FTS_TRIGGER_DELETE):
+                self._conn.execute(stmt)
+            cur = self._conn.execute(
+                "SELECT 1 FROM _df_schema_migrations WHERE migration_id=?",
+                (_FTS_MIGRATION_ID,),
+            )
+            if not cur.fetchone():
+                self._conn.execute(_FTS_BACKFILL_SQL)
+                self._conn.execute(
+                    "INSERT INTO _df_schema_migrations VALUES(?,?)",
+                    (_FTS_MIGRATION_ID, datetime.now(timezone.utc).isoformat()),
+                )
+            self._conn.commit()
+        except Exception as exc:  # noqa: BLE001 — FTS5 unavailable is non-fatal
+            logger.debug("FTS5 migration skipped: %s", exc)
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
 
     def upsert(self, memory: MemoryObject) -> None:
         data = memory.to_dict()
+        # T-390: denormalize facts/concepts into FTS5-searchable text fields.
+        # Stored as space-joined strings inside data_json so triggers can
+        # extract them via json_extract(data_json, '$.facts_text').
+        facts = memory.extra.get("facts") or []
+        concepts = memory.extra.get("concepts") or []
+        if facts:
+            data["facts_text"] = " ".join(str(f) for f in facts if f)
+        if concepts:
+            data["concepts_text"] = " ".join(str(c) for c in concepts if c)
         with self._lock:
             self._conn.execute(
                 """INSERT INTO memories
@@ -112,3 +203,27 @@ class MemoryStore:
         else:
             cur = self._conn.execute("SELECT COUNT(*) FROM memories")
         return cur.fetchone()[0]
+
+    def _fts_search(self, query: str, limit: int = 50) -> list[str]:
+        """Return memory IDs ranked by FTS5 relevance for `query`.
+
+        Returns an empty list on any failure (FTS5 unavailable, bad query
+        syntax, etc.) so callers fall through to the full-table BM25 scan.
+        FTS5 `rank` is negative — ORDER BY rank ASC gives most-relevant first.
+        """
+        if not query or not query.strip():
+            return []
+        try:
+            cur = self._conn.execute(
+                """SELECT m.id
+                   FROM memories_fts fts
+                   JOIN memories m ON fts.rowid = m.rowid
+                   WHERE memories_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT ?""",
+                (query, limit),
+            )
+            return [row[0] for row in cur.fetchall()]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_fts_search failed (falling back to full scan): %s", exc)
+            return []

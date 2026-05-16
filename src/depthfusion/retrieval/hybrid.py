@@ -389,6 +389,32 @@ class RecallPipeline:
         return [all_blocks[cid] for cid, _ in ranked]
 
 
+def fts_prefilter_memory_ids(
+    store: "Any",
+    query: str,
+    *,
+    limit: int = 50,
+) -> list[str] | None:
+    """Return FTS5-ranked memory IDs when `DEPTHFUSION_FTS_ENABLED=true`.
+
+    T-389 / S-114: wraps `store._fts_search()` with the feature flag gate so
+    callers only need to check the return value:
+      - ``None``  → flag is off or FTS unavailable; fall through to full scan
+      - ``[]``    → FTS ran but found no matches for `query`; caller may skip BM25
+      - ``[...]`` → pre-filtered candidate IDs, sorted by FTS5 rank
+
+    The caller is responsible for loading only the returned IDs from the store
+    and then scoring them with BM25 / CognitiveScorer as usual.
+    """
+    if os.getenv("DEPTHFUSION_FTS_ENABLED", "true").lower() not in ("true", "1", "yes"):
+        return None
+    try:
+        return store._fts_search(query, limit=limit)  # type: ignore[attr-defined]
+    except Exception as exc:  # noqa: BLE001 — fail-open: never degrade recall quality
+        logger.debug("fts_prefilter_memory_ids: degraded to full scan (%s)", exc)
+        return None
+
+
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     """Cosine similarity in [-1.0, 1.0]; returns 0.0 for zero-vectors or
     length-mismatched inputs (rather than raising — the retrieval path

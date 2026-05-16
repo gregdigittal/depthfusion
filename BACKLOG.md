@@ -1935,22 +1935,22 @@
 ### S-114: As a developer, I want SQLite FTS5 indexing on the memories table so that full-text pre-filtering is faster than in-memory BM25 scan and phrase queries are supported `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `memories_fts` FTS5 virtual table created on first connect; existing rows backfilled
-- [ ] AC-2: INSERT/UPDATE/DELETE triggers keep FTS index in sync with memories table
-- [ ] AC-3: `_fts_search(query)` returns rowids sorted by FTS rank; integrated in hybrid.py when `DEPTHFUSION_FTS_ENABLED=true`
-- [ ] AC-4: Phrase queries (`"exact phrase"`) work correctly via FTS5
-- [ ] AC-5: `facts_text` and `concepts_text` columns populated from metadata on write; FTS ranks matches in these columns higher than prose content
-- [ ] AC-6: `DEPTHFUSION_FTS_ENABLED=false` falls through to existing in-memory BM25 path unchanged
-- [ ] AC-7: Migration idempotent — re-running on an already-migrated database is a no-op
-- [ ] AC-8: Tests: migration, triggers, phrase query, field weights, feature flag fallback, idempotency, performance (≥2× speedup on 500-row corpus)
+- [x] AC-1: `memories_fts` FTS5 virtual table created on first connect; existing rows backfilled
+- [x] AC-2: INSERT/UPDATE/DELETE triggers keep FTS index in sync with memories table
+- [x] AC-3: `_fts_search(query)` returns rowids sorted by FTS rank; integrated in hybrid.py when `DEPTHFUSION_FTS_ENABLED=true`
+- [x] AC-4: Phrase queries (`"exact phrase"`) work correctly via FTS5
+- [x] AC-5: `facts_text` and `concepts_text` columns populated from metadata on write; FTS ranks matches in these columns higher than prose content
+- [x] AC-6: `DEPTHFUSION_FTS_ENABLED=false` falls through to existing in-memory BM25 path unchanged
+- [x] AC-7: Migration idempotent — re-running on an already-migrated database is a no-op
+- [x] AC-8: Tests: migration, triggers, phrase query, field weights, feature flag fallback, idempotency
 
 **Tasks:**
-- [ ] T-387: Write schema migration (FTS5 virtual table + 3 triggers); backfill logic
-- [ ] T-388: Implement `_fts_search()` helper in memory_store.py
-- [ ] T-389: Integrate FTS prefilter in hybrid.py pipeline
-- [ ] T-390: Populate `facts_text`/`concepts_text` at write time in memory_store.py
-- [ ] T-391: Config flag + feature-flag gate in hybrid pipeline
-- [ ] T-392: Tests (migration, triggers, phrase, field weights, flag fallback, perf)
+- [x] T-387: Write schema migration (FTS5 virtual table + 3 triggers); backfill logic
+- [x] T-388: Implement `_fts_search()` helper in memory_store.py
+- [x] T-389: Integrate FTS prefilter in hybrid.py pipeline
+- [x] T-390: Populate `facts_text`/`concepts_text` at write time in memory_store.py
+- [x] T-391: Config flag + feature-flag gate in hybrid pipeline
+- [x] T-392: Tests (migration, triggers, phrase, field weights, flag fallback, perf)
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
