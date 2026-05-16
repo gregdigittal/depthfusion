@@ -22,8 +22,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
+from depthfusion.retrieval.bm25 import BM25 as _BM25  # noqa: E402
+from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
