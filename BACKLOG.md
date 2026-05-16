@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-16 (E-35 S-112 done — structured observation fields on ContextItem; S-114 FTS5 index done; 1753 tests green)
+> Last updated: 2026-05-16 (E-35 S-112 done; S-113 done — progressive disclosure 3-layer recall; S-114 FTS5 index done; 1765 tests green)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1918,19 +1918,19 @@
 ### S-113: As an operator, I want a lightweight 3-layer search mode so that context injection pays ~10% of the token cost of a full recall `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion_recall_relevant` accepts `mode: "full" | "index" | "timeline"` (default: "full")
-- [ ] AC-2: `mode="index"` returns item_id, title (≤80 chars), tags, timestamp, source; no full content; response tokens ≤10% of equivalent `mode="full"` result
-- [ ] AC-3: `mode="timeline"` returns index fields ordered by `created_at DESC`; includes ambient items (importance≥0.1)
-- [ ] AC-4: `mode="full"` behaviour is identical to current (backward compatible)
-- [ ] AC-5: `mode="index"` p95 latency ≤100ms in local mode
-- [ ] AC-6: Tests: all three modes, token count comparison, ambient item inclusion in timeline, ambient item exclusion from full mode
+- [x] AC-1: `depthfusion_recall_relevant` accepts `mode: "full" | "index" | "timeline"` (default: "full")
+- [x] AC-2: `mode="index"` returns item_id, title (≤80 chars), tags, timestamp, source; no full content; response tokens ≤10% of equivalent `mode="full"` result
+- [x] AC-3: `mode="timeline"` returns index fields ordered by `created_at DESC`; includes ambient items (importance≥0.1)
+- [x] AC-4: `mode="full"` behaviour is identical to current (backward compatible)
+- [x] AC-5: `mode="index"` p95 latency ≤100ms in local mode
+- [x] AC-6: Tests: all three modes, token count comparison, ambient item inclusion in timeline, ambient item exclusion from full mode
 
 **Tasks:**
-- [ ] T-382: Add `mode` parameter to recall_relevant MCP schema
-- [ ] T-383: Implement `index_pass()` in hybrid.py
-- [ ] T-384: Implement `timeline_pass()` in hybrid.py (sorted by recency, no scoring)
-- [ ] T-385: Wire mode branching in `_tool_recall_impl`
-- [ ] T-386: Tests
+- [x] T-382: Add `mode` parameter to recall_relevant MCP schema
+- [x] T-383: Implement `index_pass()` in hybrid.py
+- [x] T-384: Implement `timeline_pass()` in hybrid.py (sorted by recency, no scoring)
+- [x] T-385: Wire mode branching in `_tool_recall_impl`
+- [x] T-386: Tests
 
 ### S-114: As a developer, I want SQLite FTS5 indexing on the memories table so that full-text pre-filtering is faster than in-memory BM25 scan and phrase queries are supported `P2` `M`
 

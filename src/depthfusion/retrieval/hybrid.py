@@ -389,6 +389,59 @@ class RecallPipeline:
         return [all_blocks[cid] for cid, _ in ranked]
 
 
+def index_pass(raw_blocks: list[dict], top_k: int = 20) -> list[dict]:
+    """S-113 mode='index': lightweight title+source entries, no BM25 scoring.
+
+    Deduplicates by file_stem — one entry per source file. Each entry has:
+    chunk_id, title (≤80 chars), source, tags, and timestamp when available.
+    Token cost is ~10% of a full scored response for the same corpus.
+    """
+    results: list[dict] = []
+    seen_files: set[str] = set()
+    for block in raw_blocks:
+        file_stem = block.get("file_stem", block["chunk_id"])
+        if file_stem in seen_files:
+            continue
+        seen_files.add(file_stem)
+        raw_title = block.get("title") or block["content"][:80].replace("\n", " ").strip()
+        entry: dict = {
+            "chunk_id": block["chunk_id"],
+            "title": raw_title[:80],
+            "source": block["source"],
+            "tags": block.get("tags") or [],
+        }
+        if "mtime_iso" in block:
+            entry["timestamp"] = block["mtime_iso"]
+        results.append(entry)
+        if len(results) >= top_k:
+            break
+    return results
+
+
+def timeline_pass(raw_blocks: list[dict], top_k: int = 20) -> list[dict]:
+    """S-113 mode='timeline': all blocks in recency order, no scoring, no dedup.
+
+    Blocks arrive already sorted mtime-desc from the file-loading loop, so
+    insertion order IS recency order. Includes all blocks — ambient items with
+    low importance are not filtered out.
+    """
+    results: list[dict] = []
+    for block in raw_blocks:
+        raw_title = block.get("title") or block["content"][:80].replace("\n", " ").strip()
+        entry: dict = {
+            "chunk_id": block["chunk_id"],
+            "title": raw_title[:80],
+            "source": block["source"],
+            "tags": block.get("tags") or [],
+        }
+        if "mtime_iso" in block:
+            entry["timestamp"] = block["mtime_iso"]
+        results.append(entry)
+        if len(results) >= top_k:
+            break
+    return results
+
+
 def fts_prefilter_memory_ids(
     store: "Any",
     query: str,

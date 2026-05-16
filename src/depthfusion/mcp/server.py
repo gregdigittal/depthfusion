@@ -255,6 +255,16 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     "showing individual scores used to rank it"
                 ),
             },
+            "mode": {
+                "type": "string",
+                "enum": ["full", "index", "timeline"],
+                "default": "full",
+                "description": (
+                    "Retrieval depth: 'full' (default, scored snippets), "
+                    "'index' (lightweight title+source per file, no scoring, ~10% token cost), "
+                    "'timeline' (all blocks in recency order, no scoring)"
+                ),
+            },
         },
         "required": ["query"],
     },
@@ -973,6 +983,10 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     top_k = int(arguments.get("top_k", 5))
     snippet_len = int(arguments.get("snippet_len", 1500))
     explain = bool(arguments.get("explain", False))
+    # S-113: 3-layer retrieval depth. "full" is the current default behaviour.
+    mode = str(arguments.get("mode", "full"))
+    if mode not in ("full", "index", "timeline"):
+        mode = "full"
     # T-161 / S-52: project scoping. When cross_project=False (the default),
     # results are filtered to the current project (auto-detected via git
     # remote or DEPTHFUSION_PROJECT env var). cross_project=True restores
@@ -997,14 +1011,23 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     from depthfusion.retrieval.hybrid import extract_frontmatter_project
 
     def _load_file(md_file: "Path", source_label: str) -> None:
+        from datetime import datetime, timezone as _tz
         try:
             content = md_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return
         if not content.strip():
             return
+        try:
+            mtime_iso: str | None = datetime.fromtimestamp(
+                md_file.stat().st_mtime, tz=_tz.utc
+            ).isoformat()
+        except OSError:
+            mtime_iso = None
         file_project = extract_frontmatter_project(content)
         for block in _split_into_blocks(content, source_label, md_file.stem):
+            if mtime_iso is not None:
+                block["mtime_iso"] = mtime_iso
             if file_project is not None:
                 block["project"] = file_project
             raw_blocks.append(block)
@@ -1087,6 +1110,25 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     recall_id = RecallStore.singleton().register_recall(
         [b["chunk_id"] for b in raw_blocks]
     )
+
+    # S-113: lightweight index/timeline modes bypass BM25 entirely — O(n) scan.
+    if mode in ("index", "timeline"):
+        from depthfusion.retrieval.hybrid import index_pass, timeline_pass
+        if mode == "index":
+            pass_blocks = index_pass(raw_blocks, top_k=top_k)
+            msg = f"Retrieved {len(pass_blocks)} index entries (no scoring)"
+        else:
+            pass_blocks = timeline_pass(raw_blocks, top_k=top_k)
+            msg = f"Retrieved {len(pass_blocks)} entries (recency order, no scoring)"
+        return json.dumps({
+            "query": query,
+            "mode": mode,
+            "count": len(pass_blocks),
+            "blocks": pass_blocks,
+            "recall_id": recall_id,
+            "total_sources_scanned": len(raw_blocks),
+            "message": msg,
+        }, indent=2)
 
     # Recency ordering: insertion order reflects mtime desc (used as a small tie-breaker)
     recency_list: list[str] = [b["chunk_id"] for b in raw_blocks]
