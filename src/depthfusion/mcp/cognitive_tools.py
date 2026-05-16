@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from depthfusion.core.memory_object import (
-    MemoryConfidence,
     MemoryObject,
     MemorySource,
     MemoryStatus,

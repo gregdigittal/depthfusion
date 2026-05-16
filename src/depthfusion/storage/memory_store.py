@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from depthfusion.core.memory_object import MemoryObject, MemoryStatus
+from depthfusion.core.memory_object import MemoryObject
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS memories (

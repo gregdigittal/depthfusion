@@ -1,4 +1,3 @@
-import pytest
 
 from depthfusion.cognitive.contradiction import (
     ConflictSeverity,

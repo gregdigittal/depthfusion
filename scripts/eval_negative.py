@@ -24,7 +24,6 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GOLD_DIR = PROJECT_ROOT / "docs" / "eval-sets" / "negative"
 

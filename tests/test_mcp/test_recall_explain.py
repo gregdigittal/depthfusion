@@ -19,7 +19,6 @@ import pytest
 
 from depthfusion.mcp.server import _make_tool_schema, _tool_recall_impl
 
-
 # ── Fixture corpus (same pattern as test_v04_output_identity) ────────────
 
 

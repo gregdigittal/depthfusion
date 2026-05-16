@@ -1,13 +1,8 @@
-import pytest
 
 from depthfusion.core.memory_object import (
-    MemoryConfidence,
     MemoryObject,
-    MemoryScope,
-    MemorySource,
     MemoryStatus,
     MemoryType,
-    MemoryValidity,
 )
 
 

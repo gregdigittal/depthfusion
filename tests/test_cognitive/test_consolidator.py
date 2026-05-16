@@ -1,11 +1,9 @@
 """Tests for MemoryConsolidator — Task 11 / E-31 / S-101."""
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-import pytest
-
-from depthfusion.cognitive.consolidator import ConsolidationResult, MemoryConsolidator
+from depthfusion.cognitive.consolidator import MemoryConsolidator
 from depthfusion.core.memory_object import MemoryObject, MemoryStatus, MemoryType
 
 

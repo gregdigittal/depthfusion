@@ -1,8 +1,5 @@
 import threading
 from datetime import datetime, timezone
-from pathlib import Path
-
-import pytest
 
 from depthfusion.core.memory import MemoryEvent, MemoryEventType
 from depthfusion.storage.event_log import EventLog

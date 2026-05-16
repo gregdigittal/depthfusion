@@ -43,14 +43,14 @@ except ImportError:
     sys.exit(127)
 
 print(f"[mlx-serve] Loading model on main thread: {args.model}")
-print(f"[mlx-serve] First run downloads from HuggingFace — subsequent starts are fast.")
+print("[mlx-serve] First run downloads from HuggingFace — subsequent starts are fast.")
 print()
 
 model, tokenizer = mlx_lm.load(args.model)
 print()
 print(f"[mlx-serve] Model ready. Serving on http://{args.host}:{args.port}")
-print(f"[mlx-serve] Endpoint: POST /v1/chat/completions")
-print(f"[mlx-serve] Press Ctrl+C to stop.")
+print("[mlx-serve] Endpoint: POST /v1/chat/completions")
+print("[mlx-serve] Press Ctrl+C to stop.")
 print()
 
 # ---------------------------------------------------------------------------

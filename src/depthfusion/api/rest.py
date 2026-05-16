@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import os
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 

@@ -5,7 +5,7 @@ Pinned memories are never candidates for merge or archive (security constraint).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from depthfusion.core.memory_object import MemoryObject, MemoryStatus
 

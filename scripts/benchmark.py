@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import subprocess
 import sys
 import time
@@ -25,7 +24,6 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-
 
 # ---------------------------------------------------------------------------
 # Helpers

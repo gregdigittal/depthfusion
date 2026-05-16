@@ -1,5 +1,5 @@
 # tests/test_capture/test_compressor.py
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 from depthfusion.capture.compressor import SessionCompressor, _project_from_stem
 

@@ -2068,8 +2068,8 @@ def _check_backend_health(mode: str) -> None:
 ## ---------------------------------------------------------------------------
 
 def _tool_retrieve_context(arguments: dict, config: Any) -> str:
-    from depthfusion.storage.memory_store import MemoryStore
     from depthfusion.cognitive.scorer import CognitiveScorer, ScoringContext
+    from depthfusion.storage.memory_store import MemoryStore
 
     project_id = arguments.get("project_id", "")
     query = arguments.get("query", "")
@@ -2107,10 +2107,11 @@ def _tool_retrieve_context(arguments: dict, config: Any) -> str:
 def _tool_record_decision(arguments: dict, config: Any) -> str:
     import uuid
     from datetime import datetime, timezone
+
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
     from depthfusion.mcp.cognitive_tools import build_decision_memory
     from depthfusion.storage.event_log import EventLog
     from depthfusion.storage.memory_store import MemoryStore
-    from depthfusion.core.memory import MemoryEvent, MemoryEventType
 
     project_id = arguments.get("project_id", "")
     actor = arguments.get("actor", "unknown")
@@ -2140,10 +2141,11 @@ def _tool_record_decision(arguments: dict, config: Any) -> str:
 def _tool_record_incident(arguments: dict, config: Any) -> str:
     import uuid
     from datetime import datetime, timezone
+
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
     from depthfusion.mcp.cognitive_tools import build_incident_memory
     from depthfusion.storage.event_log import EventLog
     from depthfusion.storage.memory_store import MemoryStore
-    from depthfusion.core.memory import MemoryEvent, MemoryEventType
 
     project_id = arguments.get("project_id", "")
     actor = arguments.get("actor", "unknown")
@@ -2174,10 +2176,11 @@ def _tool_record_incident(arguments: dict, config: Any) -> str:
 def _tool_mark_superseded(arguments: dict, config: Any) -> str:
     import uuid
     from datetime import datetime, timezone
-    from depthfusion.storage.event_log import EventLog
-    from depthfusion.storage.memory_store import MemoryStore
+
     from depthfusion.core.memory import MemoryEvent, MemoryEventType
     from depthfusion.core.memory_object import MemoryStatus
+    from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
 
     project_id = arguments.get("project_id", "")
     old_id = arguments.get("old_memory_id", "")
@@ -2210,9 +2213,10 @@ def _tool_mark_superseded(arguments: dict, config: Any) -> str:
 def _tool_report_outcome(arguments: dict, config: Any) -> str:
     import uuid
     from datetime import datetime, timezone
+
+    from depthfusion.core.memory import MemoryEvent, MemoryEventType
     from depthfusion.storage.event_log import EventLog
     from depthfusion.storage.memory_store import MemoryStore
-    from depthfusion.core.memory import MemoryEvent, MemoryEventType
 
     project_id = arguments.get("project_id", "")
     memory_id = arguments.get("memory_id", "")
@@ -2250,8 +2254,8 @@ def _tool_report_outcome(arguments: dict, config: Any) -> str:
 
 
 def _tool_get_cognitive_state(arguments: dict, config: Any) -> str:
-    from depthfusion.storage.memory_store import MemoryStore
     from depthfusion.storage.event_log import EventLog
+    from depthfusion.storage.memory_store import MemoryStore
 
     project_id = arguments.get("project_id", "")
     store = MemoryStore(config.memory_store_path)
@@ -2346,6 +2350,7 @@ def main() -> None:
     _emit_startup_event(len(enabled))
 
     import os as _os
+
     from depthfusion.utils.mode import normalise_mode
     _check_backend_health(normalise_mode(_os.environ.get("DEPTHFUSION_MODE")))
 
@@ -2417,8 +2422,8 @@ def _tool_query_telemetry(arguments: dict, config: Any) -> str:
 
 
 def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
-    from depthfusion.storage.telemetry_store import TelemetryStore
     from depthfusion.mcp.skillforge_client import post_skill_draft
+    from depthfusion.storage.telemetry_store import TelemetryStore
 
     threshold = arguments.get("threshold") or getattr(config, "auto_draft_threshold", 3)
     dry_run: bool = bool(arguments.get("dry_run", False))

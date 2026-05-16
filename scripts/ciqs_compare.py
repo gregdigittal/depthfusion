@@ -42,7 +42,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 # --------------------------------------------------------------------------
 # Import shared helpers from ciqs_summarise.py
 # --------------------------------------------------------------------------

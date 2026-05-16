@@ -30,7 +30,6 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GOLD_DIR = PROJECT_ROOT / "docs" / "eval-sets" / "dedup"
 
@@ -132,7 +131,7 @@ def format_report(result: DedupResult, n_files: int, threshold: float) -> str:
     lines.append("")
     lines.append(f"- Pairs evaluated: {n_files}")
     lines.append(f"- Cosine threshold: {threshold}")
-    lines.append(f"- Cosine variant: bag-of-words (backend-free)")
+    lines.append("- Cosine variant: bag-of-words (backend-free)")
     lines.append("")
     lines.append("## Summary")
     lines.append("")
@@ -146,7 +145,7 @@ def format_report(result: DedupResult, n_files: int, threshold: float) -> str:
     lines.append(f"- False-dedup rate: {fdr:.3f}")
     lines.append(f"- True-dedup hit rate: {tdhr:.3f}")
     lines.append("")
-    lines.append(f"**S-49 AC-2 target:** false-dedup rate ≤ 0.05.")
+    lines.append("**S-49 AC-2 target:** false-dedup rate ≤ 0.05.")
     if not math.isnan(fdr):
         status = "✅ PASS" if fdr <= 0.05 else "❌ FAIL"
         lines.append(f"**Current:** {status} ({fdr:.3f})")

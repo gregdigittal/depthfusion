@@ -34,7 +34,6 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-
 # --------------------------------------------------------------------------
 # Math helpers (pure functions, directly tested)
 # --------------------------------------------------------------------------

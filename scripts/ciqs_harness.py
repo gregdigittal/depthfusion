@@ -221,7 +221,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"Scoring template: {scoring_path}")
     print()
     print(f"Next: fill in scores in {scoring_path.name}, then run:")
-    print(f"  python scripts/ciqs_harness.py score \\")
+    print("  python scripts/ciqs_harness.py score \\")
     print(f"      --raw {raw_path} --scoring {scoring_path}")
     return 0
 

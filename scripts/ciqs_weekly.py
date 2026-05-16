@@ -417,8 +417,8 @@ def main(argv: list[str] | None = None) -> int:
     # Import at call time so tests can monkey-patch MetricsCollector
     # without paying an import-time fs scan.
     try:
-        from depthfusion.metrics.collector import MetricsCollector
         from depthfusion.metrics.aggregator import MetricsAggregator
+        from depthfusion.metrics.collector import MetricsCollector
     except ImportError as exc:
         print(f"ERROR: could not import depthfusion.metrics: {exc}", file=sys.stderr)
         return 2

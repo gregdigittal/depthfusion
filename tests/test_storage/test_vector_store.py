@@ -1,7 +1,6 @@
 # tests/test_storage/test_vector_store.py
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest

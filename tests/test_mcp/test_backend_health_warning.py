@@ -7,12 +7,9 @@ level log so users see the degradation in MCP server stderr output.
 from __future__ import annotations
 
 import logging
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from depthfusion.mcp.server import _check_backend_health
-from depthfusion.backends.null import NullBackend
 
 
 class TestCheckBackendHealth:

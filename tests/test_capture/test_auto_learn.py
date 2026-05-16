@@ -309,14 +309,14 @@ def test_contradiction_engine_enabled_high_severity_logged(tmp_path, monkeypatch
     # patching ContradictionEngine to return a HIGH conflict directly.
     session_file.write_text("→ do not use HS256 ever\n", encoding="utf-8")
 
+    # Patch ContradictionEngine.detect to return a HIGH conflict unconditionally.
+    import unittest.mock as mock
+
     from depthfusion.cognitive.contradiction import (
         Conflict,
         ConflictSeverity,
         ConflictStatus,
     )
-
-    # Patch ContradictionEngine.detect to return a HIGH conflict unconditionally.
-    import unittest.mock as mock
     high_conflict = Conflict(
         memory_a_id="a",
         memory_b_id="b",
@@ -358,13 +358,13 @@ def test_contradiction_engine_medium_severity_logged_at_debug(tmp_path, monkeypa
     """
     monkeypatch.setenv("DEPTHFUSION_CONTRADICTION_ENGINE", "true")
 
+    import unittest.mock as mock
+
     from depthfusion.cognitive.contradiction import (
         Conflict,
         ConflictSeverity,
         ConflictStatus,
     )
-
-    import unittest.mock as mock
     medium_conflict = Conflict(
         memory_a_id="a",
         memory_b_id="b",

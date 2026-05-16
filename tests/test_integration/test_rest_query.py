@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -15,6 +14,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_MEMORY_STORE", str(tmp_path / "memories.db"))
     monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
     from importlib import reload
+
     import depthfusion.api.rest as rest_module
     reload(rest_module)
     from fastapi.testclient import TestClient
@@ -231,9 +231,11 @@ def test_query_auth_enforced_when_key_set(tmp_path, monkeypatch, discoveries_dir
     monkeypatch.setenv("DEPTHFUSION_EVENT_LOG", str(tmp_path / "events.jsonl"))
     monkeypatch.setenv("DEPTHFUSION_MEMORY_STORE", str(tmp_path / "memories.db"))
     from importlib import reload
+
     import depthfusion.api.rest as rest_module
     reload(rest_module)
     from fastapi.testclient import TestClient
+
     from depthfusion.api import query as q
     monkeypatch.setattr(q, "_DISCOVERIES_DIR", discoveries_dir)
     c = TestClient(rest_module.app)
@@ -315,9 +317,11 @@ def test_sessions_include_telemetry_summary(tmp_path, monkeypatch):
     store = TelemetryStore(tmp_path / "tel.db")
     store.record("s1", "Read", project="df", tokens_in=100, tokens_out=200, cost_usd_estimate=0.005)
 
-    from fastapi.testclient import TestClient
-    import depthfusion.api.rest as rest_module
     from importlib import reload
+
+    from fastapi.testclient import TestClient
+
+    import depthfusion.api.rest as rest_module
     reload(rest_module)
     c = TestClient(rest_module.app)
 

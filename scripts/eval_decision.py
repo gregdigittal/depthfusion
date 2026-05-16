@@ -26,7 +26,6 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GOLD_DIR = PROJECT_ROOT / "docs" / "eval-sets" / "decision-extraction"
 
@@ -198,8 +197,8 @@ def format_report(result: MatchResult, n_files: int, threshold: float, use_llm: 
     lines.append("")
     lines.append("## Summary")
     lines.append("")
-    lines.append(f"| Metric | Value |")
-    lines.append(f"|--------|-------|")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
     lines.append(f"| True positives  | {result.tp} |")
     lines.append(f"| False positives | {result.fp} |")
     lines.append(f"| False negatives | {result.fn} |")
@@ -208,7 +207,7 @@ def format_report(result: MatchResult, n_files: int, threshold: float, use_llm: 
     lines.append(f"| Precision | {prec:.3f} |")
     lines.append(f"| Recall    | {rec:.3f} |")
     lines.append("")
-    lines.append(f"**S-45 AC-1 target:** precision ≥ 0.80.")
+    lines.append("**S-45 AC-1 target:** precision ≥ 0.80.")
     if not math.isnan(prec):
         status = "✅ PASS" if prec >= 0.80 else "❌ FAIL"
         lines.append(f"**Current:** {status} ({prec:.3f})")

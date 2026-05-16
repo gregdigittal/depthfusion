@@ -1,7 +1,7 @@
 import pytest
 
-from depthfusion.mcp.cognitive_tools import build_decision_memory, build_incident_memory
 from depthfusion.core.memory_object import MemoryType
+from depthfusion.mcp.cognitive_tools import build_decision_memory, build_incident_memory
 
 
 def test_decision_memory_extra_schema():
