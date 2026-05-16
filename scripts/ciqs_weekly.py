@@ -346,8 +346,10 @@ def format_report(
     base_window_disp = baseline.get("window_days", 7)
     lines.append(
         f"## Observability coverage\n\n"
-        f"- Current: recall stream present on {current['days_with_recall_data']}/{cur_window_disp} days\n"
-        f"- Baseline: recall stream present on {baseline['days_with_recall_data']}/{base_window_disp} days\n"
+        f"- Current: recall stream present on "
+        f"{current['days_with_recall_data']}/{cur_window_disp} days\n"
+        f"- Baseline: recall stream present on "
+        f"{baseline['days_with_recall_data']}/{base_window_disp} days\n"
     )
     lines.append("")
 

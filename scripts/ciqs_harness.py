@@ -240,8 +240,12 @@ def write_scoring_template(
     lines.append("> DepthFusion version: " + _get_df_version())
     lines.append("")
     lines.append("Fill in an integer score (0-10) in each `score: ` line.")
-    lines.append("Categories with `retrieval-only: true` have blocks from DepthFusion below the prompt.")
-    lines.append("Other categories require running the prompt through Claude Code in a fresh session")
+    lines.append(
+        "Categories with `retrieval-only: true` have blocks from DepthFusion below the prompt."
+    )
+    lines.append(
+        "Other categories require running the prompt through Claude Code in a fresh session"
+    )
     lines.append("and scoring the response against the rubric.")
     lines.append("")
     lines.append("---")
@@ -428,8 +432,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_run = sub.add_parser("run", help="Execute the battery and emit raw JSONL + scoring template")
     p_run.add_argument("--battery", default="docs/benchmarks/prompts/ciqs-battery.yaml")
-    p_run.add_argument("--mode", required=True, choices=("local", "vps-cpu", "vps-gpu"),
-                       help="The DepthFusion mode in use (for output filename; does not switch modes)")
+    p_run.add_argument(
+        "--mode", required=True, choices=("local", "vps-cpu", "vps-gpu"),
+        help="The DepthFusion mode in use (for output filename; does not switch modes)",
+    )
     p_run.add_argument("--run", type=int, required=True, help="Run number (1..N)")
     p_run.add_argument("--out-dir", default="docs/benchmarks")
     p_run.add_argument("--top-k", type=int, default=5, help="top_k for Category A retrieval")

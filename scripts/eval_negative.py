@@ -145,7 +145,9 @@ def compute_metrics(files: list[Path], threshold: float, use_llm: bool = False) 
     return result
 
 
-def format_report(result: NegativeResult, n_files: int, threshold: float, use_llm: bool = False) -> str:
+def format_report(
+    result: NegativeResult, n_files: int, threshold: float, use_llm: bool = False
+) -> str:
     extractor_name = "LLMNegativeExtractor" if use_llm else "HeuristicNegativeExtractor"
     lines = []
     lines.append("# Negative-Signal Eval Report")
@@ -161,7 +163,9 @@ def format_report(result: NegativeResult, n_files: int, threshold: float, use_ll
     lines.append(f"| Genuine negatives total   | {result.genuine_total} |")
     lines.append(f"| Genuine negatives found   | {result.genuine_found} |")
     lines.append(f"| Positive files            | {result.positive_files} |")
-    lines.append(f"| False positives (extractions on positive files) | {result.false_positive_count} |")
+    lines.append(
+        f"| False positives (extractions on positive files) | {result.false_positive_count} |"
+    )
     fnr = result.false_negative_rate
     lines.append(f"| False-negative rate       | {fnr:.3f} |")
     lines.append("")

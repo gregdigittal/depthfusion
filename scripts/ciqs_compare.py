@@ -213,7 +213,8 @@ def format_comparison_report(
     lines.append(f"- **Parity:** {len(par)} ({', '.join(par) if par else 'none'})")
     if ins:
         lines.append(
-            f"- **Insufficient data:** {len(ins)} ({', '.join(ins)}) — at least one side had no scored records"
+            f"- **Insufficient data:** {len(ins)} ({', '.join(ins)})"
+            f" — at least one side had no scored records"
         )
     lines.append("")
     if reg:

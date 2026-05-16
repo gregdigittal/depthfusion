@@ -71,7 +71,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"auto-compress: error on {session_file.name}: {exc}", file=sys.stderr)
             errors += 1
 
-    print(f"auto-compress: done — compressed={compressed} skipped={len(idle)-compressed-errors} errors={errors}")
+    print(
+        f"auto-compress: done — compressed={compressed} "
+        f"skipped={len(idle)-compressed-errors} errors={errors}"
+    )
 
     if errors and compressed == 0:
         return 1

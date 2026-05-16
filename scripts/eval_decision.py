@@ -13,7 +13,8 @@ entry, not if the wording matches.
 Usage:
     python scripts/eval_decision.py
     python scripts/eval_decision.py --include-seeds
-    python scripts/eval_decision.py --single docs/eval-sets/decision-extraction/001-auth-migration.json
+    python scripts/eval_decision.py \
+        --single docs/eval-sets/decision-extraction/001-auth-migration.json
 """
 from __future__ import annotations
 
@@ -186,7 +187,9 @@ def compute_metrics(files: list[Path], threshold: float, use_llm: bool = False) 
     return result
 
 
-def format_report(result: MatchResult, n_files: int, threshold: float, use_llm: bool = False) -> str:
+def format_report(
+    result: MatchResult, n_files: int, threshold: float, use_llm: bool = False
+) -> str:
     extractor_name = "LLMDecisionExtractor" if use_llm else "HeuristicDecisionExtractor"
     lines = []
     lines.append("# Decision-Extraction Eval Report")
@@ -242,8 +245,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         files = collect_gold_files(args.include_seeds)
     if not files:
-        print("No gold files found. Populate docs/eval-sets/decision-extraction/ or use --include-seeds.",
-              file=sys.stderr)
+        print(
+            "No gold files found. Populate docs/eval-sets/decision-extraction/ "
+            "or use --include-seeds.",
+            file=sys.stderr,
+        )
         return 1
 
     try:

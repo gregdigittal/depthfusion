@@ -198,7 +198,9 @@ def format_report(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="CIQS summariser")
-    parser.add_argument("files", nargs="+", help="Scored JSONL files (output of ciqs_harness.py score)")
+    parser.add_argument(
+        "files", nargs="+", help="Scored JSONL files (output of ciqs_harness.py score)"
+    )
     parser.add_argument("--mode", required=True, help="Mode label for the report header")
     parser.add_argument("--out", help="Output markdown path (default: stdout)")
     parser.add_argument("--confidence", type=float, default=0.95)

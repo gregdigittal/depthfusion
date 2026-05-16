@@ -35,12 +35,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 # ---------------------------------------------------------------------------
 
 _SAMPLE_CONTENTS = [
-    "Use Redis-backed sessions for the main user-facing application — instant revocation, horizontally scalable.",
-    "Migrate JWT signing from HS256 to RS256 so that the private key never leaves the auth service.",
-    "All background jobs must be idempotent — handlers must safely tolerate at-least-once delivery.",
+    "Use Redis-backed sessions for the main user-facing application — instant revocation, horizontally scalable.",  # noqa: E501
+    "Migrate JWT signing from HS256 to RS256 so that the private key never leaves the auth service.",  # noqa: E501
+    "All background jobs must be idempotent — handlers must safely tolerate at-least-once delivery.",  # noqa: E501
     "Use keyset (cursor) pagination over OFFSET-based — OFFSET has O(N) cost on large tables.",
-    "Store feature flags in environment variables, not a database table — avoids runtime DB dependency.",
-    "All timestamps stored in the database are UTC. No timezone conversion at the persistence layer.",
+    "Store feature flags in environment variables, not a database table — avoids runtime DB dependency.",  # noqa: E501
+    "All timestamps stored in the database are UTC. No timezone conversion at the persistence layer.",  # noqa: E501
     "Use GraphQL for the internal dashboard — flexible shape, typed schema, single endpoint.",
     "Use REST for the external public API — universally understood, cacheable, proxy-friendly.",
     "Rate limiting is centralised at the Kong gateway with Redis-backed sliding-window counters.",
@@ -49,9 +49,9 @@ _SAMPLE_CONTENTS = [
     "Set SameSite=Lax, Secure, HttpOnly on all session cookies — CSRF + XSS defence-in-depth.",
     "Enforce 80% line coverage as a CI gate — builds fail below this threshold.",
     "Add PostgreSQL read replicas; route analytics queries via a read-only connection pool.",
-    "Use Kubernetes over Docker Swarm for container orchestration — industry standard, better RBAC.",
+    "Use Kubernetes over Docker Swarm for container orchestration — industry standard, better RBAC.",  # noqa: E501
     "New Python microservices use async/await throughout (asyncpg, httpx, aioredis).",
-    "User deletion: soft-delete (set deleted_at) + PII scrub immediately; hard-delete after 90 days.",
+    "User deletion: soft-delete (set deleted_at) + PII scrub immediately; hard-delete after 90 days.",  # noqa: E501
     "CI: GitHub Actions — tight GitHub integration, marketplace coverage, matrix builds.",
     "CD: ArgoCD GitOps — Git is the source of truth; deployments are auditable PRs.",
     "Distributed tracing: OpenTelemetry SDK in all services exporting to Tempo.",
@@ -279,7 +279,10 @@ def main(argv: list[str] | None = None) -> int:
         ms = measure_one(q, corpus, pipeline, emb_backend=emb_backend)
         latencies.append(ms)
         if (i + 1) % 10 == 0:
-            print(f"  [{i+1}/{args.queries}]  last={ms:.1f}ms  running_p95={percentile(latencies, 95):.1f}ms")
+            print(
+                f"  [{i+1}/{args.queries}]  last={ms:.1f}ms"
+                f"  running_p95={percentile(latencies, 95):.1f}ms"
+            )
 
     print()
     p50 = percentile(latencies, 50)

@@ -28,7 +28,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model", default=os.environ.get(
     "DEPTHFUSION_GEMMA_MODEL", "mlx-community/Qwen2.5-14B-Instruct-4bit"))
 parser.add_argument("--host", default=os.environ.get("DEPTHFUSION_GEMMA_HOST", "127.0.0.1"))
-parser.add_argument("--port", type=int, default=int(os.environ.get("DEPTHFUSION_GEMMA_PORT", "8000")))
+parser.add_argument(
+    "--port", type=int, default=int(os.environ.get("DEPTHFUSION_GEMMA_PORT", "8000"))
+)
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
