@@ -25,6 +25,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -153,8 +154,8 @@ def bm25_score(query_tokens: list[str], blocks: list[dict]) -> list[dict]:
 # Core measurement loop
 # ---------------------------------------------------------------------------
 
-def measure_one(query: str, blocks: list[dict], pipeline: "Any",
-                emb_backend: "Any" = None) -> float:
+def measure_one(query: str, blocks: list[dict], pipeline: Any,
+                emb_backend: Any = None) -> float:
     """Time a single full retrieval pass; return elapsed ms.
 
     emb_backend: pre-created embedding backend to pass through to
@@ -178,11 +179,11 @@ def measure_one(query: str, blocks: list[dict], pipeline: "Any",
     # RRF fusion — v0.6.x rrf_fuse has no top_k param; v1.x may add it
     if vector_blocks:
         try:
-            fused = pipeline.rrf_fuse(bm25_top, vector_blocks, top_k=10)
+            _ = pipeline.rrf_fuse(bm25_top, vector_blocks, top_k=10)
         except TypeError:
-            fused = pipeline.rrf_fuse(bm25_top, vector_blocks)[:10]
+            _ = pipeline.rrf_fuse(bm25_top, vector_blocks)[:10]
     else:
-        fused = bm25_top[:10]
+        _ = bm25_top[:10]
 
     # Reranker (HaikuReranker on vps-cpu/vps-gpu — skip in bench to avoid API cost)
     # Pipeline.apply_reranker is a Haiku call; skip for latency measurement of local path.
