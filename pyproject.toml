@@ -75,6 +75,9 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+exclude = [
+    ".claude/worktrees",  # generated git worktrees — not production code
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
