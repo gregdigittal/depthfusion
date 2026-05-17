@@ -346,12 +346,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 7`
+- specificity: `score: 7`
+- temporal_ordering: `score: 7`
+- coverage: `score: 7`
 
-**Notes:** 
+**Notes:** Same commits as run1 (82732af/ad1fb8b/d801556) but reordered, skipped 82732af as "bookkeeping," included 93cf912. Slightly less narrative coherence.
 
 ---
 
@@ -367,12 +367,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 0`
+- specificity: `score: 2`
+- temporal_ordering: `score: 0`
+- coverage: `score: 2`
 
-**Notes:** 
+**Notes:** Gate trigger — model said "don't have recorded review-gate finding visible" and gave S-79 hooks path bug as analog instead. factual_accuracy=0 caps this topic at 25% of max.
 
 ---
 
@@ -388,12 +388,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 7`
+- specificity: `score: 7`
+- temporal_ordering: `score: 6`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** Similar to run1-D3 — accurate benchmark status, correct remaining work identified.
 
 ---
 
@@ -409,12 +409,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 8`
+- specificity: `score: 9`
+- temporal_ordering: `score: 5`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** High quality — cited specific line refs (server.py:879, server.py:952, server.py:608-610). Fail-open philosophy detailed.
 
 ---
 

@@ -1,0 +1,28 @@
+# CIQS Comparison — local/gates-on vs local/gates-off
+
+> Baseline label: **local/gates-off** (3 runs)
+> - `docs/benchmarks/2026-05-16-local-run1-scored.jsonl`
+> - `docs/benchmarks/2026-05-16-local-run2-scored.jsonl`
+> - `docs/benchmarks/2026-05-16-local-run3-scored.jsonl`
+> Candidate label: **local/gates-on** (3 runs)
+> - `docs/benchmarks/gates-on/2026-05-17-local-run1-scored.jsonl`
+> - `docs/benchmarks/gates-on/2026-05-17-local-run2-scored.jsonl`
+> - `docs/benchmarks/gates-on/2026-05-17-local-run3-scored.jsonl`
+> Delta confidence level: 95% (bootstrap, unpaired)
+
+## Per-category delta
+
+| Category | Baseline mean | Candidate mean | Δ | 95% CI (Δ) | Verdict |
+|----------|---------------|-----------------|---|----------------|---------|
+| A | 18.3 | 20.0 | +1.7 | [-6.1, +8.9] | parity |
+| D | 69.2 | 69.2 | +0.0 | [-14.8, +15.2] | parity |
+
+## Summary
+
+- **Improved:** 0 (none)
+- **Regressed:** 0 (none)
+- **Parity:** 2 (A, D)
+
+> Verdicts reflect whether 0 falls inside the delta CI. A 'parity' verdict
+> does NOT mean 'no effect' — it means the effect size is smaller than the
+> sampling noise at the number of runs provided. Run more trials to narrow.

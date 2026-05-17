@@ -1,6 +1,6 @@
 # CIQS Scoring Template - local / run 3
 
-> Generated: 2026-05-16
+> Generated: 2026-05-17
 > DepthFusion version: unknown
 
 Fill in an integer score (0-10) in each `score: ` line.
@@ -24,11 +24,11 @@ retrieval-only: True
 
 **Retrieved 5 blocks:**
 
-1. `session` / `2026-05-16-depthfusion-session` (score=24.2888)
+1. `session` / `2026-05-16-depthfusion-session` (score=33.8648)
    > # Session: 2026-05-16
 **Date:** 2026-05-16
 **Started:** 07:13
-**Last Updated:** 10:55
+**Last Updated:** 21:05
 **Project:** depthfusion
 **Branch:** main
 **Worktree:** /home/gregmorris/projects/depthfusion
@@ -39,36 +39,44 @@ retrieval-only: True
 --- SESSION END at 07:14:20 ---
 Project: depthfusion
 
-2. `session` / `2026-05-15-depthfusion-session` (score=15.905)
-   > --- COMPACTION EVENT at 08:12:16 ---
-Project: depthfusion
-Directory: /home/gregmorris/projects/depthfusion
-Trigger: context limit reached
-Hook Input: {"session_id":"cb5c5db4-ceb5-4134-b8e7-1808787af076","transcript_path":"/home/gregmorris/.
-3. `session` / `2026-05-15-agent-ops-session` (score=14.7754)
-   > --- SESSION END at 03:40:58 ---
+2. `session` / `2026-05-16-skillforge-session` (score=27.0505)
+   > # Session: 2026-05-16
+**Date:** 2026-05-16
+**Started:** 20:33
+**Last Updated:** 21:01
+**Project:** skillforge
+**Branch:** main
+**Worktree:** /home/gregmorris/projects/skillforge
+
+---
+
+
+--- COMPACTION EVENT at 10:07:15 ---
+Project: skillforg
+3. `session` / `2026-05-16-claude-code-enhancements-session` (score=21.765)
+   > --- SESSION END at 10:10:25 ---
+Project: claude-code-enhancements
+Directory: /home/gregmorris/projects/claude_code_enhancements
+End Reason: {"session_id":"5d7eeff6-4fec-4163-9ac9-567640cc0e84","transcript_path":"/home/gregmorris/.claude-acc
+4. `session` / `2026-05-16-agent-ops-session` (score=18.6585)
+   > --- SESSION END at 09:54:47 ---
 Project: agent-ops
 Directory: /home/gregmorris/projects/agent-ops
 End Reason: {"session_id":"b08f01a8-fbe1-4319-a143-3085c16dcb8d","transcript_path":"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr
-4. `session` / `2026-05-15-skillforge-session` (score=14.2066)
-   > --- SESSION END at 03:34:43 ---
-Project: skillforge
-Directory: /home/gregmorris/projects/skillforge
-End Reason: {"session_id":"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-
-5. `session` / `2026-05-15-digittal-ccrs-session` (score=13.3495)
-   > --- SESSION END at 03:35:03 ---
-Project: digittal-ccrs
-Directory: /home/gregmorris/projects/agreement-automation
-End Reason: {"session_id":"2079fc01-a61c-444f-bfb7-ec497f97a130","transcript_path":"/home/gregmorris/.claude-acc1/projects/-hom
+5. `session` / `2026-05-16-kitabu-session` (score=18.4193)
+   > --- SESSION END at 09:52:47 ---
+Project: kitabu
+Directory: /home/gregmorris/projects/kitabu
+End Reason: {"session_id":"ea6699f2-b677-4ef7-879f-6a42b7472270","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-projects
 
 **Scores (0-10 each):**
 
-- relevance: `score: 2`
-- specificity: `score: 2`
-- confidence_calibration: `score: 1`
-- novel_signal: `score: 1`
+- relevance: `score: `
+- specificity: `score: `
+- confidence_calibration: `score: `
+- novel_signal: `score: `
 
-**Notes:** Only 1/5 blocks from target project (skillforge). That block covers SkillChain/UI work, not router error handling. Depthfusion sessions rank highest due to recency bias. Cross-project contamination is the primary issue here.
+**Notes:** 
 
 ---
 
@@ -86,16 +94,11 @@ retrieval-only: True
 
 **Retrieved 5 blocks:**
 
-1. `session` / `2026-05-15-skillforge-session` (score=21.225)
-   > --- SESSION END at 03:34:43 ---
-Project: skillforge
-Directory: /home/gregmorris/projects/skillforge
-End Reason: {"session_id":"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-
-2. `session` / `2026-05-16-depthfusion-session` (score=20.3675)
+1. `session` / `2026-05-16-depthfusion-session` (score=34.4755)
    > # Session: 2026-05-16
 **Date:** 2026-05-16
 **Started:** 07:13
-**Last Updated:** 10:55
+**Last Updated:** 21:05
 **Project:** depthfusion
 **Branch:** main
 **Worktree:** /home/gregmorris/projects/depthfusion
@@ -106,31 +109,44 @@ End Reason: {"session_id":"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437","transcript_pat
 --- SESSION END at 07:14:20 ---
 Project: depthfusion
 
-3. `session` / `2026-05-15-agent-ops-session` (score=20.1791)
+2. `session` / `2026-05-16-skillforge-session` (score=32.301)
+   > # Session: 2026-05-16
+**Date:** 2026-05-16
+**Started:** 20:33
+**Last Updated:** 21:01
+**Project:** skillforge
+**Branch:** main
+**Worktree:** /home/gregmorris/projects/skillforge
+
+---
+
+
+--- COMPACTION EVENT at 10:07:15 ---
+Project: skillforg
+3. `session` / `2026-05-15-agent-ops-session` (score=22.3859)
    > --- SESSION END at 03:40:58 ---
 Project: agent-ops
 Directory: /home/gregmorris/projects/agent-ops
 End Reason: {"session_id":"b08f01a8-fbe1-4319-a143-3085c16dcb8d","transcript_path":"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr
-4. `session` / `2026-05-15-depthfusion-session` (score=17.8914)
-   > --- COMPACTION EVENT at 08:12:16 ---
-Project: depthfusion
-Directory: /home/gregmorris/projects/depthfusion
-Trigger: context limit reached
-Hook Input: {"session_id":"cb5c5db4-ceb5-4134-b8e7-1808787af076","transcript_path":"/home/gregmorris/.
-5. `session` / `2026-05-16-skillforge-session` (score=16.1589)
-   > --- SESSION END at 09:54:40 ---
-Project: skillforge
-Directory: /home/gregmorris/projects/skillforge
-End Reason: {"session_id":"097ee9a5-0a7b-4aaf-99c4-fb37a9c5b437","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-
+4. `session` / `2026-05-16-claude-code-enhancements-session` (score=20.8381)
+   > --- SESSION END at 10:10:25 ---
+Project: claude-code-enhancements
+Directory: /home/gregmorris/projects/claude_code_enhancements
+End Reason: {"session_id":"5d7eeff6-4fec-4163-9ac9-567640cc0e84","transcript_path":"/home/gregmorris/.claude-acc
+5. `session` / `2026-05-16-kitabu-session` (score=20.4709)
+   > --- SESSION END at 09:52:47 ---
+Project: kitabu
+Directory: /home/gregmorris/projects/kitabu
+End Reason: {"session_id":"ea6699f2-b677-4ef7-879f-6a42b7472270","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-projects
 
 **Scores (0-10 each):**
 
-- relevance: `score: 4`
-- specificity: `score: 4`
-- confidence_calibration: `score: 1`
-- novel_signal: `score: 3`
+- relevance: `score: `
+- specificity: `score: `
+- confidence_calibration: `score: `
+- novel_signal: `score: `
 
-**Notes:** 2/5 blocks from skillforge project. Block 1 (rank 1) is a SkillForge session that mentions YAML serializer/deserializer and SkillChain model — adjacent to Skill IR. Block 5 (rank 5) is also skillforge. Useful signal buried among off-topic blocks.
+**Notes:** 
 
 ---
 
@@ -148,11 +164,11 @@ retrieval-only: True
 
 **Retrieved 5 blocks:**
 
-1. `session` / `2026-05-16-depthfusion-session` (score=22.0564)
+1. `session` / `2026-05-16-depthfusion-session` (score=34.0354)
    > # Session: 2026-05-16
 **Date:** 2026-05-16
 **Started:** 07:13
-**Last Updated:** 10:55
+**Last Updated:** 21:05
 **Project:** depthfusion
 **Branch:** main
 **Worktree:** /home/gregmorris/projects/depthfusion
@@ -163,39 +179,44 @@ retrieval-only: True
 --- SESSION END at 07:14:20 ---
 Project: depthfusion
 
-2. `session` / `2026-05-14-digittal-ccrs-session` (score=17.8621)
-   > --- SESSION START at 02:44:49 ---
-Project: digittal-ccrs
-Directory: /home/gregmorris/projects/agreement-automation
---- SESSION START at 02:44:49 ---
-Project: digittal-ccrs
-Directory: /home/gregmorris/projects/agreement-automation
---- SESSIO
-3. `session` / `2026-05-15-digittal-ccrs-session` (score=17.1209)
-   > --- SESSION END at 03:35:03 ---
+2. `session` / `2026-05-16-skillforge-session` (score=22.6166)
+   > # Session: 2026-05-16
+**Date:** 2026-05-16
+**Started:** 20:33
+**Last Updated:** 21:01
+**Project:** skillforge
+**Branch:** main
+**Worktree:** /home/gregmorris/projects/skillforge
+
+---
+
+
+--- COMPACTION EVENT at 10:07:15 ---
+Project: skillforg
+3. `session` / `2026-05-16-claude-code-enhancements-session` (score=21.8088)
+   > --- SESSION END at 10:10:25 ---
+Project: claude-code-enhancements
+Directory: /home/gregmorris/projects/claude_code_enhancements
+End Reason: {"session_id":"5d7eeff6-4fec-4163-9ac9-567640cc0e84","transcript_path":"/home/gregmorris/.claude-acc
+4. `session` / `2026-05-16-kitabu-session` (score=20.4029)
+   > --- SESSION END at 09:52:47 ---
+Project: kitabu
+Directory: /home/gregmorris/projects/kitabu
+End Reason: {"session_id":"ea6699f2-b677-4ef7-879f-6a42b7472270","transcript_path":"/home/gregmorris/.claude-acc1/projects/-home-gregmorris-projects
+5. `session` / `2026-05-16-digittal-ccrs-session` (score=18.5907)
+   > --- SESSION END at 09:54:07 ---
 Project: digittal-ccrs
 Directory: /home/gregmorris/projects/agreement-automation
 End Reason: {"session_id":"2079fc01-a61c-444f-bfb7-ec497f97a130","transcript_path":"/home/gregmorris/.claude-acc1/projects/-hom
-4. `session` / `2026-05-15-depthfusion-session` (score=15.8927)
-   > --- COMPACTION EVENT at 08:12:16 ---
-Project: depthfusion
-Directory: /home/gregmorris/projects/depthfusion
-Trigger: context limit reached
-Hook Input: {"session_id":"cb5c5db4-ceb5-4134-b8e7-1808787af076","transcript_path":"/home/gregmorris/.
-5. `session` / `2026-05-15-agent-ops-session` (score=14.2064)
-   > --- SESSION END at 03:40:58 ---
-Project: agent-ops
-Directory: /home/gregmorris/projects/agent-ops
-End Reason: {"session_id":"b08f01a8-fbe1-4319-a143-3085c16dcb8d","transcript_path":"/home/gregmorris/.claude-acc2/projects/-home-gregmorris-pr
 
 **Scores (0-10 each):**
 
-- relevance: `score: 1`
-- specificity: `score: 1`
-- confidence_calibration: `score: 1`
-- novel_signal: `score: 1`
+- relevance: `score: `
+- specificity: `score: `
+- confidence_calibration: `score: `
+- novel_signal: `score: `
 
-**Notes:** None of the 5 retrieved blocks contain explicit commit message style preferences. The actual preference rules are in git-workflow.md (not in the session knowledge base). Retrieval returns generic session event logs for this cross-project preference query.
+**Notes:** 
 
 ---
 
@@ -346,12 +367,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: 8`
-- specificity: `score: 8`
-- temporal_ordering: `score: 8`
-- coverage: `score: 8`
+- factual_accuracy: `score: `
+- specificity: `score: `
+- temporal_ordering: `score: `
+- coverage: `score: `
 
-**Notes:** Cited 82732af/ad1fb8b/d801556 accurately. Good "capture richer data → query it → ship it" narrative. Also mentioned 93cf912/0d3c24b as infrastructure layer.
+**Notes:** 
 
 ---
 
@@ -367,12 +388,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: 8`
-- specificity: `score: 9`
-- temporal_ordering: `score: 7`
-- coverage: `score: 9`
+- factual_accuracy: `score: `
+- specificity: `score: `
+- temporal_ordering: `score: `
+- coverage: `score: `
 
-**Notes:** Found f98ba33 (benchmark_home env leakage fix). Correct finding, specific env vars named (FUSION_GATES_ENABLED/VECTOR_SEARCH_ENABLED/GRAPH_ENABLED/COGNITIVE_SCORING), accurate description of the fix.
+**Notes:** 
 
 ---
 
@@ -388,12 +409,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: 7`
-- specificity: `score: 7`
-- temporal_ordering: `score: 7`
-- coverage: `score: 7`
+- factual_accuracy: `score: `
+- specificity: `score: `
+- temporal_ordering: `score: `
+- coverage: `score: `
 
-**Notes:** Accurate S-63 through S-66 status. Cited old proxy Cat D=50.0 (stale vs actual v2 79.4%). Otherwise comprehensive.
+**Notes:** 
 
 ---
 
@@ -409,12 +430,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: 9`
-- specificity: `score: 9`
-- temporal_ordering: `score: 6`
-- coverage: `score: 9`
+- factual_accuracy: `score: `
+- specificity: `score: `
+- temporal_ordering: `score: `
+- coverage: `score: `
 
-**Notes:** 10 specific error decisions named with exact component references. Overarching philosophy stated. Very comprehensive — best D4 response across all 3 runs.
+**Notes:** 
 
 ---
 

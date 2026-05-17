@@ -346,12 +346,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 8`
+- specificity: `score: 8`
+- temporal_ordering: `score: 8`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** Cited 82732af/ad1fb8b/d801556 accurately with correct SHAs and descriptions. Good narrative on how they form E-35 capstone.
 
 ---
 
@@ -367,12 +367,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 7`
+- specificity: `score: 7`
+- temporal_ordering: `score: 6`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** Found 2026-05-05 review-gate finding (MCP tool documentation errors — fictional fields in pin_discovery, set_memory_score, recall_feedback). Real finding, accurately described. Older finding; f98ba33 was more recent.
 
 ---
 
@@ -388,12 +388,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 7`
+- specificity: `score: 7`
+- temporal_ordering: `score: 7`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** Accurate status of S-63 through S-66, correct remaining work identified (B/C/D/E scoring + AC-4 gates comparison). Specific commit reference (40999ae).
 
 ---
 
@@ -409,12 +409,12 @@ retrieval-only: False
 
 **Scores (0-10 each):**
 
-- factual_accuracy: `score: `
-- specificity: `score: 1`
-- temporal_ordering: `score: `
-- coverage: `score: `
+- factual_accuracy: `score: 7`
+- specificity: `score: 7`
+- temporal_ordering: `score: 5`
+- coverage: `score: 8`
 
-**Notes:** 
+**Notes:** Fail-open philosophy, hooks never raise, layered subsystem error handling. Accurate but less granular than run3-D4.
 
 ---
 
