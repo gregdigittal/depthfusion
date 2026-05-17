@@ -42,6 +42,19 @@ from depthfusion.retrieval.reranker import HaikuReranker
 
 logger = logging.getLogger(__name__)
 
+# Session lifecycle boilerplate patterns — these lines carry metadata but no recall value.
+# Short blocks consisting almost entirely of these markers are heavily penalised in BM25
+# scoring so that content-rich blocks from the same session corpus rank above them.
+_BOILERPLATE_LINE_RE = re.compile(
+    r"^---+ (?:SESSION (?:START|END)|COMPACTION EVENT) at \d",
+    re.MULTILINE,
+)
+
+# Project slug embedded in session event content by DepthFusion session-start/end hooks.
+# Format (in session capture files): "Project: <slug>" on its own line.
+# This is distinct from YAML frontmatter — session files use plain-text headers.
+_SESSION_PROJECT_RE = re.compile(r"^Project:\s+(\S+)\s*$", re.MULTILINE)
+
 # Frontmatter pattern — same shape as capture/dedup.py uses for discovery files.
 # Duplicated deliberately: retrieval/hybrid.py is on the recall hot path and
 # capture/dedup.py runs under the git post-commit hook; keeping them decoupled
@@ -521,6 +534,7 @@ def filter_blocks_by_project(
     *,
     current_project: str | None,
     cross_project: bool = False,
+    extra_projects: "frozenset[str] | None" = None,
 ) -> list[dict]:
     """Filter out blocks whose project tag names a different project.
 
@@ -538,10 +552,20 @@ def filter_blocks_by_project(
       * Block has no project at all     → INCLUDED (back-compat for
         pre-v0.5 discoveries and user-written memory files)
       * Block project matches           → INCLUDED
+      * Block project in extra_projects → INCLUDED (query-mention widening)
       * Block project differs           → EXCLUDED
+
+    `extra_projects`: additional project slugs to admit beyond `current_project`.
+    Used when the query explicitly names another project (e.g. "I'm working on
+    the SkillForge router" from a depthfusion session) so that cross-project
+    recall is widened precisely rather than globally.
     """
     if cross_project or current_project is None:
         return blocks
+
+    allowed: set[str] = {current_project}
+    if extra_projects:
+        allowed |= extra_projects
 
     filtered: list[dict] = []
     for block in blocks:
@@ -553,6 +577,73 @@ def filter_blocks_by_project(
         if project is None:
             content = block.get("content", "")
             project = extract_frontmatter_project(content) if content else None
-        if project is None or project == current_project:
+        if project is None or project in allowed:
             filtered.append(block)
     return filtered
+
+
+def boilerplate_penalty(content: str) -> float:
+    """Return 0.2 when content is predominantly session lifecycle boilerplate.
+
+    Session files captured by DepthFusion hooks often begin (or consist entirely
+    of) event envelopes — ``--- SESSION START/END/COMPACTION EVENT ---`` headers
+    and their JSON payloads. Blocks that are almost entirely such envelopes score
+    equally to content-rich sessions on BM25 because they share the same project
+    name tokens.
+
+    Threshold: any boilerplate marker found AND total non-empty lines ≤ 12.
+    Longer blocks typically contain real content mixed with the envelope; short
+    blocks with a boilerplate marker are almost always pure envelopes.
+    """
+    if not content:
+        return 1.0
+    if not _BOILERPLATE_LINE_RE.search(content):
+        return 1.0
+    lines = [ln for ln in content.splitlines() if ln.strip()]
+    return 0.2 if len(lines) <= 12 else 1.0
+
+
+def extract_session_project(content: str) -> str | None:
+    """Parse the project slug from session event content.
+
+    Session capture hooks embed a ``Project: <slug>`` line immediately after
+    the ``--- SESSION START/END/COMPACTION ---`` header, e.g.:
+
+        --- SESSION END at 07:14:20 ---
+        Project: depthfusion
+        Directory: /home/gregmorris/projects/depthfusion
+
+    This corrects the back-compat rule that lets all no-YAML-frontmatter blocks
+    through unfiltered: once project is parsed from session content, the project
+    filter can properly exclude off-project session blocks.
+
+    Returns None when no ``Project:`` line is found — callers treat None as
+    unknown project and keep the back-compat include-all rule.
+    """
+    if not content:
+        return None
+    m = _SESSION_PROJECT_RE.search(content)
+    return m.group(1) if m else None
+
+
+def detect_mentioned_projects(
+    query: str,
+    available_projects: "set[str]",
+) -> "frozenset[str]":
+    """Return the subset of `available_projects` whose slugs appear in `query`.
+
+    Used to widen the project filter when the user's query explicitly names a
+    project that differs from the current working directory project. For example,
+    "I'm working on the SkillForge router" from a depthfusion session should
+    retrieve skillforge context even with cross_project=False.
+
+    Matching is case-insensitive substring search on the query. Only slugs with
+    ≥4 characters are matched to avoid false positives from short abbreviations.
+    """
+    if not query or not available_projects:
+        return frozenset()
+    query_lower = query.lower()
+    return frozenset(
+        p for p in available_projects
+        if p and len(p) >= 4 and p.lower() in query_lower
+    )

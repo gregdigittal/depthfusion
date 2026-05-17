@@ -728,6 +728,7 @@ def _split_into_blocks(content: str, source_label: str, file_stem: str) -> list[
 
 _SOURCE_WEIGHTS = {
     "memory": 1.0,
+    "rule": 0.95,       # user-defined conventions and standards — high authority
     "discovery": 0.85,
     "session": 0.70,
 }
@@ -1008,7 +1009,12 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # T-160: parse `project:` frontmatter once per file and attach it to each
     # block we derive from that file. This survives the ## section split in
     # _split_into_blocks — the frontmatter lives only in block 0 otherwise.
-    from depthfusion.retrieval.hybrid import extract_frontmatter_project
+    from depthfusion.retrieval.hybrid import (
+        boilerplate_penalty as _boilerplate_penalty,
+        detect_mentioned_projects as _detect_mentioned_projects,
+        extract_frontmatter_project,
+        extract_session_project as _extract_session_project,
+    )
 
     def _load_file(md_file: "Path", source_label: str) -> None:
         from datetime import datetime, timezone as _tz
@@ -1025,6 +1031,12 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         except OSError:
             mtime_iso = None
         file_project = extract_frontmatter_project(content)
+        # For session files that lack YAML frontmatter, parse the project slug
+        # from the plain-text session event header ("Project: <slug>").
+        # This corrects the back-compat hole that let all session blocks
+        # through the project filter regardless of which project they belong to.
+        if file_project is None and source_label == "session":
+            file_project = _extract_session_project(content)
         for block in _split_into_blocks(content, source_label, md_file.stem):
             if mtime_iso is not None:
                 block["mtime_iso"] = mtime_iso
@@ -1056,6 +1068,21 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             if md_file.name == "MEMORY.md":
                 continue
             _load_file(md_file, "memory")
+
+    # Source 4: global user rules (~/.claude/rules/*.md) and project-local rules
+    # (.claude/rules/*.md in the current working directory). Rules files encode
+    # conventions, standards, and workflow preferences — high-signal for queries
+    # about coding style, commit format, error handling, test strategy, etc.
+    for rules_dir in [
+        home / ".claude" / "rules",
+        Path.cwd() / ".claude" / "rules",
+    ]:
+        if rules_dir.exists() and rules_dir.is_dir():
+            for md_file in sorted(rules_dir.glob("*.md"),
+                                  key=lambda p: p.stat().st_mtime, reverse=True)[:25]:
+                if md_file.name.startswith("_") or md_file.name == "README.md":
+                    continue
+                _load_file(md_file, "rule")
 
     if not raw_blocks:
         return json.dumps({
@@ -1089,10 +1116,22 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             else:
                 current_project = None
         if current_project:
-            from depthfusion.retrieval.hybrid import filter_blocks_by_project
+            from depthfusion.retrieval.hybrid import (
+                detect_mentioned_projects as _dmp,
+                filter_blocks_by_project,
+            )
+            # Detect projects explicitly named in the query so their blocks are
+            # included even when cross_project=False.  Example: a query like
+            # "I'm working on the SkillForge router" from a depthfusion session
+            # should still surface skillforge context.
+            _all_tagged = {b.get("project") for b in raw_blocks if b.get("project")}
+            _mentioned = _dmp(query, _all_tagged) - {current_project}
             before_count = len(raw_blocks)
             raw_blocks = filter_blocks_by_project(
-                raw_blocks, current_project=current_project, cross_project=False,
+                raw_blocks,
+                current_project=current_project,
+                cross_project=False,
+                extra_projects=frozenset(_mentioned) if _mentioned else None,
             )
             if not raw_blocks:
                 return json.dumps({
@@ -1172,23 +1211,36 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
 
     # Apply source-type weight to BM25 scores
     # S-92: per-block explain data (only populated when explain=True)
+    _query_lower = query.lower()
     _explain_data: dict[int, dict] = {}
     weighted: list[tuple[int, float]] = []
     for idx, raw_score in bm25_ranked:
-        source = raw_blocks[idx]["source"]
+        _block = raw_blocks[idx]
+        source = _block["source"]
         weight = _SOURCE_WEIGHTS.get(source, 1.0)
         # recency_rank gives a small tie-breaking boost (0–1% of score) without
         # overriding content signal
-        chunk_id = raw_blocks[idx]["chunk_id"]
+        chunk_id = _block["chunk_id"]
         recency_rank = (
             recency_list.index(chunk_id) if chunk_id in recency_list
             else len(recency_list)
         )
         recency_boost = 1.0 / (1 + recency_rank * 0.01)  # max 1%, fades quickly
-        final_score = raw_score * weight * recency_boost
+        # Boilerplate penalty: session blocks that are pure lifecycle envelopes
+        # (SESSION START/END + JSON metadata, ≤12 non-empty lines) score 0.2×.
+        bp = _boilerplate_penalty(_block.get("content", ""))
+        # Project mention boost: when the query names the block's project slug,
+        # lift that block 2× so cross-project results the user explicitly asked
+        # about outrank boilerplate from the current project.
+        _blk_proj = _block.get("project", "")
+        mention_boost = (
+            2.0
+            if _blk_proj and len(_blk_proj) >= 4 and _blk_proj.lower() in _query_lower
+            else 1.0
+        )
+        final_score = raw_score * weight * recency_boost * bp * mention_boost
         weighted.append((idx, final_score))
         if explain:
-            _block = raw_blocks[idx]
             _proj_match: bool | None = (
                 (_block.get("project") == current_project)
                 if (not cross_project and current_project is not None)
@@ -1197,6 +1249,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             _explain_data[idx] = {
                 "bm25_score": round(raw_score, 4),
                 "source_weight": weight,
+                "boilerplate_penalty": round(bp, 2),
+                "mention_boost": round(mention_boost, 2),
                 "project_match": _proj_match,
             }
 
