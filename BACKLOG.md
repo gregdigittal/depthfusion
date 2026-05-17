@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-17 (S-63 AC-4 executed — fusion-gates comparison: Cat A +1.7% parity, Cat D 0.0% parity; empty graph blocks threshold; S-63 fully closed)
+> Last updated: 2026-05-17 (S-115 done — CIQS Cat A retrieval quality: boilerplate suppression 0.2×, project-mention boost 2.0×, session project extraction, rules-file indexing; 28 regression tests; commit 33d0d54)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1951,6 +1951,29 @@
 - [x] T-390: Populate `facts_text`/`concepts_text` at write time in memory_store.py
 - [x] T-391: Config flag + feature-flag gate in hybrid pipeline
 - [x] T-392: Tests (migration, triggers, phrase, field weights, flag fallback, perf)
+
+---
+
+## E-36: CIQS Category A Retrieval Quality [done]
+
+> Fix the three structural defects that cause cross-project contamination and boilerplate
+> inflation in Category A retrieval scores.
+
+### S-115: As a developer, I want DepthFusion retrieval to prefer on-topic same-project content over boilerplate session envelopes from other projects so that CIQS Category A scores improve `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `extract_session_project()` parses `Project: <slug>` from plain-text session headers and is used as fallback project tag in `_load_file` when YAML frontmatter returns None
+- [x] AC-2: `boilerplate_penalty()` returns 0.2 for blocks with ≤12 non-blank lines that contain a `SESSION START/END` or `COMPACTION EVENT` header; returns 1.0 otherwise
+- [x] AC-3: `detect_mentioned_projects()` returns project slugs ≥4 chars that appear verbatim (case-insensitive) in the query; used to widen `filter_blocks_by_project` to include mentioned-but-not-current projects
+- [x] AC-4: Scoring loop multiplies by `boilerplate_penalty` and `mention_boost` (2.0× when block's project slug appears in query)
+- [x] AC-5: `~/.claude/rules/*.md` and `<cwd>/.claude/rules/*.md` loaded as Source 4 with weight 0.95
+- [x] AC-6: 28 regression tests in `test_ciqs_a_regression.py` guard all helpers and verify composite scoring ordering: content-rich skillforge block outranks boilerplate depthfusion block for A1/A2 CIQS prompts
+- [x] AC-7: All 131 retrieval tests pass with no regressions
+
+**Tasks:**
+- [x] T-393: Add `_BOILERPLATE_LINE_RE`, `_SESSION_PROJECT_RE`, `boilerplate_penalty()`, `extract_session_project()`, `detect_mentioned_projects()` to hybrid.py; extend `filter_blocks_by_project` with `extra_projects` kwarg
+- [x] T-394: Update `server.py`: add `rule` source weight 0.95, session project fallback in `_load_file`, rules-file Source 4 loading, query-mention widening in project filter, boilerplate+mention scoring factors in scoring loop
+- [x] T-395: Write 28 regression tests in `tests/test_retrieval/test_ciqs_a_regression.py`
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
