@@ -14,6 +14,54 @@ Conventions:
 
 ---
 
+## [v1.0.0] — 2026-05-18
+
+**Theme:** Ambient cognition — session auto-recall/capture, REST query API, telemetry platform, and retrieval quality lift (Cat A +21.7pp via OpenHuman scoring signals). Covers E-32 through E-37 + install UX (S-110/S-111) + full lint/type cleanup.
+
+### Added
+
+**Ambient Capture & Auto-Recall (E-35):**
+- `S-110` PostToolUse ambient capture hook — every tool call emits a structured capture event without requiring manual `/publish_context`
+- `S-111` SessionStart auto-recall seed injection — fresh sessions start warm; top-k recall result injected before the first user turn
+- `S-112` Structured observation fields on `ContextItem` — typed `files_read`, `files_modified`, `tool_name`, `session_id` fields enable filtering and scoring on structure rather than prose blob
+- `S-113` 3-layer progressive disclosure search (MCP tool `depthfusion_retrieve_context`) — lightweight 10%-cost mode (SQLite FTS5 → BM25 pre-filter → optional semantic) for context-injection hot paths
+- `S-114` SQLite FTS5 index on `MemoryStore` — phrase queries and pre-filter passes run against an indexed projection; degrades gracefully to in-memory BM25 scan when FTS5 is unavailable
+
+**CIQS Category A Retrieval Quality (E-36):**
+- `S-115` Project-aware scoring — `detect_mentioned_projects()` + 2× mention-boost multiplier in scoring loop; boilerplate session-envelope suppression; raises Cat A from 18.3% to 40.0% (+21.7pp, 3-run harness, commit `33d0d54`/`11081ef`)
+
+**Memory Scoring Signals — OpenHuman Port (E-37):**
+- `S-116` Lexical richness penalty — `lexical_richness_penalty(content) → [0.5, 1.0]` based on type-token ratio; 6th scoring multiplier; penalises log dumps and repetitive envelopes without touching high-entropy sessions
+- `S-117` Query-hits feedback loop — `HitTracker` singleton persists per-chunk hit counts to `~/.claude/.depthfusion_hits.jsonl` (30-day rolling window, 5 MB prune); `query_hits_boost` (max 1.5×) wired as 7th multiplier; hits registered on output blocks, not input (avoids self-inflation)
+- `S-118` Pre-indexing admission gate v2 — `_admission_score = boilerplate_penalty × lexical_richness_penalty`; chunks scoring below `DEPTHFUSION_ADMISSION_THRESHOLD` (default 0.10) are skipped at index time with a DEBUG log
+
+**Install UX (E-05 additions):**
+- `S-110` Guided web install wizard at `127.0.0.1:7300/install` — 6-step browser UI for mode selection, dependency checks, API key entry, hook/MCP wiring, and confirmation; binds loopback only
+- `S-111` Windows compatibility for `local` and `vps-cpu` modes — PowerShell hook equivalents, `dep_checker.py` cross-platform package detection; `vps-gpu` and `mac-mlx` blocked with clear error on win32
+
+**Query REST API (E-32):**
+- `S-104` `/query/discoveries`, `/query/sessions`, `/query/aggregate` — date-range + filter endpoints for BI tool connectivity; row-level SQL injection protection via parameterised queries
+- `S-105` BI connectivity guide + Metabase dashboard template (`docs/bi-connectivity.md`)
+
+**Telemetry Data Platform (E-33/E-34):**
+- `S-106` `df_record_telemetry` MCP tool — PostToolUse hooks can log structured telemetry events with session, tool, and cost metadata
+- `S-107` `df_query_telemetry` MCP tool + rollup aggregations — think-time, model pricing, session-type breakdown; cost estimation in query API
+- `S-108` `/query/sessions` telemetry enrichment with `telemetry_summary` field
+- `S-109` Candidate skill surfacing — `df_surface_skill_candidates` tool drafts recurring patterns for human review in SkillForge
+
+### Fixed
+
+- All 30 ruff violations resolved across `src/` and `scripts/` (commits `97e8ff3`–`c7e3a22`); `ruff check .` is now clean
+- All 4 mypy errors resolved in `vector_store.py` (ndarray cast) and `server.py` (set narrowing, threshold cast); `mypy src/` reports `Success: no issues found in 101 source files` (`bc85efa`)
+- Benchmark `benchmark_home` fixture no longer bleeds into live `~/.claude/depthfusion-metrics/` under `DEPTHFUSION_*` env flags (`f98ba33`)
+
+### Test totals as of v1.0.0
+
+- **1843 tests collected and passing** (was 1519 at v0.6.0; +324 from E-35 + E-36 + E-37 + install UX + scoring signals)
+- New test files: `test_hit_tracker.py` (21 tests), `test_admission_gate.py` (18 tests), `test_ui_server.py`, `test_ciqs_a_regression.py` additions
+
+---
+
 ## [v0.6.0] — 2026-05-11
 
 **Theme:** Build-plan alignment (E-30) — two P0 correctness fixes that made advertised modes non-functional, plus MCP schema completeness, vector embedding consistency, benchmark harness, SQLite metadata cache, recall explainability, and the SkillForge RLM HTTP sidecar. Promotes from `0.6.0a2`.

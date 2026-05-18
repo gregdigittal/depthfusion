@@ -491,14 +491,9 @@
 ### S-30: As a release, I want CIQS statistical confidence so that pre/post-fix deltas are credible `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: 3 complete pre-fix CIQS runs in `docs/benchmarks/`
-- [ ] AC-2: 3 complete post-fix CIQS runs in `docs/benchmarks/`
-- [ ] AC-3: Post-fix CIQS ≥ 88 overall, Category D ≥ 55%
-
-**Tasks:**
-- [ ] T-88: Execute 3-run pre-fix baseline
-- [ ] T-89: Execute 3-run post-fix baseline
-- [ ] T-90: Commit results under `docs/benchmarks/`
+- [x] AC-1: 3 complete pre-fix CIQS runs in `docs/benchmarks/` — done via E-26 S-63 harness; `docs/benchmarks/2026-05-16-*`
+- [x] AC-2: 3 complete post-fix CIQS runs in `docs/benchmarks/` — `docs/benchmarks/2026-05-17-*`; 88.5% overall, 79.4% Cat D
+- [x] AC-3: Post-fix CIQS ≥ 88 overall, Category D ≥ 55% — confirmed (S-63 AC-3 closure, commit `4ef74c9`)
 
 ### v0.3.1 Definition of Done (reconciled 2026-04-21)
 
@@ -507,7 +502,7 @@
 - [x] Sentence-boundary snippet trimming (S-25 AC-2) — `_trim_to_sentence()` at `mcp/server.py:224`
 - [x] `mypy src/depthfusion` + `ruff check src/ tests/` clean (S-59 closed 2026-04-20)
 - [x] C1-C11: all GREEN (S-37 closed; C4 false-positive whitelisted)
-- [ ] CIQS 3-run post-fix ≥ 88 overall (S-30) — **moved to E-26: Benchmark Harness**
+- [x] CIQS 3-run post-fix ≥ 88 overall (S-30) — done via E-26 S-63 harness; 88.5% overall, 79.4% Cat D
 - [x] ~~Git tag `v0.3.1`~~ — **superseded by v0.5.0/v0.5.1/v0.5.2 tag line**; v0.3.1 never cut as its own release
 
 ---
@@ -529,7 +524,7 @@
 **Tasks:**
 - [x] T-91: Author measurement prompt doc
 - [x] T-92: Add graph-subsystem benchmark cases to the battery
-- [ ] T-93: Automate CIQS run harness (script that drives prompts through Claude Code and logs scores) — **delivery moved to E-26 S-63 (2026-04-21)**
+- [x] T-93: Automate CIQS run harness (script that drives prompts through Claude Code and logs scores) — delivered as E-26 S-63 `scripts/ciqs_harness.py` (2026-04-21)
 
 ---
 
