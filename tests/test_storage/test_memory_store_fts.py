@@ -2,11 +2,8 @@
 from __future__ import annotations
 
 import json
-import time
 
-import pytest
-
-from depthfusion.core.memory_object import MemoryObject, MemoryStatus, MemoryType
+from depthfusion.core.memory_object import MemoryObject, MemoryType
 from depthfusion.storage.memory_store import MemoryStore
 
 
@@ -236,6 +233,7 @@ class TestFtsPrefilter:
 
     def test_returns_none_on_store_error(self, tmp_path, monkeypatch):
         from unittest.mock import MagicMock
+
         from depthfusion.retrieval.hybrid import fts_prefilter_memory_ids
         monkeypatch.setenv("DEPTHFUSION_FTS_ENABLED", "true")
         broken = MagicMock()

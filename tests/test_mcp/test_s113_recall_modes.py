@@ -17,7 +17,6 @@ import pytest
 
 from depthfusion.mcp.server import _make_tool_schema, _tool_recall_impl
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

@@ -1,15 +1,11 @@
 """Tests for S-110: PostToolUse ambient capture hook."""
 from __future__ import annotations
 
-import json
-import os
-
 import pytest
 
 from depthfusion.capture.auto_learn import build_ambient_item
-from depthfusion.hooks.post_tool_use import handle_post_tool_use, _extract_files
+from depthfusion.hooks.post_tool_use import _extract_files, handle_post_tool_use
 from depthfusion.router.bus import FileBus
-
 
 # ---------------------------------------------------------------------------
 # build_ambient_item (T-368)

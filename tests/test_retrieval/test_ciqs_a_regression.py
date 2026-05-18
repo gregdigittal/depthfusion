@@ -19,7 +19,6 @@ from depthfusion.retrieval.hybrid import (
     filter_blocks_by_project,
 )
 
-
 # ---------------------------------------------------------------------------
 # boilerplate_penalty — CIQS A1/A2/A3 fix: downrank envelope-only blocks
 # ---------------------------------------------------------------------------
@@ -69,13 +68,13 @@ class TestBoilerplatePenalty:
 
     def test_exactly_twelve_lines_penalised(self):
         lines = ["--- SESSION END at 01:00:00 ---"] + [f"Line {i}" for i in range(11)]
-        assert len([l for l in lines if l.strip()]) == 12
+        assert len([ln for ln in lines if ln.strip()]) == 12
         content = "\n".join(lines)
         assert boilerplate_penalty(content) == 0.2
 
     def test_thirteen_lines_no_penalty(self):
         lines = ["--- SESSION END at 01:00:00 ---"] + [f"Line {i}" for i in range(12)]
-        assert len([l for l in lines if l.strip()]) == 13
+        assert len([ln for ln in lines if ln.strip()]) == 13
         content = "\n".join(lines)
         assert boilerplate_penalty(content) == 1.0
 

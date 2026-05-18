@@ -11,10 +11,7 @@ import json
 import types
 from pathlib import Path
 
-import pytest
-
 from depthfusion.mcp.server import _tool_describe_capabilities, _tool_retrieve_context
-
 
 # ---------------------------------------------------------------------------
 # AC-5: describe_capabilities
@@ -49,7 +46,12 @@ def _write_memory_with_structured_fields(store_path: Path) -> str:
     import uuid
     from datetime import datetime, timezone
 
-    from depthfusion.core.memory_object import MemoryConfidence, MemoryObject, MemoryStatus, MemoryType
+    from depthfusion.core.memory_object import (
+        MemoryConfidence,
+        MemoryObject,
+        MemoryStatus,
+        MemoryType,
+    )
     from depthfusion.storage.memory_store import MemoryStore
 
     store = MemoryStore(store_path)
@@ -104,7 +106,12 @@ def test_retrieve_context_omits_empty_structured_fields(tmp_path):
     import uuid
     from datetime import datetime, timezone
 
-    from depthfusion.core.memory_object import MemoryConfidence, MemoryObject, MemoryStatus, MemoryType
+    from depthfusion.core.memory_object import (
+        MemoryConfidence,
+        MemoryObject,
+        MemoryStatus,
+        MemoryType,
+    )
     from depthfusion.storage.memory_store import MemoryStore
 
     cfg = _make_config(tmp_path)

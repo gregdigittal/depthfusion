@@ -213,7 +213,9 @@ class DepthFusionConfig:
                 for t in os.environ.get("DEPTHFUSION_AMBIENT_SKIP_TOOLS", "").split(",")
                 if t.strip()
             ],
-            auto_recall_at_session_start=_env_bool("DEPTHFUSION_AUTO_RECALL_AT_SESSION_START", True),
+            auto_recall_at_session_start=_env_bool(
+                "DEPTHFUSION_AUTO_RECALL_AT_SESSION_START", True
+            ),
             auto_recall_top_k=_env_int("DEPTHFUSION_AUTO_RECALL_TOP_K", 3),
             auto_recall_snippet_len=_env_int("DEPTHFUSION_AUTO_RECALL_SNIPPET_LEN", 800),
             fts_enabled=_env_bool("DEPTHFUSION_FTS_ENABLED", True),

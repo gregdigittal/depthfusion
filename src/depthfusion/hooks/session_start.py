@@ -77,11 +77,12 @@ def _recall_and_seed(
     snippet_len: int = 800,
 ) -> int:
     """Run recall and publish seed items. Returns count of items published."""
-    from depthfusion.mcp.server import _tool_recall_impl
-    from depthfusion.core.types import ContextItem
-    from depthfusion.router.bus import FileBus
     import hashlib
     import time
+
+    from depthfusion.core.types import ContextItem
+    from depthfusion.mcp.server import _tool_recall_impl
+    from depthfusion.router.bus import FileBus
 
     cwd = Path.cwd()
     project_name = _detect_project_name(cwd)

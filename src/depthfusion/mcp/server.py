@@ -1011,13 +1011,17 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # _split_into_blocks — the frontmatter lives only in block 0 otherwise.
     from depthfusion.retrieval.hybrid import (
         boilerplate_penalty as _boilerplate_penalty,
-        detect_mentioned_projects as _detect_mentioned_projects,
+    )
+    from depthfusion.retrieval.hybrid import (
         extract_frontmatter_project,
+    )
+    from depthfusion.retrieval.hybrid import (
         extract_session_project as _extract_session_project,
     )
 
     def _load_file(md_file: "Path", source_label: str) -> None:
-        from datetime import datetime, timezone as _tz
+        from datetime import datetime
+        from datetime import timezone as _tz
         try:
             content = md_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -1118,6 +1122,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         if current_project:
             from depthfusion.retrieval.hybrid import (
                 detect_mentioned_projects as _dmp,
+            )
+            from depthfusion.retrieval.hybrid import (
                 filter_blocks_by_project,
             )
             # Detect projects explicitly named in the query so their blocks are
@@ -1568,9 +1574,10 @@ def _handle_ambient_capture(arguments: dict) -> str:
         return json.dumps({"error": "tool_name required for ambient mode", "published": False})
 
     try:
+        from pathlib import Path
+
         from depthfusion.capture.auto_learn import build_ambient_item
         from depthfusion.router.bus import FileBus
-        from pathlib import Path
 
         item = build_ambient_item(
             tool_name=tool_name,
@@ -2762,8 +2769,14 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
 
 def _tool_session_seed(arguments: dict) -> str:
     """Publish top recall results as high-priority session-seed ContextItems (S-111)."""
-    from depthfusion.hooks.session_start import _recall_and_seed, _detect_project_name, _recent_git_messages, _build_seed_query
     from pathlib import Path
+
+    from depthfusion.hooks.session_start import (
+        _build_seed_query,
+        _detect_project_name,
+        _recall_and_seed,
+        _recent_git_messages,
+    )
 
     session_id = arguments.get("session_id", "unknown")
     top_k = int(arguments.get("top_k", 3))

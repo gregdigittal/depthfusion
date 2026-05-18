@@ -103,8 +103,6 @@ def test_rank_with_field_boost_boosts_correct_doc():
 
     # Without boost, get baseline order
     base_ranked = bm25.rank_all(query)
-    base_top = base_ranked[0][0]
-
     # Give doc 1 a facts hit on the query term "server"
     field_tokens = [[], ["server"]]
     boosted_ranked = bm25.rank_with_field_boost(query, field_tokens)

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,7 +14,6 @@ from depthfusion.hooks.session_start import (
     handle_session_start,
 )
 from depthfusion.router.bus import FileBus
-
 
 # ---------------------------------------------------------------------------
 # Project detection helpers
@@ -197,8 +195,8 @@ class TestSessionSeedSchema:
         assert props["snippet_len"]["minimum"] == 200
 
     def test_session_seed_in_enabled_tools(self):
-        from depthfusion.mcp.server import get_enabled_tools
         from depthfusion.core.config import DepthFusionConfig
+        from depthfusion.mcp.server import get_enabled_tools
         config = DepthFusionConfig()
         tools = get_enabled_tools(config)
         assert "depthfusion_session_seed" in tools
