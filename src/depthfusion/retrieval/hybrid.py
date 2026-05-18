@@ -35,6 +35,7 @@ import logging
 import math
 import os
 import re
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -78,6 +79,16 @@ _FRONTMATTER_PROJECT_RE = re.compile(
 _FRONTMATTER_PROJECT_KEY_RE = re.compile(
     r"^project:\s*(\S+)\s*$", re.MULTILINE,
 )
+_FRONTMATTER_VALID_FROM_RE = re.compile(
+    r"^valid_from:\s*(\S+)\s*$", re.MULTILINE,
+)
+_FRONTMATTER_VALID_UNTIL_RE = re.compile(
+    r"^valid_until:\s*(\S+)\s*$", re.MULTILINE,
+)
+
+# S-121: fusion blend mode. Default "rrf" preserves existing behaviour; set
+# DEPTHFUSION_BLEND_MODE=linear to activate MemPalace-style linear blend.
+_BLEND_MODE = os.getenv("DEPTHFUSION_BLEND_MODE", "rrf").lower()
 
 try:
     from depthfusion.storage.tier_manager import Tier as _StorageTier
@@ -409,6 +420,53 @@ class RecallPipeline:
         ranked = sorted(scores.items(), key=lambda x: -x[1])
         return [all_blocks[cid] for cid, _ in ranked]
 
+    def linear_blend(
+        self,
+        bm25_results: list[dict],
+        vector_results: list[dict],
+        *,
+        bm25_weight: float = 0.4,
+        vector_weight: float = 0.6,
+    ) -> list[dict]:
+        """Linear blend: BM25 min-max normalised within candidate set,
+        vector similarity kept as absolute cosine in [0, 1].
+
+        Prevents score-collapse when unrelated candidates widen the BM25
+        score range — a property RRF does not guarantee for small candidate
+        sets. Reference: MemPalace searcher.py hybrid_rank() (S-121 / E-38).
+
+        Only used when DEPTHFUSION_BLEND_MODE=linear (default: rrf).
+        """
+        if not bm25_results and not vector_results:
+            return []
+
+        all_blocks: dict[str, dict] = {}
+        for b in bm25_results:
+            all_blocks[b["chunk_id"]] = b
+        for b in vector_results:
+            all_blocks[b["chunk_id"]] = b
+
+        bm25_raw = {b["chunk_id"]: b.get("bm25_score", 0.0) for b in bm25_results}
+        if bm25_raw:
+            bm25_min = min(bm25_raw.values())
+            bm25_max = max(bm25_raw.values())
+            bm25_range = bm25_max - bm25_min or 1.0
+            bm25_norm = {cid: (v - bm25_min) / bm25_range for cid, v in bm25_raw.items()}
+        else:
+            bm25_norm = {}
+
+        vector_raw = {b["chunk_id"]: b.get("vector_score", 0.0) for b in vector_results}
+
+        scored: list[tuple[float, dict]] = []
+        for cid, block in all_blocks.items():
+            b_score = bm25_norm.get(cid, 0.0)
+            v_score = max(0.0, vector_raw.get(cid, 0.0))
+            final = bm25_weight * b_score + vector_weight * v_score
+            scored.append((final, block))
+
+        scored.sort(key=lambda t: -t[0])
+        return [b for _, b in scored]
+
 
 def index_pass(raw_blocks: list[dict], top_k: int = 20) -> list[dict]:
     """S-113 mode='index': lightweight title+source entries, no BM25 scoring.
@@ -535,6 +593,72 @@ def extract_frontmatter_project(content: str) -> str | None:
         return None
     key_match = _FRONTMATTER_PROJECT_KEY_RE.search(fm_match.group("fm"))
     return key_match.group(1).strip() if key_match else None
+
+
+def extract_frontmatter_validity(content: str) -> tuple[datetime | None, datetime | None]:
+    """Parse optional valid_from / valid_until ISO-8601 fields from YAML frontmatter.
+
+    Returns (valid_from, valid_until) — either or both may be None.
+    Used by filter_blocks_by_validity() to support as_of= point-in-time recall.
+    Missing or malformed date values return None rather than raising.
+    """
+    if not content:
+        return None, None
+    fm_match = _FRONTMATTER_PROJECT_RE.match(content)
+    if not fm_match:
+        return None, None
+    fm = fm_match.group("fm")
+    vf_match = _FRONTMATTER_VALID_FROM_RE.search(fm)
+    vu_match = _FRONTMATTER_VALID_UNTIL_RE.search(fm)
+    try:
+        valid_from: datetime | None = (
+            datetime.fromisoformat(vf_match.group(1)) if vf_match else None
+        )
+    except ValueError:
+        valid_from = None
+    try:
+        valid_until: datetime | None = (
+            datetime.fromisoformat(vu_match.group(1)) if vu_match else None
+        )
+    except ValueError:
+        valid_until = None
+    return valid_from, valid_until
+
+
+def filter_blocks_by_validity(
+    blocks: list[dict],
+    *,
+    as_of: datetime | None,
+) -> list[dict]:
+    """Exclude blocks whose validity window does not cover as_of.
+
+    Rules (additive to filter_blocks_by_project — callers chain them):
+      * as_of is None                      → return blocks unchanged (back-compat)
+      * block has no valid_from/valid_until → INCLUDED (back-compat for pre-S-119 files)
+      * valid_from > as_of                 → EXCLUDED (block did not yet exist at as_of)
+      * valid_until < as_of                → EXCLUDED (block was superseded before as_of)
+      * otherwise                          → INCLUDED
+    """
+    if as_of is None:
+        return blocks
+    _as_of = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=timezone.utc)
+    result: list[dict] = []
+    for block in blocks:
+        content = block.get("content", "")
+        vf, vu = extract_frontmatter_validity(content)
+        if vf is None and vu is None:
+            result.append(block)
+            continue
+        if vf is not None:
+            _vf = vf if vf.tzinfo is not None else vf.replace(tzinfo=timezone.utc)
+            if _vf > _as_of:
+                continue
+        if vu is not None:
+            _vu = vu if vu.tzinfo is not None else vu.replace(tzinfo=timezone.utc)
+            if _vu < _as_of:
+                continue
+        result.append(block)
+    return result
 
 
 def filter_blocks_by_project(

@@ -85,6 +85,8 @@ def _edge_to_dict(e: Edge) -> dict:
         "relationship": e.relationship,
         "weight": e.weight,
         "signals": e.signals,
+        "adapter_name": e.adapter_name,
+        "source_type": e.source_type,
         "metadata": e.metadata,
     }
 
@@ -97,6 +99,8 @@ def _dict_to_edge(d: dict) -> Edge:
         relationship=d["relationship"],
         weight=d.get("weight", 1.0),
         signals=d.get("signals", []),
+        adapter_name=d.get("adapter_name", ""),
+        source_type=d.get("source_type", ""),
         metadata=d.get("metadata", {}),
     )
 
@@ -189,6 +193,8 @@ class SQLiteGraphStore:
             relationship TEXT NOT NULL,
             weight REAL NOT NULL DEFAULT 1.0,
             signals TEXT NOT NULL DEFAULT '[]',
+            adapter_name TEXT NOT NULL DEFAULT '',
+            source_type TEXT NOT NULL DEFAULT '',
             metadata TEXT NOT NULL DEFAULT '{}'
         )
     """
@@ -199,6 +205,15 @@ class SQLiteGraphStore:
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.execute(self._CREATE_ENTITIES)
         self._conn.execute(self._CREATE_EDGES)
+        # Migration guard — add provenance columns to pre-S-120 databases
+        for col, coldef in [
+            ("adapter_name", "TEXT NOT NULL DEFAULT ''"),
+            ("source_type", "TEXT NOT NULL DEFAULT ''"),
+        ]:
+            try:
+                self._conn.execute(f"ALTER TABLE edges ADD COLUMN {col} {coldef}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
         self._conn.commit()
 
     def upsert_entity(self, entity: Entity) -> None:
@@ -231,12 +246,15 @@ class SQLiteGraphStore:
     def upsert_edge(self, edge: Edge) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO edges
-               (edge_id, source_id, target_id, relationship, weight, signals, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               (edge_id, source_id, target_id, relationship, weight, signals,
+                adapter_name, source_type, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 edge.edge_id, edge.source_id, edge.target_id,
                 edge.relationship, edge.weight,
-                json.dumps(edge.signals), json.dumps(edge.metadata),
+                json.dumps(edge.signals),
+                edge.adapter_name, edge.source_type,
+                json.dumps(edge.metadata),
             ),
         )
         self._conn.commit()
@@ -249,19 +267,27 @@ class SQLiteGraphStore:
         params: list = [entity_id, entity_id]
         if relationship_filter:
             sql = (
-                "SELECT * FROM edges WHERE (source_id = ? OR target_id = ?)"
+                "SELECT edge_id, source_id, target_id, relationship, weight, signals,"
+                " adapter_name, source_type, metadata"
+                " FROM edges WHERE (source_id = ? OR target_id = ?)"
                 f" AND relationship IN ({','.join('?' * len(relationship_filter))})"
             )
             params.extend(relationship_filter)
         else:
-            sql = "SELECT * FROM edges WHERE source_id = ? OR target_id = ?"
+            sql = (
+                "SELECT edge_id, source_id, target_id, relationship, weight, signals,"
+                " adapter_name, source_type, metadata"
+                " FROM edges WHERE source_id = ? OR target_id = ?"
+            )
 
         rows = self._conn.execute(sql, params).fetchall()
         return [
             Edge(
                 edge_id=r[0], source_id=r[1], target_id=r[2],
                 relationship=r[3], weight=r[4],
-                signals=json.loads(r[5]), metadata=json.loads(r[6]),
+                signals=json.loads(r[5]),
+                adapter_name=r[6], source_type=r[7],
+                metadata=json.loads(r[8]),
             )
             for r in rows
         ]
@@ -331,9 +357,19 @@ class ChromaGraphStore:
                 relationship TEXT NOT NULL,
                 weight REAL NOT NULL DEFAULT 1.0,
                 signals TEXT NOT NULL DEFAULT '[]',
+                adapter_name TEXT NOT NULL DEFAULT '',
+                source_type TEXT NOT NULL DEFAULT '',
                 metadata TEXT NOT NULL DEFAULT '{}'
             )
         """)
+        for col, coldef in [
+            ("adapter_name", "TEXT NOT NULL DEFAULT ''"),
+            ("source_type", "TEXT NOT NULL DEFAULT ''"),
+        ]:
+            try:
+                self._edge_conn.execute(f"ALTER TABLE edges ADD COLUMN {col} {coldef}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
         self._edge_conn.commit()
 
     # ------------------------------------------------------------------
@@ -403,13 +439,16 @@ class ChromaGraphStore:
         self._edge_conn.execute(
             """
             INSERT OR REPLACE INTO edges
-                (edge_id, source_id, target_id, relationship, weight, signals, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (edge_id, source_id, target_id, relationship, weight, signals,
+                 adapter_name, source_type, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 edge.edge_id, edge.source_id, edge.target_id,
                 edge.relationship, edge.weight,
-                json.dumps(edge.signals), json.dumps(edge.metadata),
+                json.dumps(edge.signals),
+                edge.adapter_name, edge.source_type,
+                json.dumps(edge.metadata),
             ),
         )
         self._edge_conn.commit()
@@ -421,7 +460,8 @@ class ChromaGraphStore:
             placeholders = ",".join("?" * len(relationship_filter))
             rows = self._edge_conn.execute(
                 f"""
-                SELECT edge_id, source_id, target_id, relationship, weight, signals, metadata
+                SELECT edge_id, source_id, target_id, relationship, weight, signals,
+                       adapter_name, source_type, metadata
                 FROM edges
                 WHERE (source_id = ? OR target_id = ?)
                   AND relationship IN ({placeholders})
@@ -431,7 +471,8 @@ class ChromaGraphStore:
         else:
             rows = self._edge_conn.execute(
                 """
-                SELECT edge_id, source_id, target_id, relationship, weight, signals, metadata
+                SELECT edge_id, source_id, target_id, relationship, weight, signals,
+                       adapter_name, source_type, metadata
                 FROM edges WHERE source_id = ? OR target_id = ?
                 """,
                 (entity_id, entity_id),
@@ -440,7 +481,9 @@ class ChromaGraphStore:
             Edge(
                 edge_id=r[0], source_id=r[1], target_id=r[2],
                 relationship=r[3], weight=r[4],
-                signals=json.loads(r[5]), metadata=json.loads(r[6]),
+                signals=json.loads(r[5]),
+                adapter_name=r[6], source_type=r[7],
+                metadata=json.loads(r[8]),
             )
             for r in rows
         ]

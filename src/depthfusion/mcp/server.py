@@ -1322,10 +1322,14 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                 query, reranker_input, top_k=max(top_k * 2, 10),
             )
             if vector_results:
-                # RRF-fuse BM25 (reranker_input, already ranked) with the
-                # vector-search ordering. Output is the fused list — replace
-                # the reranker input so downstream phases see the fused pool.
-                reranker_input = pipeline.rrf_fuse(reranker_input, vector_results)
+                # Fuse BM25 (reranker_input, already ranked) with the
+                # vector-search ordering. S-121: DEPTHFUSION_BLEND_MODE=linear
+                # activates MemPalace-style min-max blend; default is RRF.
+                from depthfusion.retrieval.hybrid import _BLEND_MODE
+                if _BLEND_MODE == "linear":
+                    reranker_input = pipeline.linear_blend(reranker_input, vector_results)
+                else:
+                    reranker_input = pipeline.rrf_fuse(reranker_input, vector_results)
         finally:
             # S-80 AC-3: record latency even when apply_vector_search raises.
             # Also record under the canonical capability key ("embedding") so

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -335,6 +335,7 @@ def write_decisions(
         f"project: {project}",
         f"session_id: {session_id}",
         f"date: {today}",
+        f"valid_from: {datetime.now(tz=timezone.utc).isoformat()}",
         f"entries: {len(filtered)}",
         "type: decisions",
         f"importance: {aggregate_importance:.4f}",

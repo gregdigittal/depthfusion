@@ -65,6 +65,8 @@ class CoOccurrenceLinker:
                 relationship="CO_OCCURS",
                 weight=1.0,
                 signals=["co_occurrence"],
+                adapter_name="co_occurrence_linker",
+                source_type="decision",
                 metadata={},
             ))
         return edges
@@ -104,6 +106,8 @@ class TemporalLinker:
                         relationship="CO_WORKED_ON",
                         weight=1.0,
                         signals=["temporal"],
+                        adapter_name="temporal_linker",
+                        source_type="session",
                         metadata={"delta_hours": delta_hours},
                     ))
         return edges
@@ -237,6 +241,8 @@ class TemporalSessionLinker:
             relationship="PRECEDED_BY",
             weight=1.0,
             signals=["temporal", "vocabulary_overlap"],
+            adapter_name="temporal_session_linker",
+            source_type="session",
             metadata={
                 "delta_hours": round(delta_hours, 3),
                 "overlap": overlap,
@@ -327,5 +333,7 @@ class HaikuLinker:
             relationship=rel,
             weight=1.0,
             signals=["haiku"],
+            adapter_name="haiku_linker",
+            source_type="decision",
             metadata={},
         )

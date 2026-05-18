@@ -413,3 +413,71 @@ class TestGetStoreChromaFactory:
         )
         store = get_store(graph_db_path=tmp_path / "g.db")
         assert isinstance(store, SQLiteGraphStore)
+
+
+# ---------------------------------------------------------------------------
+# TestEdgeProvenance — S-120: adapter_name / source_type round-trip
+# ---------------------------------------------------------------------------
+
+class TestEdgeProvenance:
+    """Verify provenance fields survive serialisation round-trips in all backends."""
+
+    from depthfusion.graph.types import Edge
+
+    def _make_edge(self, **kwargs) -> "Edge":
+        from depthfusion.graph.types import Edge
+        defaults = dict(
+            edge_id="e001", source_id="s1", target_id="t1",
+            relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"],
+        )
+        defaults.update(kwargs)
+        return Edge(**defaults)
+
+    def test_edge_stores_adapter_name_json(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        edge = self._make_edge(adapter_name="co_occurrence_linker")
+        store.upsert_edge(edge)
+        result = store.get_edges("s1")
+        assert result[0].adapter_name == "co_occurrence_linker"
+
+    def test_edge_stores_source_type_json(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        edge = self._make_edge(source_type="decision")
+        store.upsert_edge(edge)
+        result = store.get_edges("s1")
+        assert result[0].source_type == "decision"
+
+    def test_existing_edges_without_fields_deserialise_clean(self, tmp_path):
+        """Back-compat: edges serialised without provenance fields default to ''."""
+        import json
+        path = tmp_path / "g.json"
+        # Write a minimal edge dict that lacks the new fields
+        path.write_text(json.dumps({"entities": {}, "edges": {"e001": {
+            "edge_id": "e001", "source_id": "s1", "target_id": "t1",
+            "relationship": "CO_OCCURS", "weight": 1.0,
+            "signals": [], "metadata": {},
+        }}}), encoding="utf-8")
+        store = JSONGraphStore(path=path)
+        edges = store.get_edges("s1")
+        assert edges[0].adapter_name == ""
+        assert edges[0].source_type == ""
+
+    def test_sqlite_migration_guard_is_idempotent(self, tmp_path):
+        """Opening the SQLite store twice should not raise OperationalError."""
+        db = tmp_path / "g.db"
+        store1 = SQLiteGraphStore(path=db)
+        edge = self._make_edge(adapter_name="temporal_linker", source_type="session")
+        store1.upsert_edge(edge)
+        # Second open — migration guard must be idempotent (columns already exist)
+        store2 = SQLiteGraphStore(path=db)
+        result = store2.get_edges("s1")
+        assert result[0].adapter_name == "temporal_linker"
+
+    def test_json_store_round_trips_provenance(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        edge = self._make_edge(adapter_name="haiku_linker", source_type="decision")
+        store.upsert_edge(edge)
+        fresh = JSONGraphStore(path=tmp_path / "g.json")
+        result = fresh.get_edges("s1")
+        assert result[0].adapter_name == "haiku_linker"
+        assert result[0].source_type == "decision"

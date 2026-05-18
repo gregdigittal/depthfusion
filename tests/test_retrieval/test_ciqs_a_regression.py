@@ -408,3 +408,110 @@ class TestCompositeScoringOrderingA1:
             f"Expected skillforge rich ({score_sf:.4f}) > "
             f"agent-ops boilerplate ({score_ao:.4f})"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestTemporalFilter — S-119: as_of= point-in-time recall filter
+# ---------------------------------------------------------------------------
+
+class TestTemporalFilter:
+    """Tests for extract_frontmatter_validity() and filter_blocks_by_validity()."""
+
+    from depthfusion.retrieval.hybrid import (
+        extract_frontmatter_validity,
+        filter_blocks_by_validity,
+    )
+
+    _VF = "2025-01-10T00:00:00+00:00"
+    _VU = "2025-06-01T00:00:00+00:00"
+    _BEFORE = "2025-01-01T00:00:00+00:00"   # before valid_from
+    _INSIDE = "2025-03-15T00:00:00+00:00"   # within window
+    _AFTER  = "2025-12-01T00:00:00+00:00"   # after valid_until
+
+    def _fm(self, extra: str = "") -> str:
+        base = "project: test\nsession_id: s1\ntype: decisions\n"
+        return f"---\n{base}{extra}---\n\nBody text."
+
+    def test_no_as_of_returns_all(self):
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        blocks = [{"chunk_id": "a", "content": self._fm()},
+                  {"chunk_id": "b", "content": self._fm(f"valid_from: {self._VF}\n")}]
+        assert filter_blocks_by_validity(blocks, as_of=None) == blocks
+
+    def test_before_valid_from_excluded(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(f"valid_from: {self._VF}\n")}
+        as_of = datetime.fromisoformat(self._BEFORE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == []
+
+    def test_after_valid_from_included(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(f"valid_from: {self._VF}\n")}
+        as_of = datetime.fromisoformat(self._INSIDE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]
+
+    def test_before_valid_until_included(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(f"valid_until: {self._VU}\n")}
+        as_of = datetime.fromisoformat(self._INSIDE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]
+
+    def test_after_valid_until_excluded(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(f"valid_until: {self._VU}\n")}
+        as_of = datetime.fromisoformat(self._AFTER)
+        assert filter_blocks_by_validity([block], as_of=as_of) == []
+
+    def test_no_frontmatter_always_included(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": "No frontmatter here."}
+        as_of = datetime.fromisoformat(self._INSIDE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]
+
+    def test_both_fields_window_included(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(
+            f"valid_from: {self._VF}\nvalid_until: {self._VU}\n"
+        )}
+        as_of = datetime.fromisoformat(self._INSIDE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]
+
+    def test_both_fields_window_excluded_before(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(
+            f"valid_from: {self._VF}\nvalid_until: {self._VU}\n"
+        )}
+        as_of = datetime.fromisoformat(self._BEFORE)
+        assert filter_blocks_by_validity([block], as_of=as_of) == []
+
+    def test_malformed_date_included(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm("valid_from: not-a-date\n")}
+        as_of = datetime.fromisoformat(self._INSIDE)
+        # parse failure → treat as no dates → include (back-compat)
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]
+
+    def test_timezone_naive_as_of(self):
+        from datetime import datetime
+
+        from depthfusion.retrieval.hybrid import filter_blocks_by_validity
+        block = {"chunk_id": "a", "content": self._fm(f"valid_from: {self._VF}\n")}
+        # as_of has no tzinfo — the filter should normalise it to UTC
+        as_of = datetime(2025, 3, 15, 12, 0, 0)  # naive
+        assert filter_blocks_by_validity([block], as_of=as_of) == [block]

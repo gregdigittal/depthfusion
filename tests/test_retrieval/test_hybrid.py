@@ -295,3 +295,74 @@ def test_query_hits_boost_caps_at_max(tmp_path):
     tracker.register_hits(["chunk-b"] * 20)
     boost = query_hits_boost("chunk-b", tracker)
     assert boost == pytest.approx(1.5)
+
+
+# ---------------------------------------------------------------------------
+# S-121: linear_blend() — MemPalace-style BM25-relative + vector-absolute
+# ---------------------------------------------------------------------------
+
+class TestLinearBlend:
+    """Tests for HybridRetriever.linear_blend()."""
+
+    def _pipeline(self):
+        from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
+        p = RecallPipeline.__new__(RecallPipeline)
+        p.mode = PipelineMode.LOCAL
+        p._reranker = None
+        return p
+
+    def _b(self, cid, bm25=0.0, vector=0.0):
+        return {"chunk_id": cid, "bm25_score": bm25, "vector_score": vector,
+                "content": f"block {cid}"}
+
+    def test_empty_both_returns_empty(self):
+        pipeline = self._pipeline()
+        assert pipeline.linear_blend([], []) == []
+
+    def test_bm25_only_normalises_to_0_1_range(self):
+        pipeline = self._pipeline()
+        bm25 = [self._b("a", bm25=10.0), self._b("b", bm25=20.0)]
+        result = pipeline.linear_blend(bm25, [], bm25_weight=1.0, vector_weight=0.0)
+        assert result[0]["chunk_id"] == "b"
+        assert result[1]["chunk_id"] == "a"
+
+    def test_vector_only_uses_absolute_cosine(self):
+        pipeline = self._pipeline()
+        vec = [self._b("x", vector=0.9), self._b("y", vector=0.5)]
+        result = pipeline.linear_blend([], vec, bm25_weight=0.0, vector_weight=1.0)
+        assert result[0]["chunk_id"] == "x"
+
+    def test_blend_weights_applied_correctly(self):
+        pipeline = self._pipeline()
+        # a: bm25 normalises to 1.0 (only bm25 candidate) → score = 0.4*1.0 = 0.40
+        # b: bm25=0, vector=0.9 → score = 0.6*0.9 = 0.54 → b wins
+        bm25 = [self._b("a", bm25=5.0)]
+        vec = [self._b("b", vector=0.9)]
+        result = pipeline.linear_blend(bm25, vec, bm25_weight=0.4, vector_weight=0.6)
+        assert result[0]["chunk_id"] == "b"
+
+    def test_deduplication_vector_wins(self):
+        """When a chunk appears in both lists, the vector result's dict wins."""
+        pipeline = self._pipeline()
+        bm25 = [self._b("dup", bm25=5.0)]
+        vec  = [{"chunk_id": "dup", "bm25_score": 0.0, "vector_score": 0.8,
+                 "content": "vector-version"}]
+        result = pipeline.linear_blend(bm25, vec)
+        assert len(result) == 1
+        assert result[0]["content"] == "vector-version"
+
+    def test_flag_rrf_default(self, monkeypatch):
+        monkeypatch.delenv("DEPTHFUSION_BLEND_MODE", raising=False)
+        import importlib
+
+        import depthfusion.retrieval.hybrid as mod
+        importlib.reload(mod)
+        assert mod._BLEND_MODE == "rrf"
+
+    def test_flag_linear_activates_linear_blend(self, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_BLEND_MODE", "linear")
+        import importlib
+
+        import depthfusion.retrieval.hybrid as mod
+        importlib.reload(mod)
+        assert mod._BLEND_MODE == "linear"

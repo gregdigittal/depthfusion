@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-18 (S-116/S-117/S-118 done — lexical richness penalty, query-hits boost, admission gate v2; 50 new tests; commit f2dedb6)
+> Last updated: 2026-05-18 (E-38 added — S-119/S-120/S-121 MemPalace integration; S-122/S-123 backlog-only)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2021,6 +2021,86 @@
 - [x] T-403: Add `_admission_score()` (v1: boilerplate only) and gate logic to `storage/vector_store.py`
 - [x] T-404: Extend `_admission_score()` to v2 (`boilerplate_penalty × lexical_richness_penalty`) after S-116 merges
 - [x] T-405: Write 8+ tests in `tests/test_storage/test_admission_gate.py`; add 3 combined-gate tests after v2 extension
+
+---
+
+## E-38: MemPalace Integration — Temporal Recall, Provenance, Scoring Calibration [active]
+
+> Port the three net-positive patterns identified in the 2026-05-18 MemPalace comparative
+> analysis (docs/MEMPALACE_DEPTHFUSION_ANALYSIS.md) into DepthFusion's Python MCP server.
+> Activates the already-defined but unwired MemoryValidity infrastructure, adds edge
+> provenance for auditability, and introduces an opt-in linear blend mode to complement RRF.
+
+### S-119: As a DepthFusion user, I want point-in-time recall so that I can query what was known about a topic on a specific past date `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `extract_frontmatter_validity(content)` parses `valid_from` and `valid_until` ISO-8601 fields from YAML frontmatter; returns `(None, None)` for missing fields or malformed values (no crash)
+- [ ] AC-2: `filter_blocks_by_validity(blocks, *, as_of)` excludes blocks whose validity window does not cover `as_of`; `as_of=None` passes all blocks unchanged (back-compat)
+- [ ] AC-3: `write_decisions()` in `capture/decision_extractor.py` writes `valid_from: <UTC ISO-8601>` into discovery file frontmatter; existing files without the field continue to pass through unchanged
+- [ ] AC-4: `filter_blocks_by_validity` exported from `retrieval/hybrid.py`
+- [ ] AC-5: 10+ tests in `TestTemporalFilter` class in `tests/test_retrieval/test_ciqs_a_regression.py`; all passing
+
+**Tasks:**
+- [ ] T-406: Add `_FRONTMATTER_VALID_FROM_RE` / `_FRONTMATTER_VALID_UNTIL_RE` regex constants, `extract_frontmatter_validity()`, and `filter_blocks_by_validity()` to `retrieval/hybrid.py`
+- [ ] T-407: Add `valid_from: <UTC ISO>` field write to `write_decisions()` in `capture/decision_extractor.py`
+- [ ] T-408: Write `TestTemporalFilter` (10 tests) in `tests/test_retrieval/test_ciqs_a_regression.py`
+
+### S-120: As a developer, I want KG edges to carry adapter provenance so that I can audit which capture path produced a given relationship `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `Edge` dataclass in `graph/types.py` has two new fields with empty-string defaults: `adapter_name: str = ""` and `source_type: str = ""`
+- [ ] AC-2: SQLite `edges` table gains `adapter_name` and `source_type` columns; migration guard is idempotent (`ALTER TABLE ... ADD COLUMN` with `except OperationalError`)
+- [ ] AC-3: JSON store `_edge_to_dict` / `_edge_from_dict` round-trips the new fields; missing fields deserialise to `""`
+- [ ] AC-4: `auto_learn.py` contradiction/CO_OCCURS edges set `adapter_name="heuristic_extractor"`, `source_type="decision"`; PRECEDED_BY session edges set `adapter_name="temporal_linker"`, `source_type="session"`
+- [ ] AC-5: 5+ tests in `TestEdgeProvenance` class; back-compat test covers existing edges without fields
+
+**Tasks:**
+- [ ] T-409: Add `adapter_name` and `source_type` fields to `Edge` in `graph/types.py`
+- [ ] T-410: Update `_edge_to_dict`, `_edge_from_dict`, SQLite schema + migration guard, INSERT/SELECT in `graph/store.py`
+- [ ] T-411: Populate `adapter_name` / `source_type` at two construction sites in `capture/auto_learn.py`
+- [ ] T-412: Write `TestEdgeProvenance` (5 tests) in `tests/test_graph/test_graph_store.py`
+
+### S-121: As a developer, I want an opt-in BM25-relative / vector-absolute linear blend mode so that I can benchmark it against RRF on the real corpus `P3` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `HybridRetriever.linear_blend(bm25_results, vector_results)` implements min-max BM25 normalisation within candidate set + absolute vector cosine; reference: MemPalace `searcher.py` `hybrid_rank()`
+- [ ] AC-2: `DEPTHFUSION_BLEND_MODE=linear` env var switches `VPS_TIER2` fusion from RRF to linear blend; default remains `rrf` (no behaviour change without the flag)
+- [ ] AC-3: 7+ tests in `TestLinearBlend`; includes flag-switching tests and weight correctness
+
+**Tasks:**
+- [ ] T-413: Add `linear_blend()` to `HybridRetriever` in `retrieval/hybrid.py`; add `_BLEND_MODE` env var gate in `VPS_TIER2` recall path
+- [ ] T-414: Write `TestLinearBlend` (7 tests) in `tests/test_retrieval/test_hybrid.py`
+
+### S-122: As a developer, I want sub-project scoping so that multi-agent sessions can isolate retrieval to a subsystem within a project `P3` `XL`
+
+> **Blocked — requires ADR on OD-3 (Wing/Room taxonomy for Python standalone).**
+
+**Acceptance criteria:**
+- [ ] AC-1: ADR written and agreed — Wing/Room taxonomy for Python standalone; resolves OD-3
+- [ ] AC-2: `filter_blocks_by_project()` accepts optional `sub_scope: str | None` parameter; blocks with a differing `sub_scope` frontmatter field are excluded (back-compat: no field → included)
+- [ ] AC-3: `depthfusion_set_scope` MCP tool extended to accept Wing/Room namespaces
+- [ ] AC-4: Retrieval tests cover sub-scope isolation
+
+**Tasks:**
+- [ ] T-415: Write ADR (docs/decisions/ADR-sub-project-scoping.md)
+- [ ] T-416: Extend `filter_blocks_by_project()` with `sub_scope` parameter in `retrieval/hybrid.py`
+- [ ] T-417: Update `depthfusion_set_scope` MCP tool in `mcp/server.py`
+- [ ] T-418: Write isolation tests
+
+### S-123: As a developer, I want KG edge invalidation so that superseded discoveries can be queried point-in-time without physical deletion `P2` `L`
+
+> **Depends on S-119. Requires design doc on state machine consistency between .superseded suffix and KG valid_until.**
+
+**Acceptance criteria:**
+- [ ] AC-1: `GraphStore.invalidate_edge(edge_id, valid_until: datetime)` writes `valid_until` into the edge's metadata; implementation in `graph/store.py`
+- [ ] AC-2: `filter_blocks_by_validity(as_of=)` (S-119) correctly excludes invalidated discoveries when `valid_until < as_of`
+- [ ] AC-3: State machine doc written before implementation
+- [ ] AC-4: Point-in-time test: superseded discovery excluded for `as_of=` post-supersession; included for `as_of=` pre-supersession
+
+**Tasks:**
+- [ ] T-419: Write design doc (docs/designs/kg-invalidation-state-machine.md)
+- [ ] T-420: Implement `invalidate_edge()` in `graph/store.py` (JSON + SQLite backends)
+- [ ] T-421: Write point-in-time tests in `tests/test_graph/test_graph_store.py`
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

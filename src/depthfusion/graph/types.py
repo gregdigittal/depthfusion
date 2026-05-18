@@ -48,6 +48,8 @@ class Edge:
     relationship: str
     weight: float            # 1–3: count of signals that agree
     signals: list[str]       # ["co_occurrence", "haiku", "temporal"]
+    adapter_name: str = ""   # capture path that created this edge (S-120)
+    source_type: str = ""    # "decision" | "session" | "git_commit" | "negative" (S-120)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
