@@ -481,3 +481,111 @@ class TestEdgeProvenance:
         result = fresh.get_edges("s1")
         assert result[0].adapter_name == "haiku_linker"
         assert result[0].source_type == "decision"
+
+
+# ---------------------------------------------------------------------------
+# S-123 — KG edge invalidation + point-in-time get_edges
+# ---------------------------------------------------------------------------
+
+class TestEdgeInvalidation:
+    """invalidate_edge() + get_edges(as_of=) across JSON and SQLite backends."""
+
+    from datetime import datetime, timezone
+
+    def _make_edge(self, edge_id: str = "e001") -> "Edge":
+        from depthfusion.graph.types import Edge
+        return Edge(
+            edge_id=edge_id, source_id="s1", target_id="t1",
+            relationship="CO_OCCURS", weight=1.0, signals=[],
+        )
+
+    def _t(self, hour: int):
+        from datetime import datetime, timezone
+        return datetime(2026, 1, 1, hour, 0, 0, tzinfo=timezone.utc)
+
+    # --- JSON backend ---
+
+    def test_invalidate_edge_json_returns_true(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        store.upsert_edge(self._make_edge())
+        assert store.invalidate_edge("e001", self._t(12)) is True
+
+    def test_invalidate_nonexistent_edge_json_returns_false(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        assert store.invalidate_edge("no-such-edge", self._t(12)) is False
+
+    def test_get_edges_as_of_excludes_invalidated_json(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        # as_of AFTER valid_until → excluded
+        assert store.get_edges("s1", as_of=self._t(13)) == []
+
+    def test_get_edges_as_of_includes_before_invalidation_json(self, tmp_path):
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        # as_of BEFORE valid_until → included
+        result = store.get_edges("s1", as_of=self._t(11))
+        assert len(result) == 1
+
+    def test_get_edges_no_as_of_returns_all_json(self, tmp_path):
+        """as_of=None bypasses temporal filter — backward-compatible default."""
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        result = store.get_edges("s1")  # no as_of
+        assert len(result) == 1
+
+    def test_invalidate_is_idempotent_json(self, tmp_path):
+        """Calling invalidate_edge twice overwrites valid_until without error."""
+        store = JSONGraphStore(path=tmp_path / "g.json")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        store.invalidate_edge("e001", self._t(6))   # earlier timestamp wins on second call
+        result = store.get_edges("s1", as_of=self._t(5))
+        assert len(result) == 1
+        result_after = store.get_edges("s1", as_of=self._t(7))
+        assert result_after == []
+
+    # --- SQLite backend ---
+
+    def test_invalidate_edge_sqlite_returns_true(self, tmp_path):
+        store = SQLiteGraphStore(path=tmp_path / "g.db")
+        store.upsert_edge(self._make_edge())
+        assert store.invalidate_edge("e001", self._t(12)) is True
+
+    def test_invalidate_nonexistent_edge_sqlite_returns_false(self, tmp_path):
+        store = SQLiteGraphStore(path=tmp_path / "g.db")
+        assert store.invalidate_edge("no-such-edge", self._t(12)) is False
+
+    def test_get_edges_as_of_excludes_invalidated_sqlite(self, tmp_path):
+        store = SQLiteGraphStore(path=tmp_path / "g.db")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        assert store.get_edges("s1", as_of=self._t(13)) == []
+
+    def test_get_edges_as_of_includes_before_invalidation_sqlite(self, tmp_path):
+        store = SQLiteGraphStore(path=tmp_path / "g.db")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        result = store.get_edges("s1", as_of=self._t(11))
+        assert len(result) == 1
+
+    def test_get_edges_no_as_of_returns_all_sqlite(self, tmp_path):
+        store = SQLiteGraphStore(path=tmp_path / "g.db")
+        store.upsert_edge(self._make_edge())
+        store.invalidate_edge("e001", self._t(12))
+        result = store.get_edges("s1")
+        assert len(result) == 1
+
+    def test_invalidate_persists_across_reopen_sqlite(self, tmp_path):
+        """valid_until survives a close/reopen of the SQLite store."""
+        db = tmp_path / "g.db"
+        store1 = SQLiteGraphStore(path=db)
+        store1.upsert_edge(self._make_edge())
+        store1.invalidate_edge("e001", self._t(12))
+
+        store2 = SQLiteGraphStore(path=db)
+        assert store2.get_edges("s1", as_of=self._t(13)) == []
+        assert len(store2.get_edges("s1", as_of=self._t(11))) == 1

@@ -2092,15 +2092,15 @@
 > **Depends on S-119. Requires design doc on state machine consistency between .superseded suffix and KG valid_until.**
 
 **Acceptance criteria:**
-- [ ] AC-1: `GraphStore.invalidate_edge(edge_id, valid_until: datetime)` writes `valid_until` into the edge's metadata; implementation in `graph/store.py`
-- [ ] AC-2: `filter_blocks_by_validity(as_of=)` (S-119) correctly excludes invalidated discoveries when `valid_until < as_of`
-- [ ] AC-3: State machine doc written before implementation
-- [ ] AC-4: Point-in-time test: superseded discovery excluded for `as_of=` post-supersession; included for `as_of=` pre-supersession
+- [x] AC-1: `GraphStore.invalidate_edge(edge_id, valid_until: datetime)` writes `valid_until` into the edge's metadata; implementation in `graph/store.py`
+- [x] AC-2: `filter_blocks_by_validity(as_of=)` (S-119) correctly excludes invalidated discoveries when `valid_until < as_of`
+- [x] AC-3: State machine doc written before implementation
+- [x] AC-4: Point-in-time test: superseded discovery excluded for `as_of=` post-supersession; included for `as_of=` pre-supersession
 
 **Tasks:**
-- [ ] T-419: Write design doc (docs/designs/kg-invalidation-state-machine.md)
-- [ ] T-420: Implement `invalidate_edge()` in `graph/store.py` (JSON + SQLite backends)
-- [ ] T-421: Write point-in-time tests in `tests/test_graph/test_graph_store.py`
+- [x] T-419: Write design doc (docs/designs/kg-invalidation-state-machine.md)
+- [x] T-420: Implement `invalidate_edge()` in `graph/store.py` (JSON + SQLite backends)
+- [x] T-421: Write point-in-time tests in `tests/test_graph/test_store.py`
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

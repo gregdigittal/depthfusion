@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 
@@ -44,11 +45,38 @@ class GraphBackend(Protocol):
     def get_entity(self, entity_id: str) -> Entity | None: ...
     def upsert_edge(self, edge: Edge) -> None: ...
     def get_edges(
-        self, entity_id: str, relationship_filter: list[str] | None = None
+        self,
+        entity_id: str,
+        relationship_filter: list[str] | None = None,
+        as_of: datetime | None = None,
     ) -> list[Edge]: ...
+    def invalidate_edge(self, edge_id: str, valid_until: datetime) -> bool: ...
     def all_entities(self) -> list[Entity]: ...
     def node_count(self) -> int: ...
     def edge_count(self) -> int: ...
+
+
+def _edge_active_at(edge: Edge, as_of: datetime | None) -> bool:
+    """Return True if the edge should be included for the given point-in-time.
+
+    Rules (mirrors filter_blocks_by_validity from S-119):
+      as_of is None → always included (no temporal filter)
+      valid_until absent/empty → always included (edge never invalidated)
+      valid_until < as_of  → EXCLUDED (superseded before as_of)
+      valid_until >= as_of → INCLUDED (still active at as_of)
+    """
+    if as_of is None:
+        return True
+    vu_str = edge.metadata.get("valid_until", "")
+    if not vu_str:
+        return True
+    try:
+        vu = datetime.fromisoformat(vu_str)
+    except ValueError:
+        return True  # malformed → include (don't crash)
+    _as_of = as_of if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
+    _vu = vu if vu.tzinfo else vu.replace(tzinfo=timezone.utc)
+    return _vu >= _as_of
 
 
 def _entity_to_dict(e: Entity) -> dict:
@@ -145,13 +173,23 @@ class JSONGraphStore:
         self,
         entity_id: str,
         relationship_filter: list[str] | None = None,
+        as_of: datetime | None = None,
     ) -> list[Edge]:
-        return [
+        edges = [
             _dict_to_edge(d)
             for d in self._data["edges"].values()
             if (d["source_id"] == entity_id or d["target_id"] == entity_id)
             and (relationship_filter is None or d["relationship"] in relationship_filter)
         ]
+        return [e for e in edges if _edge_active_at(e, as_of)]
+
+    def invalidate_edge(self, edge_id: str, valid_until: datetime) -> bool:
+        if edge_id not in self._data["edges"]:
+            return False
+        _vu = valid_until if valid_until.tzinfo else valid_until.replace(tzinfo=timezone.utc)
+        self._data["edges"][edge_id]["metadata"]["valid_until"] = _vu.isoformat()
+        self._save()
+        return True
 
     def all_entities(self) -> list[Entity]:
         return [_dict_to_entity(d) for d in self._data["entities"].values()]
@@ -263,6 +301,7 @@ class SQLiteGraphStore:
         self,
         entity_id: str,
         relationship_filter: list[str] | None = None,
+        as_of: datetime | None = None,
     ) -> list[Edge]:
         params: list = [entity_id, entity_id]
         if relationship_filter:
@@ -281,7 +320,7 @@ class SQLiteGraphStore:
             )
 
         rows = self._conn.execute(sql, params).fetchall()
-        return [
+        edges = [
             Edge(
                 edge_id=r[0], source_id=r[1], target_id=r[2],
                 relationship=r[3], weight=r[4],
@@ -291,6 +330,23 @@ class SQLiteGraphStore:
             )
             for r in rows
         ]
+        return [e for e in edges if _edge_active_at(e, as_of)]
+
+    def invalidate_edge(self, edge_id: str, valid_until: datetime) -> bool:
+        row = self._conn.execute(
+            "SELECT metadata FROM edges WHERE edge_id = ?", (edge_id,)
+        ).fetchone()
+        if not row:
+            return False
+        meta = json.loads(row[0])
+        _vu = valid_until if valid_until.tzinfo else valid_until.replace(tzinfo=timezone.utc)
+        meta["valid_until"] = _vu.isoformat()
+        self._conn.execute(
+            "UPDATE edges SET metadata = ? WHERE edge_id = ?",
+            (json.dumps(meta), edge_id),
+        )
+        self._conn.commit()
+        return True
 
     def all_entities(self) -> list[Entity]:
         rows = self._conn.execute("SELECT * FROM entities").fetchall()
@@ -454,7 +510,10 @@ class ChromaGraphStore:
         self._edge_conn.commit()
 
     def get_edges(
-        self, entity_id: str, relationship_filter: list[str] | None = None
+        self,
+        entity_id: str,
+        relationship_filter: list[str] | None = None,
+        as_of: datetime | None = None,
     ) -> list[Edge]:
         if relationship_filter:
             placeholders = ",".join("?" * len(relationship_filter))
@@ -477,7 +536,7 @@ class ChromaGraphStore:
                 """,
                 (entity_id, entity_id),
             ).fetchall()
-        return [
+        edges = [
             Edge(
                 edge_id=r[0], source_id=r[1], target_id=r[2],
                 relationship=r[3], weight=r[4],
@@ -487,6 +546,23 @@ class ChromaGraphStore:
             )
             for r in rows
         ]
+        return [e for e in edges if _edge_active_at(e, as_of)]
+
+    def invalidate_edge(self, edge_id: str, valid_until: datetime) -> bool:
+        row = self._edge_conn.execute(
+            "SELECT metadata FROM edges WHERE edge_id = ?", (edge_id,)
+        ).fetchone()
+        if not row:
+            return False
+        meta = json.loads(row[0])
+        _vu = valid_until if valid_until.tzinfo else valid_until.replace(tzinfo=timezone.utc)
+        meta["valid_until"] = _vu.isoformat()
+        self._edge_conn.execute(
+            "UPDATE edges SET metadata = ? WHERE edge_id = ?",
+            (json.dumps(meta), edge_id),
+        )
+        self._edge_conn.commit()
+        return True
 
     def edge_count(self) -> int:
         return self._edge_conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
