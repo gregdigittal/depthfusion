@@ -85,6 +85,12 @@ _FRONTMATTER_VALID_FROM_RE = re.compile(
 _FRONTMATTER_VALID_UNTIL_RE = re.compile(
     r"^valid_until:\s*(\S+)\s*$", re.MULTILINE,
 )
+# Room (sub_scope) frontmatter key — ADR-001 / OD-3. Mirrors the project key
+# pattern: a single bare token on its own line inside the opening `---` block.
+# Passthrough only — no validation, no defaulting at parse time.
+_FRONTMATTER_SUB_SCOPE_RE = re.compile(
+    r"^sub_scope:\s*(\S+)\s*$", re.MULTILINE,
+)
 
 # S-121: fusion blend mode. Default "rrf" preserves existing behaviour; set
 # DEPTHFUSION_BLEND_MODE=linear to activate MemPalace-style linear blend.
@@ -595,6 +601,33 @@ def extract_frontmatter_project(content: str) -> str | None:
     return key_match.group(1).strip() if key_match else None
 
 
+def extract_frontmatter_sub_scope(content: str) -> str | None:
+    """Parse `sub_scope:` from YAML frontmatter; return the label or None.
+
+    The Room (sub_scope) tag is an optional sub-project divider beneath the
+    project scope (ADR-001 / OD-3). Frontmatter shape:
+        ---
+        project: <slug>
+        sub_scope: <room-label>
+        ...
+        ---
+
+    This mirrors `extract_frontmatter_project()` so the recall gate can
+    resolve a block's Room even when section-splitting has stripped the
+    file-level frontmatter from the dict the caller passes in. Passthrough
+    only — the label is returned verbatim (stripped); no validation, no
+    defaulting. Files without a `sub_scope:` key return None — callers treat
+    None as "universal / legacy" and always include the block.
+    """
+    if not content:
+        return None
+    fm_match = _FRONTMATTER_PROJECT_RE.match(content)
+    if not fm_match:
+        return None
+    key_match = _FRONTMATTER_SUB_SCOPE_RE.search(fm_match.group("fm"))
+    return key_match.group(1).strip() if key_match else None
+
+
 def extract_frontmatter_validity(content: str) -> tuple[datetime | None, datetime | None]:
     """Parse optional valid_from / valid_until ISO-8601 fields from YAML frontmatter.
 
@@ -712,6 +745,69 @@ def filter_blocks_by_project(
         if project is None or project in allowed:
             filtered.append(block)
     return filtered
+
+
+def _sub_scope_of_block(block: dict) -> str | None:
+    """Extract the Room (sub_scope) label for a block, if present.
+
+    Resolution order mirrors `filter_blocks_by_project`'s project lookup:
+      1. `block["sub_scope"]` — explicit key set at file-load time (survives
+         section-splitting that strips file-level frontmatter)
+      2. `extract_frontmatter_sub_scope(block["content"])` — fallback for
+         block 0 of a section-split file whose frontmatter is still intact
+
+    Returns None when no Room label is present (legacy / universal block).
+    """
+    raw = block.get("sub_scope")
+    if raw is None:
+        content = block.get("content", "")
+        raw = extract_frontmatter_sub_scope(content) if content else None
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+def _block_passes_sub_scope(
+    block: dict,
+    *,
+    sub_scope: str | None,
+) -> bool:
+    """Room (sub_scope) recall gate. See ADR-001 / OD-3.
+
+    - sub_scope None         -> always True (filter off)
+    - block has no sub_scope -> always True (legacy / universal)
+    - block sub_scope == active -> True
+    - block sub_scope != active -> False
+    """
+    if sub_scope is None:
+        return True
+    block_ss = _sub_scope_of_block(block)
+    if block_ss is None:
+        return True
+    return block_ss == sub_scope.strip()
+
+
+def filter_blocks_by_sub_scope(
+    blocks: list[dict],
+    *,
+    sub_scope: str | None,
+) -> list[dict]:
+    """Filter blocks by Room (sub_scope). See ADR-001 / OD-3.
+
+    Additive to `filter_blocks_by_project` — callers chain them (project
+    scope first, then Room within the project).
+
+    sub_scope=None returns the input unchanged (filter off).
+    Unlabelled blocks (no sub_scope in metadata or frontmatter) are always
+    included (back-compat for pre-Room discoveries and user memory files).
+    """
+    if sub_scope is None:
+        return list(blocks)
+    return [
+        b for b in blocks
+        if _block_passes_sub_scope(b, sub_scope=sub_scope)
+    ]
 
 
 def boilerplate_penalty(content: str) -> float:

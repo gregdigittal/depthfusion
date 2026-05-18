@@ -48,7 +48,11 @@ TOOLS: dict[str, str] = {
     # v0.4.0 graph tools
     "depthfusion_graph_traverse": "Traverse entity graph from a named entity",
     "depthfusion_graph_status": "Report graph health: node count, edge count, coverage, tier",
-    "depthfusion_set_scope": "Set session graph scope (project | cross_project | global)",
+    "depthfusion_set_scope": (
+        "Set session graph scope (project | cross_project | global). "
+        "Optionally pass sub_scope to further narrow recall to a single "
+        "subsystem within the project."
+    ),
     # v0.5.0 CM-5 active confirmation tool
     "depthfusion_confirm_discovery": "Actively confirm a decision or fact for immediate capture",
     # v0.5.1 TG-14 / S-55 discovery pruner
@@ -419,6 +423,19 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "depthfusion_set_scope": {
         "properties": {
             "scope": {"type": "string", "enum": ["project", "cross_project", "global"]},
+            "projects": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Project slugs to activate (used when scope=project).",
+            },
+            "sub_scope": {
+                "type": "string",
+                "description": (
+                    "Optional Room label. Restricts recall to blocks whose "
+                    "sub_scope frontmatter matches, plus all unlabelled blocks. "
+                    "Omit or send empty string to disable Room filtering."
+                ),
+            },
         },
         "required": ["scope"],
     },
@@ -1014,6 +1031,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     )
     from depthfusion.retrieval.hybrid import (
         extract_frontmatter_project,
+        extract_frontmatter_sub_scope,
     )
     from depthfusion.retrieval.hybrid import (
         extract_session_project as _extract_session_project,
@@ -1047,11 +1065,14 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         # through the project filter regardless of which project they belong to.
         if file_project is None and source_label == "session":
             file_project = _extract_session_project(content)
+        file_sub_scope = extract_frontmatter_sub_scope(content)
         for block in _split_into_blocks(content, source_label, md_file.stem):
             if mtime_iso is not None:
                 block["mtime_iso"] = mtime_iso
             if file_project is not None:
                 block["project"] = file_project
+            if file_sub_scope is not None:
+                block["sub_scope"] = file_sub_scope
             raw_blocks.append(block)
 
     # Source 1: goal session state files (.tmp)
@@ -1131,6 +1152,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             )
             from depthfusion.retrieval.hybrid import (
                 filter_blocks_by_project,
+                filter_blocks_by_sub_scope,
             )
             # Detect projects explicitly named in the query so their blocks are
             # included even when cross_project=False.  Example: a query like
@@ -1147,6 +1169,12 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                 cross_project=False,
                 extra_projects=frozenset(_mentioned) if _mentioned else None,
             )
+            # ADR-001 / OD-3: Room filter — applied to Wing survivors only.
+            # sub_scope=None (no active Room) is a no-op (back-compat).
+            from depthfusion.graph.scope import read_scope as _read_scope_for_recall
+            _active_scope = _read_scope_for_recall()
+            _sub_scope = _active_scope.sub_scope if _active_scope is not None else None
+            raw_blocks = filter_blocks_by_sub_scope(raw_blocks, sub_scope=_sub_scope)
             if not raw_blocks:
                 return json.dumps({
                     "query": query, "blocks": [],
@@ -2184,20 +2212,34 @@ def _tool_set_scope(arguments: dict) -> str:
     from depthfusion.graph.scope import write_scope
     from depthfusion.graph.types import GraphScope
 
-    mode = arguments.get("mode", "project")
+    # Read `scope` (schema-advertised key); fall back to `mode` for back-compat.
+    mode = arguments.get("scope") or arguments.get("mode") or "project"
     projects = arguments.get("projects") or []
 
     if mode not in ("project", "cross_project", "global"):
-        return json.dumps({"error": f"Invalid mode: {mode}. Use project|cross_project|global"})
+        return json.dumps({"error": f"Invalid scope: {mode}. Use project|cross_project|global"})
+
+    # ADR-001: sub_scope is ORTHOGONAL to mode — never cleared by mode value.
+    sub_scope_raw = arguments.get("sub_scope")
+    sub_scope: str | None = None
+    if sub_scope_raw is not None:
+        s = str(sub_scope_raw).strip()
+        sub_scope = s or None  # empty/whitespace -> None (Room filtering off)
 
     scope = GraphScope(
         mode=mode,
         active_projects=projects,
         session_id="mcp_set",
         set_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        sub_scope=sub_scope,  # NEW — ADR-001
     )
     write_scope(scope)
-    return json.dumps({"ok": True, "mode": mode, "active_projects": projects})
+    return json.dumps({
+        "ok": True,
+        "mode": mode,
+        "active_projects": projects,
+        "sub_scope": sub_scope,  # NEW — echo resolved value (None if off)
+    })
 
 
 def _process_request(request: dict, config: Any) -> dict:

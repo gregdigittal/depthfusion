@@ -30,6 +30,7 @@ def read_scope(path: Path | None = None) -> GraphScope | None:
             active_projects=data.get("active_projects", []),
             session_id=data.get("session_id", ""),
             set_at=data.get("set_at", ""),
+            sub_scope=data.get("sub_scope"),  # ADR-001 — None when absent/off
         )
     except (OSError, KeyError, json.JSONDecodeError):
         return None
@@ -39,12 +40,4 @@ def write_scope(scope: GraphScope, path: Path | None = None) -> None:
     """Persist scope to JSON file. Creates parent directories as needed."""
     target = path or _DEFAULT_SCOPE_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps({
-            "mode": scope.mode,
-            "active_projects": scope.active_projects,
-            "session_id": scope.session_id,
-            "set_at": scope.set_at,
-        }, indent=2),
-        encoding="utf-8",
-    )
+    target.write_text(json.dumps(scope.to_dict(), indent=2), encoding="utf-8")

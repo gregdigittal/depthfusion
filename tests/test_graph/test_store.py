@@ -492,7 +492,7 @@ class TestEdgeInvalidation:
 
     from datetime import datetime, timezone
 
-    def _make_edge(self, edge_id: str = "e001") -> "Edge":
+    def _make_edge(self, edge_id: str = "e001"):
         from depthfusion.graph.types import Edge
         return Edge(
             edge_id=edge_id, source_id="s1", target_id="t1",

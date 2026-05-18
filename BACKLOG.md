@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-18 (E-38 added — S-119/S-120/S-121 MemPalace integration; S-122/S-123 backlog-only)
+> Last updated: 2026-05-18 (S-122 shipped — Wing/Room sub-project scoping; all 38 epics [done])
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2073,19 +2073,17 @@
 
 ### S-122: As a developer, I want sub-project scoping so that multi-agent sessions can isolate retrieval to a subsystem within a project `P3` `XL`
 
-> **Blocked — requires ADR on OD-3 (Wing/Room taxonomy for Python standalone).**
-
 **Acceptance criteria:**
-- [ ] AC-1: ADR written and agreed — Wing/Room taxonomy for Python standalone; resolves OD-3
-- [ ] AC-2: `filter_blocks_by_project()` accepts optional `sub_scope: str | None` parameter; blocks with a differing `sub_scope` frontmatter field are excluded (back-compat: no field → included)
-- [ ] AC-3: `depthfusion_set_scope` MCP tool extended to accept Wing/Room namespaces
-- [ ] AC-4: Retrieval tests cover sub-scope isolation
+- [x] AC-1: ADR written and agreed — Wing/Room taxonomy for Python standalone; resolves OD-3 (`docs/decisions/ADR-sub-project-scoping.md`)
+- [x] AC-2: `filter_blocks_by_sub_scope()` accepts optional `sub_scope: str | None`; blocks with a differing `sub_scope` frontmatter field are excluded (back-compat: no field → included)
+- [x] AC-3: `depthfusion_set_scope` MCP tool extended to accept `sub_scope` Wing/Room namespace; schema and handler aligned (`scope` key)
+- [x] AC-4: 24 tests in `TestSubProjectScoping` cover truth-table, pipeline order, round-trip, and back-compat regression
 
 **Tasks:**
-- [ ] T-415: Write ADR (docs/decisions/ADR-sub-project-scoping.md)
-- [ ] T-416: Extend `filter_blocks_by_project()` with `sub_scope` parameter in `retrieval/hybrid.py`
-- [ ] T-417: Update `depthfusion_set_scope` MCP tool in `mcp/server.py`
-- [ ] T-418: Write isolation tests
+- [x] T-415: Write ADR (docs/decisions/ADR-sub-project-scoping.md)
+- [x] T-416: Add `filter_blocks_by_sub_scope`, `extract_frontmatter_sub_scope`, `_sub_scope_of_block`, `_block_passes_sub_scope` to `retrieval/hybrid.py`
+- [x] T-417: Add `sub_scope` to `GraphScope` + `to_dict()`; extend `depthfusion_set_scope` schema + handler; wire ingest passthrough and OD-3 recall call site in `mcp/server.py`; persist in `graph/scope.py`
+- [x] T-418: Write 24-test `TestSubProjectScoping` isolation suite
 
 ### S-123: As a developer, I want KG edge invalidation so that superseded discoveries can be queried point-in-time without physical deletion `P2` `L`
 

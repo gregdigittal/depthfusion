@@ -60,6 +60,17 @@ class GraphScope:
     active_projects: list[str]
     session_id: str
     set_at: str                  # ISO-8601
+    sub_scope: str | None = None  # Room filter — see ADR-001 (sub-project scoping)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the scope to a plain dict (used by the set_scope tool)."""
+        return {
+            "mode": self.mode,
+            "active_projects": self.active_projects,
+            "session_id": self.session_id,
+            "set_at": self.set_at,
+            "sub_scope": self.sub_scope,
+        }
 
 
 @dataclass

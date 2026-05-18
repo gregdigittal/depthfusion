@@ -363,3 +363,310 @@ class TestLinearBlend:
         import depthfusion.retrieval.hybrid as mod
         monkeypatch.setattr(mod, "_BLEND_MODE", "linear")
         assert mod._BLEND_MODE == "linear"
+
+
+# ---------------------------------------------------------------------------
+# S-122: sub_scope (Room) scoping — ADR-001 / OD-3
+# ---------------------------------------------------------------------------
+
+class TestSubProjectScoping:
+    """Isolation tests for the Room (sub_scope) filter — ADR-001 / OD-3."""
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _block(self, cid: str, sub_scope: str | None = None,
+               project: str | None = None, content: str = "") -> dict:
+        b: dict = {"chunk_id": cid, "content": content}
+        if sub_scope is not None:
+            b["sub_scope"] = sub_scope
+        if project is not None:
+            b["project"] = project
+        return b
+
+    def _block_with_frontmatter(self, cid: str, sub_scope: str) -> dict:
+        fm = (
+            "---\n"
+            f"project: test-proj\n"
+            f"sub_scope: {sub_scope}\n"
+            "---\n\n# Content\nSome text."
+        )
+        return {"chunk_id": cid, "content": fm}
+
+    # ------------------------------------------------------------------
+    # extract_frontmatter_sub_scope
+    # ------------------------------------------------------------------
+
+    def test_extract_sub_scope_from_frontmatter(self):
+        from depthfusion.retrieval.hybrid import extract_frontmatter_sub_scope
+        content = "---\nproject: myproj\nsub_scope: auth\n---\nBody."
+        assert extract_frontmatter_sub_scope(content) == "auth"
+
+    def test_extract_sub_scope_absent_returns_none(self):
+        from depthfusion.retrieval.hybrid import extract_frontmatter_sub_scope
+        content = "---\nproject: myproj\n---\nBody."
+        assert extract_frontmatter_sub_scope(content) is None
+
+    def test_extract_sub_scope_no_frontmatter_returns_none(self):
+        from depthfusion.retrieval.hybrid import extract_frontmatter_sub_scope
+        assert extract_frontmatter_sub_scope("Just some text.") is None
+
+    def test_extract_sub_scope_empty_content_returns_none(self):
+        from depthfusion.retrieval.hybrid import extract_frontmatter_sub_scope
+        assert extract_frontmatter_sub_scope("") is None
+
+    # ------------------------------------------------------------------
+    # ADR-001 truth-table: _block_passes_sub_scope
+    # ------------------------------------------------------------------
+
+    def test_truth_table_filter_off_passes_all(self):
+        """sub_scope=None → filter off; every block passes regardless of its label."""
+        from depthfusion.retrieval.hybrid import _block_passes_sub_scope
+        assert _block_passes_sub_scope(self._block("a", sub_scope="room-A"), sub_scope=None)
+        assert _block_passes_sub_scope(self._block("b", sub_scope="room-B"), sub_scope=None)
+        assert _block_passes_sub_scope(self._block("c"), sub_scope=None)
+
+    def test_truth_table_unlabelled_block_always_included(self):
+        """Block with no sub_scope → INCLUDED regardless of active Room."""
+        from depthfusion.retrieval.hybrid import _block_passes_sub_scope
+        unlabelled = self._block("u")
+        assert _block_passes_sub_scope(unlabelled, sub_scope="room-A")
+
+    def test_truth_table_matching_sub_scope_included(self):
+        """Block sub_scope == active Room → INCLUDED."""
+        from depthfusion.retrieval.hybrid import _block_passes_sub_scope
+        b = self._block("m", sub_scope="auth")
+        assert _block_passes_sub_scope(b, sub_scope="auth")
+
+    def test_truth_table_differing_sub_scope_excluded(self):
+        """Block sub_scope != active Room → EXCLUDED."""
+        from depthfusion.retrieval.hybrid import _block_passes_sub_scope
+        b = self._block("d", sub_scope="billing")
+        assert not _block_passes_sub_scope(b, sub_scope="auth")
+
+    # ------------------------------------------------------------------
+    # filter_blocks_by_sub_scope list-level
+    # ------------------------------------------------------------------
+
+    def test_none_sub_scope_returns_all_blocks(self):
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        blocks = [self._block("a", "room-A"), self._block("b", "room-B"),
+                  self._block("c")]
+        assert filter_blocks_by_sub_scope(blocks, sub_scope=None) == blocks
+
+    def test_active_room_filters_to_matching_and_unlabelled(self):
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        blocks = [
+            self._block("match", "auth"),
+            self._block("other", "billing"),
+            self._block("legacy"),
+        ]
+        result = filter_blocks_by_sub_scope(blocks, sub_scope="auth")
+        ids = [b["chunk_id"] for b in result]
+        assert "match" in ids
+        assert "legacy" in ids
+        assert "other" not in ids
+
+    def test_no_matching_blocks_returns_empty(self):
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        blocks = [self._block("x", "billing"), self._block("y", "payments")]
+        result = filter_blocks_by_sub_scope(blocks, sub_scope="auth")
+        assert result == []
+
+    def test_sub_scope_from_frontmatter_parsed_correctly(self):
+        """Falls back to frontmatter for block-0 content when no explicit key."""
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        fm_block = self._block_with_frontmatter("fm-auth", "auth")
+        other = self._block("other", sub_scope="billing")
+        legacy = self._block("legacy")
+        result = filter_blocks_by_sub_scope(
+            [fm_block, other, legacy], sub_scope="auth"
+        )
+        ids = [b["chunk_id"] for b in result]
+        assert "fm-auth" in ids
+        assert "legacy" in ids
+        assert "other" not in ids
+
+    # ------------------------------------------------------------------
+    # pipeline order — Wing (project) filter must run before Room (sub_scope)
+    # ------------------------------------------------------------------
+
+    def test_pipeline_order_project_filter_before_sub_scope(self):
+        """Room filter should only see Wing-filtered survivors.
+
+        Blocks from a different project that happen to carry a matching
+        sub_scope must be excluded by the Wing gate before Room runs.
+        """
+        from depthfusion.retrieval.hybrid import (
+            filter_blocks_by_project,
+            filter_blocks_by_sub_scope,
+        )
+        my_project_auth_block = {
+            "chunk_id": "mine-auth", "project": "myproj",
+            "sub_scope": "auth", "content": "",
+        }
+        foreign_auth_block = {
+            "chunk_id": "foreign-auth", "project": "otherproj",
+            "sub_scope": "auth", "content": "",
+        }
+        untagged_block = {"chunk_id": "untagged", "content": ""}
+
+        all_blocks = [my_project_auth_block, foreign_auth_block, untagged_block]
+
+        # Wing filter first
+        after_wing = filter_blocks_by_project(
+            all_blocks, current_project="myproj", cross_project=False
+        )
+        # Room filter second
+        after_room = filter_blocks_by_sub_scope(after_wing, sub_scope="auth")
+
+        ids = [b["chunk_id"] for b in after_room]
+        assert "mine-auth" in ids      # same project + matching room
+        assert "untagged" in ids       # no project + no room → always included
+        assert "foreign-auth" not in ids  # Wing gate excluded it before Room ran
+
+    # ------------------------------------------------------------------
+    # GraphScope.to_dict includes sub_scope
+    # ------------------------------------------------------------------
+
+    def test_graph_scope_to_dict_includes_sub_scope(self):
+        from depthfusion.graph.types import GraphScope
+        scope = GraphScope(
+            mode="project",
+            active_projects=["myproj"],
+            set_at="2026-05-18T00:00:00",
+            session_id="test-session",
+            sub_scope="auth",
+        )
+        d = scope.to_dict()
+        assert d["sub_scope"] == "auth"
+
+    def test_graph_scope_to_dict_sub_scope_none(self):
+        from depthfusion.graph.types import GraphScope
+        scope = GraphScope(
+            mode="project",
+            active_projects=["myproj"],
+            set_at="2026-05-18T00:00:00",
+            session_id="test-session",
+        )
+        assert scope.sub_scope is None
+        d = scope.to_dict()
+        assert d["sub_scope"] is None
+
+    # ------------------------------------------------------------------
+    # scope persistence round-trip (write → read → sub_scope preserved)
+    # ------------------------------------------------------------------
+
+    def test_scope_round_trips_sub_scope(self, tmp_path):
+        from depthfusion.graph.scope import read_scope, write_scope
+        from depthfusion.graph.types import GraphScope
+        scope_file = tmp_path / "scope.json"
+        scope = GraphScope(
+            mode="project",
+            active_projects=["myproj"],
+            set_at="2026-05-18T12:00:00",
+            session_id="s1",
+            sub_scope="auth",
+        )
+        write_scope(scope, path=scope_file)
+        restored = read_scope(path=scope_file)
+        assert restored is not None
+        assert restored.sub_scope == "auth"
+
+    def test_scope_round_trips_none_sub_scope(self, tmp_path):
+        from depthfusion.graph.scope import read_scope, write_scope
+        from depthfusion.graph.types import GraphScope
+        scope_file = tmp_path / "scope.json"
+        scope = GraphScope(
+            mode="project",
+            active_projects=["myproj"],
+            set_at="2026-05-18T12:00:00",
+            session_id="s1",
+        )
+        write_scope(scope, path=scope_file)
+        restored = read_scope(path=scope_file)
+        assert restored is not None
+        assert restored.sub_scope is None
+
+    # ------------------------------------------------------------------
+    # backward-compat regression — existing blocks unaffected when Room off
+    # ------------------------------------------------------------------
+
+    def test_backward_compat_no_sub_scope_key_passes_through(self):
+        """Pre-Room blocks (no sub_scope at all) always pass filter_blocks_by_sub_scope."""
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        legacy_blocks = [
+            {"chunk_id": "old-1", "content": "---\nproject: p\n---\nOld discovery."},
+            {"chunk_id": "old-2", "content": "# Note\nSome session text."},
+        ]
+        # With Room active
+        result = filter_blocks_by_sub_scope(legacy_blocks, sub_scope="auth")
+        assert len(result) == 2  # all legacy blocks survive
+
+    def test_backward_compat_sub_scope_none_is_no_op(self):
+        """sub_scope=None is a strict no-op — list is returned unchanged."""
+        from depthfusion.retrieval.hybrid import filter_blocks_by_sub_scope
+        original = [self._block("a", "room-X"), self._block("b")]
+        result = filter_blocks_by_sub_scope(original, sub_scope=None)
+        assert result is not original  # returns a new list (copy)
+        assert result == original
+
+    # ------------------------------------------------------------------
+    # _tool_set_scope integration (H-1 fix: schema key `scope` not `mode`)
+    # ------------------------------------------------------------------
+
+    def test_tool_set_scope_reads_scope_key(self, tmp_path, monkeypatch):
+        """Handler reads `scope` (schema key) and resolves mode correctly."""
+        import json
+
+        from depthfusion.mcp.server import _tool_set_scope
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+        result = json.loads(_tool_set_scope({"scope": "cross_project"}))
+        assert result["ok"] is True
+        assert result["mode"] == "cross_project"
+
+    def test_tool_set_scope_back_compat_mode_key(self, tmp_path, monkeypatch):
+        """Handler also accepts legacy `mode` key for back-compat."""
+        import json
+
+        from depthfusion.mcp.server import _tool_set_scope
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+        result = json.loads(_tool_set_scope({"mode": "global", "scope": None}))
+        assert result["ok"] is True
+        assert result["mode"] == "global"
+
+    def test_tool_set_scope_sub_scope_persisted(self, tmp_path, monkeypatch):
+        """set_scope with sub_scope persists Room label and echoes it."""
+        import json
+
+        from depthfusion.mcp.server import _tool_set_scope
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+        result = json.loads(_tool_set_scope({"scope": "project", "sub_scope": "auth"}))
+        assert result["ok"] is True
+        assert result["sub_scope"] == "auth"
+
+    def test_tool_set_scope_empty_sub_scope_becomes_none(self, tmp_path, monkeypatch):
+        """Empty string sub_scope coerces to None (Room filter off)."""
+        import json
+
+        from depthfusion.mcp.server import _tool_set_scope
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+        result = json.loads(_tool_set_scope({"scope": "project", "sub_scope": "  "}))
+        assert result["ok"] is True
+        assert result["sub_scope"] is None
+
+    def test_tool_set_scope_sub_scope_orthogonal_to_mode(self, tmp_path, monkeypatch):
+        """sub_scope is preserved regardless of scope/mode value."""
+        import json
+
+        from depthfusion.mcp.server import _tool_set_scope
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+        result = json.loads(_tool_set_scope({"scope": "global", "sub_scope": "billing"}))
+        assert result["mode"] == "global"
+        assert result["sub_scope"] == "billing"
