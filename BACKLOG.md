@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-17 (S-115 done — CIQS Cat A retrieval quality: boilerplate suppression 0.2×, project-mention boost 2.0×, session project extraction, rules-file indexing; 28 regression tests; commit 33d0d54)
+> Last updated: 2026-05-18 (S-116/S-117/S-118 done — lexical richness penalty, query-hits boost, admission gate v2; 50 new tests; commit f2dedb6)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -1977,7 +1977,7 @@
 
 ---
 
-## E-37: Memory Scoring Signals — OpenHuman Port [active]
+## E-37: Memory Scoring Signals — OpenHuman Port [done]
 
 > Port three scoring/admission patterns identified in the OpenHuman memory module
 > (Rust/Tauri) to DepthFusion's Python retrieval pipeline. Target: cleaner vector
@@ -1986,46 +1986,46 @@
 ### S-116: As a DepthFusion user, I want repetitive/low-diversity content to rank lower in recall so that high-information sessions surface preferentially `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `lexical_richness_penalty(content)` returns 1.0 for TTR ≥ 0.20, scales linearly to 0.5 for TTR = 0.0; content ≤20 word-tokens returns 1.0 (no false penalty on short notes)
-- [ ] AC-2: Function exported from `retrieval/hybrid.py` alongside `boilerplate_penalty`
-- [ ] AC-3: Applied as 6th multiplier in `server.py` scoring loop; appears in explain output as `lexical_richness`
-- [ ] AC-4: 8+ unit tests in `test_ciqs_a_regression.py::TestLexicalRichnessPenalty`, all passing
-- [ ] AC-5: CIQS proxy Category A/B/D baselines unchanged after change
+- [x] AC-1: `lexical_richness_penalty(content)` returns 1.0 for TTR ≥ 0.20, scales linearly to 0.5 for TTR = 0.0; content ≤20 word-tokens returns 1.0 (no false penalty on short notes)
+- [x] AC-2: Function exported from `retrieval/hybrid.py` alongside `boilerplate_penalty`
+- [x] AC-3: Applied as 6th multiplier in `server.py` scoring loop; appears in explain output as `lexical_richness`
+- [x] AC-4: 8+ unit tests in `test_ciqs_a_regression.py::TestLexicalRichnessPenalty`, all passing
+- [x] AC-5: CIQS proxy Category A/B/D baselines unchanged after change
 
 **Tasks:**
-- [ ] T-396: Add `_WORD_RE`, `_RICHNESS_MIN_TOKENS`, `_TTR_FLOOR` constants and `lexical_richness_penalty()` to `retrieval/hybrid.py`; export from `retrieval/__init__.py`
-- [ ] T-397: Hook `lr = lexical_richness_penalty(content)` as 6th multiplier in `server.py` scoring loop; add `lexical_richness` to explain output
-- [ ] T-398: Write `TestLexicalRichnessPenalty` (8 tests) in `tests/test_retrieval/test_ciqs_a_regression.py`
+- [x] T-396: Add `_WORD_RE`, `_RICHNESS_MIN_TOKENS`, `_TTR_FLOOR` constants and `lexical_richness_penalty()` to `retrieval/hybrid.py`; export from `retrieval/__init__.py`
+- [x] T-397: Hook `lr = lexical_richness_penalty(content)` as 6th multiplier in `server.py` scoring loop; add `lexical_richness` to explain output
+- [x] T-398: Write `TestLexicalRichnessPenalty` (8 tests) in `tests/test_retrieval/test_ciqs_a_regression.py`
 
 ### S-117: As a DepthFusion user, I want chunks I've used before to rank higher in future recalls so the system learns from my usage patterns `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `HitTracker` in `core/hit_tracker.py` persists hit log to `~/.claude/.depthfusion_hits.jsonl`; each line `{"chunk_id":"...","ts":1234567890.0,"q":"..."}`
-- [ ] AC-2: `get_hits_30d(chunk_id) → int` returns count of entries in rolling 30-day window; stale entries (>30d) pruned on write
-- [ ] AC-3: `register_hits(chunk_ids, query)` appended from `register_recall()` call path in `server.py`
-- [ ] AC-4: `query_hits_boost(chunk_id, tracker) → float` in `hybrid.py`; formula `min(1.0 + 0.1 × hits_30d, 1.5)`; wired as 7th multiplier in server.py; appears in explain output as `query_hits_boost`
-- [ ] AC-5: 10+ unit tests in `test_core/test_hit_tracker.py` covering singleton, write, read, prune, boost formula, concurrency
-- [ ] AC-6: HitTracker uses `core/file_locking.py` for cross-process safety
+- [x] AC-1: `HitTracker` in `core/hit_tracker.py` persists hit log to `~/.claude/.depthfusion_hits.jsonl`; each line `{"chunk_id":"...","ts":1234567890.0,"q":"..."}`
+- [x] AC-2: `get_hits_30d(chunk_id) → int` returns count of entries in rolling 30-day window; stale entries (>30d) pruned on write
+- [x] AC-3: `register_hits(chunk_ids, query)` appended from `register_recall()` call path in `server.py`
+- [x] AC-4: `query_hits_boost(chunk_id, tracker) → float` in `hybrid.py`; formula `min(1.0 + 0.1 × hits_30d, 1.5)`; wired as 7th multiplier in server.py; appears in explain output as `query_hits_boost`
+- [x] AC-5: 10+ unit tests in `test_core/test_hit_tracker.py` covering singleton, write, read, prune, boost formula, concurrency
+- [x] AC-6: HitTracker uses `core/file_locking.py` for cross-process safety
 
 **Tasks:**
-- [ ] T-399: Create `src/depthfusion/core/hit_tracker.py` — `HitTracker` class with `singleton()`, `register_hits()`, `get_hits_30d()`, `_prune_stale()`
-- [ ] T-400: Wire `HitTracker.singleton().register_hits()` into recall path in `server.py`
-- [ ] T-401: Add `query_hits_boost()` to `hybrid.py`; hook as 7th multiplier + explain field in `server.py`
-- [ ] T-402: Write 10+ tests in `tests/test_core/test_hit_tracker.py`; add 3 integration tests to `test_hybrid.py`
+- [x] T-399: Create `src/depthfusion/core/hit_tracker.py` — `HitTracker` class with `singleton()`, `register_hits()`, `get_hits_30d()`, `_prune_stale()`
+- [x] T-400: Wire `HitTracker.singleton().register_hits()` into recall path in `server.py`
+- [x] T-401: Add `query_hits_boost()` to `hybrid.py`; hook as 7th multiplier + explain field in `server.py`
+- [x] T-402: Write 10+ tests in `tests/test_core/test_hit_tracker.py`; add 3 integration tests to `test_hybrid.py`
 
 ### S-118: As a DepthFusion user, I want low-quality chunks skipped at index time so the vector search space stays clean as the corpus grows `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `add_document()` in `storage/vector_store.py` computes `_admission_score(content)` before upsert; if score < threshold → skip with DEBUG log
-- [ ] AC-2: `_admission_score` = `boilerplate_penalty(content) × lexical_richness_penalty(content)` (v2); v1 uses boilerplate only
-- [ ] AC-3: Drop threshold configurable via `DEPTHFUSION_ADMISSION_THRESHOLD` env var (default 0.10)
-- [ ] AC-4: All existing `add_document` tests continue to pass (rich content still indexed)
-- [ ] AC-5: 8+ new tests in `tests/test_storage/test_admission_gate.py`
+- [x] AC-1: `add_document()` in `storage/vector_store.py` computes `_admission_score(content)` before upsert; if score < threshold → skip with DEBUG log
+- [x] AC-2: `_admission_score` = `boilerplate_penalty(content) × lexical_richness_penalty(content)` (v2); v1 uses boilerplate only
+- [x] AC-3: Drop threshold configurable via `DEPTHFUSION_ADMISSION_THRESHOLD` env var (default 0.10)
+- [x] AC-4: All existing `add_document` tests continue to pass (rich content still indexed)
+- [x] AC-5: 8+ new tests in `tests/test_storage/test_admission_gate.py`
 
 **Tasks:**
-- [ ] T-403: Add `_admission_score()` (v1: boilerplate only) and gate logic to `storage/vector_store.py`
-- [ ] T-404: Extend `_admission_score()` to v2 (`boilerplate_penalty × lexical_richness_penalty`) after S-116 merges
-- [ ] T-405: Write 8+ tests in `tests/test_storage/test_admission_gate.py`; add 3 combined-gate tests after v2 extension
+- [x] T-403: Add `_admission_score()` (v1: boilerplate only) and gate logic to `storage/vector_store.py`
+- [x] T-404: Extend `_admission_score()` to v2 (`boilerplate_penalty × lexical_richness_penalty`) after S-116 merges
+- [x] T-405: Write 8+ tests in `tests/test_storage/test_admission_gate.py`; add 3 combined-gate tests after v2 extension
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
