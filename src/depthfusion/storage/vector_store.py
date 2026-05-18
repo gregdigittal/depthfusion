@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class ChromaDBStore:
         if embedding is not None:
             self._collection.upsert(
                 ids=[doc_id],
-                embeddings=[embedding[0]],
+                embeddings=cast(Any, [embedding[0]]),
                 documents=[content],
                 metadatas=[metadata],
             )
@@ -99,7 +99,9 @@ class ChromaDBStore:
             return []
         embedding = self._get_embedding([query_text])
         if embedding is not None:
-            results = self._collection.query(query_embeddings=[embedding[0]], n_results=n)
+            results = self._collection.query(
+                query_embeddings=cast(Any, [embedding[0]]), n_results=n
+            )
         else:
             logger.warning(
                 "Embedding backend unavailable during query — falling back to Chroma "

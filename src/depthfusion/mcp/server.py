@@ -1130,7 +1130,9 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             # included even when cross_project=False.  Example: a query like
             # "I'm working on the SkillForge router" from a depthfusion session
             # should still surface skillforge context.
-            _all_tagged = {b.get("project") for b in raw_blocks if b.get("project")}
+            _all_tagged = {
+                b["project"] for b in raw_blocks if isinstance(b.get("project"), str)
+            }
             _mentioned = _dmp(query, _all_tagged) - {current_project}
             before_count = len(raw_blocks)
             raw_blocks = filter_blocks_by_project(
@@ -2695,7 +2697,8 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
     from depthfusion.mcp.skillforge_client import post_skill_draft
     from depthfusion.storage.telemetry_store import TelemetryStore
 
-    threshold = arguments.get("threshold") or getattr(config, "auto_draft_threshold", 3)
+    _raw = arguments.get("threshold") or getattr(config, "auto_draft_threshold", 3)
+    threshold = int(_raw) if _raw is not None else 3
     dry_run: bool = bool(arguments.get("dry_run", False))
 
     store = TelemetryStore(config.telemetry_store_path)
