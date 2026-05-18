@@ -446,7 +446,7 @@ class RecallPipeline:
         for b in vector_results:
             all_blocks[b["chunk_id"]] = b
 
-        bm25_raw = {b["chunk_id"]: b.get("bm25_score", 0.0) for b in bm25_results}
+        bm25_raw = {b["chunk_id"]: b.get("bm25_score") or b.get("score", 0.0) for b in bm25_results}
         if bm25_raw:
             bm25_min = min(bm25_raw.values())
             bm25_max = max(bm25_raw.values())

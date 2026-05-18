@@ -1301,7 +1301,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         reranker_input.append(entry)
 
     # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
-    from depthfusion.retrieval.hybrid import RecallPipeline
+    from depthfusion.retrieval.hybrid import _BLEND_MODE, RecallPipeline
     pipeline = RecallPipeline.from_env()
 
     # S-62 / T-196: apply vector search BEFORE fusion gates and reranking.
@@ -1325,7 +1325,6 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                 # Fuse BM25 (reranker_input, already ranked) with the
                 # vector-search ordering. S-121: DEPTHFUSION_BLEND_MODE=linear
                 # activates MemPalace-style min-max blend; default is RRF.
-                from depthfusion.retrieval.hybrid import _BLEND_MODE
                 if _BLEND_MODE == "linear":
                     reranker_input = pipeline.linear_blend(reranker_input, vector_results)
                 else:
