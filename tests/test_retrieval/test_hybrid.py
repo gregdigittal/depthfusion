@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
+from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline, query_hits_boost
 
 
 def _make_blocks(n: int) -> list[dict]:
@@ -270,3 +270,28 @@ def test_cognitive_scoring_zero_score_blocks_no_division_error(monkeypatch):
     assert len(result) == 2
     for block in result:
         assert "cognitive_score" in block
+
+
+# ---------------------------------------------------------------------------
+# S-117: query_hits_boost integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_query_hits_boost_no_tracker_returns_one():
+    assert query_hits_boost("any-chunk-id", tracker=None) == 1.0
+
+
+def test_query_hits_boost_scales_with_hits(tmp_path):
+    from depthfusion.core.hit_tracker import HitTracker
+    tracker = HitTracker(log_path=tmp_path / "hits.jsonl")
+    tracker.register_hits(["chunk-a"] * 3)
+    boost = query_hits_boost("chunk-a", tracker)
+    assert boost == pytest.approx(1.3)
+
+
+def test_query_hits_boost_caps_at_max(tmp_path):
+    from depthfusion.core.hit_tracker import HitTracker
+    tracker = HitTracker(log_path=tmp_path / "hits.jsonl")
+    tracker.register_hits(["chunk-b"] * 20)
+    boost = query_hits_boost("chunk-b", tracker)
+    assert boost == pytest.approx(1.5)

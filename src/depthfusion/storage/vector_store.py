@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
 _PERSIST_DIR = Path.home() / ".claude" / ".depthfusion_vectors"
+
+# Evaluated once at import time — process restart required to pick up env changes.
+_ADMISSION_DROP_THRESHOLD: float = float(
+    os.environ.get("DEPTHFUSION_ADMISSION_THRESHOLD", "0.10")
+)
 
 try:
     import chromadb
@@ -18,6 +24,23 @@ except (ImportError, Exception):
 
 def is_chromadb_available() -> bool:
     return _CHROMADB_AVAILABLE
+
+
+def _admission_score(content: str) -> float:
+    """Cheap pre-indexing quality gate score in [0.0, 1.0].
+
+    v2: boilerplate_penalty × lexical_richness_penalty. A short session
+    envelope (bp=0.2) with low vocabulary diversity (lr≈0.5) yields a
+    combined score of ~0.10, right at the default threshold.
+
+    Returns 1.0 for normal, content-rich blocks; lower values for
+    envelopes and/or repetitive content.
+    """
+    from depthfusion.retrieval.hybrid import (  # lazy — avoids circular deps
+        boilerplate_penalty,
+        lexical_richness_penalty,
+    )
+    return boilerplate_penalty(content) * lexical_richness_penalty(content)
 
 
 class ChromaDBStore:
@@ -63,6 +86,15 @@ class ChromaDBStore:
         Uses the DepthFusion embedding backend when healthy; falls back to
         Chroma's built-in auto-embedding when the backend is unavailable.
         """
+        _score = _admission_score(content)
+        if _score < _ADMISSION_DROP_THRESHOLD:
+            logger.debug(
+                "Skipping indexing of %s — admission score %.3f < threshold %.3f",
+                doc_id,
+                _score,
+                _ADMISSION_DROP_THRESHOLD,
+            )
+            return
         embedding = self._get_embedding([content])
         if embedding is not None:
             self._collection.upsert(

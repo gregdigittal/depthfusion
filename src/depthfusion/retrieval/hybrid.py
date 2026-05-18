@@ -36,7 +36,10 @@ import math
 import os
 import re
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from depthfusion.core.hit_tracker import HitTracker
 
 from depthfusion.retrieval.reranker import HaikuReranker
 
@@ -49,6 +52,11 @@ _BOILERPLATE_LINE_RE = re.compile(
     r"^---+ (?:SESSION (?:START|END)|COMPACTION EVENT) at \d",
     re.MULTILINE,
 )
+
+# Lexical richness penalty constants — used by lexical_richness_penalty().
+_WORD_RE = re.compile(r"[a-zA-Z]{2,}")
+_RICHNESS_MIN_TOKENS: int = 20
+_TTR_FLOOR: float = 0.20
 
 # Project slug embedded in session event content by DepthFusion session-start/end hooks.
 # Format (in session capture files): "Project: <slug>" on its own line.
@@ -601,6 +609,45 @@ def boilerplate_penalty(content: str) -> float:
         return 1.0
     lines = [ln for ln in content.splitlines() if ln.strip()]
     return 0.2 if len(lines) <= 12 else 1.0
+
+
+def lexical_richness_penalty(content: str) -> float:
+    """Return a penalty factor in [0.5, 1.0] based on vocabulary diversity.
+
+    Penalises content whose type-token ratio (unique_tokens / total_tokens)
+    falls below TTR_FLOOR (0.20). Repetitive content — log dumps, template
+    files, boilerplate prose — has a TTR near 0; high-information technical
+    sessions have TTR >= 0.25.
+
+    Very short content (<= RICHNESS_MIN_TOKENS = 20 word-tokens) returns 1.0
+    to avoid false penalties on tightly scoped notes.
+    """
+    if not content:
+        return 1.0
+    tokens = [t.lower() for t in _WORD_RE.findall(content)]
+    if len(tokens) <= _RICHNESS_MIN_TOKENS:
+        return 1.0
+    ttr = len(set(tokens)) / len(tokens)
+    return max(0.5, min(1.0, ttr / _TTR_FLOOR))
+
+
+_BOOST_PER_HIT: float = 0.1
+_MAX_HITS_BOOST: float = 1.5
+
+
+def query_hits_boost(chunk_id: str, tracker: "HitTracker | None" = None) -> float:
+    """Return a boost multiplier [1.0, 1.5] based on 30-day retrieval hit count.
+
+    Chunks retrieved and used in recent queries receive a persistent rank
+    boost (up to 1.5×). Implements the query-feedback loop from OpenHuman's
+    entity-hotness formula (2.0×query_hits term, adapted for DepthFusion).
+
+    Returns 1.0 when tracker is None — no-op for configs without hit tracking.
+    """
+    if tracker is None:
+        return 1.0
+    hits = tracker.get_hits_30d(chunk_id)
+    return min(1.0 + _BOOST_PER_HIT * hits, _MAX_HITS_BOOST)
 
 
 def extract_session_project(content: str) -> str | None:

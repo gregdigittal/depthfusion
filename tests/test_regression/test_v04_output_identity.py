@@ -123,7 +123,20 @@ def fixture_home(tmp_path, monkeypatch):
     monkeypatch.delenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", raising=False)
     monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
 
-    return tmp_path
+    # S-117: reset HitTracker singleton and point to an empty log in the fixture
+    # home so scores are unaffected by real usage hits on the test machine.
+    from depthfusion.core.hit_tracker import HitTracker
+    HitTracker.reset_singleton()
+    monkeypatch.setattr(
+        "depthfusion.core.hit_tracker._HIT_LOG_PATH",
+        tmp_path / ".claude" / ".depthfusion_hits.jsonl",
+    )
+
+    yield tmp_path
+
+    # Teardown: reset singleton so subsequent tests get a fresh instance
+    # pointing to whatever _HIT_LOG_PATH monkeypatch restores.
+    HitTracker.reset_singleton()
 
 
 # ── The regression tests ─────────────────────────────────────────────────
@@ -182,10 +195,21 @@ def test_recall_output_is_deterministic_across_runs(fixture_home):
     Note: recall_id (S-72) is stripped before comparison — it is a uuid4
     that changes each call intentionally and does not indicate non-determinism
     in the retrieval pipeline.
+
+    S-117: HitTracker is reset between calls so both start from an empty hit
+    log. This isolates BM25+scoring determinism from the intentional per-call
+    hit accumulation (which would cause the second call to have higher scores
+    for chunks retrieved by the first call — correct behavior, not a bug).
     """
+    from depthfusion.core.hit_tracker import HitTracker
     from depthfusion.mcp.server import _tool_recall
     args = {"query": "architecture decisions", "top_k": 3, "snippet_len": 500}
     first = _strip_recall_id(json.loads(_tool_recall(args)))
+    # Reset hit state: clear the log file and reset the singleton so the second
+    # call starts from the same empty-hit baseline as the first.
+    import depthfusion.core.hit_tracker as _ht_mod
+    _ht_mod._HIT_LOG_PATH.unlink(missing_ok=True)
+    HitTracker.reset_singleton()
     second = _strip_recall_id(json.loads(_tool_recall(args)))
     assert first == second
 

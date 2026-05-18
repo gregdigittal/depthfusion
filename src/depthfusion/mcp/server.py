@@ -1018,6 +1018,12 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     from depthfusion.retrieval.hybrid import (
         extract_session_project as _extract_session_project,
     )
+    from depthfusion.retrieval.hybrid import (
+        lexical_richness_penalty as _lexical_richness_penalty,
+    )
+    from depthfusion.retrieval.hybrid import (
+        query_hits_boost as _query_hits_boost,
+    )
 
     def _load_file(md_file: "Path", source_label: str) -> None:
         from datetime import datetime
@@ -1154,6 +1160,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
 
     # S-72: mint recall_id after filtering so chunk_ids match the caller-visible set.
     from depthfusion.core.feedback import RecallStore
+    from depthfusion.core.hit_tracker import HitTracker
     recall_id = RecallStore.singleton().register_recall(
         [b["chunk_id"] for b in raw_blocks]
     )
@@ -1222,6 +1229,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     _query_lower = query.lower()
     _explain_data: dict[int, dict] = {}
     weighted: list[tuple[int, float]] = []
+    _tracker = HitTracker.singleton()
     for idx, raw_score in bm25_ranked:
         _block = raw_blocks[idx]
         source = _block["source"]
@@ -1246,7 +1254,9 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             if _blk_proj and len(_blk_proj) >= 4 and _blk_proj.lower() in _query_lower
             else 1.0
         )
-        final_score = raw_score * weight * recency_boost * bp * mention_boost
+        lr = _lexical_richness_penalty(_block.get("content", ""))
+        qh = _query_hits_boost(_block.get("chunk_id", ""), _tracker)
+        final_score = raw_score * weight * recency_boost * bp * mention_boost * lr * qh
         weighted.append((idx, final_score))
         if explain:
             _proj_match: bool | None = (
@@ -1259,6 +1269,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                 "source_weight": weight,
                 "boilerplate_penalty": round(bp, 2),
                 "mention_boost": round(mention_boost, 2),
+                "lexical_richness": round(lr, 4),
+                "query_hits_boost": round(qh, 4),
                 "project_match": _proj_match,
             }
 
@@ -1380,6 +1392,11 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         engaged_layers.append("reranker")
     if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true":
         engaged_layers.append("graph_traverse")
+
+    # S-117: record which chunks were returned so future queries can boost them.
+    HitTracker.singleton().register_hits(
+        [b["chunk_id"] for b in blocks_out], query
+    )
 
     return json.dumps({
         "query": query,

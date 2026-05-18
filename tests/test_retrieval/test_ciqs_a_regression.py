@@ -17,6 +17,7 @@ from depthfusion.retrieval.hybrid import (
     detect_mentioned_projects,
     extract_session_project,
     filter_blocks_by_project,
+    lexical_richness_penalty,
 )
 
 # ---------------------------------------------------------------------------
@@ -77,6 +78,64 @@ class TestBoilerplatePenalty:
         assert len([ln for ln in lines if ln.strip()]) == 13
         content = "\n".join(lines)
         assert boilerplate_penalty(content) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# lexical_richness_penalty — penalise low-TTR content (log dumps, templates)
+# ---------------------------------------------------------------------------
+
+class TestLexicalRichnessPenalty:
+    def test_empty_returns_one(self):
+        assert lexical_richness_penalty("") == 1.0
+
+    def test_short_content_returns_one(self):
+        # 5 unique word-tokens (length <=20) → no penalty
+        assert lexical_richness_penalty("hello world foo bar") == 1.0
+
+    def test_high_diversity_no_penalty(self):
+        # Rich technical session — TTR well above 0.20
+        content = (
+            "Implemented JWT refresh middleware. Decision: use httpOnly cookies.\n"
+            "Added eslint rule for no-unhandled-promise. Files: src/middleware/error.ts"
+        )
+        assert lexical_richness_penalty(content) == 1.0
+
+    def test_low_diversity_penalised(self):
+        # Very repetitive content — same words repeated
+        content = ("INFO server started server ready server running " * 10).strip()
+        result = lexical_richness_penalty(content)
+        assert 0.5 <= result < 1.0
+
+    def test_log_dump_penalised(self):
+        # Log dump with repeated tokens
+        content = " ".join(["ERROR", "WARNING", "INFO", "DEBUG"] * 20)
+        result = lexical_richness_penalty(content)
+        assert result < 1.0
+
+    def test_rich_session_no_penalty(self):
+        # A high-diversity technical block
+        content = (
+            "Refactored authentication module to use OAuth2 PKCE flow.\n"
+            "Updated database schema with new indices on user_sessions table.\n"
+            "Fixed race condition in token refresh endpoint.\n"
+            "Migrated configuration to environment variables via dotenv.\n"
+            "Wrote integration tests for callback handling and token validation.\n"
+        )
+        assert lexical_richness_penalty(content) == 1.0
+
+    def test_boundary_at_ttr_floor(self):
+        # Build content where exactly TTR = 0.20: 1 unique per 5 tokens
+        # 40 total tokens, 8 unique (TTR = 8/40 = 0.20)
+        words = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]
+        content = " ".join(words * 5)  # 40 tokens, 8 unique → TTR=0.20
+        result = lexical_richness_penalty(content)
+        assert result == 1.0  # exactly at floor → no penalty
+
+    def test_minimum_clamp_is_half(self):
+        # All same word (TTR = 1/N → near 0) → must return >= 0.5
+        content = ("word " * 50).strip()
+        result = lexical_richness_penalty(content)
+        assert result >= 0.5
 
 
 # ---------------------------------------------------------------------------
