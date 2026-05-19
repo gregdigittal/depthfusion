@@ -219,12 +219,13 @@ class RecallPipeline:
             return blocks
 
         try:
-            from depthfusion.fusion.gates import GateConfig, SelectiveFusionGates
-            cfg = GateConfig.from_env()
-            gates = SelectiveFusionGates(config=cfg)
-            survivors, log = gates.apply(blocks, query_embedding=query_embedding)
-            # Deterministic snapshot ID of the config used for this decision
-            # (S-58 / I-8 compliance; closes the TODO marker from S-51).
+            from depthfusion.fusion.selective_fusion_weighter import (
+                SelectiveFusionWeighter,
+                SelectiveGateConfig,
+            )
+            cfg = SelectiveGateConfig.from_env()
+            weighter = SelectiveFusionWeighter(config=cfg)
+            survivors, log = weighter.apply(blocks, query_embedding=query_embedding)
             config_version_id = cfg.version_id()
         except Exception as exc:  # noqa: BLE001 — fail-open contract
             logger.debug("apply_fusion_gates: degraded to pass-through (%s)", exc)

@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 from depthfusion.fusion.gates import GateConfig
+from depthfusion.fusion.selective_fusion_weighter import SelectiveGateConfig
 
 # ---------------------------------------------------------------------------
 # Determinism + stability
@@ -152,7 +153,7 @@ class TestVersionIdReachesDisk:
         # config_version_id must be present, non-empty, and match the
         # default GateConfig's id
         assert "config_version_id" in entry
-        assert entry["config_version_id"] == GateConfig().version_id()
+        assert entry["config_version_id"] == SelectiveGateConfig().version_id()
 
     def test_config_version_id_changes_when_env_var_changes(self, tmp_path, monkeypatch):
         """Two recall invocations with different DEPTHFUSION_FUSION_GATES_ALPHA
@@ -170,7 +171,7 @@ class TestVersionIdReachesDisk:
         p.apply_fusion_gates(blocks, query="first")
 
         # Second invocation after env var changes
-        monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ALPHA", "0.99")
+        monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_B_THRESHOLD", "0.99")
         p.apply_fusion_gates(blocks, query="second")
 
         gate_file = next((tmp_path / ".claude" / "depthfusion-metrics").glob("*-gates.jsonl"))
@@ -179,6 +180,6 @@ class TestVersionIdReachesDisk:
         # Same query would produce the same query_hash; differentiate by
         # config_version_id
         assert entries[0]["config_version_id"] != entries[1]["config_version_id"]
-        # Second one matches explicit alpha=0.99
-        expected = GateConfig(alpha=0.99).version_id()
+        # Second one matches explicit b_gate_min_similarity=0.99
+        expected = SelectiveGateConfig(b_gate_min_similarity=0.99).version_id()
         assert entries[1]["config_version_id"] == expected

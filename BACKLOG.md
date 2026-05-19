@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-19 (E-41/E-42 shipped — metrics reliability + pruner quality; 1918 tests, 0 lint, 0 mypy)
+> Last updated: 2026-05-19 (S-128/S-129 shipped — JWT auto-refresh + Mamba gates TS parity; 1960+ tests, 0 lint, 0 mypy)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2198,14 +2198,14 @@
 > Primary alignment gap per `docs/depthfusion-skillforge-divergence.md §8`. TS has `fusion/selective-fusion-weighter.ts`; Python has no equivalent. Required for full TS↔Python fusion parity.
 
 **Acceptance criteria:**
-- [ ] AC-1: `fusion/selective_fusion_weighter.py` implements B, C, Δ gate logic matching `selective-fusion-weighter.ts` behaviour
-- [ ] AC-2: `apply_fusion_gates()` in `RecallPipeline` calls the new weighter when `DEPTHFUSION_FUSION_GATES_ENABLED=true`
-- [ ] AC-3: ≥ 6 unit tests covering gate activation, passthrough when disabled, and parity spot-checks against the TS reference outputs
+- [x] AC-1: `fusion/selective_fusion_weighter.py` implements B, C, Δ gate logic matching `selective-fusion-weighter.ts` behaviour
+- [x] AC-2: `apply_fusion_gates()` in `RecallPipeline` calls the new weighter when `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+- [x] AC-3: ≥ 6 unit tests covering gate activation, passthrough when disabled, and parity spot-checks against the TS reference outputs
 
 **Tasks:**
-- [ ] T-447: Port `selective-fusion-weighter.ts` → `fusion/selective_fusion_weighter.py`
-- [ ] T-448: Wire into `RecallPipeline.apply_fusion_gates()`
-- [ ] T-449: Author tests in `tests/test_fusion/test_selective_fusion_weighter.py`
+- [x] T-447: Port `selective-fusion-weighter.ts` → `fusion/selective_fusion_weighter.py`
+- [x] T-448: Wire into `RecallPipeline.apply_fusion_gates()`
+- [x] T-449: Author tests in `tests/test_fusion/test_selective_fusion_weighter.py`
 
 ### S-130: As a developer, I want chunk state compression and materialisation policy ported to Python so that multi-block retrieval and include/reference/defer decisions are available in the Python stack `P3` `M`
 
