@@ -72,9 +72,16 @@ Open `~/.claude/depthfusion.env` in your editor and append any of the following 
 
 # E-39 — SkillForge recursive routing
 # Only needed if you have a running SkillForge instance with a recursive skill registered.
-# DEPTHFUSION_SKILLFORGE_API_URL=http://127.0.0.1:3000
+# DEPTHFUSION_SKILLFORGE_API_URL=http://127.0.0.1:3001
 # DEPTHFUSION_SKILLFORGE_API_TOKEN=your-bearer-token
 # DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID=<uuid-of-registered-skill>
+#
+# SkillForge auto-restart on VPS reboot (run once after installing SkillForge):
+#   sudo env PATH=$PATH:/home/<user>/.npm-global/bin \
+#        /home/<user>/.npm-global/bin/pm2 startup systemd -u <user> --hp /home/<user>
+#   pm2 save
+# Note: pm2 is installed via npm global — the sudo PATH must include ~/.npm-global/bin,
+# not /usr/bin. The startup command printed by plain `pm2 startup` uses /usr/bin and fails.
 
 # E-42 — Pruner grace period for superseded files
 # Default 0 = flag all .superseded files immediately (original behavior).
