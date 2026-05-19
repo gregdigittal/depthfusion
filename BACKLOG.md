@@ -2177,4 +2177,49 @@
 - [x] T-444: Authored 7 tests in `tests/test_mcp/test_pruner_quality.py`
 
 ---
+
+## E-43: SkillForge Operational & Divergence Alignment [backlog]
+
+> Three gaps surfaced during the E-39 SF-2 integration audit (2026-05-19): JWT token lifecycle, and two TS→Python parity gaps from `docs/depthfusion-skillforge-divergence.md §8`.
+
+### S-128: As an operator, I want SkillForge JWT tokens to auto-refresh so that recursive_llm_call calls don't fail silently when the token expires `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `RLMClient._run_via_skillforge()` detects HTTP 401 and attempts a token refresh before re-raising — refresh logic reads a configurable refresh endpoint or re-reads `DEPTHFUSION_SKILLFORGE_API_TOKEN` from env (rotation-based fallback)
+- [ ] AC-2: Token expiry is surfaced as a distinct error class (not a generic `ValueError`) with a message directing operators to rotate the token
+- [ ] AC-3: 3 tests: expired token → raises typed error; refresh succeeds → retries call; refresh also fails → raises typed error
+
+**Tasks:**
+- [ ] T-445: Add token-expiry detection + retry path in `recursive/client.py`
+- [ ] T-446: Author 3 tests in `tests/test_recursive/test_skillforge_client.py`
+
+### S-129: As SkillForge, I want Mamba selective fusion gates (B/C/Δ) ported to Python so that AttnRes fusion parity is achieved across both codebases `P2` `L`
+
+> Primary alignment gap per `docs/depthfusion-skillforge-divergence.md §8`. TS has `fusion/selective-fusion-weighter.ts`; Python has no equivalent. Required for full TS↔Python fusion parity.
+
+**Acceptance criteria:**
+- [ ] AC-1: `fusion/selective_fusion_weighter.py` implements B, C, Δ gate logic matching `selective-fusion-weighter.ts` behaviour
+- [ ] AC-2: `apply_fusion_gates()` in `RecallPipeline` calls the new weighter when `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+- [ ] AC-3: ≥ 6 unit tests covering gate activation, passthrough when disabled, and parity spot-checks against the TS reference outputs
+
+**Tasks:**
+- [ ] T-447: Port `selective-fusion-weighter.ts` → `fusion/selective_fusion_weighter.py`
+- [ ] T-448: Wire into `RecallPipeline.apply_fusion_gates()`
+- [ ] T-449: Author tests in `tests/test_fusion/test_selective_fusion_weighter.py`
+
+### S-130: As a developer, I want chunk state compression and materialisation policy ported to Python so that multi-block retrieval and include/reference/defer decisions are available in the Python stack `P3` `M`
+
+> Two related gaps from `docs/depthfusion-skillforge-divergence.md §8`: TS has `fusion/materialisation-policy.ts` and compressed boundary state; Python has neither. Lower priority than Mamba gates (S-129).
+
+**Acceptance criteria:**
+- [ ] AC-1: `fusion/materialisation_policy.py` implements include / reference / defer decisions matching `materialisation-policy.ts`
+- [ ] AC-2: Chunk state compression applied at multi-block retrieval boundaries (compressed boundary state preserved across recall calls)
+- [ ] AC-3: ≥ 4 unit tests covering each materialisation decision and compression round-trip
+
+**Tasks:**
+- [ ] T-450: Port `materialisation-policy.ts` → `fusion/materialisation_policy.py`
+- [ ] T-451: Implement compressed boundary state in multi-block retrieval path
+- [ ] T-452: Author tests
+
+---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
