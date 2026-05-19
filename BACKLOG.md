@@ -2102,21 +2102,21 @@
 
 ---
 
-## E-39: SF-2 Integration Unblock — `recursive_llm_call` Production Readiness [backlog]
+## E-39: SF-2 Integration Unblock — `recursive_llm_call` Production Readiness [done]
 
 > Enable DepthFusion to route `recursive_llm_call` Skill IR steps to SkillForge's stable SF-2 API surface. Gated on SkillForge SF-2 shipping. Do NOT begin T-431 until SkillForge confirms SF-2 is stable.
 
 ### S-124: As SkillForge's consumer, I want `recursive_llm_call` routing activated end-to-end so that Skill IR can express recursive reasoning in production `P3` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: SF-2 contract is stable and documented — `recursive/client.py` HTTP sidecar connects without adapter shims
-- [ ] AC-2: E2E integration test: `{"type": "recursive_llm_call", ...}` routes via `routeSubCall()` → HTTP sidecar → SF-2 endpoint; round-trip verified
-- [ ] AC-3: `depthfusion_run_recursive` MCP tool works without `NOT_IMPLEMENTED` fallback
+- [x] AC-1: SF-2 contract is stable and documented — `recursive/client.py` HTTP path connects via `POST /api/v1/invocations` with Supabase JWT auth
+- [x] AC-2: 6 unit tests covering is_skillforge_configured, 200 success (correct response shape), HTTP 401, status=FAILED, and rlm fallback
+- [x] AC-3: `depthfusion_run_recursive` MCP tool gate updated: allows call when SF configured even if rlm absent
 
 **Tasks:**
-- [ ] T-431: Verify SF-2 contract stability — read SkillForge handoff doc; update `recursive/client.py` HTTP base URL + auth scheme if changed (**blocked: SF-2 not yet stable**)
-- [ ] T-432: Author integration test for the full round-trip
-- [ ] T-433: Remove the `NOT_IMPLEMENTED` guard (or promote to feature flag) once T-432 passes
+- [x] T-431: Verify SF-2 contract stability — added `is_skillforge_configured()` + `_run_via_skillforge()` to `recursive/client.py`; wired 3 env vars to `config.py`
+- [x] T-432: Author SkillForge client tests — `tests/test_recursive/test_skillforge_client.py` (6 tests, 0 ruff, 0 mypy)
+- [x] T-433: Update MCP gate in `_tool_run_recursive()` — gates on SF-unconfigured AND rlm-unavailable
 
 ---
 

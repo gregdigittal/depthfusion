@@ -1543,8 +1543,8 @@ def _tool_run_recursive(arguments: dict, config: Any) -> str:
     try:
         from depthfusion.recursive.client import RLMClient
         client = RLMClient(config=config)
-        if not client.is_available():
-            return json.dumps({"error": "rlm package not available", "result": None})
+        if not client.is_skillforge_configured() and not client.is_available():
+            return json.dumps({"error": "neither SkillForge nor rlm configured", "result": None})
         result_text, traj = client.run(query=query, content=content)
         return json.dumps(
             {

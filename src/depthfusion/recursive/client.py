@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Optional
 
@@ -117,15 +118,26 @@ class RLMClient:
         content: str,
         strategy: str,
     ) -> tuple[str, RecursiveTrajectory]:
-        """Run recursive analysis through SkillForge."""
+        """Run recursive analysis through SkillForge.
+
+        SkillForge POST /api/v1/invocations returns HTTP 201 for both
+        COMPLETED and FAILED invocations; always inspect body["status"].
+        The result text is in body["output"] (top-level), not outputPayload.
+        """
         trajectory = RecursiveTrajectory(strategy=strategy, query=query)
+        parsed_url = urllib.parse.urlparse(self.config.skillforge_api_url)
+        if parsed_url.scheme not in ("http", "https") or not parsed_url.netloc:
+            raise ValueError(
+                "skillforge_api_url must be a valid http(s) URL, "
+                f"got: {self.config.skillforge_api_url!r}"
+            )
         url = f"{self.config.skillforge_api_url.rstrip('/')}/api/v1/invocations"
-        body = {
+        request_body = {
             "skillId": self.config.skillforge_recursive_skill_id,
             "input": {"query": query, "content": content},
             "policyPreset": "balanced",
         }
-        data = json.dumps(body).encode("utf-8")
+        data = json.dumps(request_body).encode("utf-8")
         request = urllib.request.Request(
             url,
             data=data,
@@ -142,16 +154,27 @@ class RLMClient:
                 timeout=self.config.rlm_timeout_seconds,
             )
             try:
-                body = json.loads(response.read().decode("utf-8"))
+                response_json = json.loads(response.read().decode("utf-8"))
             finally:
                 response.close()
-            result_text = str(body.get("outputPayload", {}).get("result", body))
+            # SkillForge returns HTTP 201 for FAILED invocations too — always check status.
+            status = response_json.get("status")
+            if status != "COMPLETED":
+                err_detail = response_json.get("log", {}) or {}
+                err_msg = str(err_detail.get("errorMessage") or status)
+                trajectory.error = f"SkillForge invocation not completed: {err_msg}"
+                trajectory.completed = False
+                raise ValueError(trajectory.error)
+            output = response_json.get("output")
+            result_text = output if isinstance(output, str) else json.dumps(output)
             trajectory.log_step(strategy, 0, 0.0, result_text[:200])
             trajectory.completed = True
             return (result_text, trajectory)
         except urllib.error.HTTPError as exc:
             trajectory.error = f"SkillForge HTTP {exc.code}: {exc.reason}"
             raise ValueError(trajectory.error) from exc
+        except ValueError:
+            raise
         except Exception as exc:
             trajectory.error = str(exc)
             raise
