@@ -940,7 +940,7 @@
 
 **Follow-up (L6/L7 from review, optional for v0.6):**
 - [ ] Simple `record()` stream not flock-guarded (pre-existing); migrate if multi-process interleaving is observed.
-- [ ] `_iter_jsonl` silently skips malformed lines; `skipped_lines` counter in summary would surface data-integrity gaps.
+- [x] `_iter_jsonl` silently skips malformed lines; `skipped_lines` counter in summary would surface data-integrity gaps.
 
 ### S-54: As an RLM user, I want Opus 4.7 task-budget headers so that `DEPTHFUSION_RLM_COST_CEILING` is enforced API-side instead of post-hoc (OP-2) `P3` `S`
 
@@ -969,7 +969,7 @@
 - [x] T-171: Author `tests/test_mcp/test_prune_discoveries.py` — 23 tests (4 env var, 8 identify_candidates, 5 prune_discoveries safety, 5 MCP tool, 1 review-gate regression on dot-file filter)
 
 **Follow-up noted:**
-- [ ] `superseded_min_age_hours` grace-period parameter (v0.6) — adds an age floor to the superseded heuristic so false-positive dedup runs have a safety window before archival.
+- [x] `superseded_min_age_hours` grace-period parameter (v0.6) — adds an age floor to the superseded heuristic so false-positive dedup runs have a safety window before archival.
 - [ ] `min-recall-score` heuristic — requires `record_recall_query` extension to capture chunk_ids of returned blocks per query (separate epic).
 
 ### S-60: As an operator, I want production code paths to emit the structured recall/capture streams added in S-53 so that `backend_summary()` and `capture_summary()` actually return data `P2` `S`

@@ -230,7 +230,7 @@ class MetricsAggregator:
         file_path = (
             self.collector.metrics_dir / f"{target_date.isoformat()}-capture.jsonl"
         )
-        entries = list(_iter_jsonl(file_path))
+        entries, skipped_lines = _iter_jsonl_counted(file_path)
         if not entries:
             return {}
 
@@ -272,6 +272,7 @@ class MetricsAggregator:
             "unknown_mechanisms": sorted(unknown_mechs),
             "total_events": sum(b["total"] for b in per_mech.values()),
             "total_entries_written": total_entries_written,
+            "skipped_lines": skipped_lines,
         }
 
 
