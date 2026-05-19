@@ -126,6 +126,9 @@ class RecallPipeline:
     def __init__(self, mode: PipelineMode = PipelineMode.LOCAL):
         self.mode = mode
         self._reranker = HaikuReranker() if mode != PipelineMode.LOCAL else None
+        # S-130 T-451: chunk boundary state persisted across apply_fusion_gates()
+        # calls so cross-recall topic coherence accumulates correctly.
+        self._boundary_state: Any = None
 
     @classmethod
     def from_env(cls) -> "RecallPipeline":
@@ -256,6 +259,28 @@ class RecallPipeline:
             )
         except Exception as exc:  # noqa: BLE001
             logger.debug("apply_fusion_gates: gate-log emission failed (%s)", exc)
+
+        # S-130 T-451: absorb survivors into the chunk boundary state so
+        # cross-recall topic coherence accumulates across calls (fail-open).
+        try:
+            from depthfusion.fusion.chunk_state_compression import ChunkStateCompressor
+            compressor = ChunkStateCompressor()
+            state = (
+                self._boundary_state
+                if self._boundary_state is not None
+                else compressor.initial()
+            )
+            for blk in survivors:
+                emb: list[float] | None = blk.get("embedding")
+                state = compressor.absorb(
+                    state,
+                    emb,
+                    [],
+                    float(blk.get("gate_fused_score") or blk.get("score") or 0.0),
+                )
+            self._boundary_state = state
+        except Exception as exc:  # noqa: BLE001 — fail-open
+            logger.debug("apply_fusion_gates: boundary state update failed (%s)", exc)
 
         # Defensive: if gates filtered everything, fall back to the original
         # pool rather than returning nothing (recall correctness > gate signal).

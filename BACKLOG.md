@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-19 (S-128/S-129 shipped — JWT auto-refresh + Mamba gates TS parity; 1960+ tests, 0 lint, 0 mypy)
+> Last updated: 2026-05-19 (S-128/S-129/S-130 shipped — JWT auto-refresh + Mamba gates TS parity + materialisation policy + chunk compression; 1990+ tests, 0 lint, 0 mypy)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2212,14 +2212,14 @@
 > Two related gaps from `docs/depthfusion-skillforge-divergence.md §8`: TS has `fusion/materialisation-policy.ts` and compressed boundary state; Python has neither. Lower priority than Mamba gates (S-129).
 
 **Acceptance criteria:**
-- [ ] AC-1: `fusion/materialisation_policy.py` implements include / reference / defer decisions matching `materialisation-policy.ts`
-- [ ] AC-2: Chunk state compression applied at multi-block retrieval boundaries (compressed boundary state preserved across recall calls)
-- [ ] AC-3: ≥ 4 unit tests covering each materialisation decision and compression round-trip
+- [x] AC-1: `fusion/materialisation_policy.py` implements include / reference / defer decisions matching `materialisation-policy.ts`
+- [x] AC-2: Chunk state compression applied at multi-block retrieval boundaries (compressed boundary state preserved across recall calls)
+- [x] AC-3: ≥ 4 unit tests covering each materialisation decision and compression round-trip
 
 **Tasks:**
-- [ ] T-450: Port `materialisation-policy.ts` → `fusion/materialisation_policy.py`
-- [ ] T-451: Implement compressed boundary state in multi-block retrieval path
-- [ ] T-452: Author tests
+- [x] T-450: Port `materialisation-policy.ts` → `fusion/materialisation_policy.py`
+- [x] T-451: Implement compressed boundary state in multi-block retrieval path
+- [x] T-452: Author tests
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
