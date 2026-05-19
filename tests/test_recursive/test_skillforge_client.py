@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from depthfusion.core.config import DepthFusionConfig
-from depthfusion.recursive.client import RLMClient
+from depthfusion.recursive.client import RLMClient, SkillForgeTokenExpiredError
 from depthfusion.recursive.trajectory import RecursiveTrajectory
 
 
@@ -130,3 +130,67 @@ def test_run_falls_back_to_rlm_when_sf_not_configured():
     result_text, trajectory = result
     assert result_text == "rlm not available"
     assert isinstance(trajectory, RecursiveTrajectory)
+
+
+# ── S-128: JWT token auto-refresh ─────────────────────────────────────────────
+
+
+def test_token_expired_raises_typed_error_when_env_token_unchanged(monkeypatch):
+    """HTTP 401 with no new token in env → SkillForgeTokenExpiredError."""
+    config = _sf_config()
+    client = RLMClient(config=config)
+    monkeypatch.setenv("DEPTHFUSION_SKILLFORGE_API_TOKEN", "test-jwt-token")
+
+    http_401 = urllib.error.HTTPError(
+        url="http://127.0.0.1:3000/api/v1/invocations",
+        code=401,
+        msg="Unauthorized",
+        hdrs={},  # type: ignore[arg-type]
+        fp=io.BytesIO(b""),
+    )
+    with patch("urllib.request.urlopen", side_effect=http_401):
+        with pytest.raises(SkillForgeTokenExpiredError, match="401"):
+            client._run_via_skillforge("query", "content", "breadth_first")
+
+
+def test_token_refresh_retries_and_succeeds_with_new_env_token(monkeypatch):
+    """HTTP 401 → env has a new token → retry succeeds → returns result."""
+    config = _sf_config(skillforge_api_token="old-expired-token")
+    client = RLMClient(config=config)
+    monkeypatch.setenv("DEPTHFUSION_SKILLFORGE_API_TOKEN", "new-valid-token")
+
+    http_401 = urllib.error.HTTPError(
+        url="http://127.0.0.1:3000/api/v1/invocations",
+        code=401,
+        msg="Unauthorized",
+        hdrs={},  # type: ignore[arg-type]
+        fp=io.BytesIO(b""),
+    )
+    success_response = _urlopen_mock(_sf_response(status="COMPLETED", output="refreshed result"))
+
+    with patch("urllib.request.urlopen", side_effect=[http_401, success_response]):
+        result_text, trajectory = client._run_via_skillforge("query", "content", "breadth_first")
+
+    assert result_text == "refreshed result"
+    assert trajectory.completed is True
+    assert client.config.skillforge_api_token == "new-valid-token"
+
+
+def test_token_refresh_raises_typed_error_when_retry_also_401(monkeypatch):
+    """HTTP 401 → env has new token → retry also 401 → SkillForgeTokenExpiredError."""
+    config = _sf_config(skillforge_api_token="old-expired-token")
+    client = RLMClient(config=config)
+    monkeypatch.setenv("DEPTHFUSION_SKILLFORGE_API_TOKEN", "also-expired-token")
+
+    def _make_401() -> urllib.error.HTTPError:
+        return urllib.error.HTTPError(
+            url="http://127.0.0.1:3000/api/v1/invocations",
+            code=401,
+            msg="Unauthorized",
+            hdrs={},  # type: ignore[arg-type]
+            fp=io.BytesIO(b""),
+        )
+
+    with patch("urllib.request.urlopen", side_effect=[_make_401(), _make_401()]):
+        with pytest.raises(SkillForgeTokenExpiredError, match="401"):
+            client._run_via_skillforge("query", "content", "breadth_first")

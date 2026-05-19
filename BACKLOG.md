@@ -2185,13 +2185,13 @@
 ### S-128: As an operator, I want SkillForge JWT tokens to auto-refresh so that recursive_llm_call calls don't fail silently when the token expires `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `RLMClient._run_via_skillforge()` detects HTTP 401 and attempts a token refresh before re-raising — refresh logic reads a configurable refresh endpoint or re-reads `DEPTHFUSION_SKILLFORGE_API_TOKEN` from env (rotation-based fallback)
-- [ ] AC-2: Token expiry is surfaced as a distinct error class (not a generic `ValueError`) with a message directing operators to rotate the token
-- [ ] AC-3: 3 tests: expired token → raises typed error; refresh succeeds → retries call; refresh also fails → raises typed error
+- [x] AC-1: `RLMClient._run_via_skillforge()` detects HTTP 401 and attempts a token refresh before re-raising — refresh logic reads a configurable refresh endpoint or re-reads `DEPTHFUSION_SKILLFORGE_API_TOKEN` from env (rotation-based fallback)
+- [x] AC-2: Token expiry is surfaced as a distinct error class (`SkillForgeTokenExpiredError(ValueError)`) with a message directing operators to rotate the token
+- [x] AC-3: 3 tests: expired token → raises typed error; refresh succeeds → retries call; refresh also fails → raises typed error
 
 **Tasks:**
-- [ ] T-445: Add token-expiry detection + retry path in `recursive/client.py`
-- [ ] T-446: Author 3 tests in `tests/test_recursive/test_skillforge_client.py`
+- [x] T-445: Added `SkillForgeTokenExpiredError` + 401-retry path in `recursive/client.py`; refactored `_run_via_skillforge` with `_build_request`/`_parse_response` helpers to avoid duplicating success-path logic across initial call and retry
+- [x] T-446: 3 new tests in `tests/test_recursive/test_skillforge_client.py` (unchanged token, refresh+success, refresh+401)
 
 ### S-129: As SkillForge, I want Mamba selective fusion gates (B/C/Δ) ported to Python so that AttnRes fusion parity is achieved across both codebases `P2` `L`
 

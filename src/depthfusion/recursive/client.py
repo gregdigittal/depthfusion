@@ -14,6 +14,7 @@ overshoots when the beta is stable, and is a no-op on older SDKs.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import os
@@ -30,6 +31,13 @@ from depthfusion.router.cost_estimator import CostEstimator
 logger = logging.getLogger(__name__)
 
 _RLM_AVAILABLE: Optional[bool] = None
+
+
+class SkillForgeTokenExpiredError(ValueError):
+    """Raised when SkillForge returns HTTP 401 and env-based token refresh cannot recover.
+
+    Rotate DEPTHFUSION_SKILLFORGE_API_TOKEN and restart the process.
+    """
 
 
 def _check_rlm_available() -> bool:
@@ -123,6 +131,12 @@ class RLMClient:
         SkillForge POST /api/v1/invocations returns HTTP 201 for both
         COMPLETED and FAILED invocations; always inspect body["status"].
         The result text is in body["output"] (top-level), not outputPayload.
+
+        On HTTP 401, attempts a single token refresh by re-reading
+        DEPTHFUSION_SKILLFORGE_API_TOKEN from the environment (rotation-based
+        refresh — the operator rotates the token externally and restarts or
+        lets the running process pick it up on the next 401). If the env token
+        is unchanged or the retry also 401s, raises SkillForgeTokenExpiredError.
         """
         trajectory = RecursiveTrajectory(strategy=strategy, query=query)
         parsed_url = urllib.parse.urlparse(self.config.skillforge_api_url)
@@ -138,21 +152,19 @@ class RLMClient:
             "policyPreset": "balanced",
         }
         data = json.dumps(request_body).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.config.skillforge_api_token}",
-            },
-            method="POST",
-        )
 
-        try:
-            response = urllib.request.urlopen(
-                request,
-                timeout=self.config.rlm_timeout_seconds,
+        def _build_request(token: str) -> urllib.request.Request:
+            return urllib.request.Request(
+                url,
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+                method="POST",
             )
+
+        def _parse_response(response: http.client.HTTPResponse) -> tuple[str, RecursiveTrajectory]:
             try:
                 response_json = json.loads(response.read().decode("utf-8"))
             finally:
@@ -170,7 +182,40 @@ class RLMClient:
             trajectory.log_step(strategy, 0, 0.0, result_text[:200])
             trajectory.completed = True
             return (result_text, trajectory)
+
+        try:
+            response = urllib.request.urlopen(
+                _build_request(self.config.skillforge_api_token),
+                timeout=self.config.rlm_timeout_seconds,
+            )
+            return _parse_response(response)
         except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                refreshed = os.environ.get(
+                    "DEPTHFUSION_SKILLFORGE_API_TOKEN", ""
+                ).strip()
+                if refreshed and refreshed != self.config.skillforge_api_token:
+                    self.config.skillforge_api_token = refreshed
+                    try:
+                        response = urllib.request.urlopen(
+                            _build_request(refreshed),
+                            timeout=self.config.rlm_timeout_seconds,
+                        )
+                        return _parse_response(response)
+                    except urllib.error.HTTPError as retry_exc:
+                        msg = (
+                            f"SkillForge token expired — HTTP {retry_exc.code} after"
+                            " refresh attempt. Rotate"
+                            " DEPTHFUSION_SKILLFORGE_API_TOKEN and restart."
+                        )
+                        trajectory.error = msg
+                        raise SkillForgeTokenExpiredError(msg) from retry_exc
+                msg = (
+                    "SkillForge token expired (HTTP 401). Rotate"
+                    " DEPTHFUSION_SKILLFORGE_API_TOKEN and restart."
+                )
+                trajectory.error = msg
+                raise SkillForgeTokenExpiredError(msg) from exc
             trajectory.error = f"SkillForge HTTP {exc.code}: {exc.reason}"
             raise ValueError(trajectory.error) from exc
         except ValueError:
