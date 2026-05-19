@@ -171,14 +171,31 @@ class RLMClient:
                 response.close()
             # SkillForge returns HTTP 201 for FAILED invocations too — always check status.
             status = response_json.get("status")
-            if status != "COMPLETED":
+            if status == "COMPLETED":
+                output = response_json.get("output")
+                result_text = output if isinstance(output, str) else json.dumps(output)
+            elif status == "FAILED":
+                # Output schema validation failed but the LLM ran — extract raw LLM text.
+                # rawResponse.content is set when the model returned natural language
+                # instead of the expected JSON schema. Use it as the result so the
+                # SkillForge path remains useful even without strict schema compliance.
+                log_field = response_json.get("log") or {}
+                raw_resp = log_field.get("rawResponse") or {}
+                raw_content = raw_resp.get("content") or ""
+                if raw_content:
+                    result_text = str(raw_content)
+                else:
+                    # No usable LLM output at all — treat as a real failure.
+                    err_msg = str(log_field.get("errorMessage") or status)
+                    trajectory.error = f"SkillForge invocation not completed: {err_msg}"
+                    trajectory.completed = False
+                    raise ValueError(trajectory.error)
+            else:
                 err_detail = response_json.get("log", {}) or {}
                 err_msg = str(err_detail.get("errorMessage") or status)
                 trajectory.error = f"SkillForge invocation not completed: {err_msg}"
                 trajectory.completed = False
                 raise ValueError(trajectory.error)
-            output = response_json.get("output")
-            result_text = output if isinstance(output, str) else json.dumps(output)
             trajectory.log_step(strategy, 0, 0.0, result_text[:200])
             trajectory.completed = True
             return (result_text, trajectory)
