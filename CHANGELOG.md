@@ -10,7 +10,50 @@ Conventions:
 
 ---
 
-## [Unreleased]
+## [Unreleased] — post-v1.0.0
+
+**Theme:** SkillForge operational hardening, MemPalace retrieval integration, metrics reliability, and full Python parity for the Mamba B/C/Δ selective fusion stack. Covers E-38 through E-43.
+
+### Added
+
+**MemPalace Retrieval Integration (E-38):**
+- `S-119` Temporal validity filter — `valid_from` / `valid_until` frontmatter fields respected at recall time; stale window entries excluded without eviction
+- `S-120` Knowledge-graph provenance on recalled chunks — each result carries the entity path that produced it, enabling callers to reason about why a chunk surfaced
+- `S-121` Linear-blend fusion opt-in — `DEPTHFUSION_LINEAR_BLEND=true` replaces RRF with a configurable α-weighted linear combination; benchmarked at parity with RRF+vector on current corpus
+- `S-122` Wing/Room sub-project scoping (OD-3 resolution) — `DEPTHFUSION_WING_ID` / `DEPTHFUSION_ROOM_ID` confine recall and capture to a logical sub-project partition within a shared `~/.claude/` corpus; resolves the OD-3 ADR ambiguity
+- `S-123` KG edge invalidation + point-in-time `get_edges` — edges can now carry `valid_until`; `graph_traverse` excludes invalidated edges by default; `get_edges(at=<timestamp>)` returns the graph state at any prior point
+
+**SkillForge SF-2 Integration (E-39):**
+- `depthfusion_run_recursive` MCP tool now routes via SkillForge HTTP API when three env vars are set: `DEPTHFUSION_SKILLFORGE_API_URL`, `DEPTHFUSION_SKILLFORGE_API_TOKEN`, `DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID`
+- `RLMClient.is_skillforge_configured()` — predicate exposed so operators can verify routing before use
+- MCP server gate updated: returns `{"error": "neither SkillForge nor rlm configured"}` instead of the old hard "rlm not available" error — preserves existing rlm path as fallback
+
+**CIQS Category D Benchmark Harness (E-40):**
+- `tests/benchmarks/ciqs_cat_d_harness.py` — PRECEDED_BY temporal-edge recall benchmark; measures cross-session continuity lift from knowledge-graph temporal linkage; reusable for regression CI
+
+**Metrics Reliability (E-41):**
+- `MetricsCollector.record()` now flock-guarded (`fcntl.flock`) — eliminates the multi-process interleaving window under concurrent hook execution (pre-existing gap, surfaced in S-53 review)
+- `_iter_jsonl_counted()` added to `metrics/aggregator.py` — like `_iter_jsonl` but returns `(entries, skipped_lines)` for data-integrity visibility
+- `backend_summary()` returns `skipped_lines` count — visible in `depthfusion_status` output
+- `capture_summary()` returns `skipped_lines` count — matching the backend summary API
+
+**Pruner grace period (E-42):**
+- `identify_candidates()` accepts `superseded_min_age_hours: int = 0` — superseded files younger than the threshold are not returned as prune candidates; prevents false-positive archival when dedup runs faster than the age floor; default 0 = current behaviour (back-compat)
+
+**SkillForge Divergence Gaps (E-43):**
+- `S-128` JWT token auto-refresh on HTTP 401 from SkillForge — `RLMClient._run_via_skillforge()` transparently re-fetches auth and retries once on 401; subsequent 401 surfaces as `ValueError`
+- `S-129` Selective fusion weighter Python port — `SelectiveFusionWeighter` (Mamba B/C/Δ sequential multiplicative gates) ported from `selective-fusion-weighter.ts`; full TS/Python parity; opt-in via `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+- `S-130` Materialisation policy + chunk state compression Python port — `MaterialisationPolicy` (three-gate: score threshold → novelty → capacity eviction) and `ChunkStateCompressor` (Mamba-style fixed-size boundary state: topic EMA, entity LRU, score stats, exponential decay) ported from TypeScript; `RecallPipeline` wired to persist `ChunkBoundaryState` across `apply_fusion_gates()` calls; fail-open contract
+
+### Changed
+
+- `capture_summary()` now uses `_iter_jsonl_counted` internally — return shape gains `skipped_lines` key (additive; existing callers unaffected)
+- `depthfusion_run_recursive` MCP error message updated: `"rlm package not available"` → `"neither SkillForge nor rlm configured"` when both paths are absent
+
+### Test totals (post-v1.0.0)
+
+- **1993 tests passing** (was 1843 at v1.0.0; +150 across E-38 through E-43 + 30 new fusion tests in S-130)
+- 0 ruff violations · 0 mypy errors
 
 ---
 

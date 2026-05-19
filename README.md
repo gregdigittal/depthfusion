@@ -2,7 +2,7 @@
 
 Cross-session memory for Claude Code — tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture mechanisms, a memory-policy layer, and a full Cognitive Infrastructure Layer that brings typed memory objects, contradiction detection, and decision-aware recall.
 
-> **Status:** v1.0.0 (stable, E-31 Structured Evolving Cognition complete, 2026-05-12). 1605 tests across 51 closed user stories. The MCP surface (24 tools) is stable; all E-31 cognitive features enabled by default in the canonical depthfusion.env.
+> **Status:** v1.0.0 + post-release hardening (E-38–E-43 shipped to `main`, 2026-05-19). 1993 tests passing · 0 ruff · 0 mypy. The MCP surface (24 tools) is stable; all E-31 cognitive features enabled by default in the canonical depthfusion.env. SkillForge SF-2 integration live; Mamba B/C/Δ fusion stack fully ported to Python.
 
 ---
 
@@ -138,6 +138,8 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
+**Upgrading from v1.0.0?** → **[docs/install/upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md)** — 5-minute upgrade guide covering VPS and local installs (E-38–E-43, backward-compatible).
+
 > ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
 > Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and will switch your **entire** Claude Code billing from your Pro/Max subscription to pay-per-token API for everything — not just DepthFusion. The separate `DEPTHFUSION_API_KEY` exists specifically to prevent this. The installer refuses to use `ANTHROPIC_API_KEY`.
 
@@ -250,7 +252,10 @@ grep PYTHON ~/.claude-shared/hooks/depthfusion-session-init.sh   # should match 
 - **Local embeddings** (vps-gpu) — sentence-transformers, cosine similarity
 - **ChromaDB vector store** (Tier 2, 500+ sessions) — HNSW ANN over embeddings
 - **RRF fusion** (k=60) — combines BM25 and vector results when both engaged
-- **Selective fusion gates** (S-51, Mamba B/C/Δ) — α-blended source weighting; opt-in via `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+- **Selective fusion gates** (S-51/S-129, Mamba B/C/Δ) — α-blended source weighting; full Python parity with TypeScript implementation; opt-in via `DEPTHFUSION_FUSION_GATES_ENABLED=true`
+- **Materialisation policy** (S-130) — three-gate pipeline (score threshold → novelty cosine gate → capacity eviction) for selective persistence of high-value chunks; wired to `RecallPipeline` when fusion gates are enabled
+- **Chunk state compression** (S-130) — `ChunkStateCompressor` maintains Mamba-style fixed-size boundary state (topic EMA, entity LRU, score stats, exponential decay) across multi-call recall boundaries
+- **Sub-project scoping** (S-122, Wing/Room) — `DEPTHFUSION_WING_ID` / `DEPTHFUSION_ROOM_ID` confine recall and capture to a logical sub-project partition within a shared `~/.claude/` corpus
 - **Quality-ranked fallback chains** (S-44 / DR-018 §4) — Gemma → Haiku → Null with typed-error rerouting
 - **Cross-project / project-scoped recall** — defaults to current project; `cross_project=true` searches all
 - **CognitiveScorer** (E-31) — 8-component ranking layer applied after RRF; ~15 ms overhead
@@ -296,7 +301,7 @@ Four daily JSONL streams under `~/.claude/depthfusion-metrics/`:
 | `YYYY-MM-DD-capture.jsonl` | Per-write capture: `capture_mechanism`, `file_path`, `chars_written`, `event_subtype`, `config_version_id` |
 | `YYYY-MM-DD-gates.jsonl` | Mamba B/C/Δ gate audit (opt-in via `DEPTHFUSION_FUSION_GATES_ENABLED=true`) |
 
-Aggregation tools: `MetricsAggregator.backend_summary()` (per-backend latency + error rates), `MetricsAggregator.capture_summary()` (per-mechanism write rates).
+Aggregation tools: `MetricsAggregator.backend_summary()` (per-backend latency + error rates + `skipped_lines`), `MetricsAggregator.capture_summary()` (per-mechanism write rates + `skipped_lines`). Both summaries include `skipped_lines` (E-41) for data-integrity visibility — non-zero indicates malformed JSONL lines that were silently dropped.
 
 Runbook: **[docs/runbooks/dogfood-telemetry.md](docs/runbooks/dogfood-telemetry.md)** for the weekly self-audit protocol.
 
@@ -429,8 +434,15 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 | `DEPTHFUSION_HAIKU_ENABLED` | Haiku API for summarisation/extraction | `false` |
 | `DEPTHFUSION_BACKEND_FALLBACK_LOG` | Emit fallback events to metrics stream | `true` |
 | `DEPTHFUSION_PRUNE_AGE_DAYS` | Age threshold for `prune_discoveries` | `90` |
+| `DEPTHFUSION_PRUNE_SUPERSEDED_MIN_AGE_HOURS` | Grace period before archiving superseded files (E-42) | `0` |
 | `DEPTHFUSION_RLM_COST_CEILING` | Per-call rlm cost ceiling (USD) | `0.50` |
 | `DEPTHFUSION_EMBEDDING_BACKEND` | `local` / `null` (vps-gpu only) | `local` (vps-gpu) |
+| `DEPTHFUSION_LINEAR_BLEND` | Replace RRF with α-weighted linear fusion (E-38 S-121) | `false` |
+| `DEPTHFUSION_WING_ID` | Sub-project wing scope for recall/capture (E-38 S-122) | — |
+| `DEPTHFUSION_ROOM_ID` | Sub-project room scope within a wing (E-38 S-122) | — |
+| `DEPTHFUSION_SKILLFORGE_API_URL` | SkillForge base URL for recursive calls (E-39) | — |
+| `DEPTHFUSION_SKILLFORGE_API_TOKEN` | Bearer token for SkillForge API (E-39) | — |
+| `DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID` | UUID of pre-registered SkillForge skill (E-39) | — |
 
 ### E-31 Cognitive flags (all ON in the canonical depthfusion.env)
 
@@ -465,8 +477,8 @@ Expected: **10 GREEN · 1 YELLOW** (C4 — CLaRa indicator string in PostCSS `no
 ```bash
 source .venv/bin/activate
 
-pytest                              # 1605 tests, GREEN (a few skipped if chromadb/cuda absent)
-pytest tests/test_metrics/ -q       # 83 tests — observability
+pytest                              # 1993 tests, GREEN (a few skipped if chromadb/cuda absent)
+pytest tests/test_metrics/ -q       # 116 tests — observability (includes E-41 reliability tests)
 pytest tests/test_backends/ -q      # 225 tests — backend chain + factory
 pytest tests/test_cognitive/ -q     # 175 tests — E-31 cognitive layer
 pytest --cov=depthfusion            # coverage report
@@ -505,7 +517,8 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 
 ## Project status & roadmap
 
-- **Closed:** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0 with all cognitive infrastructure features enabled.
-- **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; these are observability ACs that do not block the cognitive layer.
-- **Backlog:** E-26 (Benchmark Harness) — eval-set curation (50 decisions / 30 dedup pairs / 40 negatives) blocked on ≥ 7 days of real discovery content; E-16 S-35 (SkillForge HTTP sidecar) blocked on SkillForge SF-2. MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
+- **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port).
+- **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
+- **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
