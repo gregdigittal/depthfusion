@@ -576,7 +576,7 @@
 - [x] AC-2: Retrieval quality validator implemented
 - [x] AC-3: `routeSubCall()` method on `CapabilityRouter`
 - [x] AC-4: `recursive/client.py` wrapped as HTTP sidecar service
-- [ ] AC-5: Blocked until SF-2 is stable (ordering constraint from plan)
+- [x] AC-5: SF-2 stable — unblocked and satisfied by E-39 S-124 (`recursive/client.py` HTTP path via `POST /api/v1/invocations`)
 
 **Tasks:**
 - [x] T-103: Extend Skill IR schema (E1, E2)
