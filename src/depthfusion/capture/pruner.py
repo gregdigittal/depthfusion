@@ -1,27 +1,21 @@
-"""Discovery file pruner — S-55 / T-169 / TG-14.
+"""Discovery file pruner — S-55 / T-169 / TG-14, extended in E-42 / S-127.
 
 Identifies stale discovery files in `~/.claude/shared/discoveries/` and
 (on explicit confirmation) moves them to a sibling `.archive/` directory.
 NEVER deletes; moves only, so the operation is trivially reversible by
 moving files back out of `.archive/`.
 
-Heuristics (v0.5 initial set)
-=============================
+Heuristics
+==========
 1. **Age exceeded** — file mtime older than `age_days` (default 90).
 2. **Superseded** — file name ends in `.superseded` (CM-2 / S-49 dedup
    produces these when a newer semantically-equivalent discovery lands).
-   Flagged REGARDLESS of age: dedup has already determined these are
-   redundant. A follow-up `superseded_min_age_hours` parameter could
-   add a grace period if false-positive dedup runs become a concern —
-   tracked as a v0.6 enhancement.
-
-Not yet implemented (deferred)
-==============================
-`DEPTHFUSION_PRUNE_MIN_RECALL_SCORE` (from build plan §TG-14, default
-`0.05` — "never recalled above threshold in last 30 days → prune
-candidate") requires `record_recall_query` to capture chunk_ids of
-returned blocks, which it doesn't in v0.5.1. When that extension lands,
-add a `never_recalled` reason to `identify_candidates`.
+   The `superseded_min_age_hours` parameter adds an optional grace period:
+   superseded files younger than the threshold are NOT flagged (E-42 AC-1).
+3. **Never recalled** (`min_recall_score=True`) — discovery file whose chunk
+   stems do NOT appear in any recall JSONL within the last 90 days. Requires
+   `record_recall_query` to emit `chunk_ids` (E-42 AC-2/AC-3). Enabled by
+   passing `recall_log_dir` to `identify_candidates`.
 
 Safety contract
 ===============
@@ -127,10 +121,63 @@ def _is_pinned(path: Path) -> bool:
     return bool(pin_re.search(m.group(1)))
 
 
+def _recalled_stems(recall_log_dir: Path, window_days: int = 90) -> set[str]:
+    """Return file stems seen in recall JSONL chunk_ids within `window_days`.
+
+    Reads all `*-recall.jsonl` files in `recall_log_dir` whose date suffix
+    falls within the last `window_days`. For each recall record that carries
+    a `chunk_ids` list, extracts the stem of each chunk_id (the part before
+    the first `#`). Returns the set of stems — callers use `stem in recalled`
+    to decide whether a discovery file was recently surfaced.
+
+    Returns an empty set on any error so callers always see a conservative
+    result (never incorrectly prune a file because the JSONL was unreadable).
+    """
+    import json
+
+    now = datetime.now(tz=timezone.utc)
+    stems: set[str] = set()
+    if not recall_log_dir.exists():
+        return stems
+    try:
+        for p in recall_log_dir.iterdir():
+            if not p.name.endswith("-recall.jsonl"):
+                continue
+            # Extract date from filename YYYY-MM-DD-recall.jsonl
+            date_part = p.name[: len("YYYY-MM-DD")]
+            try:
+                from datetime import date as _date
+                file_date = _date.fromisoformat(date_part)
+            except ValueError:
+                continue
+            delta = (now.date() - file_date).days
+            if delta > window_days:
+                continue
+            try:
+                with open(p, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        for cid in rec.get("chunk_ids") or []:
+                            stems.add(cid.split("#", 1)[0])
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return stems
+
+
 def identify_candidates(
     output_dir: Path | None = None,
     *,
     age_days: int | None = None,
+    superseded_min_age_hours: int = 0,
+    recall_log_dir: Path | None = None,
 ) -> list[PruneCandidate]:
     """Scan `output_dir` and return files that match one or more heuristics.
 
@@ -139,6 +186,14 @@ def identify_candidates(
             `~/.claude/shared/discoveries/`.
         age_days: override the age threshold. Defaults to the value of
             `DEPTHFUSION_PRUNE_AGE_DAYS` or 90.
+        superseded_min_age_hours: grace period for the `superseded` heuristic.
+            A `.superseded` file younger than this many hours is NOT flagged
+            (E-42 AC-1). Default 0 = flag all superseded files (back-compat).
+        recall_log_dir: directory containing `*-recall.jsonl` files written
+            by `MetricsCollector`. When provided, enables the `min_recall_score`
+            heuristic: files whose stems appear in any recall record within
+            the last 90 days are excluded from candidates (E-42 AC-3).
+            None (default) = heuristic disabled.
 
     Returns:
         List of `PruneCandidate`. Order is deterministic (sorted by path)
@@ -151,6 +206,11 @@ def identify_candidates(
 
     threshold_days = age_days if age_days is not None else _read_age_days()
     now_ts = datetime.now(tz=timezone.utc).timestamp()
+
+    # Build recalled-stem set once for the whole scan (E-42 AC-3).
+    recalled: set[str] = (
+        _recalled_stems(recall_log_dir) if recall_log_dir is not None else set()
+    )
 
     candidates: list[PruneCandidate] = []
     try:
@@ -188,6 +248,11 @@ def identify_candidates(
 
         # Reason 1: superseded suffix (CM-2 / S-49 dedup)
         if path.name.endswith(_SUPERSEDED_SUFFIX):
+            # E-42 AC-1: honour grace period — skip recently superseded files.
+            if superseded_min_age_hours > 0:
+                age_hours = age_sec / 3600.0
+                if age_hours < superseded_min_age_hours:
+                    continue
             candidates.append(PruneCandidate(
                 path=path, reason="superseded", age_days=round(age_d, 2),
             ))
@@ -195,6 +260,16 @@ def identify_candidates(
 
         # Reason 2: age exceeds threshold
         if age_d > threshold_days:
+            # E-42 AC-3: min_recall_score — keep if recently recalled.
+            if recalled:
+                file_stem = path.name
+                # Strip known extensions to get the bare stem
+                for ext in (".md", ".txt", ".json"):
+                    if file_stem.endswith(ext):
+                        file_stem = file_stem[: -len(ext)]
+                        break
+                if file_stem in recalled:
+                    continue
             candidates.append(PruneCandidate(
                 path=path, reason="age_exceeded", age_days=round(age_d, 2),
             ))

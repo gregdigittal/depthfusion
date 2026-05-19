@@ -130,7 +130,7 @@ class MetricsAggregator:
         file_path = (
             self.collector.metrics_dir / f"{target_date.isoformat()}-recall.jsonl"
         )
-        entries = list(_iter_jsonl(file_path))
+        entries, skipped_lines = _iter_jsonl_counted(file_path)
         if not entries:
             return {}
 
@@ -198,6 +198,7 @@ class MetricsAggregator:
             "overall_error_rate": (
                 total_errors / total_queries if total_queries else 0.0
             ),
+            "skipped_lines": skipped_lines,
         }
 
     def capture_summary(self, target_date: date | None = None) -> dict:
@@ -294,6 +295,31 @@ def _iter_jsonl(path: Path):
                     continue
     except OSError:
         return
+
+
+def _iter_jsonl_counted(path: Path) -> tuple[list[dict], int]:
+    """Return (entries, skipped_lines) from a JSONL file.
+
+    Like `_iter_jsonl` but also counts lines that failed JSON decoding,
+    so callers can surface data-integrity gaps in summary output (E-41).
+    """
+    entries: list[dict] = []
+    skipped = 0
+    if not path.exists():
+        return entries, skipped
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    skipped += 1
+    except OSError:
+        pass
+    return entries, skipped
 
 
 def _percentile(values: list[float], p: float) -> float:

@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-18 (S-122 shipped — Wing/Room sub-project scoping; all 38 epics [done])
+> Last updated: 2026-05-19 (E-41/E-42 shipped — metrics reliability + pruner quality; 1918 tests, 0 lint, 0 mypy)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2099,6 +2099,82 @@
 - [x] T-419: Write design doc (docs/designs/kg-invalidation-state-machine.md)
 - [x] T-420: Implement `invalidate_edge()` in `graph/store.py` (JSON + SQLite backends)
 - [x] T-421: Write point-in-time tests in `tests/test_graph/test_store.py`
+
+---
+
+## E-39: SF-2 Integration Unblock — `recursive_llm_call` Production Readiness [backlog]
+
+> Enable DepthFusion to route `recursive_llm_call` Skill IR steps to SkillForge's stable SF-2 API surface. Gated on SkillForge SF-2 shipping. Do NOT begin T-431 until SkillForge confirms SF-2 is stable.
+
+### S-124: As SkillForge's consumer, I want `recursive_llm_call` routing activated end-to-end so that Skill IR can express recursive reasoning in production `P3` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: SF-2 contract is stable and documented — `recursive/client.py` HTTP sidecar connects without adapter shims
+- [ ] AC-2: E2E integration test: `{"type": "recursive_llm_call", ...}` routes via `routeSubCall()` → HTTP sidecar → SF-2 endpoint; round-trip verified
+- [ ] AC-3: `depthfusion_run_recursive` MCP tool works without `NOT_IMPLEMENTED` fallback
+
+**Tasks:**
+- [ ] T-431: Verify SF-2 contract stability — read SkillForge handoff doc; update `recursive/client.py` HTTP base URL + auth scheme if changed (**blocked: SF-2 not yet stable**)
+- [ ] T-432: Author integration test for the full round-trip
+- [ ] T-433: Remove the `NOT_IMPLEMENTED` guard (or promote to feature flag) once T-432 passes
+
+---
+
+## E-40: CIQS Category D Benchmark Harness [backlog]
+
+> Close S-50 AC-3: prove that `PRECEDED_BY` temporal graph edges raise CIQS Category D ("recent work" questions) by ≥ +2 points. Requires a reproducible eval corpus and automated harness.
+
+### S-125: As a recall quality owner, I want a Category D benchmark harness so that PRECEDED_BY temporal edges are validated against a live corpus `P2` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `tools/bench_cat_d.py` loads ≥ 10 "recent work" Q/A pairs from `tests/fixtures/ciqs_cat_d/` and scores each query against both `PRECEDED_BY=off` and `PRECEDED_BY=on`
+- [ ] AC-2: Harness emits a JSON report (`docs/benchmarks/YYYY-MM-DD-ciqs-cat-d.json`) with per-question and aggregate scores
+- [ ] AC-3: Delta ≥ +2pp on aggregate score (constitutes AC-3 of S-50)
+- [ ] AC-4: ≥ 5 tests in `tests/test_bench/test_cat_d_harness.py`
+
+**Tasks:**
+- [ ] T-434: Write ≥ 10 Cat D fixture Q/A pairs to `tests/fixtures/ciqs_cat_d/`
+- [ ] T-435: Implement `tools/bench_cat_d.py` — loads fixtures, toggles `DEPTHFUSION_TEMPORAL_LINKS_ENABLED` env flag, calls `recall_relevant` with `explain=true`, scores MRR/hit@k
+- [ ] T-436: Emit JSON benchmark report; gate S-50 AC-3 on the delta
+- [ ] T-437: Author 5 harness tests in `tests/test_bench/test_cat_d_harness.py`
+
+---
+
+## E-41: Metrics Stream Reliability [done]
+
+> Two multi-process correctness gaps in `metrics/collector.py` identified during S-53 review: `_append_jsonl()` is not flock-guarded; `_iter_jsonl()` silently skips malformed lines with no visibility.
+
+### S-126: As an operator, I want the metrics stream to be multi-process safe and surface data-integrity gaps so that concurrent agents don't corrupt telemetry `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `record()` and `_append_jsonl()` use `fcntl.flock(LOCK_EX)`; concurrent writers do not interleave lines — verified by `test_concurrent_writers_do_not_interleave`
+- [x] AC-2: `_iter_jsonl_counted()` added; `backend_summary()` returns count under key `skipped_lines`; existing tests unaffected
+- [x] AC-3: 10 new tests in `tests/test_metrics/test_collector_reliability.py` (≥ 4 required)
+
+**Tasks:**
+- [x] T-438: Add flock guard to `record()` in `metrics/collector.py` — inline `fcntl.flock(LOCK_EX)` preserving error propagation; `_append_jsonl()` already had flock
+- [x] T-439: Add `_iter_jsonl_counted()` to `metrics/aggregator.py`; thread `skipped_lines` through `backend_summary()` return dict
+- [x] T-440: Author 10 tests in `tests/test_metrics/test_collector_reliability.py`
+
+---
+
+## E-42: Pruner Quality Improvements [done]
+
+> Two quality improvements to `capture/pruner.py` deferred from S-55: `superseded_min_age_hours` grace period for false-positive protection; `min-recall-score` heuristic gated on `record_recall_query` capturing `chunk_ids`.
+
+### S-127: As a maintainer, I want pruner quality improvements so that archival is safer and heuristics can score by recall frequency `P3` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `identify_candidates()` accepts `superseded_min_age_hours: int = 0`; a superseded file younger than this threshold is not returned as a candidate — back-compat: default 0 = current behaviour
+- [x] AC-2: `record_recall_query()` in `collector.py` writes `chunk_ids: list[str]` to the recall JSONL record
+- [x] AC-3: `min_recall_score` heuristic: a discovery file whose chunks appear in ≥ 1 recall query in the last 90 days is excluded from candidates
+- [x] AC-4: 7 new tests in `tests/test_mcp/test_pruner_quality.py` (≥ 5 required)
+
+**Tasks:**
+- [x] T-441: Added `superseded_min_age_hours` param to `identify_candidates()` in `capture/pruner.py`; age check uses file mtime vs `datetime.now()`
+- [x] T-442: Extended `record_recall_query()` in `metrics/collector.py` to append `chunk_ids` field
+- [x] T-443: Implemented `_recalled_stems()` + `min_recall_score` heuristic in `identify_candidates()` — reads recall JSONL, extracts stems from chunk_ids, cross-references against discovery file stems
+- [x] T-444: Authored 7 tests in `tests/test_mcp/test_pruner_quality.py`
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

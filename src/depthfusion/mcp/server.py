@@ -841,9 +841,14 @@ def _tool_recall(arguments: dict) -> str:
     # Best-effort metrics emission — never raises into the caller.
     try:
         result_count = 0
+        chunk_ids: list[str] = []
         try:
             parsed = json.loads(response_json) if response_json else {}
-            result_count = len(parsed.get("blocks", []) or [])
+            blocks_parsed = parsed.get("blocks", []) or []
+            result_count = len(blocks_parsed)
+            chunk_ids = [
+                b["chunk_id"] for b in blocks_parsed if isinstance(b.get("chunk_id"), str)
+            ]
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -893,6 +898,7 @@ def _tool_recall(arguments: dict) -> str:
             total_latency_ms=round(total_latency_ms, 3),
             result_count=result_count,
             event_subtype=event_subtype,
+            chunk_ids=chunk_ids,
         )
     except Exception as exc:  # noqa: BLE001 — observability must not raise
         logger.debug("recall metrics emission failed: %s", exc)

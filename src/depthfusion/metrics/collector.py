@@ -57,10 +57,9 @@ writes up to `PIPE_BUF` (4096 bytes on Linux), and above that a
 multi-writer scenario can interleave. Recall + capture entries usually
 fit within 4 KiB, but the lock is applied uniformly for consistency.
 
-Note: the simple `record()` metrics stream is NOT flock-guarded
-(pre-v0.5 behaviour preserved for back-compat). If multi-process
-writes to `YYYY-MM-DD.jsonl` are ever observed to interleave, migrate
-that stream to `_append_jsonl` too.
+Note: `record()` (simple stream) uses an inline flock guard (E-41 / S-126)
+identical to `_append_jsonl` but propagates OSError so callers can detect
+write failures (e.g. _emit_startup_event in server.py).
 """
 from __future__ import annotations
 
@@ -309,7 +308,12 @@ class MetricsCollector:
         return "ok"
 
     def record(self, metric_name: str, value: float, labels: dict | None = None) -> None:
-        """Append metric to daily JSONL file: metrics_dir/YYYY-MM-DD.jsonl."""
+        """Append metric to daily JSONL file: metrics_dir/YYYY-MM-DD.jsonl.
+
+        Uses an inline flock guard (E-41) for multi-process safety, but lets
+        OSError propagate so callers like _emit_startup_event can detect and
+        log write failures (unlike _append_jsonl which swallows errors).
+        """
         entry = {
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             "metric": metric_name,
@@ -318,7 +322,11 @@ class MetricsCollector:
         }
         path = self.today_path()
         with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except OSError:
+                pass  # flock unsupported on some filesystems — best-effort
+            f.write(json.dumps(entry, default=_json_default) + "\n")
 
     def record_gate_log(
         self,
@@ -383,6 +391,7 @@ class MetricsCollector:
         result_count: int | None = None,
         event_subtype: str = "ok",
         config_version_id: str | None = None,
+        chunk_ids: list[str] | None = None,
     ) -> None:
         """Append a structured recall-query record to `YYYY-MM-DD-recall.jsonl`.
 
@@ -416,10 +425,13 @@ class MetricsCollector:
             `config_version_resolver`. Pass `CONFIG_VERSION_NONE` ("none")
             to mark a genuinely config-invariant emission. Empty string
             is never written to disk — it coerces to `CONFIG_VERSION_NONE`.
+          - `chunk_ids`: list of chunk_id strings from result blocks (E-42
+            `min_recall_score` heuristic). `None` omits the field entirely
+            so old records remain forward-compatible.
 
         Errors are swallowed.
         """
-        entry = {
+        entry: dict = {
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             "event": "recall_query",
             "event_subtype": self._validate_event_subtype(event_subtype),
@@ -432,6 +444,8 @@ class MetricsCollector:
             "result_count": result_count,
             "config_version_id": self._resolve_config_version_id(config_version_id),
         }
+        if chunk_ids is not None:
+            entry["chunk_ids"] = list(chunk_ids)
         self._append_jsonl(self.today_recall_path(), entry)
 
     def record_capture_event(
