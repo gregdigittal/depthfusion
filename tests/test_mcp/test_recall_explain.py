@@ -86,6 +86,22 @@ def fixture_home(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
+    # Isolate HitTracker from the real ~/.claude/.depthfusion_hits.jsonl.
+    # _HIT_LOG_PATH is evaluated at module-import time (before any monkeypatch),
+    # so patching Path.home() does not redirect it.  We must patch the constant
+    # directly and reset the singleton so the next call creates a fresh instance
+    # pointing at the tmp path.  Without this, register_hits() called at the end
+    # of each _tool_recall_impl persists to the real hit log, and the second call
+    # in test_explain_does_not_change_score_or_snippet sees the first call's hits
+    # as a query_hits_boost, changing final_score non-deterministically.
+    import depthfusion.core.hit_tracker as _ht_mod
+    from depthfusion.core.hit_tracker import HitTracker
+    monkeypatch.setattr(
+        _ht_mod, "_HIT_LOG_PATH",
+        tmp_path / ".claude" / ".depthfusion_hits.jsonl",
+    )
+    HitTracker.reset_singleton()
+
     # Local mode — no external calls, deterministic output
     monkeypatch.delenv("DEPTHFUSION_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -97,7 +113,9 @@ def fixture_home(tmp_path, monkeypatch):
     monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
     # cross_project=True so tests don't depend on git remote detection
     # (project filter would silently drop all blocks otherwise)
-    return tmp_path
+    yield tmp_path
+    # Reset singleton so the patched path doesn't leak into subsequent tests.
+    HitTracker.reset_singleton()
 
 
 # ── Schema tests ──────────────────────────────────────────────────────────
@@ -216,10 +234,19 @@ def test_explain_block_has_rrf_score(fixture_home):
 
 def test_explain_does_not_change_score_or_snippet(fixture_home):
     """explain=True must not alter score or snippet compared to explain=False."""
+    import depthfusion.core.hit_tracker as _ht_mod
+    from depthfusion.core.hit_tracker import HitTracker
+
     query = "backend provider typed protocol"
     without = json.loads(_tool_recall_impl({
         "query": query, "top_k": 3, "cross_project": True, "explain": False,
     }))
+    # _tool_recall_impl calls register_hits() at the end, persisting the
+    # returned chunk_ids to the hit log.  The second call would see those hits
+    # and apply a query_hits_boost (1.0 + 0.1×hits), changing final_score.
+    # Clear the file and reset the singleton so both calls start from 0 hits.
+    _ht_mod._HIT_LOG_PATH.unlink(missing_ok=True)
+    HitTracker.reset_singleton()
     with_explain = json.loads(_tool_recall_impl({
         "query": query, "top_k": 3, "cross_project": True, "explain": True,
     }))
