@@ -2120,23 +2120,23 @@
 
 ---
 
-## E-40: CIQS Category D Benchmark Harness [backlog]
+## E-40: CIQS Category D Benchmark Harness [done]
 
 > Close S-50 AC-3: prove that `PRECEDED_BY` temporal graph edges raise CIQS Category D ("recent work" questions) by ≥ +2 points. Requires a reproducible eval corpus and automated harness.
 
 ### S-125: As a recall quality owner, I want a Category D benchmark harness so that PRECEDED_BY temporal edges are validated against a live corpus `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `tools/bench_cat_d.py` loads ≥ 10 "recent work" Q/A pairs from `tests/fixtures/ciqs_cat_d/` and scores each query against both `PRECEDED_BY=off` and `PRECEDED_BY=on`
-- [ ] AC-2: Harness emits a JSON report (`docs/benchmarks/YYYY-MM-DD-ciqs-cat-d.json`) with per-question and aggregate scores
-- [ ] AC-3: Delta ≥ +2pp on aggregate score (constitutes AC-3 of S-50)
-- [ ] AC-4: ≥ 5 tests in `tests/test_bench/test_cat_d_harness.py`
+- [x] AC-1: `tools/bench_cat_d.py` loads ≥ 10 "recent work" Q/A pairs from `tests/fixtures/ciqs_cat_d/` and scores each query against both `PRECEDED_BY=off` and `PRECEDED_BY=on`
+- [x] AC-2: Harness emits a JSON report (`docs/benchmarks/YYYY-MM-DD-ciqs-cat-d.json`) with per-question and aggregate scores
+- [x] AC-3: Delta ≥ +2pp on aggregate score (constitutes AC-3 of S-50) — achieved +4.17pp (2026-05-19)
+- [x] AC-4: ≥ 5 tests in `tests/test_bench/test_cat_d_harness.py` — 19 tests written
 
 **Tasks:**
-- [ ] T-434: Write ≥ 10 Cat D fixture Q/A pairs to `tests/fixtures/ciqs_cat_d/`
-- [ ] T-435: Implement `tools/bench_cat_d.py` — loads fixtures, toggles `DEPTHFUSION_TEMPORAL_LINKS_ENABLED` env flag, calls `recall_relevant` with `explain=true`, scores MRR/hit@k
-- [ ] T-436: Emit JSON benchmark report; gate S-50 AC-3 on the delta
-- [ ] T-437: Author 5 harness tests in `tests/test_bench/test_cat_d_harness.py`
+- [x] T-434: Write ≥ 10 Cat D fixture Q/A pairs to `tests/fixtures/ciqs_cat_d/`
+- [x] T-435: Implement `tools/bench_cat_d.py` — loads fixtures, two-config graph toggle, scores MRR/hit@k
+- [x] T-436: Emit JSON benchmark report; gate S-50 AC-3 on the delta
+- [x] T-437: Author 5 harness tests in `tests/test_bench/test_cat_d_harness.py`
 
 ---
 
