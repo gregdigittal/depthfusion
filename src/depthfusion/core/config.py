@@ -95,6 +95,9 @@ class DepthFusionConfig:
     # RLM parameters
     rlm_cost_ceiling: float = 0.50   # USD per query
     rlm_timeout_seconds: int = 120
+    skillforge_api_url: str = ""          # e.g. "http://127.0.0.1:3000"
+    skillforge_api_token: str = ""        # Bearer token
+    skillforge_recursive_skill_id: str = ""  # UUID of pre-registered recursive skill
 
     # Context bus
     bus_backend: str = "file"        # "memory" | "file" | "supabase"
@@ -171,6 +174,11 @@ class DepthFusionConfig:
             rrf_k=_env_int("DEPTHFUSION_RRF_K", 60),
             rlm_cost_ceiling=_env_float("DEPTHFUSION_RLM_COST_CEILING", 0.50),
             rlm_timeout_seconds=_env_int("DEPTHFUSION_RLM_TIMEOUT_SECONDS", 120),
+            skillforge_api_url=os.environ.get("DEPTHFUSION_SKILLFORGE_API_URL", ""),
+            skillforge_api_token=os.environ.get("DEPTHFUSION_SKILLFORGE_API_TOKEN", ""),
+            skillforge_recursive_skill_id=os.environ.get(
+                "DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID", ""
+            ),
             bus_backend=os.environ.get("DEPTHFUSION_BUS_BACKEND", "file"),
             bus_file_dir=os.environ.get(
                 "DEPTHFUSION_BUS_FILE_DIR", "~/.claude/context-bus"

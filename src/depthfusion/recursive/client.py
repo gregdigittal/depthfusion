@@ -14,8 +14,11 @@ overshoots when the beta is stable, and is a no-op on older SDKs.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import urllib.error
+import urllib.request
 from typing import Optional
 
 from depthfusion.core.config import DepthFusionConfig
@@ -97,6 +100,62 @@ class RLMClient:
         """Return True if rlm package is importable and functional."""
         return self._available
 
+    def is_skillforge_configured(self) -> bool:
+        """Return True when SkillForge API configuration is complete."""
+        return all(
+            isinstance(value, str) and value.strip()
+            for value in (
+                self.config.skillforge_api_url,
+                self.config.skillforge_api_token,
+                self.config.skillforge_recursive_skill_id,
+            )
+        )
+
+    def _run_via_skillforge(
+        self,
+        query: str,
+        content: str,
+        strategy: str,
+    ) -> tuple[str, RecursiveTrajectory]:
+        """Run recursive analysis through SkillForge."""
+        trajectory = RecursiveTrajectory(strategy=strategy, query=query)
+        url = f"{self.config.skillforge_api_url.rstrip('/')}/api/v1/invocations"
+        body = {
+            "skillId": self.config.skillforge_recursive_skill_id,
+            "input": {"query": query, "content": content},
+            "policyPreset": "balanced",
+        }
+        data = json.dumps(body).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.config.skillforge_api_token}",
+            },
+            method="POST",
+        )
+
+        try:
+            response = urllib.request.urlopen(
+                request,
+                timeout=self.config.rlm_timeout_seconds,
+            )
+            try:
+                body = json.loads(response.read().decode("utf-8"))
+            finally:
+                response.close()
+            result_text = str(body.get("outputPayload", {}).get("result", body))
+            trajectory.log_step(strategy, 0, 0.0, result_text[:200])
+            trajectory.completed = True
+            return (result_text, trajectory)
+        except urllib.error.HTTPError as exc:
+            trajectory.error = f"SkillForge HTTP {exc.code}: {exc.reason}"
+            raise ValueError(trajectory.error) from exc
+        except Exception as exc:
+            trajectory.error = str(exc)
+            raise
+
     def run(
         self,
         query: str,
@@ -112,6 +171,11 @@ class RLMClient:
         - Returns (result_text, trajectory)
         - If rlm unavailable: returns ("rlm not available", stub_trajectory)
         """
+        if self.is_skillforge_configured():
+            if strategy is None:
+                strategy = recommend_strategy(len(content.split()))
+            return self._run_via_skillforge(query, content, strategy)
+
         # Auto-select strategy if not provided
         if strategy is None:
             approx_tokens = len(content.split())
@@ -195,4 +259,3 @@ class RLMClient:
             trajectory.error = str(exc)
             trajectory.completed = False
             raise
-
