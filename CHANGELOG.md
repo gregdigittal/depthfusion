@@ -27,6 +27,7 @@ Conventions:
 - `depthfusion_run_recursive` MCP tool now routes via SkillForge HTTP API when three env vars are set: `DEPTHFUSION_SKILLFORGE_API_URL`, `DEPTHFUSION_SKILLFORGE_API_TOKEN`, `DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID`
 - `RLMClient.is_skillforge_configured()` — predicate exposed so operators can verify routing before use
 - MCP server gate updated: returns `{"error": "neither SkillForge nor rlm configured"}` instead of the old hard "rlm not available" error — preserves existing rlm path as fallback
+- `_parse_response` handles SkillForge `status: FAILED` gracefully — when output schema validation fails but the LLM ran, extracts `log.rawResponse.content` as the result text instead of raising `ValueError`; raises only when no LLM output is present at all
 
 **CIQS Category D Benchmark Harness (E-40):**
 - `tests/benchmarks/ciqs_cat_d_harness.py` — PRECEDED_BY temporal-edge recall benchmark; measures cross-session continuity lift from knowledge-graph temporal linkage; reusable for regression CI
