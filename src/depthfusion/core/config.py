@@ -96,7 +96,8 @@ class DepthFusionConfig:
     rlm_cost_ceiling: float = 0.50   # USD per query
     rlm_timeout_seconds: int = 120
     skillforge_api_url: str = ""          # e.g. "http://127.0.0.1:3000"
-    skillforge_api_token: str = ""        # Bearer token
+    # Supabase HS256 JWT with MEMBER role (short-lived — no auto-refresh)
+    skillforge_api_token: str = ""
     skillforge_recursive_skill_id: str = ""  # UUID of pre-registered recursive skill
 
     # Context bus
