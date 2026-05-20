@@ -138,9 +138,9 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
-**Upgrading from v1.0.0?** → **[docs/install/upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md)** — 5-minute upgrade guide covering VPS and local installs (E-38–E-43, backward-compatible).
+**Upgrading to v1.1.0?** → **[docs/install/upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md)** — covers E-44 (Windows installer, fcntl compat, CI matrix). Pull + reinstall, no schema changes.
 
-**Upgrading from post-v1.0.0 to v1.1.0?** Pull latest + reinstall — no schema changes, no migration steps. See [CHANGELOG](CHANGELOG.md) for E-44 details.
+**Upgrading from v1.0.0 (skipping post-v1.0.0)?** Follow [upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md) (E-38–E-43) first, then [upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md) (E-44).
 
 > ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
 > Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and will switch your **entire** Claude Code billing from your Pro/Max subscription to pay-per-token API for everything — not just DepthFusion. The separate `DEPTHFUSION_API_KEY` exists specifically to prevent this. The installer refuses to use `ANTHROPIC_API_KEY`.

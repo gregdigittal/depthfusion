@@ -1,7 +1,11 @@
-# Upgrade Guide — v1.0.0 → post-v1.0.0 (main)
+# Upgrade Guide — v1.0.0 → v1.1.0
+
+> **Note:** This guide covers the E-38–E-43 changes that shipped between v1.0.0 and v1.1.0.
+> For E-44 (Windows installer, fcntl compat, CI matrix) see **[upgrade-to-v1.1.0.md](upgrade-to-v1.1.0.md)**.
+> If upgrading directly from v1.0.0, follow both guides in order (this one first, then v1.1.0).
 
 > **Applies to:** existing installs running exactly v1.0.0 (`git describe --tags` shows `v1.0.0`).
-> **Scope:** E-38 through E-43 shipped to `main`. No schema migrations. All changes are backward-compatible.
+> **Scope:** E-38 through E-43. No schema migrations. All changes are backward-compatible.
 > **Estimated time:** 5 minutes (VPS) · 3 minutes (local laptop)
 
 ---
