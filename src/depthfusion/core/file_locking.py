@@ -21,6 +21,33 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Optional
 
+try:
+    import fcntl as _fcntl
+
+    def flock_ex(fd: int) -> None:
+        """Acquire exclusive lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_EX)
+
+    def flock_sh(fd: int) -> None:
+        """Acquire shared lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_SH)
+
+    def flock_un(fd: int) -> None:
+        """Release lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+
+except ImportError:
+    # Windows: file locking is a no-op. DepthFusion local mode runs single-process;
+    # multi-process VPS mode runs on Linux only where POSIX locking is always available.
+    def flock_ex(fd: int) -> None:  # type: ignore[misc]
+        pass
+
+    def flock_sh(fd: int) -> None:  # type: ignore[misc]
+        pass
+
+    def flock_un(fd: int) -> None:  # type: ignore[misc]
+        pass
+
 
 def _splice_memory_score_frontmatter(
     body: str,
