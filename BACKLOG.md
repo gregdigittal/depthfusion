@@ -2223,56 +2223,56 @@
 
 ---
 
-## E-44: Cross-platform unified installer (Mac / Linux / Windows) [backlog]
+## E-44: Cross-platform unified installer (Mac / Linux / Windows) [done]
 
 > Single-command install on all three platforms. Mac and Linux share a `curl | bash` bootstrap; Windows uses a PowerShell equivalent. The Python installer module (`depthfusion.install.install`) already handles 80% of setup — the gap is detecting Python, creating the venv, and wiring the shell profile per OS.
 
 ### S-131: As a new user on Mac or Linux, I want a single `curl | bash` command to install DepthFusion so that I don't need to manually manage Python, venvs, or shell config `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `scripts/install.sh` detects Python 3.10+ (or installs via `brew`/`apt`/`dnf`) and aborts with a clear message if no suitable Python is available
-- [ ] AC-2: Creates `.venv` in the project directory, installs the correct extras (`mac-mlx` on Apple Silicon, `local` on x86 Mac/Linux)
-- [ ] AC-3: Writes `~/.claude/depthfusion.env` with `DEPTHFUSION_API_KEY` and `DEPTHFUSION_STORAGE_PATH`; **refuses** to accept `ANTHROPIC_API_KEY` (billing safety guard)
-- [ ] AC-4: Wires `mcp-server.sh` into `~/.claude/claude_desktop_config.json` (or `~/.config/Claude/claude_desktop_config.json` on Linux)
-- [ ] AC-5: Idempotent — re-running on an existing install upgrades without destroying existing config or storage
-- [ ] AC-6: Install log written to `/tmp/depthfusion-install.log` for debugging failed installs
+- [x] AC-1: `scripts/install.sh` detects Python 3.10+ (or installs via `brew`/`apt`/`dnf`) and aborts with a clear message if no suitable Python is available
+- [x] AC-2: Creates `.venv` in the project directory, installs the correct extras (`mac-mlx` on Apple Silicon, `local` on x86 Mac/Linux)
+- [x] AC-3: Writes `~/.claude/depthfusion.env` with `DEPTHFUSION_API_KEY` and `DEPTHFUSION_STORAGE_PATH`; **refuses** to accept `ANTHROPIC_API_KEY` (billing safety guard)
+- [x] AC-4: Wires `mcp-server.sh` into `~/.claude/claude_desktop_config.json` (or `~/.config/Claude/claude_desktop_config.json` on Linux)
+- [x] AC-5: Idempotent — re-running on an existing install upgrades without destroying existing config or storage
+- [x] AC-6: Install log written to `/tmp/depthfusion-install.log` for debugging failed installs
 
 **Tasks:**
-- [ ] T-453: Author `scripts/install.sh` — Python detection, venv creation, pip install, env file scaffold
-- [ ] T-454: Add shell profile wiring (`.zshrc` / `.bashrc` `source ~/.claude/depthfusion.env`)
-- [ ] T-455: Add Claude Desktop config JSON patch (jq-based merge, safe if block already exists)
-- [ ] T-456: Add idempotency check (detect existing venv and skip recreate; detect existing env keys and preserve)
-- [ ] T-457: Manual test matrix: macOS 14 (Apple Silicon), macOS 13 (Intel), Ubuntu 22.04, Ubuntu 24.04
+- [x] T-453: Author `scripts/install.sh` — Python detection, venv creation, pip install, env file scaffold
+- [x] T-454: Add shell profile wiring (`.zshrc` / `.bashrc` `source ~/.claude/depthfusion.env`)
+- [x] T-455: Add Claude Desktop config JSON patch (jq-based merge, safe if block already exists)
+- [x] T-456: Add idempotency check (detect existing venv and skip recreate; detect existing env keys and preserve)
+- [x] T-457: Manual test matrix: macOS 14 (Apple Silicon), macOS 13 (Intel), Ubuntu 22.04, Ubuntu 24.04
 
 ### S-132: As a new user on Windows, I want a single `irm | iex` PowerShell command to install DepthFusion so that I don't need to use WSL or manual Python setup `P2` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `scripts/install.ps1` detects Python 3.10+ from `py` launcher or `python`; offers to install via `winget` if missing
-- [ ] AC-2: Creates `.venv` in the project directory, installs `.[local]` extras
-- [ ] AC-3: Writes `%APPDATA%\Claude\depthfusion.env` (or equivalent) with `DEPTHFUSION_API_KEY`; **refuses** `ANTHROPIC_API_KEY`
-- [ ] AC-4: Patches `%APPDATA%\Claude\claude_desktop_config.json` to register `mcp-server.bat` (Windows wrapper for `mcp-server.sh` equivalent)
-- [ ] AC-5: Idempotent — re-running upgrades without losing config or storage
-- [ ] AC-6: Author `scripts/mcp-server.bat` (Windows batch wrapper calling `.venv\Scripts\python`)
+- [x] AC-1: `scripts/install.ps1` detects Python 3.10+ from `py` launcher or `python`; offers to install via `winget` if missing
+- [x] AC-2: Creates `.venv` in the project directory, installs `.[local]` extras
+- [x] AC-3: Writes `%APPDATA%\Claude\depthfusion.env` (or equivalent) with `DEPTHFUSION_API_KEY`; **refuses** `ANTHROPIC_API_KEY`
+- [x] AC-4: Patches `%APPDATA%\Claude\claude_desktop_config.json` to register `mcp-server.bat` (Windows wrapper for `mcp-server.sh` equivalent)
+- [x] AC-5: Idempotent — re-running upgrades without losing config or storage
+- [x] AC-6: Author `scripts/mcp-server.bat` (Windows batch wrapper calling `.venv\Scripts\python`)
 
 **Tasks:**
-- [ ] T-458: Author `scripts/install.ps1` — Python detection, venv, pip install, env scaffold
-- [ ] T-459: Author `scripts/mcp-server.bat` — Windows MCP server launch wrapper
-- [ ] T-460: Add Claude Desktop config JSON patch (PowerShell `ConvertFrom-Json` / `ConvertTo-Json` merge)
-- [ ] T-461: Manual test matrix: Windows 11 (22H2+), Windows 10 (21H2+), both with and without existing Python
+- [x] T-458: Author `scripts/install.ps1` — Python detection, venv, pip install, env scaffold
+- [x] T-459: Author `scripts/mcp-server.bat` — Windows MCP server launch wrapper
+- [x] T-460: Add Claude Desktop config JSON patch (PowerShell `ConvertFrom-Json` / `ConvertTo-Json` merge)
+- [x] T-461: Manual test matrix: Windows 11 (22H2+), Windows 10 (21H2+), both with and without existing Python
 
 ### S-133: As a maintainer, I want the installer to be covered by a CI test matrix so that regressions on any platform are caught before release `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: GitHub Actions workflow runs `install.sh` in a Docker container for Ubuntu 22.04 and Ubuntu 24.04 on every PR that touches `scripts/`
-- [ ] AC-2: macOS runner tests `install.sh` on the `macos-latest` GitHub Actions runner (x86; Apple Silicon requires self-hosted)
-- [ ] AC-3: Windows runner tests `install.ps1` on `windows-latest`
-- [ ] AC-4: Each CI run verifies: venv created, `depthfusion` importable, env file present, `mcp-server.sh` exits 0 with `--version`
-- [ ] AC-5: `install.sh` and `install.ps1` both pass `shellcheck` / `PSScriptAnalyzer` with 0 errors
+- [x] AC-1: GitHub Actions workflow runs `install.sh` in a Docker container for Ubuntu 22.04 and Ubuntu 24.04 on every PR that touches `scripts/`
+- [x] AC-2: macOS runner tests `install.sh` on the `macos-latest` GitHub Actions runner (x86; Apple Silicon requires self-hosted)
+- [x] AC-3: Windows runner tests `install.ps1` on `windows-latest`
+- [x] AC-4: Each CI run verifies: venv created, `depthfusion` importable, env file present, `mcp-server.sh` exits 0 with `--version`
+- [x] AC-5: `install.sh` and `install.ps1` both pass `shellcheck` / `PSScriptAnalyzer` with 0 errors
 
 **Tasks:**
-- [ ] T-462: Author `.github/workflows/installer-ci.yml` with matrix (ubuntu-22.04, ubuntu-24.04, macos-latest, windows-latest)
-- [ ] T-463: Add `--dry-run` flag to `install.sh` and `install.ps1` for CI mode (no actual file writes to host)
-- [ ] T-464: Add `shellcheck` step for `install.sh`, `PSScriptAnalyzer` step for `install.ps1`
+- [x] T-462: Author `.github/workflows/installer-ci.yml` with matrix (ubuntu-22.04, ubuntu-24.04, macos-latest, windows-latest)
+- [x] T-463: Add `--dry-run` flag to `install.sh` and `install.ps1` for CI mode (no actual file writes to host)
+- [x] T-464: Add `shellcheck` step for `install.sh`, `PSScriptAnalyzer` step for `install.ps1`
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
