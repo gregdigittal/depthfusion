@@ -10,9 +10,13 @@ Conventions:
 
 ---
 
-## [Unreleased] — post-v1.0.0
+## [Unreleased]
 
-**Theme:** SkillForge operational hardening, MemPalace retrieval integration, metrics reliability, and full Python parity for the Mamba B/C/Δ selective fusion stack. Covers E-38 through E-43.
+---
+
+## [v1.1.0] — 2026-05-20
+
+**Theme:** SkillForge operational hardening, MemPalace retrieval integration, metrics reliability, full Python parity for the Mamba B/C/Δ selective fusion stack, and Windows + cross-platform installer. Covers E-38 through E-44.
 
 ### Added
 
@@ -51,9 +55,18 @@ Conventions:
 - `capture_summary()` now uses `_iter_jsonl_counted` internally — return shape gains `skipped_lines` key (additive; existing callers unaffected)
 - `depthfusion_run_recursive` MCP error message updated: `"rlm package not available"` → `"neither SkillForge nor rlm configured"` when both paths are absent
 
-### Test totals (post-v1.0.0)
+**Cross-Platform Installer (E-44):**
+- `S-131` `scripts/install.sh` — single-command Mac/Linux installer: creates venv, pip-installs, prompts for API key, writes `~/.claude/depthfusion.env` (chmod 600), merges `~/.claude/claude_desktop_config.json` with atomic write + timestamped backup; refuses keys matching `^sk-ant-api03-` to prevent subscription billing cross-contamination
+- `S-131` `src/depthfusion/install/install.py`: `install_local_windows()` + `--non-interactive` flag — Windows install path writes to `%APPDATA%\Claude\`, registers python.exe in Claude Desktop config; `--non-interactive` reads `DEPTHFUSION_API_KEY` from env for CI provisioning
+- `S-132` `scripts/install.ps1` — Windows PowerShell installer (requires 5.1+): venv creation, pip install, ACL-restricted env file (current user only), `ConvertTo-Json -Depth 32` (avoids silent truncation of complex existing configs), atomic temp-file write + timestamped backup of `%APPDATA%\Claude\claude_desktop_config.json`
+- `S-132` `scripts/mcp-server.bat` — Windows Claude Desktop MCP launcher; uses `%~dp0`-relative venv path
+- `S-132` `fcntl` Windows portability — `flock_ex` / `flock_sh` / `flock_un` wrappers in `core/file_locking.py` behind `try: import fcntl as _fcntl / except ImportError: no-op`; all direct `fcntl.flock()` call sites in `storage/event_log.py`, `router/bus.py`, `metrics/collector.py` migrated; emits `RuntimeWarning` when `fcntl` unavailable on non-Windows (degraded-lock observability)
+- `S-133` `.github/workflows/installer-ci.yml` — 9-cell CI matrix (ubuntu-latest / macos-latest / windows-latest × Python 3.10 / 3.11 / 3.12); `fail-fast: false`; 20-minute timeout; OS-conditional pip quoting
+- `docs/install/windows-quickstart.md` — step-by-step Windows install guide covering prerequisites, clone, `powershell -ExecutionPolicy Bypass -File scripts\install.ps1`, API key sourcing, restart, verification via `depthfusion_status`, and troubleshooting
 
-- **1993 tests passing** (was 1843 at v1.0.0; +150 across E-38 through E-43 + 30 new fusion tests in S-130)
+### Test totals (v1.1.0)
+
+- **1986 tests passing** (post-merge; benchmark suite excluded from count; delta reflects test suite restructuring)
 - 0 ruff violations · 0 mypy errors
 
 ---

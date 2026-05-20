@@ -2,7 +2,7 @@
 
 Cross-session memory for Claude Code — tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture mechanisms, a memory-policy layer, and a full Cognitive Infrastructure Layer that brings typed memory objects, contradiction detection, and decision-aware recall.
 
-> **Status:** v1.0.0 + post-release hardening (E-38–E-43 shipped to `main`, 2026-05-19). 1993 tests passing · 0 ruff · 0 mypy. The MCP surface (24 tools) is stable; all E-31 cognitive features enabled by default in the canonical depthfusion.env. SkillForge SF-2 integration live; Mamba B/C/Δ fusion stack fully ported to Python.
+> **Status:** v1.1.0 (2026-05-20). 1986 tests passing · 0 ruff · 0 mypy. Windows installer (`scripts/install.ps1`), Mac/Linux installer (`scripts/install.sh`), fcntl cross-platform compat, and GitHub Actions CI matrix shipped (E-44). MCP surface (24 tools) stable; E-31 cognitive features active by default; SkillForge SF-2 + Mamba B/C/Δ fusion stack live.
 
 ---
 
@@ -131,7 +131,7 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 | Mode | Use when | LLM backend | Extras | Step-by-step |
 |---|---|---|---|---|
-| `local` | Laptop, zero API deps | Heuristics + BM25 only | `[local]` | inline below |
+| `local` | Laptop / Windows, zero API deps | Heuristics + BM25 only | `[local]` | **Mac/Linux:** inline below · **Windows:** [docs/install/windows-quickstart.md](docs/install/windows-quickstart.md) |
 | `vps-cpu` | Cloud VPS, no GPU | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
 | `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
@@ -139,6 +139,8 @@ DepthFusion has three install modes. Pick the one matching your target:
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
 **Upgrading from v1.0.0?** → **[docs/install/upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md)** — 5-minute upgrade guide covering VPS and local installs (E-38–E-43, backward-compatible).
+
+**Upgrading from post-v1.0.0 to v1.1.0?** Pull latest + reinstall — no schema changes, no migration steps. See [CHANGELOG](CHANGELOG.md) for E-44 details.
 
 > ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
 > Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and will switch your **entire** Claude Code billing from your Pro/Max subscription to pay-per-token API for everything — not just DepthFusion. The separate `DEPTHFUSION_API_KEY` exists specifically to prevent this. The installer refuses to use `ANTHROPIC_API_KEY`.
@@ -160,7 +162,7 @@ git clone https://github.com/gregdigittal/depthfusion.git ~/projects/depthfusion
 cd ~/projects/depthfusion
 
 # Pin to a known-good release.
-git checkout v1.0.0
+git checkout v1.1.0
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -183,6 +185,20 @@ ls ~/.claude/depthfusion-metrics/          # should exist after first MCP call
 ```
 
 **Limitations of `local` mode:** No semantic reranking (BM25 only). Cat-D continuity requires manual `/learn` after each session. No auto-capture (no PostCompact hook). Cognitive layer (E-31) operates in heuristic-only mode without a reranker backend.
+
+### Quick install — `local` mode (Windows)
+
+```powershell
+git clone https://github.com/gregdigittal/depthfusion.git $HOME\projects\depthfusion
+cd $HOME\projects\depthfusion
+
+# Run the installer (creates venv, installs, registers with Claude Desktop)
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
+
+The installer will prompt for your DepthFusion API key (get it from `claude.ai/settings → API Keys`). It will **refuse** a key starting with `sk-ant-api03-` — those are Claude Code's own billing credentials.
+
+Full step-by-step: **[docs/install/windows-quickstart.md](docs/install/windows-quickstart.md)**
 
 ### Install — `vps-cpu` mode (recommended for cloud servers)
 
