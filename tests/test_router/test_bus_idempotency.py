@@ -422,6 +422,12 @@ class TestMcpPublishContextToolShape:
             raw = mcp_server._tool_publish_context(retry_payload)
 
         result = json.loads(raw)
-        assert result == {"published": True, "item_id": "first", "deduped": True}, (
+        # E-45 added the `indexed_in_hnsw` field — always present, defaults False
+        # when the HNSW feature flag is off. Strip it for the v0.5.x dedup
+        # contract assertion below.
+        result_core = {
+            k: v for k, v in result.items() if k != "indexed_in_hnsw"
+        }
+        assert result_core == {"published": True, "item_id": "first", "deduped": True}, (
             f"AC-4: dedup response must return original item_id — got {result}"
         )

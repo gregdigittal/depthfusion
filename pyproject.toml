@@ -30,12 +30,13 @@ vps-cpu = [
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
 # plus sentence-transformers for local embeddings. ChromaDB still
 # included so the Tier 2 path stays available alongside the local
-# vector backend.
+# vector backend. hnswlib powers the E-45 fused recall index.
 vps-gpu = [
     "sentence-transformers>=2.2",
     "chromadb>=0.4",
     "fastapi>=0.100",
     "uvicorn>=0.23",
+    "hnswlib>=0.7",
 ]
 
 # `mac-mlx` mode: Apple Silicon GPU inference via mlx_lm.server.
@@ -48,6 +49,14 @@ mac-mlx = [
     "chromadb>=0.4",
     "fastapi>=0.100",
     "uvicorn>=0.23",
+    "hnswlib>=0.7",
+]
+
+# E-45: standalone HNSW extra — install for the agent-ops bridge integration
+# without pulling the rest of the vps-gpu/mac-mlx stack.
+hnsw = [
+    "sentence-transformers>=2.2",
+    "hnswlib>=0.7",
 ]
 
 rlm = ["rlms"]

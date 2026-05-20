@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-19 (E-44 added — cross-platform unified installer Mac/Linux/Windows; S-128/S-129/S-130 shipped; 1993 tests, 0 lint, 0 mypy)
+> Last updated: 2026-05-20 (E-45 added and done — HNSW embedding index + fused recall (ruflo-mod contract); S-134–S-140 shipped; 2000 tests, 0 lint, 0 mypy)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2273,6 +2273,92 @@
 - [x] T-462: Author `.github/workflows/installer-ci.yml` with matrix (ubuntu-22.04, ubuntu-24.04, macos-latest, windows-latest)
 - [x] T-463: Add `--dry-run` flag to `install.sh` and `install.ps1` for CI mode (no actual file writes to host)
 - [x] T-464: Add `shellcheck` step for `install.sh`, `PSScriptAnalyzer` step for `install.ps1`
+
+---
+
+## E-45: HNSW Embedding Index + Fused Recall (ruflo-mod contract) [done]
+
+> Implement the DepthFusion side of the agent-ops bridge contract defined in `docs/ruflo-mod.md`.
+> Adds `hnswlib`-backed vector indexing and BM25+HNSW fusion recall behind a feature flag.
+> All existing BM25 behaviour is preserved when `DEPTHFUSION_HNSW_ENABLED=false` (default).
+
+### S-134: As the recall pipeline, I want an hnswlib-backed HNSW index module so that DepthFusion can embed, store, and query discovery content as dense vectors `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `retrieval/hnsw_store.py` provides `HNSWStore` with `upsert(discovery_id, content)`, `search(query, k)`, `save()`, `state()`, `capability()` methods
+- [x] AC-2: Label map (`discovery_id → int`) persisted as `.labels.json` sidecar; index persisted as `.bin`; state as `.meta.json` — all three atomic (tmp + os.replace)
+- [x] AC-3: Auto-saves every 100 upserts; gracefully degrades (returns None/False/[]) when `hnswlib` is absent or model load fails
+- [x] AC-4: `HNSWState` shape (schema_version, index_path, embedding_model, dimension, entry_count, last_updated) matches ruflo-mod contract
+- [x] AC-5: `HNSWCapability` shape (enabled, backend, model, dimension, index_path, entry_count) matches ruflo-mod contract
+
+**Tasks:**
+- [x] T-465: Create `src/depthfusion/retrieval/hnsw_store.py` — `HNSWStore` class with lazy `LocalEmbeddingBackend` embedding, atomic persistence, graceful degradation
+- [x] T-466: Thread-safe singleton accessor `_get_hnsw_store()` in `server.py` gated on `DEPTHFUSION_HNSW_ENABLED`
+- [x] T-467: SIGTERM/SIGINT shutdown handler flushes index to disk; registered only on main thread on first store init
+
+### S-135: As the agent-ops bridge, I want a `depthfusion_hnsw_capability` MCP tool so that it can read HNSW state at startup without polling `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_hnsw_capability` registered in `TOOLS`, `_TOOL_FLAGS` (always enabled), `TOOL_SCHEMAS`, `_dispatch_tool`
+- [x] AC-2: Returns `HNSWCapability` shape when `DEPTHFUSION_HNSW_ENABLED=true`; returns `{enabled: false, backend: "none", ...zeros}` when flag is false or store init failed
+- [x] AC-3: Tool count in `tests/test_analyzer/test_mcp_server.py` updated to 29
+
+**Tasks:**
+- [x] T-468: Add `depthfusion_hnsw_capability` to TOOLS/TOOL_FLAGS/TOOL_SCHEMAS in `server.py`
+- [x] T-469: Implement `_tool_hnsw_capability()` dispatch function
+
+### S-136: As an operator, I want `depthfusion_publish_context` to return `indexed_in_hnsw: bool` so that the bridge knows whether each publish was also vector-indexed `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `indexed_in_hnsw` (bool, never missing, never None) present in every `depthfusion_publish_context` response
+- [x] AC-2: When `DEPTHFUSION_HNSW_ENABLED=true` and upsert succeeds: `indexed_in_hnsw: true`
+- [x] AC-3: When flag is false, store unavailable, or upsert throws: `indexed_in_hnsw: false`; BM25 publish path is unaffected
+
+**Tasks:**
+- [x] T-470: Update `_tool_publish_context` in `server.py` to upsert into HNSW store and inject `indexed_in_hnsw` into result dict
+- [x] T-471: Relax strict equality in `test_bus_idempotency.py` to strip `indexed_in_hnsw` before comparing historical contract dict
+
+### S-137: As the recall pipeline, I want fused BM25 + HNSW recall so that semantic similarity complements keyword matching `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `strategy` (`'bm25-only'` or `'fused'`) and `hnsw_available` (bool) present in ALL `depthfusion_recall_relevant` responses (empty results, filtered, index/timeline modes, error path)
+- [x] AC-2: When HNSW enabled and produces hits: `final_score = 0.6 × bm25_score + 0.4 × hnsw_cosine_score`; blocks present in both get `source: 'fused'`; BM25-only get `source: 'bm25'`; HNSW-only additions get `source: 'hnsw'`
+- [x] AC-3: Results re-sorted by fused score, re-sliced to `top_k` after fusion
+- [x] AC-4: HNSW search failure degrades gracefully to BM25-only without raising
+
+**Tasks:**
+- [x] T-472: Update `_tool_recall_impl` to add `strategy`/`hnsw_available` to all return paths and apply post-hoc fusion when HNSW store returns hits
+- [x] T-473: Regenerate `tests/test_regression/golden/v04_recall_output.json` to include new fields
+
+### S-138: As a DepthFusion operator, I want the HNSW index persisted on shutdown and loaded on startup so that vectors survive process restarts `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: SIGTERM/SIGINT handlers flush index, label map, and state to disk atomically before exit
+- [x] AC-2: On startup, if `.bin` file exists at `DEPTHFUSION_HNSW_INDEX_PATH`, index is loaded (with label map and state); fresh index created if file absent
+- [x] AC-3: Startup failure degrades to BM25-only (logs error, does not crash process)
+
+**Tasks:**
+- [x] T-474: Implement startup load path in `HNSWStore.__init__`
+- [x] T-475: Implement `_register_hnsw_shutdown()` called on first successful store init
+
+### S-139: As a developer, I want tests for HNSW components so that regressions are caught `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `tests/test_retrieval/test_hnsw_store.py` — 11 tests (2 always-on for no-hnswlib path; 9 skipped when hnswlib absent)
+- [x] AC-2: `tests/test_mcp/test_hnsw_capability.py` — 5 tests covering capability tool, `indexed_in_hnsw`, `strategy`, `hnsw_available`
+- [x] AC-3: Full suite passes with 0 regressions (2000 passed, 9 skipped)
+
+**Tasks:**
+- [x] T-476: Author `tests/test_retrieval/test_hnsw_store.py`
+- [x] T-477: Author `tests/test_mcp/test_hnsw_capability.py`
+
+### S-140: As a developer, I want `hnswlib` declared in pyproject.toml extras so that the dependency is trackable `P3` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: `hnswlib>=0.7` added to `vps-gpu`, `mac-mlx`, and standalone `hnsw` extras in `pyproject.toml`
+
+**Tasks:**
+- [x] T-478: Update `pyproject.toml` optional-dependencies
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.

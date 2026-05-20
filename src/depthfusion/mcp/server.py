@@ -189,6 +189,12 @@ TOOLS: dict[str, str] = {
         "snippet_len (int, optional, default 800). "
         "Response: {published: int, query: str, session_id: str}."
     ),
+    # E-45 HNSW capability ping for the agent-ops bridge
+    "depthfusion_hnsw_capability": (
+        "Return current HNSW index capability and state. Called by the agent-ops "
+        "bridge at startup. No args. Returns HNSWCapability: "
+        "{enabled, backend, model, dimension, index_path, entry_count}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -225,6 +231,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_surface_skill_candidates": None, # always enabled (E-34 S-109)
     # E-35 S-111 session-start auto-recall seed
     "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
+    # E-45 HNSW capability ping — always enabled; returns disabled when env flag is off
+    "depthfusion_hnsw_capability": None,
 }
 
 
@@ -576,6 +584,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["session_id"],
     },
+    # E-45 HNSW capability ping
+    "depthfusion_hnsw_capability": {
+        "properties": {},
+        "required": [],
+    },
 }
 
 
@@ -687,6 +700,8 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_surface_skill_candidates(arguments, config)
     elif tool_name == "depthfusion_session_seed":
         return _tool_session_seed(arguments)
+    elif tool_name == "depthfusion_hnsw_capability":
+        return _tool_hnsw_capability()
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -835,7 +850,13 @@ def _tool_recall(arguments: dict) -> str:
     except Exception as exc:
         event_subtype = "error"
         response_json = json.dumps(
-            {"error": str(exc), "query": str(arguments.get("query", "")), "blocks": []}
+            {
+                "error": str(exc),
+                "query": str(arguments.get("query", "")),
+                "blocks": [],
+                "strategy": "bm25-only",
+                "hnsw_available": _get_hnsw_store() is not None,
+            }
         )
 
     # Best-effort metrics emission — never raises into the caller.
@@ -1121,10 +1142,16 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                     continue
                 _load_file(md_file, "rule")
 
+    # E-45: surface HNSW availability on every recall response (even early exits).
+    _hnsw_store_handle = _get_hnsw_store()
+    _hnsw_available = _hnsw_store_handle is not None
+
     if not raw_blocks:
         return json.dumps({
             "query": query, "blocks": [], "recall_id": None,
             "message": "No session context available",
+            "strategy": "bm25-only",
+            "hnsw_available": _hnsw_available,
         })
 
     # S-52 T-161: apply project-scoped filter before scoring so BM25 IDF
@@ -1190,6 +1217,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                         f"(filtered {before_count} blocks). Pass "
                         "cross_project=true to search all projects."
                     ),
+                    "strategy": "bm25-only",
+                    "hnsw_available": _hnsw_available,
                 })
 
     # S-72: mint recall_id after filtering so chunk_ids match the caller-visible set.
@@ -1216,6 +1245,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             "recall_id": recall_id,
             "total_sources_scanned": len(raw_blocks),
             "message": msg,
+            "strategy": "bm25-only",
+            "hnsw_available": _hnsw_available,
         }, indent=2)
 
     # Recency ordering: insertion order reflects mtime desc (used as a small tie-breaker)
@@ -1239,6 +1270,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
             "recall_id": recall_id,
             "total_sources_scanned": len(raw_blocks),
             "message": f"Retrieved {len(blocks_out)} blocks (recency order, no query)",
+            "strategy": "bm25-only",
+            "hnsw_available": _hnsw_available,
         }, indent=2)
 
     # BM25 scoring with source-type weights
@@ -1430,6 +1463,58 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     if os.environ.get("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true":
         engaged_layers.append("graph_traverse")
 
+    # E-45: HNSW post-hoc fusion (BM25 + dense vector). Behind feature flag;
+    # NEVER lets HNSW failure crash the BM25 path.
+    strategy = "bm25-only"
+    if _hnsw_store_handle is not None:
+        try:
+            hnsw_hits = _hnsw_store_handle.search(query, k=max(top_k * 2, 10))
+        except Exception as exc:  # noqa: BLE001 — graceful degrade
+            logger.debug("[hnsw] search raised during fusion: %s", exc)
+            hnsw_hits = []
+        if hnsw_hits:
+            engaged_layers.append("hnsw")
+            # Map both raw discovery_id and a file_stem-prefix view so we can
+            # cross-reference BM25 chunk_ids (which look like "file_stem#N" or
+            # plain "file_stem").
+            hnsw_by_did: dict[str, float] = {
+                hit["discovery_id"]: float(hit.get("score", 0.0)) for hit in hnsw_hits
+            }
+            # Apply fusion boost to existing BM25 blocks.
+            for block in blocks_out:
+                chunk_id = str(block.get("chunk_id", ""))
+                stem = chunk_id.split("#", 1)[0] if "#" in chunk_id else chunk_id
+                hnsw_score = hnsw_by_did.get(chunk_id, hnsw_by_did.get(stem))
+                bm25_score = float(block.get("score", 0.0))
+                if hnsw_score is not None:
+                    block["score"] = round(0.6 * bm25_score + 0.4 * hnsw_score, 6)
+                    block["source_layer"] = "fused"
+                else:
+                    block["score"] = round(0.6 * bm25_score, 6)
+                    block["source_layer"] = "bm25"
+
+            # Add HNSW-only hits that weren't already in BM25 results.
+            existing_ids = {str(b.get("chunk_id", "")) for b in blocks_out}
+            existing_stems = {
+                cid.split("#", 1)[0] if "#" in cid else cid for cid in existing_ids
+            }
+            for hit in hnsw_hits:
+                did = hit["discovery_id"]
+                if did in existing_ids or did in existing_stems:
+                    continue
+                hnsw_score = float(hit.get("score", 0.0))
+                blocks_out.append({
+                    "chunk_id": did,
+                    "source": "hnsw",
+                    "source_layer": "hnsw",
+                    "score": round(0.4 * hnsw_score, 6),
+                    "snippet": "",
+                })
+
+            blocks_out.sort(key=lambda b: -float(b.get("score", 0.0)))
+            blocks_out = blocks_out[:top_k]
+            strategy = "fused"
+
     # S-117: record which chunks were returned so future queries can boost them.
     HitTracker.singleton().register_hits(
         [b["chunk_id"] for b in blocks_out], query
@@ -1442,6 +1527,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         "total_sources_scanned": len(raw_blocks),
         "engaged_layers": engaged_layers,
         "message": f"Retrieved {len(blocks_out)} relevant blocks (BM25+RRF)",
+        "strategy": strategy,
+        "hnsw_available": _hnsw_available,
     }, indent=2)
 
 
@@ -1476,6 +1563,129 @@ def _get_context_bus(config: Any = None) -> ContextBus:
     else:
         _BUS_INSTANCE = FileBus(bus_dir=Path(bus_dir_str).expanduser())
     return _BUS_INSTANCE
+
+
+# ---------------------------------------------------------------------------
+# E-45 HNSW vector index — module-level singleton (lazy init, env-gated)
+# ---------------------------------------------------------------------------
+
+_HNSW_STORE: Any = None  # depthfusion.retrieval.hnsw_store.HNSWStore | None
+_HNSW_INIT_ATTEMPTED: bool = False
+_HNSW_SHUTDOWN_REGISTERED: bool = False
+_HNSW_LOCK = threading.Lock()
+
+
+def _hnsw_enabled() -> bool:
+    return os.environ.get("DEPTHFUSION_HNSW_ENABLED", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
+def _register_hnsw_shutdown() -> None:
+    """Install SIGTERM/SIGINT handlers that flush the index on graceful exit."""
+    global _HNSW_SHUTDOWN_REGISTERED
+    if _HNSW_SHUTDOWN_REGISTERED:
+        return
+    try:
+        import signal as _signal
+
+        def _hnsw_shutdown_handler(signum, frame):  # type: ignore[no-redef]
+            store = _HNSW_STORE
+            if store is not None:
+                try:
+                    store.save()
+                    logger.info("[hnsw] index persisted on shutdown")
+                except Exception as exc:  # noqa: BLE001 — best-effort flush
+                    logger.warning("[hnsw] failed to persist on shutdown: %s", exc)
+
+        # Only install handlers in the main thread (signal API restriction).
+        if threading.current_thread() is threading.main_thread():
+            _signal.signal(_signal.SIGTERM, _hnsw_shutdown_handler)
+            _signal.signal(_signal.SIGINT, _hnsw_shutdown_handler)
+            _HNSW_SHUTDOWN_REGISTERED = True
+    except (ValueError, OSError) as exc:
+        # signal() raises ValueError outside the main thread or when running
+        # under restricted environments — degrade silently.
+        logger.debug("[hnsw] shutdown handler not installed: %s", exc)
+
+
+def _get_hnsw_store() -> Any:
+    """Return the process-wide HNSWStore (lazily constructed), or None.
+
+    Returns None when ``DEPTHFUSION_HNSW_ENABLED`` is falsey or when the
+    store could not be initialised (missing hnswlib, embedding-model load
+    failure, etc.). The init attempt is only made once per process — on
+    subsequent calls a failed init still returns None without retrying.
+    """
+    global _HNSW_STORE, _HNSW_INIT_ATTEMPTED
+    if not _hnsw_enabled():
+        return None
+    if _HNSW_INIT_ATTEMPTED:
+        return _HNSW_STORE
+
+    with _HNSW_LOCK:
+        if _HNSW_INIT_ATTEMPTED:
+            return _HNSW_STORE
+        _HNSW_INIT_ATTEMPTED = True
+        try:
+            from depthfusion.retrieval.hnsw_store import HNSWStore
+
+            index_path_raw = os.environ.get(
+                "DEPTHFUSION_HNSW_INDEX_PATH",
+                "~/.agent-mc/depthfusion/hnsw.bin",
+            )
+            model_name = (
+                os.environ.get("DEPTHFUSION_EMBEDDING_MODEL", "").strip()
+                or "all-MiniLM-L6-v2"
+            )
+            store = HNSWStore(
+                index_path=Path(index_path_raw).expanduser(),
+                model_name=model_name,
+            )
+            if not getattr(store, "hnsw_ready", False):
+                logger.info("[hnsw] store not ready — falling back to BM25-only")
+                _HNSW_STORE = None
+                return None
+            _HNSW_STORE = store
+            _register_hnsw_shutdown()
+            logger.info("[hnsw] store initialised (model=%s)", model_name)
+            return _HNSW_STORE
+        except Exception as exc:  # noqa: BLE001 — graceful degrade
+            logger.info("[hnsw] init failed (%s) — falling back to BM25-only", exc)
+            _HNSW_STORE = None
+            return None
+
+
+def _tool_hnsw_capability() -> str:
+    """Return current HNSW index capability/state (E-45)."""
+    store = _get_hnsw_store()
+    if store is None:
+        return json.dumps(
+            {
+                "enabled": False,
+                "backend": "none",
+                "model": "",
+                "dimension": 0,
+                "index_path": "",
+                "entry_count": 0,
+            }
+        )
+    try:
+        return json.dumps(store.capability())
+    except Exception as exc:  # noqa: BLE001 — never crash the tool
+        logger.warning("[hnsw] capability() raised: %s", exc)
+        return json.dumps(
+            {
+                "enabled": False,
+                "backend": "none",
+                "model": "",
+                "dimension": 0,
+                "index_path": "",
+                "entry_count": 0,
+            }
+        )
 
 
 def _tool_publish_context(arguments: dict, config: Any = None) -> str:
@@ -1534,6 +1744,20 @@ def _tool_publish_context(arguments: dict, config: Any = None) -> str:
             threshold=getattr(_cfg, "high_importance_threshold", 0.8),
         )
 
+    # E-45: HNSW upsert behind feature flag; never blocks the BM25/bus path.
+    indexed_in_hnsw = False
+    store = _get_hnsw_store()
+    if store is not None:
+        try:
+            indexed_in_hnsw = bool(store.upsert(item.item_id, item.content))
+        except Exception as exc:  # noqa: BLE001 — graceful degrade
+            logger.debug("[hnsw] upsert failed for %s: %s", item.item_id, exc)
+            indexed_in_hnsw = False
+
+    if isinstance(result, dict):
+        result["indexed_in_hnsw"] = indexed_in_hnsw
+    else:
+        result = {"indexed_in_hnsw": indexed_in_hnsw, "result": result}
     return json.dumps(result)
 
 
