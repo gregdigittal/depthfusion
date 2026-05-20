@@ -67,24 +67,53 @@ echo "✓ API key saved to $ENV_FILE"
 # 6. Register MCP server in claude_desktop_config.json
 PYTHON_BIN="$VENV_PATH/bin/python"
 mkdir -p "$CONFIG_DIR"
+
+# Backup existing config before any mutation
+if [ -f "$DESKTOP_CONFIG" ]; then
+    BACKUP_STAMP=$(date +%Y%m%d-%H%M%S)
+    cp "$DESKTOP_CONFIG" "${DESKTOP_CONFIG}.bak-${BACKUP_STAMP}"
+    echo "  (backed up existing config to ${DESKTOP_CONFIG}.bak-${BACKUP_STAMP})"
+fi
+
 if [ ! -f "$DESKTOP_CONFIG" ]; then
     python3 - "$DESKTOP_CONFIG" "$PYTHON_BIN" "$ENV_FILE" <<'PYEOF'
-import json, sys
+import json, os, sys, tempfile
 config_path, python_bin, env_file = sys.argv[1], sys.argv[2], sys.argv[3]
 config = {"mcpServers": {"depthfusion": {"command": python_bin, "args": ["-m", "depthfusion.mcp"], "env": {"DEPTHFUSION_ENV_FILE": env_file}}}}
-with open(config_path, "w") as f:
-    json.dump(config, f, indent=2)
+d = os.path.dirname(config_path)
+fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+try:
+    with os.fdopen(fd, "w") as tf:
+        json.dump(config, tf, indent=2)
+    os.replace(tmp, config_path)
+except Exception:
+    try: os.unlink(tmp)
+    except OSError: pass
+    raise
 PYEOF
 else
     python3 - "$DESKTOP_CONFIG" "$PYTHON_BIN" "$ENV_FILE" <<'PYEOF'
-import json, sys
+import json, os, sys, tempfile
 config_path, python_bin, env_file = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(config_path) as f:
-    config = json.load(f)
+    try:
+        config = json.load(f)
+    except json.JSONDecodeError as exc:
+        sys.exit(f"Error: {config_path} is not valid JSON ({exc}). Fix or remove it, then re-run the installer.")
 config.setdefault("mcpServers", {})
+if not isinstance(config["mcpServers"], dict):
+    sys.exit(f"Error: 'mcpServers' in {config_path} is not an object. Cannot safely merge. Fix the file and re-run.")
 config["mcpServers"]["depthfusion"] = {"command": python_bin, "args": ["-m", "depthfusion.mcp"], "env": {"DEPTHFUSION_ENV_FILE": env_file}}
-with open(config_path, "w") as f:
-    json.dump(config, f, indent=2)
+d = os.path.dirname(config_path)
+fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+try:
+    with os.fdopen(fd, "w") as tf:
+        json.dump(config, tf, indent=2)
+    os.replace(tmp, config_path)
+except Exception:
+    try: os.unlink(tmp)
+    except OSError: pass
+    raise
 PYEOF
 fi
 echo "✓ MCP server registered in $DESKTOP_CONFIG"

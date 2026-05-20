@@ -61,14 +61,31 @@ Write-Host "✓ API key saved to $EnvFile"
 # 6. Register MCP server
 $PythonBin = Join-Path $VenvPath "Scripts\python.exe"
 $McpEntry = @{ command = $PythonBin; args = @("-m", "depthfusion.mcp"); env = @{ DEPTHFUSION_ENV_FILE = $EnvFile } }
+
+# Backup existing config before any mutation (atomic write via temp file)
+if (Test-Path $DesktopConfig) {
+    $BackupStamp = (Get-Date -Format "yyyyMMdd-HHmmss")
+    Copy-Item $DesktopConfig "$DesktopConfig.bak-$BackupStamp"
+    Write-Host "  (backed up existing config to $DesktopConfig.bak-$BackupStamp)"
+}
+
+$TmpConfig = $DesktopConfig + ".tmp"
 if (-not (Test-Path $DesktopConfig)) {
-    @{ mcpServers = @{ depthfusion = $McpEntry } } | ConvertTo-Json -Depth 5 | Set-Content $DesktopConfig
+    @{ mcpServers = @{ depthfusion = $McpEntry } } | ConvertTo-Json -Depth 32 | Set-Content $TmpConfig
 } else {
     $Config = Get-Content $DesktopConfig -Raw | ConvertFrom-Json
-    if (-not $Config.PSObject.Properties['mcpServers']) { $Config | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([PSCustomObject]@{}) }
+    # Validate mcpServers is an object (PSCustomObject) before merging
+    $mcsProp = $Config.PSObject.Properties['mcpServers']
+    if (-not $mcsProp) {
+        $Config | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([PSCustomObject]@{})
+    } elseif ($mcsProp.Value -isnot [PSCustomObject]) {
+        Write-Error "'mcpServers' in $DesktopConfig is not a JSON object — cannot safely merge. Fix the file and re-run."
+        exit 1
+    }
     $Config.mcpServers | Add-Member -NotePropertyName depthfusion -NotePropertyValue $McpEntry -Force
-    $Config | ConvertTo-Json -Depth 5 | Set-Content $DesktopConfig
+    $Config | ConvertTo-Json -Depth 32 | Set-Content $TmpConfig
 }
+Move-Item -Force $TmpConfig $DesktopConfig
 Write-Host "✓ MCP server registered in $DesktopConfig"
 
 Write-Host ""
