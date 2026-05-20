@@ -12,7 +12,6 @@ Used by ``_tool_set_memory_score`` (S-70), ``RecallStore.apply_feedback``
 """
 from __future__ import annotations
 
-import fcntl
 import os
 import re
 import tempfile
@@ -200,7 +199,7 @@ def atomic_frontmatter_rewrite(path: Path) -> Iterator[FrontmatterContext]:
     lock_path = path.parent / f".{path.name}.scorelock"
     lock_fh = open(lock_path, "a", encoding="utf-8")
     try:
-        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        flock_ex(lock_fh.fileno())
         try:
             body = path.read_text(encoding="utf-8")
             ctx = FrontmatterContext(body=body)
@@ -252,6 +251,6 @@ def atomic_frontmatter_rewrite(path: Path) -> Iterator[FrontmatterContext]:
                     pass
                 raise
         finally:
-            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            flock_un(lock_fh.fileno())
     finally:
         lock_fh.close()
