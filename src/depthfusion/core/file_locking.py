@@ -38,6 +38,16 @@ try:
 except ImportError:
     # Windows: file locking is a no-op. DepthFusion local mode runs single-process;
     # multi-process VPS mode runs on Linux only where POSIX locking is always available.
+    import sys as _sys
+    import warnings as _warnings
+    if _sys.platform != "win32":
+        _warnings.warn(
+            "fcntl unavailable on non-Windows platform — file locking degraded to no-op; "
+            "multi-process safety is not guaranteed.",
+            RuntimeWarning,
+            stacklevel=1,
+        )
+
     def flock_ex(fd: int) -> None:  # type: ignore[misc]
         pass
 
