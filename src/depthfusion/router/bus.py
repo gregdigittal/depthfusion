@@ -12,13 +12,13 @@ creating a second row. Legacy ``bus.jsonl`` rows written before S-78 lack a
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import threading
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from depthfusion.core.file_locking import flock_ex, flock_un
 from depthfusion.core.types import ContextItem
 
 
@@ -137,7 +137,7 @@ class FileBus:
             # Open in 'a+' to combine read (for fresh under-lock scan) and append.
             # We never read past the index-build phase; the append always lands at EOF.
             with self._bus_file.open("a+", encoding="utf-8") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                flock_ex(f.fileno())
                 try:
                     # Re-scan under lock so writes from sibling processes since
                     # __init__ are observed.
@@ -211,7 +211,7 @@ class FileBus:
 
                     return _publish_result(item.item_id, deduped=False)
                 finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    flock_un(f.fileno())
 
     def subscribe(
         self, tags: list[str], source_agent: str | None = None
@@ -292,11 +292,11 @@ class FileBus:
             # Touch the file (in case it doesn't exist yet) so we have something
             # to flock against. open() in 'a' creates if absent.
             with self._bus_file.open("a", encoding="utf-8") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                flock_ex(f.fileno())
                 try:
                     f.truncate(0)
                     f.flush()
                     os.fsync(f.fileno())
                 finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    flock_un(f.fileno())
             self._hash_index.clear()

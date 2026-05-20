@@ -63,7 +63,6 @@ write failures (e.g. _emit_startup_event in server.py).
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import logging
@@ -72,6 +71,8 @@ from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+
+from depthfusion.core.file_locking import flock_ex
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +279,7 @@ class MetricsCollector:
         try:
             with open(path, "a", encoding="utf-8") as f:
                 try:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    flock_ex(f.fileno())
                 except OSError:
                     # flock unsupported (some filesystems / OSes) — best-effort only
                     pass
@@ -323,7 +324,7 @@ class MetricsCollector:
         path = self.today_path()
         with open(path, "a", encoding="utf-8") as f:
             try:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                flock_ex(f.fileno())
             except OSError:
                 pass  # flock unsupported on some filesystems — best-effort
             f.write(json.dumps(entry, default=_json_default) + "\n")

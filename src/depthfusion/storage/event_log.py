@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import fcntl
 import json
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional
 
+from depthfusion.core.file_locking import flock_ex, flock_sh, flock_un
 from depthfusion.core.memory import MemoryEvent
 
 
@@ -37,12 +37,12 @@ class EventLog:
                 return False
             line = json.dumps(event.to_dict()) + "\n"
             with open(self._path, "a") as f:
-                fcntl.flock(f, fcntl.LOCK_EX)
+                flock_ex(f.fileno())
                 try:
                     f.write(line)
                     f.flush()
                 finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)
+                    flock_un(f.fileno())
             self._seen_ids.add(event.event_id)
             return True
 
@@ -54,7 +54,7 @@ class EventLog:
         if not self._path.exists():
             return
         with open(self._path) as f:
-            fcntl.flock(f, fcntl.LOCK_SH)
+            flock_sh(f.fileno())
             try:
                 for line in f:
                     line = line.strip()
@@ -71,7 +71,7 @@ class EventLog:
                     except (json.JSONDecodeError, KeyError, ValueError):
                         pass
             finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                flock_un(f.fileno())
 
     def count(self) -> int:
         with self._lock:

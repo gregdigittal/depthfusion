@@ -12,7 +12,6 @@ Used by ``_tool_set_memory_score`` (S-70), ``RecallStore.apply_feedback``
 """
 from __future__ import annotations
 
-import fcntl
 import os
 import re
 import tempfile
@@ -20,6 +19,33 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Optional
+
+try:
+    import fcntl as _fcntl
+
+    def flock_ex(fd: int) -> None:
+        """Acquire exclusive lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_EX)
+
+    def flock_sh(fd: int) -> None:
+        """Acquire shared lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_SH)
+
+    def flock_un(fd: int) -> None:
+        """Release lock (no-op on Windows — local mode is single-process)."""
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+
+except ImportError:
+    # Windows: file locking is a no-op. DepthFusion local mode runs single-process;
+    # multi-process VPS mode runs on Linux only where POSIX locking is always available.
+    def flock_ex(fd: int) -> None:  # type: ignore[misc]
+        pass
+
+    def flock_sh(fd: int) -> None:  # type: ignore[misc]
+        pass
+
+    def flock_un(fd: int) -> None:  # type: ignore[misc]
+        pass
 
 
 def _splice_memory_score_frontmatter(
@@ -173,7 +199,7 @@ def atomic_frontmatter_rewrite(path: Path) -> Iterator[FrontmatterContext]:
     lock_path = path.parent / f".{path.name}.scorelock"
     lock_fh = open(lock_path, "a", encoding="utf-8")
     try:
-        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        flock_ex(lock_fh.fileno())
         try:
             body = path.read_text(encoding="utf-8")
             ctx = FrontmatterContext(body=body)
@@ -225,6 +251,6 @@ def atomic_frontmatter_rewrite(path: Path) -> Iterator[FrontmatterContext]:
                     pass
                 raise
         finally:
-            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            flock_un(lock_fh.fileno())
     finally:
         lock_fh.close()
