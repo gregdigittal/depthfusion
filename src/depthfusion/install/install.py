@@ -25,6 +25,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -154,6 +155,85 @@ def install_local(dry_run: bool = False) -> None:
         _register_mcp_server()
     _print_step("Local install complete.", dry_run)
     _print_step("Add to your environment: DEPTHFUSION_MODE=local", dry_run)
+
+
+def _register_mcp_windows(config_path: Path, python_bin: Path, env_file: Path) -> None:
+    """Merge depthfusion MCP server entry into claude_desktop_config.json."""
+    import json
+
+    config: dict = {}
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            config = {}
+    config.setdefault("mcpServers", {})
+    config["mcpServers"]["depthfusion"] = {
+        "command": str(python_bin),
+        "args": ["-m", "depthfusion.mcp"],
+        "env": {"DEPTHFUSION_ENV_FILE": str(env_file)},
+    }
+    config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+
+def install_local_windows(*, non_interactive: bool = False) -> None:
+    """Install DepthFusion for Windows (writes to %APPDATA%\\Claude\\)."""
+    import getpass
+    import subprocess
+
+    appdata = os.environ.get("APPDATA", "")
+    config_dir = Path(appdata) / "Claude"
+    env_file = config_dir / "depthfusion.env"
+    desktop_config = config_dir / "claude_desktop_config.json"
+    venv_path = Path(
+        os.environ.get("DEPTHFUSION_VENV_PATH", str(Path.home() / ".depthfusion-venv"))
+    )
+
+    # Get API key
+    if non_interactive:
+        api_key = os.environ.get("DEPTHFUSION_API_KEY", "")
+        if not api_key:
+            print(
+                "Error: --non-interactive requires DEPTHFUSION_API_KEY to be set in env.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        print("\nGet your DepthFusion API key from: claude.ai/settings → API Keys")
+        print("(This is NOT the same as your Claude Code subscription key)\n")
+        api_key = getpass.getpass("DEPTHFUSION_API_KEY: ")
+
+    # CRITICAL: refuse Claude Code's own billing key
+    if re.match(r"^sk-ant-api03-", api_key):
+        print(
+            "Error: That looks like a Claude Code API key (used for subscription billing).\n"
+            "Your DepthFusion API key is different — get it from claude.ai/settings → API Keys.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if not api_key.strip():
+        print("Error: API key cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+
+    # Create venv
+    config_dir.mkdir(parents=True, exist_ok=True)
+    if not venv_path.exists():
+        subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+
+    # Install
+    pip_bin = venv_path / "Scripts" / "pip.exe"
+    repo_root = Path(__file__).parent
+    subprocess.run([str(pip_bin), "install", "-e", f"{repo_root}[local]"], check=True)
+
+    # Write env file
+    env_file.write_text(f"DEPTHFUSION_API_KEY={api_key}\n", encoding="utf-8")
+
+    # Register MCP server
+    python_bin = venv_path / "Scripts" / "python.exe"
+    _register_mcp_windows(desktop_config, python_bin, env_file)
+
+    print("\nInstallation complete. Restart Claude Desktop to activate DepthFusion.")
 
 
 def install_vps_cpu(dry_run: bool = False, tier_threshold: int = 500) -> None:
@@ -991,6 +1071,12 @@ def main(argv: list[str] | None = None) -> int:
         "--ui", action="store_true",
         help="Launch the guided web install UI at http://127.0.0.1:7300/install",
     )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        default=False,
+        help="Read DEPTHFUSION_API_KEY from env instead of prompting (for CI installs)",
+    )
     args = parser.parse_args(argv)
 
     if args.ui:
@@ -1032,6 +1118,10 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if mode == "local":
+        if sys.platform == "win32":
+            install_local_windows(non_interactive=args.non_interactive)
+            return 0
+        # existing posix path below — unchanged
         install_local(dry_run=args.dry_run)
         return 0
     if mode == "vps-cpu":
