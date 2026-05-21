@@ -58,6 +58,25 @@ $Acl.AddAccessRule($Rule)
 Set-Acl $EnvFile $Acl
 Write-Host "✓ API key saved to $EnvFile"
 
+# 5b. Optional: HNSW embedding index
+Write-Host ""
+Write-Host "Enable HNSW embedding index for fused BM25+vector recall? [y/N]"
+Write-Host "  (Adds ~50 MB sentence-transformers model; skip if you prefer BM25-only)"
+$HnswChoice = Read-Host
+if ($HnswChoice -match '^[Yy]') {
+    Add-Content -Path $EnvFile -Value "`nDEPTHFUSION_HNSW_ENABLED=true"
+    Add-Content -Path $EnvFile -Value "DEPTHFUSION_HNSW_INDEX_PATH=$HOME\.depthfusion\hnsw"
+    try {
+        & "$VenvPath\Scripts\pip.exe" install --quiet "hnswlib>=0.7"
+        Write-Host "✓ hnswlib installed — HNSW fused recall active"
+    } catch {
+        Write-Host "  ⚠ hnswlib install failed — HNSW flag written but index will be disabled until hnswlib is installed"
+        Write-Host "    Run: $VenvPath\Scripts\pip.exe install 'hnswlib>=0.7'"
+    }
+} else {
+    Write-Host "  Skipping HNSW — BM25-only recall active (enable later via DEPTHFUSION_HNSW_ENABLED=true)"
+}
+
 # 6. Register MCP server
 $PythonBin = Join-Path $VenvPath "Scripts\python.exe"
 $McpEntry = @{ command = $PythonBin; args = @("-m", "depthfusion.mcp"); env = @{ DEPTHFUSION_ENV_FILE = $EnvFile } }

@@ -14,6 +14,36 @@ Conventions:
 
 ---
 
+## [v1.2.0] — 2026-05-21
+
+**Theme:** HNSW approximate nearest-neighbour embedding index + BM25-HNSW fused recall (ruflo-mod contract). Covers E-45.
+
+### Added
+
+**HNSW Embedding Index (E-45):**
+- `S-134` `HNSWStore` — `hnswlib`-backed approximate nearest-neighbour index with lazy `LocalEmbeddingBackend` (384-dim `all-MiniLM-L6-v2`), label map (`.labels.json` sidecar), metadata (`.meta.json` sidecar), auto-save every 100 upserts, atomic writes via tmp + `os.replace()`; graceful degradation to no-op when `hnswlib` is absent
+- `S-135` `depthfusion_hnsw_capability` MCP tool — returns `HNSWCapability` shape (`enabled`, `backend`, `model`, `dimension`, `index_path`, `entry_count`) regardless of index state; always-on, no feature flag required; designed for the agent-ops bridge startup probe
+- `S-136` `publish_context` HNSW integration — every publish upserts into the HNSW index when `DEPTHFUSION_HNSW_ENABLED=true`; `indexed_in_hnsw: bool` field added to all `publish_context` responses (additive, back-compat with existing callers)
+- `S-137` BM25+HNSW fused recall — when HNSW is available, `recall_relevant` applies post-hoc cosine fusion: BM25 scores first, HNSW cosine similarity boosts matching items and appends HNSW-only hits; `final_score = 0.6 × bm25_score + 0.4 × hnsw_cosine`; results re-sorted and sliced to `top_k`
+- `S-138` Recall response contract extension — `strategy` field (`"bm25-only"` / `"bm25+hnsw-fused"`) and `hnsw_available: bool` added to ALL `recall_relevant` response paths including empty results, filtered queries, index/timeline modes, and error paths; additive, back-compat
+- `S-139` Graceful SIGTERM/SIGINT shutdown — HNSW store saves to disk on graceful server shutdown; registered via `_register_hnsw_shutdown()` at server start (main-thread guarded)
+- `S-140` New `hnsw` extras group in `pyproject.toml` — `hnswlib>=0.7`; also added to `vps-gpu` and `mac-mlx` extras; `hnswlib` is optional — all code paths degrade gracefully without it
+
+### New env vars (E-45)
+
+| Env Var | Controls | Default |
+|---|---|---|
+| `DEPTHFUSION_HNSW_ENABLED` | Enable HNSW index + fused BM25+vector recall | `false` |
+| `DEPTHFUSION_HNSW_INDEX_PATH` | Directory for HNSW index files + sidecars | `~/.depthfusion/hnsw/` |
+| `DEPTHFUSION_EMBEDDING_MODEL` | sentence-transformers model for HNSW embeddings | `all-MiniLM-L6-v2` |
+
+### Test totals (v1.2.0)
+- **2000 passed · 9 skipped · 0 failed** (up from 1986 in v1.1.0)
+- 9 skipped: hnswlib-gated tests — skip gracefully when `hnswlib` is not installed in the dev venv
+- MCP tool count: **29** (28 in v1.1.0 + `depthfusion_hnsw_capability`)
+
+---
+
 ## [v1.1.0] — 2026-05-20
 
 **Theme:** SkillForge operational hardening, MemPalace retrieval integration, metrics reliability, full Python parity for the Mamba B/C/Δ selective fusion stack, and Windows + cross-platform installer. Covers E-38 through E-44.

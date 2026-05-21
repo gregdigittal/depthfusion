@@ -2,7 +2,7 @@
 
 Cross-session memory for Claude Code — tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture mechanisms, a memory-policy layer, and a full Cognitive Infrastructure Layer that brings typed memory objects, contradiction detection, and decision-aware recall.
 
-> **Status:** v1.1.0 (2026-05-20). 1986 tests passing · 0 ruff · 0 mypy. Windows installer (`scripts/install.ps1`), Mac/Linux installer (`scripts/install.sh`), fcntl cross-platform compat, and GitHub Actions CI matrix shipped (E-44). MCP surface (24 tools) stable; E-31 cognitive features active by default; SkillForge SF-2 + Mamba B/C/Δ fusion stack live.
+> **Status:** v1.2.0 (2026-05-21). 2000 tests passing · 9 skipped · 0 ruff · 0 mypy. HNSW embedding index + BM25-HNSW fused recall shipped (E-45). MCP surface (29 tools); E-31 cognitive features active by default; SkillForge SF-2 + Mamba B/C/Δ fusion stack + HNSW vector layer live.
 
 ---
 
@@ -108,7 +108,7 @@ src/depthfusion/
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (24 tools gated by feature flags)
+├── mcp/         — server (29 tools gated by feature flags)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -138,9 +138,11 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
+**Upgrading to v1.2.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. To enable HNSW: set `DEPTHFUSION_HNSW_ENABLED=true` in `~/.claude/depthfusion.env` and `pip install hnswlib>=0.7` into your venv. HNSW is fully optional — BM25-only recall remains the default.
+
 **Upgrading to v1.1.0?** → **[docs/install/upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md)** — covers E-44 (Windows installer, fcntl compat, CI matrix). Pull + reinstall, no schema changes.
 
-**Upgrading from v1.0.0 (skipping post-v1.0.0)?** Follow [upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md) (E-38–E-43) first, then [upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md) (E-44).
+**Upgrading from v1.0.0 (skipping post-v1.0.0)?** Follow [upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md) (E-38–E-43) first, then [upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md) (E-44), then v1.2.0 above.
 
 > ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
 > Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and will switch your **entire** Claude Code billing from your Pro/Max subscription to pay-per-token API for everything — not just DepthFusion. The separate `DEPTHFUSION_API_KEY` exists specifically to prevent this. The installer refuses to use `ANTHROPIC_API_KEY`.
@@ -390,7 +392,7 @@ When `DEPTHFUSION_REST_API=true`, a FastAPI server starts on `127.0.0.1:7300`. L
 
 ---
 
-## MCP Tools (24 total)
+## MCP Tools (29 total)
 
 ### Core tools (pre-E-31, 18 tools)
 
@@ -426,6 +428,16 @@ When `DEPTHFUSION_REST_API=true`, a FastAPI server starts on `127.0.0.1:7300`. L
 | `df_report_outcome` | Record outcome of a past decision (feedback loop) | `decision_memory` |
 | `df_get_cognitive_state` | Current cognitive layer health + active memory count | always |
 
+### Post-E-31 tools (5 new tools — E-33, E-34, E-35, E-45)
+
+| Tool | Description | Required flag |
+|---|---|---|
+| `depthfusion_record_telemetry` | Log a per-tool-call telemetry event (cost, latency, usage) | always |
+| `depthfusion_query_telemetry` | Aggregate telemetry by project, agent, story, sprint, or period | always |
+| `depthfusion_surface_skill_candidates` | Scan telemetry for recurring patterns; draft candidate skills in SkillForge | always |
+| `depthfusion_session_seed` | Run a seed recall at session start; publish results as high-priority context | always |
+| `depthfusion_hnsw_capability` | Report HNSW index capability and state (agent-ops bridge startup probe) | always |
+
 Full tool documentation with response shapes: see `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.
 
 ---
@@ -459,6 +471,14 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 | `DEPTHFUSION_SKILLFORGE_API_URL` | SkillForge base URL for recursive calls (E-39) | — |
 | `DEPTHFUSION_SKILLFORGE_API_TOKEN` | Bearer token for SkillForge API (E-39) | — |
 | `DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID` | UUID of pre-registered SkillForge skill (E-39) | — |
+
+### E-45 HNSW flags
+
+| Env Var | Controls | Default |
+|---|---|---|
+| `DEPTHFUSION_HNSW_ENABLED` | Enable HNSW index + fused BM25+vector recall | `false` |
+| `DEPTHFUSION_HNSW_INDEX_PATH` | Directory for HNSW index files + sidecars | `~/.depthfusion/hnsw/` |
+| `DEPTHFUSION_EMBEDDING_MODEL` | sentence-transformers model for HNSW embeddings | `all-MiniLM-L6-v2` |
 
 ### E-31 Cognitive flags (all ON in the canonical depthfusion.env)
 
