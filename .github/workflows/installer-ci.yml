@@ -34,14 +34,14 @@ jobs:
 
       - name: Install dependencies (Unix)
         if: runner.os != 'Windows'
-        run: pip install -e '.[local]' pytest
+        run: pip install -e '.[local,dev]'
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: pip install -e .[local] pytest
+        run: pip install -e .[local,dev]
 
       - name: Run tests
-        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_install --ignore=tests/test_integration --ignore=tests/test_recursive/test_sidecar.py
+        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration
         continue-on-error: false
 
       - name: Lint
