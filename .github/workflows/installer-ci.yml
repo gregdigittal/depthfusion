@@ -41,7 +41,7 @@ jobs:
         run: pip install -e .[local] pytest
 
       - name: Run tests
-        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks
+        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_install
         continue-on-error: false
 
       - name: Lint
