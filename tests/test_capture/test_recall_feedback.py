@@ -10,6 +10,7 @@ Commit 3 (feedback) land.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from pathlib import Path
 from unittest.mock import patch
@@ -399,6 +400,7 @@ class TestConcurrency:
         )
 
     @tool_required
+    @pytest.mark.skipif(sys.platform == "win32", reason="fcntl file locking not available on Windows")
     def test_concurrent_partial_updates_serialize(self, store, tmp_path, monkeypatch):
         """set_memory_score and recall_feedback racing on same file: both updates land."""
         monkeypatch.setattr(
