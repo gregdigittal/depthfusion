@@ -15,6 +15,7 @@ Acceptance criteria coverage map:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -622,6 +623,7 @@ class TestSetMemoryScoreTool:
         assert "error" in result
         assert not ghost.exists()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="fcntl file locking not available on Windows")
     def test_set_memory_score_concurrent_partial_updates_serialize(self, tmp_path):
         """AC-4 (consensus Round 1 / Codex finding, Commit 3): two callers
         each supplying ONLY ONE of (importance, salience) must serialize
