@@ -1019,6 +1019,12 @@ def _read_mode_choice(recommendation: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows consoles default to cp1252 which can't encode box-drawing chars.
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="DepthFusion installer (three-mode: local / vps-cpu / vps-gpu)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
