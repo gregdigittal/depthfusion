@@ -57,7 +57,7 @@ def _make_mock_store() -> ChromaDBStore:
 
     with (
         patch("depthfusion.storage.vector_store._CHROMADB_AVAILABLE", True),
-        patch("depthfusion.storage.vector_store.chromadb") as mock_chromadb,
+        patch("depthfusion.storage.vector_store.chromadb", create=True) as mock_chromadb,
     ):
         mock_chromadb.PersistentClient.return_value = mock_client
         # Path.mkdir called inside __init__ — patch it out

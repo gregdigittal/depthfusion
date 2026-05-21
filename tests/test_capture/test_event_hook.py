@@ -1,5 +1,6 @@
 """Tests for S-73 high-importance event hook (capture/event_hook.py)."""
 import json
+import sys
 
 import pytest
 
@@ -131,6 +132,7 @@ class TestEnvVarOverride:
 
 
 class TestErrorHandling:
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows allows writing to /proc-style paths")
     def test_unwritable_path_returns_false(self):
         item = _make_item(importance=0.9)
         result = emit_if_high_importance(
