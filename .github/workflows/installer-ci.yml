@@ -20,6 +20,10 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
+      - name: Enable git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -30,14 +34,14 @@ jobs:
 
       - name: Install dependencies (Unix)
         if: runner.os != 'Windows'
-        run: pip install -e '.[local]'
+        run: pip install -e '.[local]' pytest
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: pip install -e .[local]
+        run: pip install -e .[local] pytest
 
       - name: Run tests
-        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark
+        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks
         continue-on-error: false
 
       - name: Lint
