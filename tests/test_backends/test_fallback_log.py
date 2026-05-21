@@ -23,6 +23,22 @@ import pytest
 
 from depthfusion.backends.factory import _emit_fallback_event, get_backend
 
+
+def _mock_haiku_sdk(monkeypatch):
+    """Make HaikuBackend constructible without the optional anthropic package."""
+    from unittest.mock import MagicMock
+
+    import depthfusion.backends.haiku as haiku_module
+
+    anthropic_client = MagicMock()
+    monkeypatch.setattr(haiku_module, "_ANTHROPIC_IMPORTABLE", True)
+    monkeypatch.setattr(
+        haiku_module,
+        "anthropic",
+        MagicMock(Anthropic=MagicMock(return_value=anthropic_client)),
+    )
+
+
 # ── _emit_fallback_event unit tests ──────────────────────────────────────
 
 
@@ -136,9 +152,11 @@ def test_factory_haiku_fallback_emits_record(monkeypatch):
 
 def test_factory_healthy_haiku_does_not_emit_fallback(monkeypatch):
     """Healthy haiku (API key present) → no fallback event."""
+    _mock_haiku_sdk(monkeypatch)
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
     monkeypatch.setenv("DEPTHFUSION_BACKEND_FALLBACK_LOG", "true")
     monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-test-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("DEPTHFUSION_RERANKER_BACKEND", raising=False)
 
     with patch("depthfusion.metrics.collector.MetricsCollector.record") as mock_record:
