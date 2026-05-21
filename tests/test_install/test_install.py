@@ -302,12 +302,14 @@ class TestInteractiveModeSelect:
         fake_home = tmp_path / "home"
         (fake_home / ".claude").mkdir(parents=True)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
-        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.gpu_probe import AppleSiliconInfo, GPUInfo
         good_gpu = GPUInfo(True, "RTX 4090", 24.0, 1, "ok")
-        with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
-            with patch("depthfusion.install.install.install_vps_gpu",
-                       return_value=0) as mock_install:
-                rc = install_mod.main(["--yes"])
+        no_apple = AppleSiliconInfo(has_apple_silicon=False, chip_name="", memory_gb=0.0, reason="not Apple Silicon")
+        with patch("depthfusion.install.install.detect_apple_silicon", return_value=no_apple):
+            with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
+                with patch("depthfusion.install.install.install_vps_gpu",
+                           return_value=0) as mock_install:
+                    rc = install_mod.main(["--yes"])
         assert rc == 0
         captured = capsys.readouterr()
         assert "NVIDIA GPU detected" in captured.out
