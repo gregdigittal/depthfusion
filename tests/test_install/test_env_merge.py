@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import os
 import stat
+import sys
 from pathlib import Path
+
+import pytest
 
 from depthfusion.install.install import (
     _LOCAL_ENV_LINES,
@@ -129,6 +132,7 @@ class TestWriteEnvConfigMerge:
         result = self._env_file(tmp_path).read_text()
         assert "\n\n" in result
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="chmod is a no-op on Windows")
     def test_chmod_600_preserved(self, tmp_path, monkeypatch):
         """S-68 AC-4: file permissions must survive the merge."""
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
