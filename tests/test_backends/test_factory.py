@@ -14,6 +14,22 @@ import pytest
 from depthfusion.backends.factory import get_backend
 from depthfusion.backends.null import NullBackend
 
+
+def _mock_haiku_sdk(monkeypatch):
+    """Make HaikuBackend constructible without the optional anthropic package."""
+    from unittest.mock import MagicMock
+
+    import depthfusion.backends.haiku as haiku_module
+
+    anthropic_client = MagicMock()
+    monkeypatch.setattr(haiku_module, "_ANTHROPIC_IMPORTABLE", True)
+    monkeypatch.setattr(
+        haiku_module,
+        "anthropic",
+        MagicMock(Anthropic=MagicMock(return_value=anthropic_client)),
+    )
+
+
 # ── Mode defaults ────────────────────────────────────────────────────────
 
 
@@ -143,9 +159,12 @@ def test_unknown_mode_falls_through_to_null(monkeypatch):
 def test_haiku_override_returns_haiku_when_key_set(monkeypatch):
     """Explicit haiku override + API key → returns a healthy HaikuBackend."""
     from depthfusion.backends.haiku import HaikuBackend
+
+    _mock_haiku_sdk(monkeypatch)
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_RERANKER_BACKEND", "haiku")
     monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     backend = get_backend("reranker")
     assert isinstance(backend, HaikuBackend)
     assert backend.healthy()
@@ -169,8 +188,11 @@ def test_vps_cpu_defaults_to_haiku_when_key_set(monkeypatch):
     factory returns HaikuBackend.
     """
     from depthfusion.backends.haiku import HaikuBackend
+
+    _mock_haiku_sdk(monkeypatch)
     monkeypatch.setenv("DEPTHFUSION_MODE", "vps-cpu")
     monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     for cap in ["reranker", "extractor", "linker", "summariser", "decision_extractor"]:
         monkeypatch.delenv(f"DEPTHFUSION_{cap.upper()}_BACKEND", raising=False)
         backend = get_backend(cap)
