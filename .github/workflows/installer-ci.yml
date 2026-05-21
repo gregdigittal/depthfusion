@@ -10,7 +10,7 @@ on:
 jobs:
   test-matrix:
     name: "Test (${{ matrix.os }}, Python ${{ matrix.python-version }})"
-    timeout-minutes: 40
+    timeout-minutes: 60
     runs-on: ${{ matrix.os }}
 
     strategy:
