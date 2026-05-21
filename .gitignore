@@ -38,8 +38,9 @@ dmypy.json
 *.tmp
 *.log
 *.jsonl
-# Allow checked-in fixture files
+# Allow checked-in fixture files (top-level and subdirectories)
 !tests/fixtures/*.jsonl
+!tests/fixtures/ciqs_cat_d/*.jsonl
 
 # IDE
 .vscode/
