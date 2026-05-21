@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-20 (E-45 added and done — HNSW embedding index + fused recall (ruflo-mod contract); S-134–S-140 shipped; 2000 tests, 0 lint, 0 mypy)
+> Last updated: 2026-05-21 (E-43 closed — S-128/S-129/S-130 verified done; E-45 HNSW embedding index + fused recall; all 45 epics done)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2178,7 +2178,7 @@
 
 ---
 
-## E-43: SkillForge Operational & Divergence Alignment [backlog]
+## E-43: SkillForge Operational & Divergence Alignment [done]
 
 > Three gaps surfaced during the E-39 SF-2 integration audit (2026-05-19): JWT token lifecycle, and two TS→Python parity gaps from `docs/depthfusion-skillforge-divergence.md §8`.
 
