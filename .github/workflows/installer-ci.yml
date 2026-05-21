@@ -10,7 +10,7 @@ on:
 jobs:
   test-matrix:
     name: "Test (${{ matrix.os }}, Python ${{ matrix.python-version }})"
-    timeout-minutes: 60
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -40,8 +40,16 @@ jobs:
         if: runner.os == 'Windows'
         run: pip install -e .[local,dev]
 
-      - name: Run tests
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
         run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration
+        continue-on-error: false
+
+      - name: Run tests (Windows — platform subset)
+        if: runner.os == 'Windows'
+        # Windows runners are ~15x slower than Linux; run a focused subset covering
+        # platform-specific behaviour. Ubuntu runs the full suite as authoritative.
+        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration --ignore=tests/test_retrieval --ignore=tests/test_backends --ignore=tests/test_fusion --ignore=tests/test_graph --ignore=tests/test_scripts --ignore=tests/test_analyzer
         continue-on-error: false
 
       - name: Lint
