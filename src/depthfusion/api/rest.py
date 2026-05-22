@@ -14,7 +14,8 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query
+from pydantic import BaseModel
 
 app = FastAPI(
     title="DepthFusion Cognitive API",
@@ -295,6 +296,467 @@ async def get_telemetry(
 
     next_cursor = _encode_cursor(offset + limit) if has_more else None
     return {"rows": rows, "row_count": len(rows), "next_cursor": next_cursor}
+
+
+# ---------------------------------------------------------------------------
+# Request body models for mutation endpoints
+# ---------------------------------------------------------------------------
+
+class ScopeBody(BaseModel):
+    scope: str
+
+class SessionSeedBody(BaseModel):
+    project: str
+    branch: Optional[str] = None
+    context: Optional[str] = None
+
+class CompressSessionBody(BaseModel):
+    max_tokens: Optional[int] = None
+
+class TagSessionBody(BaseModel):
+    tags: list[str]
+
+class RecallBody(BaseModel):
+    query: str
+    limit: Optional[int] = 5
+    threshold: Optional[float] = 0.7
+    scope: Optional[str] = None
+
+class RecallFeedbackBody(BaseModel):
+    recall_id: str
+    rating: int
+    notes: Optional[str] = None
+
+class PublishContextBody(BaseModel):
+    content: str
+    tags: list[str]
+    project: Optional[str] = None
+    session_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+class RetrieveContextBody(BaseModel):
+    id: Optional[str] = None
+    tags: Optional[list[str]] = None
+    project: Optional[str] = None
+
+class AutoLearnBody(BaseModel):
+    session_id: Optional[str] = None
+    depth: Optional[str] = None
+
+class GraphTraverseBody(BaseModel):
+    from_node: str
+    depth: Optional[int] = 2
+    direction: Optional[str] = "both"
+    filter_tags: Optional[list[str]] = None
+
+class RunRecursiveBody(BaseModel):
+    query: str
+    max_depth: Optional[int] = 3
+
+class SupersedeBody(BaseModel):
+    project_id: str
+    old_memory_id: str
+    new_memory_id: str
+    reason: Optional[str] = None
+    actor: Optional[str] = None
+
+class PruneDiscoveriesBody(BaseModel):
+    older_than_days: Optional[int] = 30
+    status: Optional[str] = None
+
+class SetMemoryScoreBody(BaseModel):
+    score: float
+
+class RecordTelemetryBody(BaseModel):
+    event: str
+    data: dict
+    session_id: Optional[str] = None
+
+class RecordDecisionBody(BaseModel):
+    decision: str
+    rationale: str
+    context: Optional[str] = None
+    project: Optional[str] = None
+
+class RecordIncidentBody(BaseModel):
+    description: str
+    severity: str
+    impact: Optional[str] = None
+
+class ReportOutcomeBody(BaseModel):
+    task_id: str
+    outcome: str
+    notes: Optional[str] = None
+
+class SkillCandidatesBody(BaseModel):
+    query: str
+    limit: Optional[int] = 5
+    project: Optional[str] = None
+
+class ConfirmDiscoveryBody(BaseModel):
+    text: str
+    project: Optional[str] = None
+    category: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class PinDiscoveryBody(BaseModel):
+    filename: str
+    pinned: bool = True
+
+
+class InspectDiscoveryBody(BaseModel):
+    filename: str
+
+
+def _parse_tool_result(result):
+    """Parse a _tool_* return value: JSON string → dict, or wrap plain string."""
+    import json
+    if isinstance(result, str):
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, ValueError):
+            return {"result": result}
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Status and capability endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/status")
+async def status(_auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_status
+    cfg = DepthFusionConfig()
+    return _parse_tool_result(_tool_status(cfg))
+
+
+@app.get("/tiers/status")
+async def tiers_status(_auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_tier_status
+    return _parse_tool_result(_tool_tier_status())
+
+
+@app.get("/capabilities")
+async def capabilities(_auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_describe_capabilities
+    return _parse_tool_result(_tool_describe_capabilities())
+
+
+@app.get("/hnsw/capability")
+async def hnsw_capability(_auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_hnsw_capability
+    return _parse_tool_result(_tool_hnsw_capability())
+
+
+@app.get("/cognitive-state")
+async def cognitive_state_v2(_auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_get_cognitive_state
+    cfg = DepthFusionConfig()
+    return _parse_tool_result(_tool_get_cognitive_state({}, cfg))
+
+
+# ---------------------------------------------------------------------------
+# Session lifecycle endpoints
+# ---------------------------------------------------------------------------
+
+@app.put("/scope")
+async def set_scope(body: ScopeBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_set_scope
+    return _parse_tool_result(_tool_set_scope({"scope": body.scope}))
+
+
+@app.post("/session/seed")
+async def session_seed(body: SessionSeedBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_session_seed
+    args = {"project": body.project}
+    if body.branch is not None:
+        args["branch"] = body.branch
+    if body.context is not None:
+        args["context"] = body.context
+    return _parse_tool_result(_tool_session_seed(args))
+
+
+@app.post("/session/compress")
+async def session_compress(body: CompressSessionBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_compress_session
+    args = {}
+    if body.max_tokens is not None:
+        args["max_tokens"] = body.max_tokens
+    return _parse_tool_result(_tool_compress_session(args))
+
+
+@app.post("/session/tags")
+async def session_tags(body: TagSessionBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_tag_session
+    return _parse_tool_result(_tool_tag_session({"tags": body.tags}))
+
+
+# ---------------------------------------------------------------------------
+# Recall endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/recall")
+async def recall(body: RecallBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_recall
+    args: dict = {"query": body.query, "limit": body.limit, "threshold": body.threshold}
+    if body.scope is not None:
+        args["scope"] = body.scope
+    return _parse_tool_result(_tool_recall(args))
+
+
+@app.post("/recall/feedback")
+async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_recall_feedback
+    args: dict = {"recall_id": body.recall_id, "rating": body.rating}
+    if body.notes is not None:
+        args["notes"] = body.notes
+    return _parse_tool_result(_tool_recall_feedback(args))
+
+
+# ---------------------------------------------------------------------------
+# Context endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/context")
+async def publish_context(body: PublishContextBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_publish_context
+    cfg = DepthFusionConfig()
+    args: dict = {"content": body.content, "tags": body.tags}
+    if body.project is not None:
+        args["project"] = body.project
+    if body.session_id is not None:
+        args["session_id"] = body.session_id
+    if body.metadata is not None:
+        args["metadata"] = body.metadata
+    return _parse_tool_result(_tool_publish_context(args, cfg))
+
+
+@app.post("/context/retrieve")
+async def retrieve_context(body: RetrieveContextBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_retrieve_context
+    cfg = DepthFusionConfig()
+    args: dict = {}
+    if body.id is not None:
+        args["id"] = body.id
+    if body.tags is not None:
+        args["tags"] = body.tags
+    if body.project is not None:
+        args["project"] = body.project
+    return _parse_tool_result(_tool_retrieve_context(args, cfg))
+
+
+@app.post("/auto-learn")
+async def auto_learn(body: AutoLearnBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_auto_learn
+    args: dict = {}
+    if body.session_id is not None:
+        args["session_id"] = body.session_id
+    if body.depth is not None:
+        args["depth"] = body.depth
+    return _parse_tool_result(_tool_auto_learn(args))
+
+
+# ---------------------------------------------------------------------------
+# Graph endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/graph/status")
+async def graph_status(_auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_graph_status
+    return _parse_tool_result(_tool_graph_status())
+
+
+@app.post("/graph/traverse")
+async def graph_traverse(body: GraphTraverseBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_graph_traverse
+    args: dict = {"from": body.from_node, "depth": body.depth, "direction": body.direction}
+    if body.filter_tags is not None:
+        args["filter_tags"] = body.filter_tags
+    return _parse_tool_result(_tool_graph_traverse(args))
+
+
+@app.post("/run/recursive")
+async def run_recursive(body: RunRecursiveBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_run_recursive
+    cfg = DepthFusionConfig()
+    args: dict = {"query": body.query, "max_depth": body.max_depth}
+    return _parse_tool_result(_tool_run_recursive(args, cfg))
+
+
+# ---------------------------------------------------------------------------
+# Discovery endpoints
+# discoveries use filesystem filenames as identifiers (URL-encoded in path)
+# ---------------------------------------------------------------------------
+
+@app.get("/discoveries")
+async def list_discoveries(
+    project: Optional[str] = Query(default=None),
+    agent: Optional[str] = Query(default=None),
+    from_: Optional[str] = Query(default=None, alias="from"),
+    to: Optional[str] = Query(default=None),
+    tags: Optional[str] = Query(default=None, description="Comma-separated tags"),
+    cursor: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=200),
+    _auth: None = Depends(_check_auth),
+):
+    from depthfusion.api.query import query_discoveries
+
+    from_dt = _parse_dt(from_, "from")
+    to_dt = _parse_dt(to, "to")
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+
+    try:
+        return query_discoveries(
+            project=project,
+            agent=agent,
+            from_dt=from_dt,
+            to_dt=to_dt,
+            tags=tag_list,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid cursor")
+
+
+@app.post("/discoveries/inspect")
+async def inspect_discovery(body: InspectDiscoveryBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_inspect_discovery
+    return _parse_tool_result(_tool_inspect_discovery({"filename": body.filename}))
+
+
+@app.post("/discoveries/confirm")
+async def confirm_discovery(body: ConfirmDiscoveryBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_confirm_discovery
+    args: dict = {"text": body.text}
+    if body.project is not None:
+        args["project"] = body.project
+    if body.category is not None:
+        args["category"] = body.category
+    if body.confidence is not None:
+        args["confidence"] = body.confidence
+    return _parse_tool_result(_tool_confirm_discovery(args))
+
+
+@app.post("/discoveries/pin")
+async def pin_discovery(body: PinDiscoveryBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_pin_discovery
+    return _parse_tool_result(_tool_pin_discovery({"filename": body.filename, "pinned": body.pinned}))
+
+
+@app.post("/discoveries/supersede")
+async def mark_superseded(body: SupersedeBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_mark_superseded
+    cfg = DepthFusionConfig()
+    args: dict = {
+        "project_id": body.project_id,
+        "old_memory_id": body.old_memory_id,
+        "new_memory_id": body.new_memory_id,
+    }
+    if body.reason is not None:
+        args["reason"] = body.reason
+    if body.actor is not None:
+        args["actor"] = body.actor
+    return _parse_tool_result(_tool_mark_superseded(args, cfg))
+
+
+@app.post("/discoveries/prune")
+async def prune_discoveries(body: PruneDiscoveriesBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.mcp.server import _tool_prune_discoveries
+    args: dict = {"older_than_days": body.older_than_days}
+    if body.status is not None:
+        args["status"] = body.status
+    return _parse_tool_result(_tool_prune_discoveries(args))
+
+
+# ---------------------------------------------------------------------------
+# Memory scoring
+# ---------------------------------------------------------------------------
+
+@app.put("/memories/{memory_id}/score")
+async def set_memory_score(
+    memory_id: str = Path(...),
+    body: SetMemoryScoreBody = ...,
+    _auth: None = Depends(_check_auth),
+):
+    from depthfusion.mcp.server import _tool_set_memory_score
+    return _parse_tool_result(_tool_set_memory_score({"id": memory_id, "score": body.score}))
+
+
+# ---------------------------------------------------------------------------
+# Telemetry
+# ---------------------------------------------------------------------------
+
+@app.post("/telemetry")
+async def record_telemetry(body: RecordTelemetryBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_record_telemetry
+    cfg = DepthFusionConfig()
+    args: dict = {"event": body.event, "data": body.data}
+    if body.session_id is not None:
+        args["session_id"] = body.session_id
+    return _parse_tool_result(_tool_record_telemetry(args, cfg))
+
+
+# ---------------------------------------------------------------------------
+# Decisions, incidents, outcomes
+# ---------------------------------------------------------------------------
+
+@app.post("/decisions")
+async def record_decision(body: RecordDecisionBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_record_decision
+    cfg = DepthFusionConfig()
+    args: dict = {"decision": body.decision, "rationale": body.rationale}
+    if body.context is not None:
+        args["context"] = body.context
+    if body.project is not None:
+        args["project"] = body.project
+    return _parse_tool_result(_tool_record_decision(args, cfg))
+
+
+@app.post("/incidents")
+async def record_incident(body: RecordIncidentBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_record_incident
+    cfg = DepthFusionConfig()
+    args: dict = {"description": body.description, "severity": body.severity}
+    if body.impact is not None:
+        args["impact"] = body.impact
+    return _parse_tool_result(_tool_record_incident(args, cfg))
+
+
+@app.post("/outcomes")
+async def report_outcome(body: ReportOutcomeBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_report_outcome
+    cfg = DepthFusionConfig()
+    args: dict = {"task_id": body.task_id, "outcome": body.outcome}
+    if body.notes is not None:
+        args["notes"] = body.notes
+    return _parse_tool_result(_tool_report_outcome(args, cfg))
+
+
+# ---------------------------------------------------------------------------
+# Skills
+# ---------------------------------------------------------------------------
+
+@app.post("/skills/candidates")
+async def surface_skill_candidates(body: SkillCandidatesBody, _auth: None = Depends(_check_auth)):
+    from depthfusion.core.config import DepthFusionConfig
+    from depthfusion.mcp.server import _tool_surface_skill_candidates
+    cfg = DepthFusionConfig()
+    args: dict = {"query": body.query, "limit": body.limit}
+    if body.project is not None:
+        args["project"] = body.project
+    return _parse_tool_result(_tool_surface_skill_candidates(args, cfg))
 
 
 @app.get("/query/telemetry/aggregate")
