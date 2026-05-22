@@ -685,7 +685,7 @@ async def prune_discoveries(body: PruneDiscoveriesBody, _auth: None = Depends(_c
 @app.put("/memories/{memory_id}/score")
 async def set_memory_score(
     memory_id: str = Path(...),
-    body: SetMemoryScoreBody = ...,
+    body: SetMemoryScoreBody,
     _auth: None = Depends(_check_auth),
 ):
     from depthfusion.mcp.server import _tool_set_memory_score
