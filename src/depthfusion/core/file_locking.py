@@ -25,15 +25,15 @@ try:
 
     def flock_ex(fd: int) -> None:
         """Acquire exclusive lock (no-op on Windows — local mode is single-process)."""
-        _fcntl.flock(fd, _fcntl.LOCK_EX)
+        _fcntl.flock(fd, _fcntl.LOCK_EX)  # type: ignore[attr-defined]
 
     def flock_sh(fd: int) -> None:
         """Acquire shared lock (no-op on Windows — local mode is single-process)."""
-        _fcntl.flock(fd, _fcntl.LOCK_SH)
+        _fcntl.flock(fd, _fcntl.LOCK_SH)  # type: ignore[attr-defined]
 
     def flock_un(fd: int) -> None:
         """Release lock (no-op on Windows — local mode is single-process)."""
-        _fcntl.flock(fd, _fcntl.LOCK_UN)
+        _fcntl.flock(fd, _fcntl.LOCK_UN)  # type: ignore[attr-defined]
 
 except ImportError:
     # Windows: file locking is a no-op. DepthFusion local mode runs single-process;
