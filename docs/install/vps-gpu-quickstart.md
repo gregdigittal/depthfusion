@@ -393,6 +393,15 @@ HNSW is an approximate nearest-neighbour index that fuses with BM25 to
 give vector-similarity-boosted recall. `hnswlib` is already installed by
 the `[vps-gpu]` extras — you only need to add two env vars and restart.
 
+> **Non-vps-gpu installs (e.g. Mac `local` mode):** `hnswlib` is not in
+> the `local` or `vps-cpu` extras. Install it manually:
+> ```bash
+> pip install 'hnswlib>=0.7'
+> ```
+> **zsh users:** quote the version specifier — without quotes, zsh interprets
+> `>=` as an output-redirection operator and you get `zsh: 0.7 not found`
+> instead of a pip install. Single quotes (`'hnswlib>=0.7'`) prevent this.
+
 ```bash
 # Add to ~/.claude/depthfusion.env
 cat >> ~/.claude/depthfusion.env <<'EOF'
