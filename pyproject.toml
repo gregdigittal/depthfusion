@@ -22,9 +22,14 @@ local = []
 # for Haiku reranking; chromadb is used for optional Tier 2 vector search.
 vps-cpu = [
     "anthropic>=0.40",
-    "chromadb>=0.4",
+    "chromadb>=1.0",
     "fastapi>=0.100",
     "uvicorn>=0.23",
+    # security lower bounds — transitive via chromadb
+    "Mako>=1.3.12",
+    "PyJWT>=2.12.0",
+    "Pygments>=2.20.0",
+    "Markdown>=3.8.1",
 ]
 
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
@@ -33,10 +38,15 @@ vps-cpu = [
 # vector backend. hnswlib powers the E-45 fused recall index.
 vps-gpu = [
     "sentence-transformers>=2.2",
-    "chromadb>=0.4",
+    "chromadb>=1.0",
     "fastapi>=0.100",
     "uvicorn>=0.23",
     "hnswlib>=0.7",
+    # security lower bounds — transitive via chromadb
+    "Mako>=1.3.12",
+    "PyJWT>=2.12.0",
+    "Pygments>=2.20.0",
+    "Markdown>=3.8.1",
 ]
 
 # `mac-mlx` mode: Apple Silicon GPU inference via mlx_lm.server.
@@ -46,10 +56,15 @@ vps-gpu = [
 mac-mlx = [
     "mlx-lm>=0.18",
     "sentence-transformers>=2.2",
-    "chromadb>=0.4",
+    "chromadb>=1.0",
     "fastapi>=0.100",
     "uvicorn>=0.23",
     "hnswlib>=0.7",
+    # security lower bounds — transitive via chromadb
+    "Mako>=1.3.12",
+    "PyJWT>=2.12.0",
+    "Pygments>=2.20.0",
+    "Markdown>=3.8.1",
 ]
 
 # E-45: standalone HNSW extra — install for the agent-ops bridge integration
