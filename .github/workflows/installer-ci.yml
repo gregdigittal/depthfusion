@@ -52,12 +52,22 @@ jobs:
         run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration
         continue-on-error: false
 
-      - name: Run tests (Windows — platform subset)
+      - name: Run tests (Windows — fast allowlist)
         if: runner.os == 'Windows'
-        # Windows subset: excludes dirs that are either platform-agnostic algorithm
-        # tests (covered by Ubuntu) or subprocess-heavy (RecursiveSandbox spawns a
-        # new Python process per test — 5-15s each on Windows vs 50ms on Linux).
-        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration --ignore=tests/test_retrieval --ignore=tests/test_backends --ignore=tests/test_fusion --ignore=tests/test_graph --ignore=tests/test_scripts --ignore=tests/test_analyzer --ignore=tests/test_recursive --ignore=tests/test_capture
+        # Allowlist of dirs confirmed subprocess-free and threading-light.
+        # Windows process spawn is 5-15s vs 50ms on Linux; dirs with real
+        # subprocess.run or multiprocessing (test_install, test_router,
+        # test_recursive, test_metrics, test_capture, etc.) are covered by
+        # Ubuntu which runs the full suite as the authoritative reference.
+        run: >-
+          python -m pytest
+          tests/test_core
+          tests/test_session
+          tests/test_hooks
+          tests/test_storage
+          tests/test_cognitive
+          tests/test_regression
+          -x -q
         continue-on-error: false
 
       - name: Lint
