@@ -647,7 +647,9 @@ async def confirm_discovery(body: ConfirmDiscoveryBody, _auth: None = Depends(_c
 @app.post("/discoveries/pin")
 async def pin_discovery(body: PinDiscoveryBody, _auth: None = Depends(_check_auth)):
     from depthfusion.mcp.server import _tool_pin_discovery
-    return _parse_tool_result(_tool_pin_discovery({"filename": body.filename, "pinned": body.pinned}))
+    return _parse_tool_result(
+        _tool_pin_discovery({"filename": body.filename, "pinned": body.pinned})
+    )
 
 
 @app.post("/discoveries/supersede")
