@@ -12,6 +12,33 @@ Conventions:
 
 ## [Unreleased]
 
+### Added
+
+**REST API systemd service:**
+- `infra/systemd/depthfusion-rest.service` — user-level systemd unit for the FastAPI REST API
+  (`127.0.0.1:7300`); reads `~/.claude/depthfusion.env` via `EnvironmentFile`; `Restart=on-failure`
+- `infra/systemd/README.md` — install instructions: `cp`, `daemon-reload`, `enable --now`
+
+**HNSW activated on VPS (operator change — 2026-05-22):**
+- `DEPTHFUSION_HNSW_ENABLED=true` and `DEPTHFUSION_VECTOR_SEARCH_ENABLED=true` added to
+  `~/.claude/depthfusion.env` on the `vps-gpu` host; both services restarted; recall now
+  uses `strategy: "bm25+hnsw-fused"` with real `vector_score` values (e.g. 0.4242)
+- `docs/install/vps-gpu-quickstart.md` — §7 (HNSW enablement), §8 (REST API systemd service),
+  §9 (generated CLI install) added; "Done" checklist updated
+
+**Generated CLI (`depthfusion-pp-cli` / `depthfusion-pp-mcp`):**
+- 30-command Go CLI generated from `infra/depthfusion/openapi-spec.yaml` via cli-printing-press v4.11.0
+  (29 generated + 3 compound); Scorecard: A (83%); binaries at
+  `~/printing-press/library/depthfusion/build/stage/bin/`
+- Compound commands: `discovery-audit` (discovery age/conflict audit),
+  `graph-inspect` (BM25 recall → graph traversal), `batch-recall` (concurrent multi-query dedup)
+- `depthfusion-pp-mcp` — stdio MCP server mirroring all 30 commands as agent tools;
+  registered as `depthfusion-cli` in Claude Code (`claude mcp add --scope user`)
+- `docs/cli.md` — full CLI reference (install, auth, common workflows, compound commands, MCP server)
+- `infra/depthfusion/openapi-spec.yaml` — 29-endpoint OpenAPI 3.0 spec reverse-engineered from
+  MCP tool signatures; source of truth for CLI generation
+- `infra/depthfusion/catalog.yaml` — local cli-printing-press catalog entry
+
 ---
 
 ## [v1.2.0] — 2026-05-21

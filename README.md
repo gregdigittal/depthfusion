@@ -390,6 +390,15 @@ Runs periodically in DRY-RUN mode — observes what it would merge or archive bu
 
 When `DEPTHFUSION_REST_API=true`, a FastAPI server starts on `127.0.0.1:7300`. Loopback-only by default. Set `DEPTHFUSION_API_PUBLIC=1` **only** with `DEPTHFUSION_API_TOKEN` configured — the server will refuse to start public without a token.
 
+For persistent operation, use the bundled systemd user service:
+
+```bash
+cp ~/projects/depthfusion/infra/systemd/depthfusion-rest.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now depthfusion-rest
+```
+
+A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) expose all 29 REST endpoints as subcommands and agent tools. See **[docs/cli.md](docs/cli.md)** for install and usage.
+
 ---
 
 ## MCP Tools (29 total)
@@ -439,6 +448,8 @@ When `DEPTHFUSION_REST_API=true`, a FastAPI server starts on `127.0.0.1:7300`. L
 | `depthfusion_hnsw_capability` | Report HNSW index capability and state (agent-ops bridge startup probe) | always |
 
 Full tool documentation with response shapes: see `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.
+
+The generated CLI (`depthfusion-pp-cli`) exposes all 29 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 
