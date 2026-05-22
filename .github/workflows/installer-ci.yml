@@ -54,9 +54,10 @@ jobs:
 
       - name: Run tests (Windows — platform subset)
         if: runner.os == 'Windows'
-        # Windows runners are ~15x slower than Linux; run a focused subset covering
-        # platform-specific behaviour. Ubuntu runs the full suite as authoritative.
-        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration --ignore=tests/test_retrieval --ignore=tests/test_backends --ignore=tests/test_fusion --ignore=tests/test_graph --ignore=tests/test_scripts --ignore=tests/test_analyzer
+        # Windows subset: excludes dirs that are either platform-agnostic algorithm
+        # tests (covered by Ubuntu) or subprocess-heavy (RecursiveSandbox spawns a
+        # new Python process per test — 5-15s each on Windows vs 50ms on Linux).
+        run: python -m pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration --ignore=tests/test_retrieval --ignore=tests/test_backends --ignore=tests/test_fusion --ignore=tests/test_graph --ignore=tests/test_scripts --ignore=tests/test_analyzer --ignore=tests/test_recursive --ignore=tests/test_capture
         continue-on-error: false
 
       - name: Lint
