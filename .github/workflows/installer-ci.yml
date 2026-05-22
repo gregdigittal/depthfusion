@@ -24,6 +24,13 @@ jobs:
         if: runner.os == 'Windows'
         run: git config --system core.longpaths true
 
+      - name: Disable Windows Defender real-time scanning (speed)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE"
+          Add-MpPreference -ExclusionPath "$env:RUNNER_TOOL_CACHE"
+
       - name: Checkout
         uses: actions/checkout@v4
 
