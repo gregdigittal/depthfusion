@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-21 (E-43 closed — S-128/S-129/S-130 verified done; E-45 HNSW embedding index + fused recall; all 45 epics done)
+> Last updated: 2026-05-23 (E-46 active — Event Graph Fabric; S-141 done: EventStore + StreamBackend + 15 tests; S-142–S-146 in backlog)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2362,3 +2362,112 @@
 
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
+
+## E-46: Event Graph Fabric [active]
+
+> Shared multi-agent memory layer: every publish, subscribe, and recall becomes a graph node. Agents see each other's in-progress work in real time; new sessions inherit the room's working memory via fabric_seed; provenance queries reveal who knew what and when.
+
+### S-141: As the knowledge graph, I want an `event` Entity type and four new edge relationships so that agent provenance can be recorded as first-class graph nodes `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `Entity.type` docstring in `graph/types.py` includes `event`; no new Python class required — metadata dict carries event-specific fields (`event_type`, `agent_id`, `project_slug`, `memory_refs`, `session_id`)
+- [x] AC-2: `Edge.relationship` vocabulary in `graph/types.py` documents `AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM`; no existing relationship values changed
+- [x] AC-3: `entity_id` for an event entity is `sha256(agent_id + event_type + timestamp_iso + "".join(sorted(memory_refs)))[:12]` — deterministic, dedup-safe
+- [x] AC-4: `EventStore` class in `core/event_store.py` — `publish()`, `get_recent_events()`, `subscribe_stream()` — backed by a `StreamBackend` Protocol and the existing `GraphBackend`
+- [x] AC-5: `StreamBackend` Protocol in `core/event_store.py` mirrors the `GraphBackend` Protocol pattern: `publish(channel, payload)`, `subscribe(channels, since_id)`, `read_since(channel, since_id, count)` — all async
+- [x] AC-6: `RedisStreamBackend` implements `StreamBackend` via `redis.asyncio` XADD/XREAD/consumer groups; channel naming: `depthfusion:stream:{project_slug}`
+- [x] AC-7: Graph writes in `EventStore` use `run_in_executor` (non-blocking) + `file_locking.py` per-project lock; SQLite WAL mode enforced at store init
+- [x] AC-8: `EventStore` degrades gracefully if `RedisStreamBackend` is unavailable — graph writes succeed; stream notification is best-effort (log warning, do not raise)
+- [x] AC-9: Unit tests for `EventStore.publish()` and `get_recent_events()` using an in-memory stub `StreamBackend`; 0 regressions in existing suite
+
+**Tasks:**
+- [x] T-479: Add `event` to `Entity.type` docstring in `graph/types.py`; add `AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM` to `Edge` relationship vocabulary
+- [x] T-480: Create `src/depthfusion/core/event_store.py` — `StreamBackend` Protocol + `RedisStreamBackend` (redis.asyncio XADD/XREAD/consumer groups)
+- [x] T-481: Implement `EventStore` class — `publish()` (graph write + stream XADD), `get_recent_events()` (graph traversal), `subscribe_stream()` (SSE generator backed by XREAD)
+- [x] T-482: Concurrency safety — `run_in_executor` for graph writes, `file_locking.py` per-project lock, SQLite WAL mode at init
+- [x] T-483: Unit tests for EventStore using in-memory stub StreamBackend; verify dedup-safe entity_id; verify graceful Redis degradation
+
+### S-142: As an agent on the Tailscale network, I want REST endpoints to publish events and subscribe to the live stream so that any HTTP client can participate in the fabric `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `POST /v1/events/publish` — accepts `{agent_id, project_slug, memory_refs, session_id?}`; calls `EventStore.publish()`; returns `{event_id, indexed: bool}`; Bearer token required
+- [ ] AC-2: `GET /v1/events/stream` — SSE endpoint; query params `projects` (comma-sep), `since_id` (last consumed Redis Stream ID, enables replay), `consumer_id`; yields EventEntity JSON; Bearer token required
+- [ ] AC-3: `DEPTHFUSION_API_TAILSCALE=1` causes REST server to bind an additional listener on the Tailscale interface IP (resolved via `tailscale ip -4` at startup); loopback listener stays active
+- [ ] AC-4: Tailscale bind requires `DEPTHFUSION_API_TOKEN` — startup raises `ValueError` if `DEPTHFUSION_API_TAILSCALE=1` and token is absent (mirrors existing `DEPTHFUSION_API_PUBLIC` validation)
+- [ ] AC-5: Tailscale bind fails gracefully (log warning, serve loopback-only) if `tailscale` command is unavailable or returns an error; does not crash the process
+- [ ] AC-6: Redis stays loopback-only — never exposed on the Tailscale interface
+- [ ] AC-7: `redis>=5.0` added to a new `fabric` optional-dependency extra in `pyproject.toml`
+- [ ] AC-8: Tests for `/v1/events/publish` (200 + 401 paths) and SSE stream (mock EventStore); Tailscale bind validation unit test
+
+**Tasks:**
+- [ ] T-484: Create `src/depthfusion/api/events.py` — FastAPI router with `POST /v1/events/publish` and `GET /v1/events/stream` SSE; Bearer token via `_check_auth` (reuse from rest.py)
+- [ ] T-485: `DEPTHFUSION_API_TAILSCALE=1` support in `rest.py` — resolve Tailscale IP at startup, bind second uvicorn listener; `validate_public_bind_config()` extended for Tailscale case
+- [ ] T-486: Mount events router in `rest.py`; update systemd service env template to document `DEPTHFUSION_API_TAILSCALE` and `DEPTHFUSION_API_TOKEN`
+- [ ] T-487: Add `redis>=5.0` to `pyproject.toml` `fabric` optional-dependency extra
+- [ ] T-488: Tests for publish/stream endpoints and Tailscale bind startup validation
+
+### S-143: As a session starting cold, I want `depthfusion_session_seed` to support `fabric_seed` mode so that new agents inherit the room's working memory from the event graph `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion_session_seed` MCP tool accepts `mode: "fabric_seed"` parameter; existing `mode` values unchanged
+- [ ] AC-2: `fabric_seed` flow: query EventStore for events in `projects` (last 24h default); collect `memory_refs`; run BM25+HNSW recall against those refs with `goal` as query; rank by `score = recall_relevance × recency_decay × log(1 + observer_count)` where `observer_count` = distinct AGENT_RECEIVED edges to that memory
+- [ ] AC-3: `GET /v1/events/seed?projects=&session_id=&goal=` REST endpoint exposes the same logic for non-MCP clients
+- [ ] AC-4: `fabric_seed` falls back to graph-only traversal (no live Redis query) if Redis is unavailable; returns partial bundle with `degraded: true` flag
+- [ ] AC-5: Write-path deduplication in capture path: `sha256(content)` checked against `metadata["content_hash"]` on existing entities; if found, creates `AGENT_PUBLISHED` EventEntity linking to existing node and skips re-indexing; logs dedup hit
+- [ ] AC-6: New MemoryEntities have `metadata["content_hash"]` set at index time
+- [ ] AC-7: 100 concurrent publish calls on identical content produce exactly 1 MemoryEntity and 100 EventEntities in the graph
+- [ ] AC-8: Three new MCP tools registered: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`; tool count test updated
+- [ ] AC-9: Tests for `fabric_seed` ranking logic, dedup correctness, and MCP tool registration
+
+**Tasks:**
+- [ ] T-489: Content-hash gate in `src/depthfusion/capture/` — compute `sha256(content)`, check graph, write `AGENT_PUBLISHED` EventEntity on hit, skip re-index; set `metadata["content_hash"]` on new entities
+- [ ] T-490: `GET /v1/events/seed` endpoint in `events.py`; implement `fabric_seed` ranking: recall_relevance × recency_decay × log(1 + observer_count)
+- [ ] T-491: Extend `depthfusion_session_seed` in `session/loader.py` with `mode="fabric_seed"` parameter; Redis degradation fallback
+- [ ] T-492: Register `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail` MCP tools in `mcp/server.py`; update tool count assertion
+- [ ] T-493: Tests for dedup (100 concurrent publishes → 1 MemoryEntity), `fabric_seed` observer_count weighting, MCP tool registration
+
+### S-144: As a developer or agent, I want provenance query endpoints so that I can answer "who knew what, when" across the agent fleet `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `GET /v1/graph/agent/{agent_id}/trail?project=&since=&until=` returns all AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for the agent in the time range, sorted by timestamp ascending
+- [ ] AC-2: `GET /v1/graph/memory/{entity_id}/observers` returns all distinct `agent_id` values that have an AGENT_RECEIVED edge to the entity, with timestamps
+- [ ] AC-3: Both endpoints require Bearer token; return 404 if entity_id not found; return empty list (not 404) if no events match the time range
+- [ ] AC-4: Integration test: 3 concurrent test agents publish and subscribe; verify AGENT_PUBLISHED and AGENT_RECEIVED EventEntities are correctly created; verify `/observers` returns all 3 agent IDs
+- [ ] AC-5: Integration test: agent A publishes memory X; agent B subscribes and receives SSE event; graph contains AGENT_RECEIVED EventEntity for agent B → memory X
+- [ ] AC-6: Integration test: 100 concurrent publish calls on identical content → `/observers` for that memory returns 100 distinct entries (dedup preserved the memory, events are per-agent)
+
+**Tasks:**
+- [ ] T-494: `GET /v1/graph/agent/{agent_id}/trail` in `events.py` — graph traversal for AGENT_PUBLISHED + AGENT_RECEIVED edges filtered by agent_id and time range
+- [ ] T-495: `GET /v1/graph/memory/{entity_id}/observers` in `events.py` — find all AGENT_RECEIVED edges to entity_id; return distinct agent_ids + timestamps
+- [ ] T-496: Integration test suite: 3-agent concurrent publish/subscribe scenario; verify SSE receipt + graph EventEntity creation
+- [ ] T-497: Integration test: dedup + observers consistency (100 publishes → 1 memory, 100 observer entries)
+
+### S-145: As a DepthFusion operator, I want performance baselines for the fabric so that SLA targets are validated before the arc ships `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Publish-to-SSE latency benchmark: 10 concurrent publishers × 100 events each; p99 < 500ms end-to-end (publish REST call → SSE subscriber receives event)
+- [ ] AC-2: `fabric_seed` latency: project with 500 recent EventEntities; `GET /v1/events/seed` responds in < 2s p99
+- [ ] AC-3: Graph provenance query: 1,000 EventEntities in store; `/trail` and `/observers` queries return in < 500ms
+- [ ] AC-4: Graceful degradation test: Redis process killed mid-stream; existing `depthfusion_recall_relevant` and `depthfusion_retrieve_context` paths are unaffected; degradation is logged, not raised
+- [ ] AC-5: Baseline results written to `docs/performance/event-graph-baseline-YYYY-MM-DD.md`
+
+**Tasks:**
+- [ ] T-498: Publish-to-SSE latency benchmark script: 10 concurrent publishers, measure SSE receipt timestamps; assert p99 < 500ms
+- [ ] T-499: `fabric_seed` latency benchmark: seed 500 EventEntities, measure GET /v1/events/seed; assert p99 < 2s
+- [ ] T-500: Provenance query benchmark: 1,000 EventEntities; measure /trail and /observers; assert p99 < 500ms
+- [ ] T-501: Graceful degradation test: kill Redis, verify recall/retrieve unaffected, verify degradation log emitted
+
+### S-146: As the DepthFusion open-source community, I want documentation for the Event Graph Fabric so that other teams can deploy and use it `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: README has a "Shared Memory Fabric" section: what it is, the three pain points it solves, a 5-line curl quickstart (publish, stream, seed), link to full docs
+- [ ] AC-2: `docs/fabric/tailscale-setup.md` — step-by-step: install Tailscale, set `DEPTHFUSION_API_TAILSCALE=1` and `DEPTHFUSION_API_TOKEN` in systemd service, verify connectivity with `curl -H "Authorization: Bearer $TOKEN" http://100.x.x.x:7300/v1/events/seed`
+- [ ] AC-3: `docs/fabric/api-reference.md` — all 5 fabric endpoints documented with request/response examples; `StreamBackend` Protocol interface documented for Kafka+Flink implementors
+- [ ] AC-4: CHANGELOG updated: v0.6.0-alpha — "Event Graph Fabric: multi-agent shared memory, agent provenance graph, fabric_seed mode"
+- [ ] AC-5: `docs/fabric/kafka-flink-migration.md` — operator guide for swapping `RedisStreamBackend` → `KafkaFlinkBackend` when scale demands it; documents CEP convergence signal capability
+
+**Tasks:**
+- [ ] T-502: Write README "Shared Memory Fabric" section with curl quickstart
+- [ ] T-503: Write `docs/fabric/tailscale-setup.md` — Tailscale install + DepthFusion config + verification
+- [ ] T-504: Write `docs/fabric/api-reference.md` — endpoint docs + StreamBackend Protocol interface
+- [ ] T-505: Write `docs/fabric/kafka-flink-migration.md` — migration guide + CEP convergence signal overview; update CHANGELOG for v0.6.0-alpha
