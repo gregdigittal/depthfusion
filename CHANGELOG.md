@@ -28,6 +28,16 @@ Conventions:
 - `S-145` Performance baselines: publish p99 = 30ms (SLA < 500ms, 16× headroom); `fabric_seed` p99 = 110ms (SLA < 2s, 18× headroom); `/trail` p99 = 50ms (SLA < 500ms, 9× headroom); `/observers` p99 = 8.5ms (SLA < 500ms, 59× headroom); graceful degradation verified; results in `docs/performance/event-graph-baseline-2026-05-23.md`
 - `S-146` Documentation: README "Shared Memory Fabric" section with 5-command curl quickstart; `docs/fabric/tailscale-setup.md`, `docs/fabric/api-reference.md`, `docs/fabric/kafka-flink-migration.md`
 
+### Fixed
+
+- **CI lint/type errors in E-46 code** — two post-release fix commits resolved all ruff and mypy issues introduced by the fabric feature:
+  - `bench_degradation.py`, `bench_fabric_seed.py`, `bench_publish_sse.py`: removed unused imports (F401) and fixed import sort order (I001)
+  - `bench_provenance_queries.py`: E501 line-length violations in comment and print statement fixed
+  - `event_store.py`: F401 (`asynccontextmanager`), I001 import order, E501 on `_event_entity_id` signature; mypy `Cannot infer type of lambda` fixed (closure capture replaces default-arg capture); mypy `Coroutine has no __aiter__` fixed by changing `StreamBackend.subscribe` from `async def` to `def` (async generators return `AsyncIterator` directly — no `await` at the call site)
+  - `mcp/server.py`: E501 on three dict-literal and datetime-chain expressions
+  - `test_event_store.py`, `test_events_api.py`, `test_mcp_server.py`: F401 and I001 fixes; E741 ambiguous variable `l` renamed to `ln`
+  - `pyproject.toml`: added `pytest-asyncio>=0.23` to `[dev]` extras (required for `@pytest.mark.asyncio` tests)
+
 ---
 
 ## [v1.2.0] — 2026-05-22
