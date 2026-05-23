@@ -1,8 +1,14 @@
 # DepthFusion
 
-Cross-session memory for Claude Code — tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture mechanisms, a memory-policy layer, and a full Cognitive Infrastructure Layer that brings typed memory objects, contradiction detection, and decision-aware recall.
+**DepthFusion gives AI agents the institutional memory your team already has.**
 
-> **Status:** v1.2.0 (2026-05-21). 2000 tests passing · 9 skipped · 0 ruff · 0 mypy. HNSW embedding index + BM25-HNSW fused recall shipped (E-45). MCP surface (29 tools); E-31 cognitive features active by default; SkillForge SF-2 + Mamba B/C/Δ fusion stack + HNSW vector layer live.
+Every agent session starts from zero — it doesn't know what previous sessions discovered or what your teammates' agents figured out. DepthFusion fixes this: a shared memory layer where agents publish discoveries, new sessions inherit them instantly via `fabric_seed`, and every memory is queryable by provenance ("who knew what, when").
+
+Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
+
+**[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
+
+> **Status:** v1.2.0 (2026-05-23). 2000+ tests passing · 0 ruff · 0 mypy. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: 32 tools. SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ---
 
@@ -131,7 +137,7 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 | Mode | Use when | LLM backend | Extras | Step-by-step |
 |---|---|---|---|---|
-| `local` | Laptop / Windows, zero API deps | Heuristics + BM25 only | `[local]` | **Mac/Linux:** inline below · **Windows:** [docs/install/windows-quickstart.md](docs/install/windows-quickstart.md) |
+| `local` | Laptop / Windows (GPU auto-detected) | BM25 · GPU embeddings if CUDA present | `[local]` | **Mac/Linux:** inline below · **Windows:** [docs/install/windows-quickstart.md](docs/install/windows-quickstart.md) |
 | `vps-cpu` | Cloud VPS, no GPU | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
 | `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
