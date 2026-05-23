@@ -2409,38 +2409,38 @@
 ### S-143: As a session starting cold, I want `depthfusion_session_seed` to support `fabric_seed` mode so that new agents inherit the room's working memory from the event graph `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion_session_seed` MCP tool accepts `mode: "fabric_seed"` parameter; existing `mode` values unchanged
-- [ ] AC-2: `fabric_seed` flow: query EventStore for events in `projects` (last 24h default); collect `memory_refs`; run BM25+HNSW recall against those refs with `goal` as query; rank by `score = recall_relevance × recency_decay × log(1 + observer_count)` where `observer_count` = distinct AGENT_RECEIVED edges to that memory
-- [ ] AC-3: `GET /v1/events/seed?projects=&session_id=&goal=` REST endpoint exposes the same logic for non-MCP clients
-- [ ] AC-4: `fabric_seed` falls back to graph-only traversal (no live Redis query) if Redis is unavailable; returns partial bundle with `degraded: true` flag
-- [ ] AC-5: Write-path deduplication in capture path: `sha256(content)` checked against `metadata["content_hash"]` on existing entities; if found, creates `AGENT_PUBLISHED` EventEntity linking to existing node and skips re-indexing; logs dedup hit
-- [ ] AC-6: New MemoryEntities have `metadata["content_hash"]` set at index time
-- [ ] AC-7: 100 concurrent publish calls on identical content produce exactly 1 MemoryEntity and 100 EventEntities in the graph
-- [ ] AC-8: Three new MCP tools registered: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`; tool count test updated
-- [ ] AC-9: Tests for `fabric_seed` ranking logic, dedup correctness, and MCP tool registration
+- [x] AC-1: `depthfusion_session_seed` MCP tool accepts `mode: "fabric_seed"` parameter; existing `mode` values unchanged
+- [x] AC-2: `fabric_seed` flow: query EventStore for events in `projects` (last 24h default); collect `memory_refs`; run BM25+HNSW recall against those refs with `goal` as query; rank by `score = recall_relevance × recency_decay × log(1 + observer_count)` where `observer_count` = distinct AGENT_RECEIVED edges to that memory
+- [x] AC-3: `GET /v1/events/seed?projects=&session_id=&goal=` REST endpoint exposes the same logic for non-MCP clients
+- [x] AC-4: `fabric_seed` falls back to graph-only traversal (no live Redis query) if Redis is unavailable; returns partial bundle with `degraded: true` flag
+- [x] AC-5: Write-path deduplication in capture path: `sha256(content)` checked against `metadata["content_hash"]` on existing entities; if found, creates `AGENT_PUBLISHED` EventEntity linking to existing node and skips re-indexing; logs dedup hit
+- [x] AC-6: New MemoryEntities have `metadata["content_hash"]` set at index time
+- [x] AC-7: 100 concurrent publish calls on identical content produce exactly 1 MemoryEntity and 100 EventEntities in the graph
+- [x] AC-8: Three new MCP tools registered: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`; tool count test updated
+- [x] AC-9: Tests for `fabric_seed` ranking logic, dedup correctness, and MCP tool registration
 
 **Tasks:**
-- [ ] T-489: Content-hash gate in `src/depthfusion/capture/` — compute `sha256(content)`, check graph, write `AGENT_PUBLISHED` EventEntity on hit, skip re-index; set `metadata["content_hash"]` on new entities
-- [ ] T-490: `GET /v1/events/seed` endpoint in `events.py`; implement `fabric_seed` ranking: recall_relevance × recency_decay × log(1 + observer_count)
-- [ ] T-491: Extend `depthfusion_session_seed` in `session/loader.py` with `mode="fabric_seed"` parameter; Redis degradation fallback
-- [ ] T-492: Register `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail` MCP tools in `mcp/server.py`; update tool count assertion
-- [ ] T-493: Tests for dedup (100 concurrent publishes → 1 MemoryEntity), `fabric_seed` observer_count weighting, MCP tool registration
+- [x] T-489: Content-hash gate in `src/depthfusion/capture/` — compute `sha256(content)`, check graph, write `AGENT_PUBLISHED` EventEntity on hit, skip re-index; set `metadata["content_hash"]` on new entities
+- [x] T-490: `GET /v1/events/seed` endpoint in `events.py`; implement `fabric_seed` ranking: recall_relevance × recency_decay × log(1 + observer_count)
+- [x] T-491: Extend `depthfusion_session_seed` in `session/loader.py` with `mode="fabric_seed"` parameter; Redis degradation fallback
+- [x] T-492: Register `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail` MCP tools in `mcp/server.py`; update tool count assertion
+- [x] T-493: Tests for dedup (100 concurrent publishes → 1 MemoryEntity), `fabric_seed` observer_count weighting, MCP tool registration
 
 ### S-144: As a developer or agent, I want provenance query endpoints so that I can answer "who knew what, when" across the agent fleet `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `GET /v1/graph/agent/{agent_id}/trail?project=&since=&until=` returns all AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for the agent in the time range, sorted by timestamp ascending
-- [ ] AC-2: `GET /v1/graph/memory/{entity_id}/observers` returns all distinct `agent_id` values that have an AGENT_RECEIVED edge to the entity, with timestamps
-- [ ] AC-3: Both endpoints require Bearer token; return 404 if entity_id not found; return empty list (not 404) if no events match the time range
-- [ ] AC-4: Integration test: 3 concurrent test agents publish and subscribe; verify AGENT_PUBLISHED and AGENT_RECEIVED EventEntities are correctly created; verify `/observers` returns all 3 agent IDs
-- [ ] AC-5: Integration test: agent A publishes memory X; agent B subscribes and receives SSE event; graph contains AGENT_RECEIVED EventEntity for agent B → memory X
-- [ ] AC-6: Integration test: 100 concurrent publish calls on identical content → `/observers` for that memory returns 100 distinct entries (dedup preserved the memory, events are per-agent)
+- [x] AC-1: `GET /v1/graph/agent/{agent_id}/trail?project=&since=&until=` returns all AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for the agent in the time range, sorted by timestamp ascending
+- [x] AC-2: `GET /v1/graph/memory/{entity_id}/observers` returns all distinct `agent_id` values that have an AGENT_RECEIVED edge to the entity, with timestamps
+- [x] AC-3: Both endpoints require Bearer token; return 404 if entity_id not found; return empty list (not 404) if no events match the time range
+- [x] AC-4: Integration test: 3 concurrent test agents publish and subscribe; verify AGENT_PUBLISHED and AGENT_RECEIVED EventEntities are correctly created; verify `/observers` returns all 3 agent IDs
+- [x] AC-5: Integration test: agent A publishes memory X; agent B subscribes and receives SSE event; graph contains AGENT_RECEIVED EventEntity for agent B → memory X
+- [x] AC-6: Integration test: 100 concurrent publish calls on identical content → `/observers` for that memory returns 100 distinct entries (dedup preserved the memory, events are per-agent)
 
 **Tasks:**
-- [ ] T-494: `GET /v1/graph/agent/{agent_id}/trail` in `events.py` — graph traversal for AGENT_PUBLISHED + AGENT_RECEIVED edges filtered by agent_id and time range
-- [ ] T-495: `GET /v1/graph/memory/{entity_id}/observers` in `events.py` — find all AGENT_RECEIVED edges to entity_id; return distinct agent_ids + timestamps
-- [ ] T-496: Integration test suite: 3-agent concurrent publish/subscribe scenario; verify SSE receipt + graph EventEntity creation
-- [ ] T-497: Integration test: dedup + observers consistency (100 publishes → 1 memory, 100 observer entries)
+- [x] T-494: `GET /v1/graph/agent/{agent_id}/trail` in `events.py` — graph traversal for AGENT_PUBLISHED + AGENT_RECEIVED edges filtered by agent_id and time range
+- [x] T-495: `GET /v1/graph/memory/{entity_id}/observers` in `events.py` — find all AGENT_RECEIVED edges to entity_id; return distinct agent_ids + timestamps
+- [x] T-496: Integration test suite: 3-agent concurrent publish/subscribe scenario; verify SSE receipt + graph EventEntity creation
+- [x] T-497: Integration test: dedup + observers consistency (100 publishes → 1 memory, 100 observer entries)
 
 ### S-145: As a DepthFusion operator, I want performance baselines for the fabric so that SLA targets are validated before the arc ships `P2` `S`
 

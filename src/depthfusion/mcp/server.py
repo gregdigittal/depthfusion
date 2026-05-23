@@ -181,19 +181,44 @@ TOOLS: dict[str, str] = {
         "already_tracked: int, items: [{pattern_key, name, session_count, "
         "drafted, skillforge_id}]}."
     ),
-    # E-35 S-111 session-start auto-recall seed
+    # E-35 S-111 session-start auto-recall seed; E-46 S-143 fabric_seed extension
     "depthfusion_session_seed": (
         "Run a seed recall query at session start and publish results as high-priority "
         "ContextItems tagged ['session-seed', session_id] (S-111). "
         "Args: session_id (str, required), top_k (int, optional, default 3), "
-        "snippet_len (int, optional, default 800). "
-        "Response: {published: int, query: str, session_id: str}."
+        "snippet_len (int, optional, default 800), "
+        "mode (str, optional — 'recall' (default) | 'fabric_seed'), "
+        "projects (str[], optional — required for fabric_seed mode), "
+        "goal (str, optional — goal query for fabric_seed ranking). "
+        "Response: {published: int, query: str, session_id: str} or "
+        "{bundle: [...], degraded: bool, session_id: str} for fabric_seed."
     ),
     # E-45 HNSW capability ping for the agent-ops bridge
     "depthfusion_hnsw_capability": (
         "Return current HNSW index capability and state. Called by the agent-ops "
         "bridge at startup. No args. Returns HNSWCapability: "
         "{enabled, backend, model, dimension, index_path, entry_count}."
+    ),
+    # E-46 Event Graph Fabric tools (S-143 / T-492)
+    "depthfusion_event_publish": (
+        "Publish content as a MemoryEntity + EventEntity with content-hash dedup (E-46 S-143). "
+        "Identical content published by N agents produces 1 MemoryEntity and N EventEntities. "
+        "Args: content (str, required), agent_id (str, required), project_slug (str, required), "
+        "session_id (str, optional), event_type (str, optional, default 'publish'). "
+        "Response: {memory_id: str, event_id: str, deduped: bool, indexed_in_hnsw: bool}."
+    ),
+    "depthfusion_event_seed": (
+        "Return a ranked context bundle for fabric_seed session warm-up (E-46 S-143). "
+        "Ranking: recall_relevance × recency_decay × log(1 + observer_count). "
+        "Args: projects (str[], required), goal (str, optional), top_k (int, optional, default 5), "
+        "since_hours (float, optional, default 24). "
+        "Response: {bundle: [...], degraded: bool, project_count: int}."
+    ),
+    "depthfusion_agent_trail": (
+        "Return AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for an agent (E-46 S-143). "
+        "Args: agent_id (str, required), project (str, optional), "
+        "since (str, optional — ISO-8601), until (str, optional — ISO-8601). "
+        "Response: {trail: [{entity_id, event_type, memory_refs, first_seen, ...}], count: int}."
     ),
 }
 
@@ -233,6 +258,10 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
     # E-45 HNSW capability ping — always enabled; returns disabled when env flag is off
     "depthfusion_hnsw_capability": None,
+    # E-46 Event Graph Fabric tools — always enabled (S-143 / T-492)
+    "depthfusion_event_publish": None,
+    "depthfusion_event_seed": None,
+    "depthfusion_agent_trail": None,
 }
 
 
@@ -560,7 +589,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": [],
     },
-    # E-35 S-111 session-start auto-recall seed
+    # E-35 S-111 session-start auto-recall seed; E-46 S-143 fabric_seed extension
     "depthfusion_session_seed": {
         "properties": {
             "session_id": {
@@ -581,6 +610,21 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 "default": 800,
                 "description": "Maximum snippet length per seed item",
             },
+            "mode": {
+                "type": "string",
+                "enum": ["recall", "fabric_seed"],
+                "default": "recall",
+                "description": "'recall' (default) or 'fabric_seed' for Event Graph Fabric warm-up",
+            },
+            "projects": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Project slugs (required for fabric_seed mode)",
+            },
+            "goal": {
+                "type": "string",
+                "description": "Goal query for recall_relevance ranking in fabric_seed mode",
+            },
         },
         "required": ["session_id"],
     },
@@ -588,6 +632,39 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "depthfusion_hnsw_capability": {
         "properties": {},
         "required": [],
+    },
+    # E-46 Event Graph Fabric tools (S-143 / T-492)
+    "depthfusion_event_publish": {
+        "properties": {
+            "content": {"type": "string", "description": "Memory content to publish"},
+            "agent_id": {"type": "string", "description": "Publishing agent identifier"},
+            "project_slug": {"type": "string", "description": "Project namespace"},
+            "session_id": {"type": "string"},
+            "event_type": {"type": "string", "default": "publish"},
+        },
+        "required": ["content", "agent_id", "project_slug"],
+    },
+    "depthfusion_event_seed": {
+        "properties": {
+            "projects": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Project slugs to query",
+            },
+            "goal": {"type": "string", "description": "Goal query for recall_relevance ranking"},
+            "top_k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+            "since_hours": {"type": "number", "minimum": 1, "maximum": 720, "default": 24},
+        },
+        "required": ["projects"],
+    },
+    "depthfusion_agent_trail": {
+        "properties": {
+            "agent_id": {"type": "string", "description": "Agent to look up"},
+            "project": {"type": "string", "description": "Filter by project slug"},
+            "since": {"type": "string", "description": "ISO-8601 lower bound"},
+            "until": {"type": "string", "description": "ISO-8601 upper bound"},
+        },
+        "required": ["agent_id"],
     },
 }
 
@@ -702,6 +779,12 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_session_seed(arguments)
     elif tool_name == "depthfusion_hnsw_capability":
         return _tool_hnsw_capability()
+    elif tool_name == "depthfusion_event_publish":
+        return _tool_event_publish(arguments)
+    elif tool_name == "depthfusion_event_seed":
+        return _tool_event_seed(arguments)
+    elif tool_name == "depthfusion_agent_trail":
+        return _tool_agent_trail(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -3063,9 +3146,39 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
 
 
 def _tool_session_seed(arguments: dict) -> str:
-    """Publish top recall results as high-priority session-seed ContextItems (S-111)."""
+    """Publish top recall results as high-priority session-seed ContextItems (S-111/S-143)."""
+    import asyncio
     from pathlib import Path
 
+    session_id = arguments.get("session_id", "unknown")
+    mode = arguments.get("mode", "recall")
+
+    if not session_id:
+        return json.dumps({"error": "session_id required", "published": 0})
+
+    if mode == "fabric_seed":
+        projects = arguments.get("projects") or []
+        if not projects:
+            return json.dumps({"error": "projects required for fabric_seed mode", "session_id": session_id})
+        goal = arguments.get("goal", "")
+        top_k = int(arguments.get("top_k", 5))
+        since_hours = float(arguments.get("since_hours", 24.0))
+        try:
+            store = _get_fabric_store()
+            result = asyncio.run(
+                store.fabric_seed_bundle(
+                    projects=projects,
+                    goal=goal,
+                    top_k=top_k,
+                    since_hours=since_hours,
+                )
+            )
+            result["session_id"] = session_id
+            return json.dumps(result)
+        except Exception as exc:
+            return json.dumps({"error": str(exc), "session_id": session_id, "bundle": [], "degraded": True})
+
+    # Default: recall mode (S-111)
     from depthfusion.hooks.session_start import (
         _build_seed_query,
         _detect_project_name,
@@ -3073,12 +3186,8 @@ def _tool_session_seed(arguments: dict) -> str:
         _recent_git_messages,
     )
 
-    session_id = arguments.get("session_id", "unknown")
     top_k = int(arguments.get("top_k", 3))
     snippet_len = int(arguments.get("snippet_len", 800))
-
-    if not session_id:
-        return json.dumps({"error": "session_id required", "published": 0})
 
     try:
         cwd = Path.cwd()
@@ -3093,6 +3202,157 @@ def _tool_session_seed(arguments: dict) -> str:
         })
     except Exception as exc:
         return json.dumps({"error": str(exc), "published": 0, "session_id": session_id})
+
+
+# ---------------------------------------------------------------------------
+# E-46 Event Graph Fabric tool helpers
+# ---------------------------------------------------------------------------
+
+_fabric_store = None
+
+
+def _get_fabric_store():
+    """Lazy singleton EventStore for MCP tool calls (sync init, async methods)."""
+    global _fabric_store
+    if _fabric_store is None:
+        from depthfusion.core.event_store import EventStore, RedisStreamBackend
+        from depthfusion.graph.store import get_store
+
+        graph = get_store()
+        redis_url = os.getenv("DEPTHFUSION_REDIS_URL", "")
+        stream = RedisStreamBackend(redis_url) if redis_url else None
+        _fabric_store = EventStore(graph=graph, stream=stream)
+    return _fabric_store
+
+
+def _tool_event_publish(arguments: dict) -> str:
+    """Publish content as a MemoryEntity + EventEntity with content-hash dedup (E-46 S-143)."""
+    import asyncio
+
+    content = arguments.get("content", "")
+    agent_id = arguments.get("agent_id", "")
+    project_slug = arguments.get("project_slug", "")
+
+    if not content:
+        return json.dumps({"error": "content required"})
+    if not agent_id:
+        return json.dumps({"error": "agent_id required"})
+    if not project_slug:
+        return json.dumps({"error": "project_slug required"})
+
+    session_id = arguments.get("session_id") or None
+    event_type = arguments.get("event_type", "publish")
+
+    try:
+        store = _get_fabric_store()
+        result = asyncio.run(
+            store.publish_memory(
+                content=content,
+                agent_id=agent_id,
+                project_slug=project_slug,
+                event_type=event_type,
+                session_id=session_id,
+            )
+        )
+        indexed_in_hnsw = False
+        if not result.get("deduped"):
+            hnsw = _get_hnsw_store()
+            if hnsw is not None:
+                try:
+                    hnsw.upsert(entity_id=result["memory_id"], text=content, project=project_slug)
+                    indexed_in_hnsw = True
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("[event_publish] HNSW upsert failed (non-fatal): %s", exc)
+        result["indexed_in_hnsw"] = indexed_in_hnsw
+        return json.dumps(result)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+def _tool_event_seed(arguments: dict) -> str:
+    """Return ranked context bundle for fabric_seed session warm-up (E-46 S-143)."""
+    import asyncio
+
+    projects = arguments.get("projects") or []
+    if not projects:
+        return json.dumps({"error": "projects required", "bundle": [], "degraded": True})
+
+    goal = arguments.get("goal", "")
+    top_k = int(arguments.get("top_k", 5))
+    since_hours = float(arguments.get("since_hours", 24.0))
+
+    try:
+        store = _get_fabric_store()
+        result = asyncio.run(
+            store.fabric_seed_bundle(
+                projects=projects,
+                goal=goal,
+                top_k=top_k,
+                since_hours=since_hours,
+            )
+        )
+        return json.dumps(result)
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "bundle": [], "degraded": True})
+
+
+def _tool_agent_trail(arguments: dict) -> str:
+    """Return AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for an agent (E-46 S-143)."""
+    from depthfusion.graph.store import get_store
+
+    agent_id = arguments.get("agent_id", "")
+    if not agent_id:
+        return json.dumps({"error": "agent_id required", "trail": [], "count": 0})
+
+    project_filter = arguments.get("project") or None
+    since_str = arguments.get("since") or None
+    until_str = arguments.get("until") or None
+
+    since_ts: float | None = None
+    until_ts: float | None = None
+    try:
+        if since_str:
+            from datetime import datetime, timezone
+            since_ts = datetime.fromisoformat(since_str).replace(tzinfo=timezone.utc).timestamp()
+        if until_str:
+            from datetime import datetime, timezone
+            until_ts = datetime.fromisoformat(until_str).replace(tzinfo=timezone.utc).timestamp()
+    except (ValueError, TypeError) as exc:
+        return json.dumps({"error": f"invalid date format: {exc}", "trail": [], "count": 0})
+
+    try:
+        graph = get_store()
+        all_entities = graph.all_entities()
+        trail = []
+        for entity in all_entities:
+            if entity.type != "event":
+                continue
+            meta = entity.metadata or {}
+            if meta.get("agent_id") != agent_id:
+                continue
+            if project_filter and meta.get("project_slug") != project_filter:
+                continue
+            try:
+                from datetime import datetime, timezone
+                ts = datetime.fromisoformat(entity.first_seen).replace(tzinfo=timezone.utc).timestamp()
+            except (ValueError, TypeError):
+                ts = 0.0
+            if since_ts is not None and ts < since_ts:
+                continue
+            if until_ts is not None and ts > until_ts:
+                continue
+            trail.append({
+                "entity_id": entity.entity_id,
+                "event_type": meta.get("event_type", ""),
+                "memory_refs": meta.get("memory_refs", []),
+                "first_seen": entity.first_seen,
+                "project": meta.get("project_slug", entity.project),
+                "session_id": meta.get("session_id"),
+            })
+        trail.sort(key=lambda x: x["first_seen"])
+        return json.dumps({"trail": trail, "count": len(trail)})
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "trail": [], "count": 0})
 
 
 if __name__ == "__main__":

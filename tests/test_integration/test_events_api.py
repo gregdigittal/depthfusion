@@ -233,3 +233,286 @@ def test_get_tailscale_ip_returns_ip_on_success():
         from depthfusion.api.rest import get_tailscale_ip
         result = get_tailscale_ip()
     assert result == "100.64.1.42"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for S-144 provenance tests
+# ---------------------------------------------------------------------------
+
+def _fabric_client(tmp_path, monkeypatch):
+    """TestClient wired to a real in-memory EventStore (no Redis, no auth)."""
+    monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+    monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
+    monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
+    monkeypatch.delenv("DEPTHFUSION_API_TOKEN", raising=False)
+
+    import depthfusion.api.events as ev_mod
+    ev_mod._event_store = None
+
+    from depthfusion.api.rest import app
+    return TestClient(app, raise_server_exceptions=True)
+
+
+def _setup_fabric_store(tmp_path):
+    """Return a real EventStore backed by a tmp-path SQLite graph."""
+    from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
+    from depthfusion.graph.store import get_store
+    graph = get_store(graph_json_path=tmp_path / "graph.json")
+    return EventStore(graph=graph, stream=InMemoryStreamBackend())
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/graph/agent/{agent_id}/trail  (S-144 / T-494 / T-496)
+# ---------------------------------------------------------------------------
+
+class TestAgentTrail:
+    def test_trail_returns_empty_list_for_unknown_agent(self, tmp_path, monkeypatch):
+        client = _fabric_client(tmp_path, monkeypatch)
+        resp = client.get("/v1/graph/agent/ghost-agent/trail")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["trail"] == []
+        assert data["count"] == 0
+
+    def test_trail_returns_event_for_publishing_agent(self, tmp_path, monkeypatch):
+        import asyncio
+        client = _fabric_client(tmp_path, monkeypatch)
+
+        # Pre-seed state via publish endpoint (creates AGENT_PUBLISHED EventEntity)
+        resp = client.post("/v1/events/publish", json={
+            "agent_id": "trail-agent",
+            "project_slug": "proj-a",
+            "memory_refs": ["mem-x"],
+        })
+        assert resp.status_code == 200
+
+        trail_resp = client.get("/v1/graph/agent/trail-agent/trail")
+        assert trail_resp.status_code == 200
+        data = trail_resp.json()
+        assert data["count"] >= 1
+        entry = data["trail"][0]
+        assert entry["project"] == "proj-a"
+        assert "entity_id" in entry
+        assert "first_seen" in entry
+
+    def test_trail_filters_by_project(self, tmp_path, monkeypatch):
+        client = _fabric_client(tmp_path, monkeypatch)
+
+        # Publish to two projects
+        for slug in ("proj-x", "proj-y"):
+            client.post("/v1/events/publish", json={
+                "agent_id": "multi-proj-agent",
+                "project_slug": slug,
+                "memory_refs": ["mem-1"],
+            })
+
+        # Filter to proj-x only
+        resp = client.get("/v1/graph/agent/multi-proj-agent/trail?project=proj-x")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+        assert all(e["project"] == "proj-x" for e in data["trail"])
+
+    def test_trail_sorted_ascending_by_timestamp(self, tmp_path, monkeypatch):
+        client = _fabric_client(tmp_path, monkeypatch)
+
+        for i in range(3):
+            client.post("/v1/events/publish", json={
+                "agent_id": "order-agent",
+                "project_slug": "proj",
+                "memory_refs": [f"mem-{i}"],
+            })
+
+        resp = client.get("/v1/graph/agent/order-agent/trail")
+        assert resp.status_code == 200
+        trail = resp.json()["trail"]
+        timestamps = [e["first_seen"] for e in trail]
+        assert timestamps == sorted(timestamps)
+
+    def test_trail_requires_auth_when_token_set(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
+        monkeypatch.setenv("DEPTHFUSION_API_TOKEN", "trail-secret")
+        monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
+
+        import depthfusion.api.events as ev_mod
+        ev_mod._event_store = None
+
+        from depthfusion.api.rest import app
+        client = TestClient(app, raise_server_exceptions=True)
+
+        # No token → 401
+        resp = client.get("/v1/graph/agent/any-agent/trail")
+        assert resp.status_code == 401
+
+        # Correct token → 200
+        resp = client.get(
+            "/v1/graph/agent/any-agent/trail",
+            headers={"Authorization": "Bearer trail-secret"},
+        )
+        assert resp.status_code == 200
+
+    def test_trail_three_agents_all_indexed(self, tmp_path, monkeypatch):
+        """3 concurrent-style agents each publish; all three appear in their respective trails."""
+        client = _fabric_client(tmp_path, monkeypatch)
+
+        agents = ["alpha", "beta", "gamma"]
+        for agent_id in agents:
+            client.post("/v1/events/publish", json={
+                "agent_id": agent_id,
+                "project_slug": "shared-proj",
+                "memory_refs": ["shared-mem"],
+            })
+
+        for agent_id in agents:
+            resp = client.get(f"/v1/graph/agent/{agent_id}/trail")
+            assert resp.status_code == 200
+            assert resp.json()["count"] >= 1, f"{agent_id} has no trail"
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/graph/memory/{entity_id}/observers  (S-144 / T-495 / T-496 / T-497)
+# ---------------------------------------------------------------------------
+
+class TestMemoryObservers:
+    def test_observers_returns_404_for_unknown_entity(self, tmp_path, monkeypatch):
+        client = _fabric_client(tmp_path, monkeypatch)
+        resp = client.get("/v1/graph/memory/does-not-exist/observers")
+        assert resp.status_code == 404
+
+    def test_observers_returns_empty_list_when_no_edges(self, tmp_path, monkeypatch):
+        """Memory entity exists but has no AGENT_RECEIVED edges yet."""
+        client = _fabric_client(tmp_path, monkeypatch)
+
+        # Publish an event so the memory entity is indexed
+        pub = client.post("/v1/events/publish", json={
+            "agent_id": "agent-a",
+            "project_slug": "proj",
+            "memory_refs": ["mem-abc"],
+        })
+        assert pub.status_code == 200
+        event_id = pub.json()["event_id"]
+
+        # Find the memory entity (it's the event entity — publish() returns event_id)
+        # The event entity exists; observers only count AGENT_RECEIVED edges
+        resp = client.get(f"/v1/graph/memory/{event_id}/observers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 0
+        assert data["observers"] == []
+
+    def test_observers_counts_received_edges(self, tmp_path, monkeypatch):
+        """After creating AGENT_RECEIVED edges, /observers returns them."""
+        import asyncio
+        import depthfusion.api.events as ev_mod
+
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
+        monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
+        monkeypatch.delenv("DEPTHFUSION_API_TOKEN", raising=False)
+        ev_mod._event_store = None
+
+        store = _setup_fabric_store(tmp_path)
+        ev_mod._event_store = store
+
+        from depthfusion.api.rest import app
+        client = TestClient(app, raise_server_exceptions=True)
+
+        # Publish content to create a MemoryEntity via publish_memory
+        r = asyncio.run(store.publish_memory(
+            content="shared knowledge", agent_id="agent-a", project_slug="proj",
+        ))
+        memory_id = r["memory_id"]
+
+        # Manually add AGENT_RECEIVED edges (simulates SSE subscribers receiving the event)
+        from depthfusion.graph.types import Edge
+        for i, agent in enumerate(("agent-b", "agent-c")):
+            store.graph.upsert_edge(Edge(
+                edge_id=f"{memory_id}-recv-{agent}", source_id=memory_id, target_id=agent,
+                relationship="AGENT_RECEIVED", weight=1.0, signals=["fabric"],
+                metadata={"agent_id": agent, "timestamp": f"2026-01-01T00:0{i}:00+00:00"},
+            ))
+
+        resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 2
+        agent_ids = {o["agent_id"] for o in data["observers"]}
+        assert agent_ids == {"agent-b", "agent-c"}
+
+    def test_observers_requires_auth_when_token_set(self, tmp_path, monkeypatch):
+        import asyncio
+        import depthfusion.api.events as ev_mod
+
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
+        monkeypatch.setenv("DEPTHFUSION_API_TOKEN", "obs-secret")
+        monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
+        ev_mod._event_store = None
+
+        store = _setup_fabric_store(tmp_path)
+        ev_mod._event_store = store
+
+        r = asyncio.run(store.publish_memory("content", "agent-x", "proj"))
+        memory_id = r["memory_id"]
+
+        from depthfusion.api.rest import app
+        client = TestClient(app, raise_server_exceptions=True)
+
+        # No token → 401
+        resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
+        assert resp.status_code == 401
+
+        # Correct token → 200
+        resp = client.get(
+            f"/v1/graph/memory/{memory_id}/observers",
+            headers={"Authorization": "Bearer obs-secret"},
+        )
+        assert resp.status_code == 200
+
+    def test_dedup_produces_one_memory_n_event_entities(self, tmp_path, monkeypatch):
+        """T-497: 10 concurrent publishes of identical content → 1 MemoryEntity, 10 EventEntities."""
+        import asyncio
+        import depthfusion.api.events as ev_mod
+
+        monkeypatch.setenv("DEPTHFUSION_MODE", "local")
+        monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
+        monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
+        monkeypatch.delenv("DEPTHFUSION_API_TOKEN", raising=False)
+        ev_mod._event_store = None
+
+        store = _setup_fabric_store(tmp_path)
+        ev_mod._event_store = store
+
+        # Publish same content from 10 different agents
+        N = 10
+        results = [
+            asyncio.run(store.publish_memory(
+                content="identical content",
+                agent_id=f"agent-{i}",
+                project_slug="proj",
+            ))
+            for i in range(N)
+        ]
+
+        # All return the same memory_id
+        memory_ids = {r["memory_id"] for r in results}
+        assert len(memory_ids) == 1, "dedup should produce exactly 1 MemoryEntity"
+        memory_id = next(iter(memory_ids))
+
+        # 9 of 10 should be deduped (first one is new)
+        deduped_count = sum(1 for r in results if r["deduped"])
+        assert deduped_count == N - 1
+
+        # Verify via graph: only 1 memory entity, N event entities
+        all_entities = store.graph.all_entities()
+        memory_entities = [e for e in all_entities if e.type == "memory"]
+        event_entities = [e for e in all_entities if e.type == "event"]
+        assert len(memory_entities) == 1
+        assert len(event_entities) == N
+
+        # Verify the /observers endpoint finds the memory entity
+        from depthfusion.api.rest import app
+        client = TestClient(app, raise_server_exceptions=True)
+        resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
+        assert resp.status_code == 200

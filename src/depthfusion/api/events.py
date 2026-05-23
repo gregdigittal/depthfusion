@@ -1,13 +1,16 @@
-"""Event Graph Fabric — REST router for /v1/events/* endpoints.
+"""Event Graph Fabric — REST router for /v1/events/* and /v1/graph/* endpoints.
 
 Implements:
-  POST /v1/events/publish  — record an agent publish event in the graph + stream
-  GET  /v1/events/stream   — SSE fan-out of live EventEntity objects
+  POST /v1/events/publish              — record an agent publish event
+  GET  /v1/events/stream               — SSE fan-out of live EventEntity objects
+  GET  /v1/events/seed                 — ranked context bundle for fabric_seed mode (S-143)
+  GET  /v1/graph/agent/{agent_id}/trail    — provenance trail for one agent (S-144)
+  GET  /v1/graph/memory/{entity_id}/observers — agents that received a memory (S-144)
 
 Authentication: Bearer token required whenever DEPTHFUSION_API_TOKEN is set.
 Redis stays loopback-only; the Tailscale interface is handled by rest.py.
 
-S-142 / T-484
+S-142 / T-484; S-143 / T-490; S-144 / T-494 T-495
 """
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -172,3 +176,150 @@ async def stream_events(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/events/seed  (S-143 AC-3)
+# ---------------------------------------------------------------------------
+
+@router.get("/v1/events/seed")
+async def events_seed(
+    projects: str = Query(..., description="Comma-separated project slugs"),
+    session_id: Optional[str] = Query(default=None),
+    goal: str = Query(default="", description="Goal query for recall_relevance ranking"),
+    top_k: int = Query(default=5, ge=1, le=20),
+    since_hours: float = Query(default=24.0, gt=0.0, le=720.0),
+    _auth: None = Depends(_check_fabric_auth),
+):
+    """Return a ranked context bundle for fabric_seed session warm-up.
+
+    Ranking: ``recall_relevance × recency_decay × log(1 + observer_count)``
+
+    ``observer_count`` is the number of distinct agent_ids that have an
+    ``AGENT_RECEIVED`` edge to the memory entity.  ``recency_decay`` is
+    ``exp(-days_since_first_seen / 7)``.
+
+    Returns ``{"bundle": [...], "degraded": bool}`` where ``degraded: true``
+    means Redis is unavailable and the bundle is derived from graph-only data.
+    """
+    project_list = [p.strip() for p in projects.split(",") if p.strip()]
+    if not project_list:
+        raise HTTPException(status_code=422, detail="projects must not be empty")
+
+    store = await _get_event_store()
+    result = await store.fabric_seed_bundle(
+        projects=project_list,
+        goal=goal,
+        top_k=top_k,
+        since_hours=since_hours,
+    )
+    if session_id:
+        result["session_id"] = session_id
+    return result
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/graph/agent/{agent_id}/trail  (S-144 AC-1)
+# ---------------------------------------------------------------------------
+
+@router.get("/v1/graph/agent/{agent_id}/trail")
+async def agent_trail(
+    agent_id: str,
+    project: Optional[str] = Query(default=None, description="Filter by project slug"),
+    since: Optional[str] = Query(default=None, description="ISO-8601 lower bound (inclusive)"),
+    until: Optional[str] = Query(default=None, description="ISO-8601 upper bound (inclusive)"),
+    _auth: None = Depends(_check_fabric_auth),
+):
+    """Return AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for ``agent_id``.
+
+    Results are sorted by ``first_seen`` ascending.
+    Returns ``{"trail": [...], "count": int}`` — empty list (not 404) when no
+    events match the time range.
+    """
+    since_ts: Optional[float] = None
+    until_ts: Optional[float] = None
+    try:
+        if since:
+            since_ts = datetime.fromisoformat(since).replace(tzinfo=timezone.utc).timestamp()
+        if until:
+            until_ts = datetime.fromisoformat(until).replace(tzinfo=timezone.utc).timestamp()
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=f"invalid date format: {exc}")
+
+    store = await _get_event_store()
+    all_entities = await asyncio.get_event_loop().run_in_executor(
+        None, store.graph.all_entities
+    )
+
+    trail = []
+    for entity in all_entities:
+        if entity.type != "event":
+            continue
+        meta = entity.metadata or {}
+        if meta.get("agent_id") != agent_id:
+            continue
+        if project and meta.get("project_slug") != project:
+            continue
+        try:
+            ts = datetime.fromisoformat(entity.first_seen).replace(tzinfo=timezone.utc).timestamp()
+        except (ValueError, TypeError):
+            ts = 0.0
+        if since_ts is not None and ts < since_ts:
+            continue
+        if until_ts is not None and ts > until_ts:
+            continue
+        trail.append({
+            "entity_id": entity.entity_id,
+            "event_type": meta.get("event_type", ""),
+            "memory_refs": meta.get("memory_refs", []),
+            "first_seen": entity.first_seen,
+            "project": meta.get("project_slug", entity.project),
+            "session_id": meta.get("session_id"),
+        })
+
+    trail.sort(key=lambda x: x["first_seen"])
+    return {"trail": trail, "count": len(trail)}
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/graph/memory/{entity_id}/observers  (S-144 AC-2)
+# ---------------------------------------------------------------------------
+
+@router.get("/v1/graph/memory/{entity_id}/observers")
+async def memory_observers(
+    entity_id: str,
+    _auth: None = Depends(_check_fabric_auth),
+):
+    """Return all distinct ``agent_id`` values that have an AGENT_RECEIVED edge to ``entity_id``.
+
+    Returns 404 if ``entity_id`` is not found in the graph.
+    Returns ``{"observers": [...], "count": int}`` otherwise.
+    Each observer entry: ``{"agent_id": str, "timestamp": str, "edge_id": str}``.
+    """
+    store = await _get_event_store()
+
+    entity = await asyncio.get_event_loop().run_in_executor(
+        None, store.graph.get_entity, entity_id
+    )
+    if entity is None:
+        raise HTTPException(status_code=404, detail=f"entity {entity_id!r} not found")
+
+    edges = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: store.graph.get_edges(entity_id, relationship_filter=["AGENT_RECEIVED"])
+    )
+
+    seen_agents: set[str] = set()
+    observers = []
+    for edge in edges:
+        agent = edge.metadata.get("agent_id") or edge.target_id
+        if agent in seen_agents:
+            continue
+        seen_agents.add(agent)
+        observers.append({
+            "agent_id": agent,
+            "timestamp": edge.metadata.get("timestamp", ""),
+            "edge_id": edge.edge_id,
+        })
+
+    observers.sort(key=lambda x: x["timestamp"])
+    return {"observers": observers, "count": len(observers)}

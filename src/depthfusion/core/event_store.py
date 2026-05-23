@@ -245,6 +245,11 @@ class EventStore:
         self._loop = loop
         self._enforce_wal()
 
+    @property
+    def graph(self) -> GraphBackend:
+        """Public read-only access to the underlying graph backend."""
+        return self._graph
+
     def _enforce_wal(self) -> None:
         """Enable SQLite WAL mode if the graph backend is SQLite-backed."""
         import sqlite3 as _sqlite3
@@ -304,6 +309,78 @@ class EventStore:
 
         return event_id
 
+    async def publish_memory(
+        self,
+        content: str,
+        agent_id: str,
+        project_slug: str,
+        event_type: str = "publish",
+        session_id: str | None = None,
+    ) -> dict:
+        """Publish content as a MemoryEntity + EventEntity with content-hash dedup.
+
+        The MemoryEntity is content-addressed: entity_id = sha256(content)[:12].
+        Concurrent publishes of identical content converge to 1 MemoryEntity
+        because ``upsert_entity`` is idempotent (INSERT OR REPLACE in SQLite).
+
+        Returns: {"memory_id": str, "event_id": str, "deduped": bool}
+        """
+        content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
+        timestamp_iso = datetime.now(timezone.utc).isoformat()
+
+        # Check if MemoryEntity already exists (best-effort dedup signal).
+        # Under concurrency, multiple callers may see None simultaneously —
+        # the upsert below is still idempotent so only 1 entity ends up in the graph.
+        loop = asyncio.get_event_loop()
+        existing = await loop.run_in_executor(None, self._graph.get_entity, content_hash)
+        deduped = existing is not None
+
+        memory_entity = Entity(
+            entity_id=content_hash,
+            name=content[:80].replace("\n", " "),
+            type="memory",
+            project=project_slug,
+            source_files=[],
+            confidence=1.0,
+            first_seen=existing.first_seen if existing else timestamp_iso,
+            metadata={
+                "content_hash": content_hash,
+                "agent_id": agent_id,
+            },
+        )
+        await self._graph_write(project_slug, memory_entity)
+
+        if deduped:
+            log.debug(
+                "EventStore.publish_memory: content_hash=%s already in graph — dedup hit",
+                content_hash,
+            )
+
+        # EventEntity — always unique (distinct timestamp per call)
+        event_id = _event_entity_id(agent_id, event_type, timestamp_iso, [content_hash])
+        event_entity = Entity(
+            entity_id=event_id,
+            name=f"{event_type}:{agent_id}:{timestamp_iso}",
+            type="event",
+            project=project_slug,
+            source_files=[],
+            confidence=1.0,
+            first_seen=timestamp_iso,
+            metadata={
+                "event_type": event_type,
+                "agent_id": agent_id,
+                "project_slug": project_slug,
+                "memory_refs": [content_hash],
+                "session_id": session_id,
+                "content_hash": content_hash,
+            },
+        )
+        await self._graph_write(project_slug, event_entity)
+        await self._graph_write_edge(project_slug, event_id, content_hash, "AGENT_PUBLISHED")
+        await self._stream_publish(project_slug, event_entity)
+
+        return {"memory_id": content_hash, "event_id": event_id, "deduped": deduped}
+
     async def get_recent_events(
         self,
         project_slug: str,
@@ -338,6 +415,111 @@ class EventStore:
 
         results.sort(key=lambda x: x.first_seen)
         return results
+
+    async def fabric_seed_bundle(
+        self,
+        projects: list[str],
+        goal: str = "",
+        top_k: int = 5,
+        since_hours: float = 24.0,
+    ) -> dict:
+        """Compute a ranked context bundle for fabric_seed mode.
+
+        Ranking: score = recall_relevance × recency_decay × log(1 + observer_count)
+        - recall_relevance: BM25 keyword overlap between goal and memory name (0-1)
+        - recency_decay: exp(-days_since_first_seen / 7)
+        - observer_count: distinct agent_ids with AGENT_RECEIVED edges to the memory
+
+        Falls back to graph-only traversal if Redis unavailable; returns
+        ``degraded: True`` in that case.
+        """
+        import math
+
+        degraded = self._stream is None
+        loop = asyncio.get_event_loop()
+
+        # Collect recent event entities for the requested projects
+        all_entities: list[Entity] = await loop.run_in_executor(None, self._graph.all_entities)
+        now = datetime.now(timezone.utc).timestamp()
+        cutoff = now - since_hours * 3600
+
+        # Gather unique memory_refs from recent events across requested projects
+        memory_ids: set[str] = set()
+        for e in all_entities:
+            if e.type != "event":
+                continue
+            if e.metadata.get("project_slug") not in projects:
+                continue
+            try:
+                ts = datetime.fromisoformat(e.first_seen).timestamp()
+            except (ValueError, TypeError):
+                continue
+            if ts < cutoff:
+                continue
+            for ref in e.metadata.get("memory_refs", []):
+                memory_ids.add(ref)
+
+        # Fetch MemoryEntities and score them
+        goal_tokens = set(goal.lower().split()) if goal else set()
+        scored: list[tuple[float, Entity]] = []
+
+        for mid in memory_ids:
+            entity = await loop.run_in_executor(None, self._graph.get_entity, mid)
+            if entity is None:
+                continue
+
+            # recency_decay
+            try:
+                ts = datetime.fromisoformat(entity.first_seen).timestamp()
+                days_old = (now - ts) / 86400.0
+                recency_decay = math.exp(-days_old / 7.0)
+            except (ValueError, TypeError):
+                recency_decay = 0.1
+
+            # observer_count via AGENT_RECEIVED edges
+            edges = await loop.run_in_executor(
+                None,
+                lambda eid=mid: self._graph.get_edges(eid, relationship_filter=["AGENT_RECEIVED"]),
+            )
+            agent_ids = {e.metadata.get("agent_id", e.source_id) for e in edges}
+            observer_count = len(agent_ids)
+
+            # recall_relevance — Jaccard-style token overlap with goal
+            if goal_tokens:
+                name_tokens = set(entity.name.lower().split())
+                overlap = len(goal_tokens & name_tokens)
+                recall_relevance = overlap / max(len(goal_tokens | name_tokens), 1)
+            else:
+                recall_relevance = 1.0
+
+            score = recall_relevance * recency_decay * math.log(1 + observer_count + 1)
+            scored.append((score, entity))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        bundle = [
+            {
+                "memory_id": e.entity_id,
+                "name": e.name,
+                "project": e.project,
+                "first_seen": e.first_seen,
+                "score": round(s, 4),
+                "observer_count": len(
+                    {ed.metadata.get("agent_id", ed.source_id)
+                     for ed in self._graph.get_edges(
+                         e.entity_id, relationship_filter=["AGENT_RECEIVED"]
+                     )}
+                ),
+                "metadata": e.metadata,
+            }
+            for s, e in scored[:top_k]
+        ]
+
+        return {
+            "bundle": bundle,
+            "degraded": degraded,
+            "project_count": len(projects),
+            "memory_ids_scanned": len(memory_ids),
+        }
 
     async def subscribe_stream(
         self,
