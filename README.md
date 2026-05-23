@@ -453,6 +453,43 @@ The generated CLI (`depthfusion-pp-cli`) exposes all 29 tools as subcommands. Se
 
 ---
 
+## Shared Memory Fabric (E-46, v0.6.0-alpha)
+
+Every memory publication, subscription, and recall becomes a first-class node in the knowledge graph. Any session can ask "who knew what, when" — and new sessions inherit the room's working memory automatically.
+
+**Three pain points it solves:**
+1. Agents in the same project duplicate work because they can't see each other's in-progress discoveries.
+2. A new session starts cold even though five other agents have been building context all morning.
+3. There's no audit trail for "which agent introduced this assumption into the shared context?"
+
+### Quickstart (5 commands)
+
+```bash
+# 1. Start the REST server (requires DEPTHFUSION_API_TOKEN for any non-loopback bind)
+DEPTHFUSION_API_TOKEN=mytoken uvicorn depthfusion.api.rest:app --port 7300
+
+# 2. Subscribe to the live event stream (terminal 1)
+curl -N -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/events/stream?projects=myproject&consumer_id=agent-b"
+
+# 3. Publish a memory event (terminal 2)
+curl -X POST -H "Authorization: Bearer mytoken" -H "Content-Type: application/json" \
+  -d '{"agent_id":"agent-a","project_slug":"myproject","memory_refs":["abc123"]}' \
+  http://localhost:7300/v1/events/publish
+
+# 4. Seed a new session with the room's working memory
+curl -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/events/seed?projects=myproject&goal=implement+auth"
+
+# 5. Query provenance: who has seen memory abc123?
+curl -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/graph/memory/abc123/observers"
+```
+
+Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.md)** · [Tailscale setup](docs/fabric/tailscale-setup.md) · [Kafka/Flink migration](docs/fabric/kafka-flink-migration.md)
+
+---
+
 ## Feature Flags
 
 ### Core flags (pre-E-31)

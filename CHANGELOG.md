@@ -14,6 +14,22 @@ Conventions:
 
 ---
 
+## [v0.6.0-alpha] — 2026-05-23
+
+**Theme:** Event Graph Fabric — multi-agent shared memory, agent provenance graph, `fabric_seed` cold-start mode. Covers E-46.
+
+### Added
+
+**Event Graph Fabric (E-46):**
+- `S-141` `event` Entity type and four new edge relationships (`AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM`) added to the knowledge graph vocabulary; `StreamBackend` Protocol + `RedisStreamBackend` (Redis Streams XADD/XREAD); `EventStore` class with `publish()`, `get_recent_events()`, `subscribe_stream()`, graceful Redis degradation (best-effort stream, graph write always succeeds)
+- `S-142` REST endpoints: `POST /v1/events/publish`, `GET /v1/events/stream` (SSE), `GET /v1/events/seed`; `DEPTHFUSION_API_TAILSCALE=1` bind on Tailscale interface IP (loopback always active; token required for non-loopback per infra-exposure.md); `redis>=5.0` added to new `fabric` optional-dependency extra
+- `S-143` `fabric_seed` mode for `depthfusion_session_seed` MCP tool — cold-start context bundle ranked by `recall_relevance × recency_decay × log(1+observer_count)`; write-path content-hash deduplication (100 concurrent publishes of identical content → 1 MemoryEntity + 100 EventEntities); three new MCP tools: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`
+- `S-144` Provenance query endpoints: `GET /v1/graph/agent/{agent_id}/trail` (all AGENT_PUBLISHED/AGENT_RECEIVED events for an agent, time-filtered), `GET /v1/graph/memory/{entity_id}/observers` (distinct agents with AGENT_RECEIVED edges, with timestamps)
+- `S-145` Performance baselines: publish p99 = 30ms (SLA < 500ms, 16× headroom); `fabric_seed` p99 = 110ms (SLA < 2s, 18× headroom); `/trail` p99 = 50ms (SLA < 500ms, 9× headroom); `/observers` p99 = 8.5ms (SLA < 500ms, 59× headroom); graceful degradation verified; results in `docs/performance/event-graph-baseline-2026-05-23.md`
+- `S-146` Documentation: README "Shared Memory Fabric" section with 5-command curl quickstart; `docs/fabric/tailscale-setup.md`, `docs/fabric/api-reference.md`, `docs/fabric/kafka-flink-migration.md`
+
+---
+
 ## [v1.2.0] — 2026-05-22
 
 **Theme:** HNSW approximate nearest-neighbour embedding index + BM25-HNSW fused recall (ruflo-mod contract), CI matrix hardening, security updates, REST API systemd service, and generated CLI. Covers E-45.

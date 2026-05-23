@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-23 (E-46 active — Event Graph Fabric; S-141 done: EventStore + StreamBackend + 15 tests; S-142–S-146 in backlog)
+> Last updated: 2026-05-23 (E-46 done — Event Graph Fabric complete; S-141–S-146 all shipped; v0.6.0-alpha)
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2363,7 +2363,7 @@
 ---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
 
-## E-46: Event Graph Fabric [active]
+## E-46: Event Graph Fabric [done]
 
 > Shared multi-agent memory layer: every publish, subscribe, and recall becomes a graph node. Agents see each other's in-progress work in real time; new sessions inherit the room's working memory via fabric_seed; provenance queries reveal who knew what and when.
 
@@ -2445,29 +2445,29 @@
 ### S-145: As a DepthFusion operator, I want performance baselines for the fabric so that SLA targets are validated before the arc ships `P2` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Publish-to-SSE latency benchmark: 10 concurrent publishers × 100 events each; p99 < 500ms end-to-end (publish REST call → SSE subscriber receives event)
-- [ ] AC-2: `fabric_seed` latency: project with 500 recent EventEntities; `GET /v1/events/seed` responds in < 2s p99
-- [ ] AC-3: Graph provenance query: 1,000 EventEntities in store; `/trail` and `/observers` queries return in < 500ms
-- [ ] AC-4: Graceful degradation test: Redis process killed mid-stream; existing `depthfusion_recall_relevant` and `depthfusion_retrieve_context` paths are unaffected; degradation is logged, not raised
-- [ ] AC-5: Baseline results written to `docs/performance/event-graph-baseline-YYYY-MM-DD.md`
+- [x] AC-1: Publish-to-SSE latency benchmark: 10 concurrent publishers × 100 events each; p99 < 500ms end-to-end (publish REST call → SSE subscriber receives event)
+- [x] AC-2: `fabric_seed` latency: project with 500 recent EventEntities; `GET /v1/events/seed` responds in < 2s p99
+- [x] AC-3: Graph provenance query: 1,000 EventEntities in store; `/trail` and `/observers` queries return in < 500ms
+- [x] AC-4: Graceful degradation test: Redis process killed mid-stream; existing `depthfusion_recall_relevant` and `depthfusion_retrieve_context` paths are unaffected; degradation is logged, not raised
+- [x] AC-5: Baseline results written to `docs/performance/event-graph-baseline-2026-05-23.md`
 
 **Tasks:**
-- [ ] T-498: Publish-to-SSE latency benchmark script: 10 concurrent publishers, measure SSE receipt timestamps; assert p99 < 500ms
-- [ ] T-499: `fabric_seed` latency benchmark: seed 500 EventEntities, measure GET /v1/events/seed; assert p99 < 2s
-- [ ] T-500: Provenance query benchmark: 1,000 EventEntities; measure /trail and /observers; assert p99 < 500ms
-- [ ] T-501: Graceful degradation test: kill Redis, verify recall/retrieve unaffected, verify degradation log emitted
+- [x] T-498: Publish-to-SSE latency benchmark script: 10 concurrent publishers, measure SSE receipt timestamps; assert p99 < 500ms
+- [x] T-499: `fabric_seed` latency benchmark: seed 500 EventEntities, measure GET /v1/events/seed; assert p99 < 2s
+- [x] T-500: Provenance query benchmark: 1,000 EventEntities; measure /trail and /observers; assert p99 < 500ms
+- [x] T-501: Graceful degradation test: kill Redis, verify recall/retrieve unaffected, verify degradation log emitted
 
 ### S-146: As the DepthFusion open-source community, I want documentation for the Event Graph Fabric so that other teams can deploy and use it `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: README has a "Shared Memory Fabric" section: what it is, the three pain points it solves, a 5-line curl quickstart (publish, stream, seed), link to full docs
-- [ ] AC-2: `docs/fabric/tailscale-setup.md` — step-by-step: install Tailscale, set `DEPTHFUSION_API_TAILSCALE=1` and `DEPTHFUSION_API_TOKEN` in systemd service, verify connectivity with `curl -H "Authorization: Bearer $TOKEN" http://100.x.x.x:7300/v1/events/seed`
-- [ ] AC-3: `docs/fabric/api-reference.md` — all 5 fabric endpoints documented with request/response examples; `StreamBackend` Protocol interface documented for Kafka+Flink implementors
-- [ ] AC-4: CHANGELOG updated: v0.6.0-alpha — "Event Graph Fabric: multi-agent shared memory, agent provenance graph, fabric_seed mode"
-- [ ] AC-5: `docs/fabric/kafka-flink-migration.md` — operator guide for swapping `RedisStreamBackend` → `KafkaFlinkBackend` when scale demands it; documents CEP convergence signal capability
+- [x] AC-1: README has a "Shared Memory Fabric" section: what it is, the three pain points it solves, a 5-line curl quickstart (publish, stream, seed), link to full docs
+- [x] AC-2: `docs/fabric/tailscale-setup.md` — step-by-step: install Tailscale, set `DEPTHFUSION_API_TAILSCALE=1` and `DEPTHFUSION_API_TOKEN` in systemd service, verify connectivity with `curl -H "Authorization: Bearer $TOKEN" http://100.x.x.x:7300/v1/events/seed`
+- [x] AC-3: `docs/fabric/api-reference.md` — all 5 fabric endpoints documented with request/response examples; `StreamBackend` Protocol interface documented for Kafka+Flink implementors
+- [x] AC-4: CHANGELOG updated: v0.6.0-alpha — "Event Graph Fabric: multi-agent shared memory, agent provenance graph, fabric_seed mode"
+- [x] AC-5: `docs/fabric/kafka-flink-migration.md` — operator guide for swapping `RedisStreamBackend` → `KafkaFlinkBackend` when scale demands it; documents CEP convergence signal capability
 
 **Tasks:**
-- [ ] T-502: Write README "Shared Memory Fabric" section with curl quickstart
-- [ ] T-503: Write `docs/fabric/tailscale-setup.md` — Tailscale install + DepthFusion config + verification
-- [ ] T-504: Write `docs/fabric/api-reference.md` — endpoint docs + StreamBackend Protocol interface
-- [ ] T-505: Write `docs/fabric/kafka-flink-migration.md` — migration guide + CEP convergence signal overview; update CHANGELOG for v0.6.0-alpha
+- [x] T-502: Write README "Shared Memory Fabric" section with curl quickstart
+- [x] T-503: Write `docs/fabric/tailscale-setup.md` — Tailscale install + DepthFusion config + verification
+- [x] T-504: Write `docs/fabric/api-reference.md` — endpoint docs + StreamBackend Protocol interface
+- [x] T-505: Write `docs/fabric/kafka-flink-migration.md` — migration guide + CEP convergence signal overview; update CHANGELOG for v0.6.0-alpha
