@@ -52,7 +52,7 @@ async def run_benchmark():
         print("Test 1: EventStore.publish() with dead Redis ...")
         try:
             t0 = time.perf_counter()
-            result = await store.publish(
+            await store.publish(
                 agent_id="degrade-agent",
                 project_slug="bench",
                 event_type="AGENT_PUBLISHED",
@@ -101,7 +101,6 @@ async def run_benchmark():
 
         print("\nTest 4: recall/retrieve paths unaffected (no Redis dependency) ...")
         # These go through the graph layer directly — Redis is not in the path
-        from depthfusion.graph.store import GraphBackend
         try:
             entities = graph.all_entities()
             print(f"  graph.all_entities() returned {len(entities)} entities — unaffected")
