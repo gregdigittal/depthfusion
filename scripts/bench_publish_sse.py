@@ -14,7 +14,6 @@ Usage:
 """
 from __future__ import annotations
 
-import json
 import os
 import statistics
 import sys
@@ -30,9 +29,10 @@ os.environ.setdefault("DEPTHFUSION_MODE", "local")
 
 
 def run_benchmark():
+    from starlette.testclient import TestClient
+
     import depthfusion.api.events as ev_mod
     from depthfusion.api.rest import app
-    from starlette.testclient import TestClient
 
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["DEPTHFUSION_GRAPH_JSON"] = str(Path(tmp) / "bench.json")

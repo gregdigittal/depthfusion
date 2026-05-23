@@ -3159,7 +3159,10 @@ def _tool_session_seed(arguments: dict) -> str:
     if mode == "fabric_seed":
         projects = arguments.get("projects") or []
         if not projects:
-            return json.dumps({"error": "projects required for fabric_seed mode", "session_id": session_id})
+            return json.dumps({
+                "error": "projects required for fabric_seed mode",
+                "session_id": session_id,
+            })
         goal = arguments.get("goal", "")
         top_k = int(arguments.get("top_k", 5))
         since_hours = float(arguments.get("since_hours", 24.0))
@@ -3176,7 +3179,9 @@ def _tool_session_seed(arguments: dict) -> str:
             result["session_id"] = session_id
             return json.dumps(result)
         except Exception as exc:
-            return json.dumps({"error": str(exc), "session_id": session_id, "bundle": [], "degraded": True})
+            return json.dumps({
+                "error": str(exc), "session_id": session_id, "bundle": [], "degraded": True,
+            })
 
     # Default: recall mode (S-111)
     from depthfusion.hooks.session_start import (
@@ -3334,7 +3339,11 @@ def _tool_agent_trail(arguments: dict) -> str:
                 continue
             try:
                 from datetime import datetime, timezone
-                ts = datetime.fromisoformat(entity.first_seen).replace(tzinfo=timezone.utc).timestamp()
+                ts = (
+                    datetime.fromisoformat(entity.first_seen)
+                    .replace(tzinfo=timezone.utc)
+                    .timestamp()
+                )
             except (ValueError, TypeError):
                 ts = 0.0
             if since_ts is not None and ts < since_ts:

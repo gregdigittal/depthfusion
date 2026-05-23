@@ -362,6 +362,7 @@ class TestEventStoreDedup:
 
     def test_one_memory_entity_n_event_entities(self):
         import asyncio
+
         from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
 
         graph = _FakeGraph()
@@ -403,6 +404,7 @@ class TestFabricSeedBundle:
     def test_observer_count_boosts_score(self):
         """Memory seen by 3 agents ranks higher than memory seen by 1 agent."""
         import asyncio
+
         from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
         from depthfusion.graph.types import Edge
 

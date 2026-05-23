@@ -45,9 +45,10 @@ async def seed_memory_entities(tmp: str, n: int = 20) -> list[str]:
 
 
 def run_benchmark():
+    from starlette.testclient import TestClient
+
     import depthfusion.api.events as ev_mod
     from depthfusion.api.rest import app
-    from starlette.testclient import TestClient
 
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["DEPTHFUSION_GRAPH_JSON"] = str(Path(tmp) / "bench.json")
@@ -91,7 +92,8 @@ def run_benchmark():
             assert resp.status_code == 200, f"/trail failed: {resp.text}"
             trail_latencies.append(elapsed)
 
-        # /observers benchmark on memory entities (which have AGENT_RECEIVED edges from publish calls)
+        # /observers benchmark on memory entities
+        # (AGENT_RECEIVED edges come from the publish calls above)
         obs_latencies: list[float] = []
         print(f"Measuring /observers × {n_runs} runs (memory entities) ...")
         for i in range(n_runs):
@@ -115,7 +117,10 @@ def run_benchmark():
             mx = max(data)
             passed = p99 < 500.0
             print(f"\n{name}:")
-            print(f"  mean {mean:.1f} ms  median {median:.1f} ms  p95 {p95:.1f} ms  p99 {p99:.1f} ms  max {mx:.1f} ms")
+            print(
+                f"  mean {mean:.1f} ms  median {median:.1f} ms"
+                f"  p95 {p95:.1f} ms  p99 {p99:.1f} ms  max {mx:.1f} ms"
+            )
             print(f"  SLA: p99 < 500ms → {'PASS' if passed else 'FAIL'} ({p99:.1f} ms)")
             return {
                 "mean_ms": round(mean, 1),

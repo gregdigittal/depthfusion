@@ -1,12 +1,10 @@
 """REST API tests for /v1/events/* endpoints — S-142 / T-488."""
 from __future__ import annotations
 
-import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -150,7 +148,7 @@ def test_stream_with_mocked_backend(tmp_path, monkeypatch):
     import depthfusion.api.events as ev_mod
     ev_mod._event_store = None
 
-    from depthfusion.core.event_store import InMemoryStreamBackend, EventStore
+    from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
     from depthfusion.graph.store import get_store
 
     graph = get_store(graph_json_path=tmp_path / "graph.json")
@@ -172,7 +170,7 @@ def test_stream_with_mocked_backend(tmp_path, monkeypatch):
         "/v1/events/stream?projects=test-proj&since_id=0",
     )
     assert stream_resp.status_code == 200
-    lines = [l for l in stream_resp.text.splitlines() if l.startswith("data:")]
+    lines = [ln for ln in stream_resp.text.splitlines() if ln.startswith("data:")]
     assert len(lines) == 1
     import json
     payload = json.loads(lines[0][len("data: "):])
@@ -205,7 +203,6 @@ def test_tailscale_bind_passes_with_token(monkeypatch):
 def test_get_tailscale_ip_returns_none_when_unavailable(monkeypatch):
     """get_tailscale_ip() must return None gracefully when tailscale not installed."""
     with patch("depthfusion.api.rest.subprocess.run", side_effect=FileNotFoundError):
-        from importlib import reload
         import depthfusion.api.rest as rest_mod
         # Call directly without reload to avoid module-level side effects
         result = rest_mod.get_tailscale_ip()
@@ -213,7 +210,6 @@ def test_get_tailscale_ip_returns_none_when_unavailable(monkeypatch):
 
 
 def test_get_tailscale_ip_returns_none_on_nonzero_exit(monkeypatch):
-    import subprocess as _sp
     mock_result = MagicMock()
     mock_result.returncode = 1
     mock_result.stdout = ""
@@ -225,7 +221,6 @@ def test_get_tailscale_ip_returns_none_on_nonzero_exit(monkeypatch):
 
 
 def test_get_tailscale_ip_returns_ip_on_success():
-    import subprocess as _sp
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = "100.64.1.42\n"
@@ -275,7 +270,6 @@ class TestAgentTrail:
         assert data["count"] == 0
 
     def test_trail_returns_event_for_publishing_agent(self, tmp_path, monkeypatch):
-        import asyncio
         client = _fabric_client(tmp_path, monkeypatch)
 
         # Pre-seed state via publish endpoint (creates AGENT_PUBLISHED EventEntity)
@@ -404,6 +398,7 @@ class TestMemoryObservers:
     def test_observers_counts_received_edges(self, tmp_path, monkeypatch):
         """After creating AGENT_RECEIVED edges, /observers returns them."""
         import asyncio
+
         import depthfusion.api.events as ev_mod
 
         monkeypatch.setenv("DEPTHFUSION_MODE", "local")
@@ -442,6 +437,7 @@ class TestMemoryObservers:
 
     def test_observers_requires_auth_when_token_set(self, tmp_path, monkeypatch):
         import asyncio
+
         import depthfusion.api.events as ev_mod
 
         monkeypatch.setenv("DEPTHFUSION_MODE", "local")
@@ -473,6 +469,7 @@ class TestMemoryObservers:
     def test_dedup_produces_one_memory_n_event_entities(self, tmp_path, monkeypatch):
         """T-497: 10 concurrent publishes of identical content → 1 MemoryEntity, 10 EventEntities."""
         import asyncio
+
         import depthfusion.api.events as ev_mod
 
         monkeypatch.setenv("DEPTHFUSION_MODE", "local")

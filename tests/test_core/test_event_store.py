@@ -4,10 +4,6 @@ T-483 / S-141 / E-46
 """
 from __future__ import annotations
 
-import asyncio
-import hashlib
-from unittest.mock import MagicMock, patch
-
 import pytest
 
 from depthfusion.core.event_store import (
@@ -16,7 +12,6 @@ from depthfusion.core.event_store import (
     _event_entity_id,
 )
 from depthfusion.graph.types import Entity
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -15,7 +15,6 @@ import logging
 import os
 import time
 from asyncio import AbstractEventLoop
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator, Protocol, runtime_checkable
@@ -43,7 +42,7 @@ class StreamBackend(Protocol):
         """Append a payload to the stream channel; return the stream entry ID."""
         ...
 
-    async def subscribe(
+    def subscribe(
         self,
         channels: list[str],
         since_id: str = "0",
@@ -199,7 +198,9 @@ class RedisStreamBackend:
 # EventStore
 # ---------------------------------------------------------------------------
 
-def _event_entity_id(agent_id: str, event_type: str, timestamp_iso: str, memory_refs: list[str]) -> str:
+def _event_entity_id(
+    agent_id: str, event_type: str, timestamp_iso: str, memory_refs: list[str]
+) -> str:
     """Deterministic, dedup-safe entity_id for event entities.
 
     Formula: sha256(agent_id + event_type + timestamp_iso + sorted(memory_refs))[:12]
@@ -479,7 +480,7 @@ class EventStore:
             # observer_count via AGENT_RECEIVED edges
             edges = await loop.run_in_executor(
                 None,
-                lambda eid=mid: self._graph.get_edges(eid, relationship_filter=["AGENT_RECEIVED"]),
+                lambda: self._graph.get_edges(mid, relationship_filter=["AGENT_RECEIVED"]),
             )
             agent_ids = {e.metadata.get("agent_id", e.source_id) for e in edges}
             observer_count = len(agent_ids)
@@ -575,8 +576,9 @@ class EventStore:
         relationship: str,
     ) -> None:
         """Write a directed edge to the graph, serialized per-project."""
-        from depthfusion.core.file_locking import flock_ex, flock_un
         import hashlib as _hl
+
+        from depthfusion.core.file_locking import flock_ex, flock_un
 
         edge_id = _hl.sha256(f"{source_id}{relationship}{target_id}".encode()).hexdigest()[:12]
         edge = Edge(
