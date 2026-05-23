@@ -34,7 +34,7 @@ The fabric_seed ranking function is: `score = recall_relevance × recency_decay 
 Happy to answer questions about the architecture, the graph model, or the agent coordination patterns that emerged from using this on real projects.
 
 **Links:**
-- GitHub: [github.com/gregdigittal/depthfusion]
+- GitHub: https://github.com/gregdigittal/depthfusion
 - Animated demo: https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html
 - Install in 60 seconds: `pip install depthfusion && depthfusion init`
 
