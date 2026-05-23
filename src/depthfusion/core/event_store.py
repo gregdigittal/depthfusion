@@ -1,0 +1,468 @@
+"""Event Graph Fabric — EventStore, StreamBackend Protocol, RedisStreamBackend.
+
+Every memory publish, subscribe, and recall is recorded as a first-class
+`event` Entity node in the knowledge graph so any session can later ask
+"who knew what, when."
+
+v0.6 / E-46 / S-141
+"""
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import logging
+import os
+import time
+from asyncio import AbstractEventLoop
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import AsyncIterator, Protocol, runtime_checkable
+
+from depthfusion.graph.store import GraphBackend
+from depthfusion.graph.types import Edge, Entity
+
+log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# StreamBackend Protocol
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class StreamBackend(Protocol):
+    """Async streaming transport for event fan-out.
+
+    Mirrors the ``GraphBackend`` Protocol pattern from ``graph/store.py``.
+    The canonical v1 implementation is ``RedisStreamBackend`` (Redis Streams).
+    Operators can swap in a ``KafkaFlinkBackend`` (v1.5) without touching
+    EventStore by implementing this Protocol.
+    """
+
+    async def publish(self, channel: str, payload: dict) -> str:
+        """Append a payload to the stream channel; return the stream entry ID."""
+        ...
+
+    async def subscribe(
+        self,
+        channels: list[str],
+        since_id: str = "0",
+    ) -> AsyncIterator[tuple[str, dict]]:
+        """Yield ``(stream_entry_id, payload)`` tuples in real time.
+
+        ``since_id`` enables replay from a past position in the stream
+        (pass the last consumed Redis Stream ID, e.g. ``"1716456789123-0"``).
+        Pass ``"$"`` to receive only new entries.
+        """
+        ...
+
+    async def read_since(
+        self,
+        channel: str,
+        since_id: str = "0",
+        count: int = 100,
+    ) -> list[tuple[str, dict]]:
+        """Return up to ``count`` entries from ``channel`` starting after ``since_id``."""
+        ...
+
+    async def close(self) -> None:
+        """Release underlying connections."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# InMemoryStreamBackend (used in tests — not a production backend)
+# ---------------------------------------------------------------------------
+
+class InMemoryStreamBackend:
+    """In-memory stub StreamBackend for unit tests.
+
+    Stores entries in a list per channel so tests can inspect published
+    payloads without a Redis dependency.
+    """
+
+    def __init__(self) -> None:
+        self._streams: dict[str, list[tuple[str, dict]]] = {}
+        self._counter = 0
+
+    def _next_id(self) -> str:
+        self._counter += 1
+        return f"{int(time.time() * 1000)}-{self._counter}"
+
+    async def publish(self, channel: str, payload: dict) -> str:
+        entry_id = self._next_id()
+        self._streams.setdefault(channel, []).append((entry_id, payload))
+        return entry_id
+
+    async def subscribe(
+        self,
+        channels: list[str],
+        since_id: str = "0",
+    ) -> AsyncIterator[tuple[str, dict]]:
+        # In tests this generator yields all existing entries then stops.
+        for ch in channels:
+            for entry_id, payload in self._streams.get(ch, []):
+                yield entry_id, payload
+
+    async def read_since(
+        self,
+        channel: str,
+        since_id: str = "0",
+        count: int = 100,
+    ) -> list[tuple[str, dict]]:
+        entries = self._streams.get(channel, [])
+        if since_id in ("0", "$"):
+            results = entries if since_id == "0" else []
+        else:
+            results = [e for e in entries if e[0] > since_id]
+        return results[:count]
+
+    async def close(self) -> None:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# RedisStreamBackend
+# ---------------------------------------------------------------------------
+
+class RedisStreamBackend:
+    """Production StreamBackend backed by Redis Streams (redis.asyncio).
+
+    Channel naming: ``depthfusion:stream:{project_slug}``
+
+    Uses XADD for publishing and XREAD (with consumer groups for fan-out
+    to multiple concurrent subscribers) for reading.
+
+    Requires ``redis>=5.0`` (``pip install depthfusion[fabric]``).
+    """
+
+    def __init__(self, redis_url: str = "redis://127.0.0.1:6379") -> None:
+        try:
+            import redis.asyncio as aioredis  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise ImportError(
+                "RedisStreamBackend requires redis>=5.0. "
+                "Install with: pip install depthfusion[fabric]"
+            ) from exc
+
+        self._client = aioredis.from_url(redis_url, decode_responses=True)
+
+    async def publish(self, channel: str, payload: dict) -> str:
+        flat = {k: json.dumps(v) if not isinstance(v, str) else v for k, v in payload.items()}
+        entry_id: str = await self._client.xadd(channel, flat)
+        return entry_id
+
+    async def subscribe(
+        self,
+        channels: list[str],
+        since_id: str = "$",
+    ) -> AsyncIterator[tuple[str, dict]]:
+        last_ids = {ch: since_id for ch in channels}
+        while True:
+            streams = await self._client.xread(
+                last_ids,
+                count=100,
+                block=1000,
+            )
+            if not streams:
+                continue
+            for channel, entries in streams:
+                for entry_id, raw in entries:
+                    last_ids[channel] = entry_id
+                    payload = {
+                        k: (json.loads(v) if v and v[0] in ("{", "[", '"') else v)
+                        for k, v in raw.items()
+                    }
+                    yield entry_id, payload
+
+    async def read_since(
+        self,
+        channel: str,
+        since_id: str = "0",
+        count: int = 100,
+    ) -> list[tuple[str, dict]]:
+        raw_entries = await self._client.xrange(channel, min=since_id, count=count)
+        results = []
+        for entry_id, raw in raw_entries:
+            payload = {
+                k: (json.loads(v) if v and v[0] in ("{", "[", '"') else v)
+                for k, v in raw.items()
+            }
+            results.append((entry_id, payload))
+        return results
+
+    async def close(self) -> None:
+        await self._client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# EventStore
+# ---------------------------------------------------------------------------
+
+def _event_entity_id(agent_id: str, event_type: str, timestamp_iso: str, memory_refs: list[str]) -> str:
+    """Deterministic, dedup-safe entity_id for event entities.
+
+    Formula: sha256(agent_id + event_type + timestamp_iso + sorted(memory_refs))[:12]
+    """
+    refs_str = "".join(sorted(memory_refs))
+    raw = f"{agent_id}{event_type}{timestamp_iso}{refs_str}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:12]
+
+
+def _graph_lock_path(project_slug: str) -> Path:
+    """Sidecar lock file for per-project graph write serialization."""
+    lock_dir = Path(os.environ.get("DEPTHFUSION_LOCK_DIR", Path.home() / ".depthfusion" / "locks"))
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    return lock_dir / f".{project_slug}.graphlock"
+
+
+class EventStore:
+    """Fabric-level event store.
+
+    Writes event Entities to the knowledge graph (authoritative, durable)
+    and optionally notifies via a StreamBackend (best-effort, real-time).
+
+    Graph writes are:
+    - Serialized per-project via ``file_locking.flock_ex``
+    - Run in a thread-pool executor to avoid blocking the asyncio event loop
+      (the underlying ``GraphBackend`` is synchronous)
+    - Performed with SQLite WAL mode enforced at init time when the backend
+      supports it
+
+    Redis stream notifications are best-effort: if the StreamBackend is
+    unavailable, a warning is logged and the publish() call still returns
+    successfully (with the graph write completed).
+    """
+
+    def __init__(
+        self,
+        graph: GraphBackend,
+        stream: StreamBackend | None = None,
+        loop: AbstractEventLoop | None = None,
+    ) -> None:
+        self._graph = graph
+        self._stream = stream
+        self._loop = loop
+        self._enforce_wal()
+
+    def _enforce_wal(self) -> None:
+        """Enable SQLite WAL mode if the graph backend is SQLite-backed."""
+        import sqlite3 as _sqlite3
+        backend = self._graph
+        # SQLiteGraphBackend exposes a ``_conn`` attribute (from graph/store.py).
+        conn = getattr(backend, "_conn", None)
+        if isinstance(conn, _sqlite3.Connection):
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.commit()
+            log.debug("EventStore: SQLite WAL mode enforced")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def publish(
+        self,
+        agent_id: str,
+        project_slug: str,
+        memory_refs: list[str],
+        event_type: str = "publish",
+        session_id: str | None = None,
+    ) -> str:
+        """Record a publish event in the graph and notify via stream.
+
+        Returns the event entity_id.
+        """
+        timestamp_iso = datetime.now(timezone.utc).isoformat()
+        event_id = _event_entity_id(agent_id, event_type, timestamp_iso, memory_refs)
+
+        entity = Entity(
+            entity_id=event_id,
+            name=f"{event_type}:{agent_id}:{timestamp_iso}",
+            type="event",
+            project=project_slug,
+            source_files=[],
+            confidence=1.0,
+            first_seen=timestamp_iso,
+            metadata={
+                "event_type": event_type,
+                "agent_id": agent_id,
+                "project_slug": project_slug,
+                "memory_refs": memory_refs,
+                "session_id": session_id,
+            },
+        )
+
+        # Graph write (authoritative) — serialize per project
+        await self._graph_write(project_slug, entity)
+
+        # Edges: AGENT_PUBLISHED from event → each referenced memory entity
+        for ref_id in memory_refs:
+            await self._graph_write_edge(project_slug, entity.entity_id, ref_id, "AGENT_PUBLISHED")
+
+        # Stream notification (best-effort)
+        await self._stream_publish(project_slug, entity)
+
+        return event_id
+
+    async def get_recent_events(
+        self,
+        project_slug: str,
+        since_hours: float = 24.0,
+        agent_id: str | None = None,
+        event_types: list[str] | None = None,
+    ) -> list[Entity]:
+        """Return recent event entities from the graph matching the filters."""
+        loop = asyncio.get_event_loop()
+        entities: list[Entity] = await loop.run_in_executor(
+            None, self._graph.all_entities
+        )
+        cutoff = datetime.now(timezone.utc).timestamp() - since_hours * 3600
+
+        results = []
+        for e in entities:
+            if e.type != "event":
+                continue
+            if e.metadata.get("project_slug") != project_slug:
+                continue
+            try:
+                ts = datetime.fromisoformat(e.first_seen).timestamp()
+            except (ValueError, TypeError):
+                continue
+            if ts < cutoff:
+                continue
+            if agent_id and e.metadata.get("agent_id") != agent_id:
+                continue
+            if event_types and e.metadata.get("event_type") not in event_types:
+                continue
+            results.append(e)
+
+        results.sort(key=lambda x: x.first_seen)
+        return results
+
+    async def subscribe_stream(
+        self,
+        projects: list[str],
+        since_id: str = "$",
+        consumer_id: str | None = None,
+    ) -> AsyncIterator[tuple[str, Entity]]:
+        """Yield ``(stream_entry_id, EventEntity)`` from the live stream.
+
+        Requires a configured StreamBackend. Raises ``RuntimeError`` if none
+        is configured.
+        """
+        if self._stream is None:
+            raise RuntimeError(
+                "EventStore.subscribe_stream requires a StreamBackend. "
+                "Configure RedisStreamBackend and pass it to EventStore()."
+            )
+        channels = [f"depthfusion:stream:{p}" for p in projects]
+        async for entry_id, payload in self._stream.subscribe(channels, since_id=since_id):
+            entity = self._payload_to_entity(payload)
+            if entity is not None:
+                yield entry_id, entity
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _graph_write(self, project_slug: str, entity: Entity) -> None:
+        """Write entity to graph, serialized per-project via fcntl lock."""
+        from depthfusion.core.file_locking import flock_ex, flock_un
+
+        lock_path = _graph_lock_path(project_slug)
+        loop = asyncio.get_event_loop()
+
+        def _write() -> None:
+            lock_fh = open(lock_path, "a", encoding="utf-8")
+            try:
+                flock_ex(lock_fh.fileno())
+                try:
+                    self._graph.upsert_entity(entity)
+                finally:
+                    flock_un(lock_fh.fileno())
+            finally:
+                lock_fh.close()
+
+        await loop.run_in_executor(None, _write)
+
+    async def _graph_write_edge(
+        self,
+        project_slug: str,
+        source_id: str,
+        target_id: str,
+        relationship: str,
+    ) -> None:
+        """Write a directed edge to the graph, serialized per-project."""
+        from depthfusion.core.file_locking import flock_ex, flock_un
+        import hashlib as _hl
+
+        edge_id = _hl.sha256(f"{source_id}{relationship}{target_id}".encode()).hexdigest()[:12]
+        edge = Edge(
+            edge_id=edge_id,
+            source_id=source_id,
+            target_id=target_id,
+            relationship=relationship,
+            weight=1.0,
+            signals=["event_fabric"],
+            adapter_name="event_store",
+            source_type="event",
+        )
+
+        lock_path = _graph_lock_path(project_slug)
+        loop = asyncio.get_event_loop()
+
+        def _write() -> None:
+            lock_fh = open(lock_path, "a", encoding="utf-8")
+            try:
+                flock_ex(lock_fh.fileno())
+                try:
+                    self._graph.upsert_edge(edge)
+                finally:
+                    flock_un(lock_fh.fileno())
+            finally:
+                lock_fh.close()
+
+        await loop.run_in_executor(None, _write)
+
+    async def _stream_publish(self, project_slug: str, entity: Entity) -> None:
+        """Best-effort stream notification. Logs and continues on failure."""
+        if self._stream is None:
+            return
+        channel = f"depthfusion:stream:{project_slug}"
+        payload = {
+            "entity_id": entity.entity_id,
+            "name": entity.name,
+            "type": entity.type,
+            "project": entity.project,
+            "first_seen": entity.first_seen,
+            "metadata": entity.metadata,
+        }
+        try:
+            await self._stream.publish(channel, payload)
+        except Exception as exc:
+            log.warning(
+                "EventStore: stream publish failed (best-effort) — %s: %s",
+                type(exc).__name__,
+                exc,
+            )
+
+    @staticmethod
+    def _payload_to_entity(payload: dict) -> Entity | None:
+        """Reconstruct an EventEntity from a raw stream payload dict."""
+        try:
+            metadata = payload.get("metadata", {})
+            if isinstance(metadata, str):
+                metadata = json.loads(metadata)
+            return Entity(
+                entity_id=payload["entity_id"],
+                name=payload.get("name", ""),
+                type=payload.get("type", "event"),
+                project=payload.get("project", ""),
+                source_files=[],
+                confidence=1.0,
+                first_seen=payload.get("first_seen", ""),
+                metadata=metadata,
+            )
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            log.warning("EventStore: malformed stream payload — %s", exc)
+            return None

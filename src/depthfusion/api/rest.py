@@ -4,24 +4,41 @@ Security: binds 127.0.0.1:7300 unless DEPTHFUSION_API_PUBLIC=1 AND
 DEPTHFUSION_API_TOKEN is set. Startup raises ValueError if public
 bind is requested without a bearer token.
 
+Tailscale multi-bind: set DEPTHFUSION_API_TAILSCALE=1 to spawn a second
+uvicorn listener on the Tailscale interface IP (resolved via ``tailscale ip
+-4`` at startup). Requires DEPTHFUSION_API_TOKEN. Fails gracefully (log
+warning, loopback-only) if the tailscale command is unavailable or errors.
+Redis stays loopback-only — never exposed on the Tailscale interface.
+
 Query endpoints (/query/*) additionally support X-DepthFusion-Key header
 auth controlled by DEPTHFUSION_QUERY_API_KEY env var.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
+import logging
 import os
+import subprocess
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query
 from pydantic import BaseModel
 
+from depthfusion.api.events import router as events_router
+
+log = logging.getLogger(__name__)
+
 app = FastAPI(
     title="DepthFusion Cognitive API",
     version="1.0.0",
     openapi_url="/openapi.json",
 )
+
+# Mount the Event Graph Fabric router (S-142 / T-486)
+app.include_router(events_router)
 
 _API_TOKEN = os.getenv("DEPTHFUSION_API_TOKEN", "")
 _API_PUBLIC = os.getenv("DEPTHFUSION_API_PUBLIC", "0") == "1"
@@ -45,6 +62,91 @@ def validate_public_bind_config() -> None:
                 "DEPTHFUSION_QUERY_API_KEY must be set when DEPTHFUSION_API_PUBLIC=1. "
                 "Public bind exposes /query/* endpoints which require an API key."
             )
+    if os.getenv("DEPTHFUSION_API_TAILSCALE", "0") == "1":
+        if not os.getenv("DEPTHFUSION_API_TOKEN", ""):
+            raise ValueError(
+                "DEPTHFUSION_API_TOKEN must be set when DEPTHFUSION_API_TAILSCALE=1. "
+                "Tailscale bind without bearer token authentication is forbidden."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Tailscale multi-bind (T-485)
+# ---------------------------------------------------------------------------
+
+def get_tailscale_ip() -> Optional[str]:
+    """Return the Tailscale IPv4 address or None if unavailable."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "ip", "-4"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            ip = result.stdout.strip()
+            if ip:
+                return ip
+        log.warning(
+            "rest: tailscale ip -4 exited %d: %s",
+            result.returncode,
+            result.stderr.strip(),
+        )
+    except FileNotFoundError:
+        log.warning("rest: tailscale command not found — Tailscale bind skipped")
+    except subprocess.TimeoutExpired:
+        log.warning("rest: tailscale ip -4 timed out — Tailscale bind skipped")
+    except Exception as exc:
+        log.warning("rest: tailscale IP resolution failed — %s", exc)
+    return None
+
+
+def _run_tailscale_server(host: str, port: int) -> None:
+    """Run a second uvicorn server on the Tailscale interface in a daemon thread."""
+    try:
+        import uvicorn  # type: ignore[import-untyped]
+    except ImportError:
+        log.warning("rest: uvicorn not available — Tailscale listener not started")
+        return
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    config = uvicorn.Config(app=app, host=host, port=port, loop="none", log_level="info")
+    server = uvicorn.Server(config)
+    try:
+        loop.run_until_complete(server.serve())
+    finally:
+        loop.close()
+
+
+def start_tailscale_listener() -> None:
+    """Spawn a second uvicorn listener on the Tailscale interface if configured.
+
+    Fails gracefully: logs a warning and returns without raising if Tailscale
+    is unavailable or the IP cannot be resolved. Redis is never exposed on
+    this interface — only the HTTP API is served here.
+    """
+    if os.getenv("DEPTHFUSION_API_TAILSCALE", "0") != "1":
+        return
+
+    ts_ip = get_tailscale_ip()
+    if not ts_ip:
+        log.warning(
+            "rest: DEPTHFUSION_API_TAILSCALE=1 but no Tailscale IP found — "
+            "serving loopback only"
+        )
+        return
+
+    port = int(os.getenv("DEPTHFUSION_API_PORT", "7300"))
+    log.info("rest: starting Tailscale listener on %s:%d", ts_ip, port)
+
+    t = threading.Thread(
+        target=_run_tailscale_server,
+        args=(ts_ip, port),
+        daemon=True,
+        name="depthfusion-tailscale-listener",
+    )
+    t.start()
 
 
 def _check_auth(authorization: Optional[str] = Header(default=None)) -> None:

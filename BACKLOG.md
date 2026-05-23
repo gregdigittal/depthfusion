@@ -2390,21 +2390,21 @@
 ### S-142: As an agent on the Tailscale network, I want REST endpoints to publish events and subscribe to the live stream so that any HTTP client can participate in the fabric `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `POST /v1/events/publish` — accepts `{agent_id, project_slug, memory_refs, session_id?}`; calls `EventStore.publish()`; returns `{event_id, indexed: bool}`; Bearer token required
-- [ ] AC-2: `GET /v1/events/stream` — SSE endpoint; query params `projects` (comma-sep), `since_id` (last consumed Redis Stream ID, enables replay), `consumer_id`; yields EventEntity JSON; Bearer token required
-- [ ] AC-3: `DEPTHFUSION_API_TAILSCALE=1` causes REST server to bind an additional listener on the Tailscale interface IP (resolved via `tailscale ip -4` at startup); loopback listener stays active
-- [ ] AC-4: Tailscale bind requires `DEPTHFUSION_API_TOKEN` — startup raises `ValueError` if `DEPTHFUSION_API_TAILSCALE=1` and token is absent (mirrors existing `DEPTHFUSION_API_PUBLIC` validation)
-- [ ] AC-5: Tailscale bind fails gracefully (log warning, serve loopback-only) if `tailscale` command is unavailable or returns an error; does not crash the process
-- [ ] AC-6: Redis stays loopback-only — never exposed on the Tailscale interface
-- [ ] AC-7: `redis>=5.0` added to a new `fabric` optional-dependency extra in `pyproject.toml`
-- [ ] AC-8: Tests for `/v1/events/publish` (200 + 401 paths) and SSE stream (mock EventStore); Tailscale bind validation unit test
+- [x] AC-1: `POST /v1/events/publish` — accepts `{agent_id, project_slug, memory_refs, session_id?}`; calls `EventStore.publish()`; returns `{event_id, indexed: bool}`; Bearer token required
+- [x] AC-2: `GET /v1/events/stream` — SSE endpoint; query params `projects` (comma-sep), `since_id` (last consumed Redis Stream ID, enables replay), `consumer_id`; yields EventEntity JSON; Bearer token required
+- [x] AC-3: `DEPTHFUSION_API_TAILSCALE=1` causes REST server to bind an additional listener on the Tailscale interface IP (resolved via `tailscale ip -4` at startup); loopback listener stays active
+- [x] AC-4: Tailscale bind requires `DEPTHFUSION_API_TOKEN` — startup raises `ValueError` if `DEPTHFUSION_API_TAILSCALE=1` and token is absent (mirrors existing `DEPTHFUSION_API_PUBLIC` validation)
+- [x] AC-5: Tailscale bind fails gracefully (log warning, serve loopback-only) if `tailscale` command is unavailable or returns an error; does not crash the process
+- [x] AC-6: Redis stays loopback-only — never exposed on the Tailscale interface
+- [x] AC-7: `redis>=5.0` added to a new `fabric` optional-dependency extra in `pyproject.toml`
+- [x] AC-8: Tests for `/v1/events/publish` (200 + 401 paths) and SSE stream (mock EventStore); Tailscale bind validation unit test
 
 **Tasks:**
-- [ ] T-484: Create `src/depthfusion/api/events.py` — FastAPI router with `POST /v1/events/publish` and `GET /v1/events/stream` SSE; Bearer token via `_check_auth` (reuse from rest.py)
-- [ ] T-485: `DEPTHFUSION_API_TAILSCALE=1` support in `rest.py` — resolve Tailscale IP at startup, bind second uvicorn listener; `validate_public_bind_config()` extended for Tailscale case
-- [ ] T-486: Mount events router in `rest.py`; update systemd service env template to document `DEPTHFUSION_API_TAILSCALE` and `DEPTHFUSION_API_TOKEN`
-- [ ] T-487: Add `redis>=5.0` to `pyproject.toml` `fabric` optional-dependency extra
-- [ ] T-488: Tests for publish/stream endpoints and Tailscale bind startup validation
+- [x] T-484: Create `src/depthfusion/api/events.py` — FastAPI router with `POST /v1/events/publish` and `GET /v1/events/stream` SSE; Bearer token via `_check_auth` (reuse from rest.py)
+- [x] T-485: `DEPTHFUSION_API_TAILSCALE=1` support in `rest.py` — resolve Tailscale IP at startup, bind second uvicorn listener; `validate_public_bind_config()` extended for Tailscale case
+- [x] T-486: Mount events router in `rest.py`; update systemd service env template to document `DEPTHFUSION_API_TAILSCALE` and `DEPTHFUSION_API_TOKEN`
+- [x] T-487: Add `redis>=5.0` to `pyproject.toml` `fabric` optional-dependency extra
+- [x] T-488: Tests for publish/stream endpoints and Tailscale bind startup validation
 
 ### S-143: As a session starting cold, I want `depthfusion_session_seed` to support `fabric_seed` mode so that new agents inherit the room's working memory from the event graph `P1` `M`
 

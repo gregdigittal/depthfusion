@@ -76,6 +76,14 @@ hnsw = [
 
 rlm = ["rlms"]
 
+# E-46: Event Graph Fabric streaming transport (S-142 AC-7).
+# Install with: pip install depthfusion[fabric]
+# Enables RedisStreamBackend for multi-agent memory fan-out.
+# Redis stays loopback-only; never exposed on external interfaces.
+fabric = [
+    "redis>=5.0",
+]
+
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
