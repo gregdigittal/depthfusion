@@ -35,7 +35,7 @@ Happy to answer questions about the architecture, the graph model, or the agent 
 
 **Links:**
 - GitHub: [github.com/gregdigittal/depthfusion]
-- Animated demo: [link to live demo or raw HTML]
+- Animated demo: https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html
 - Install in 60 seconds: `pip install depthfusion && depthfusion init`
 
 ---
