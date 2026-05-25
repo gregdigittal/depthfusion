@@ -20,13 +20,24 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   echo "[dry-run] No changes will be written."
 fi
 
-PLIST="$HOME/Library/LaunchAgents/com.depthfusion.rest.plist"
+# Try known plist names in order of preference
+PLIST=""
+for candidate in \
+  "$HOME/Library/LaunchAgents/com.depthfusion.rest.plist" \
+  "$HOME/Library/LaunchAgents/com.depthfusion.mcp.plist"; do
+  if [[ -f "$candidate" ]]; then
+    PLIST="$candidate"
+    break
+  fi
+done
 
-if [[ ! -f "$PLIST" ]]; then
-  echo "ERROR: plist not found at $PLIST"
-  echo "       Install the DepthFusion REST service first (docs/install/mac-mlx-quickstart.md step 4)."
+if [[ -z "$PLIST" ]]; then
+  echo "ERROR: no DepthFusion plist found in ~/Library/LaunchAgents/"
+  echo "       Checked: com.depthfusion.rest.plist, com.depthfusion.mcp.plist"
+  echo "       Install the service first (docs/install/mac-mlx-quickstart.md step 4)."
   exit 1
 fi
+echo "Using plist: $PLIST"
 
 # --- plist editing via Python plistlib (XML-safe, no sed fragility) ---------
 
