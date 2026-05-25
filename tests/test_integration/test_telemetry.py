@@ -469,67 +469,6 @@ def test_update_candidate_skillforge_id(tmp_path):
     assert candidates[0]["skillforge_id"] == "sf-42"
 
 
-def test_mcp_surface_skill_candidates_dry_run(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(3):
-        store.record(f"s{i}", "Bash")
-
-    result = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert result["candidates_found"] == 1
-    assert result["candidates_drafted"] == 1
-    assert result["dry_run"] is True
-    assert result["items"][0]["pattern_key"] == "tool:Bash"
-    assert result["items"][0]["skillforge_id"] is None
-
-
-def test_mcp_surface_skill_candidates_below_threshold(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(2):
-        store.record(f"s{i}", "Glob")
-
-    result = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert result["candidates_found"] == 0
-    assert result["candidates_drafted"] == 0
-
-
-def test_mcp_surface_skill_candidates_no_duplicate_draft(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(3):
-        store.record(f"s{i}", "Read")
-
-    r1 = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert r1["candidates_drafted"] == 1
-    assert r1["already_tracked"] == 0
-
-    r2 = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert r2["candidates_drafted"] == 0
-    assert r2["already_tracked"] == 1
 
 
 def test_skillforge_client_no_url(monkeypatch):

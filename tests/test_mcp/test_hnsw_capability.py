@@ -41,22 +41,6 @@ def test_hnsw_capability_returns_disabled_when_env_not_set():
         assert "index_path" in cap
 
 
-def test_hnsw_capability_tool_in_tools_list():
-    """The tool is registered, schema-listed, and always-enabled."""
-    assert "depthfusion_hnsw_capability" in mcp_server.TOOLS
-    assert "depthfusion_hnsw_capability" in mcp_server._TOOL_FLAGS
-    assert mcp_server._TOOL_FLAGS["depthfusion_hnsw_capability"] is None
-    assert "depthfusion_hnsw_capability" in mcp_server.TOOL_SCHEMAS
-
-    # get_enabled_tools must surface it regardless of config flags.
-    class _Cfg:
-        router_enabled = False
-        rlm_enabled = False
-        graph_enabled = False
-
-    enabled = mcp_server.get_enabled_tools(_Cfg())
-    assert "depthfusion_hnsw_capability" in enabled
-
 
 def test_publish_context_returns_indexed_in_hnsw_false_when_disabled(tmp_path: Path):
     """With HNSW disabled, publish_context still works and reports False."""

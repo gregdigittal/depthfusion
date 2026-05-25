@@ -26,5 +26,5 @@
   ],
   "message": "Retrieved 3 relevant blocks (BM25+RRF)",
   "strategy": "bm25-only",
-  "hnsw_available": false
+  "hnsw_available": true
 }

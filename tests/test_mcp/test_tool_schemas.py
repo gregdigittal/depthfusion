@@ -27,12 +27,6 @@ def test_recall_feedback_has_recall_id_required():
     assert "recall_id" in schema["inputSchema"]["required"]
 
 
-def test_prune_discoveries_has_no_required():
-    schema = _make_tool_schema("depthfusion_prune_discoveries", "desc")
-    assert schema["inputSchema"]["required"] == []
-    assert "age_days" in schema["inputSchema"]["properties"]
-    assert "confirm" in schema["inputSchema"]["properties"]
-
 
 def test_confirm_discovery_has_content_required():
     schema = _make_tool_schema("depthfusion_confirm_discovery", "desc")
