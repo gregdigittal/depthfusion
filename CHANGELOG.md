@@ -12,6 +12,15 @@ Conventions:
 
 ## [Unreleased]
 
+### Added
+
+- `docs/install/mac-mlx-quickstart.md` — complete install guide for Apple Silicon Macs: launchd plist setup, MLX-LM inference server, Claude Desktop + Claude Code CLI registration, HNSW cold-start note, troubleshooting section (launchctl load pitfall, duplicate plist labels, zsh paste issues)
+- `docs/install/README.md` updated — Mac MLX guide added to the install guide table
+
+### Fixed
+
+- **REST `/context` endpoint wiring bug** — `POST /context` passes `content` and `tags` as flat keys into `_tool_publish_context`, but the tool expects `arguments["item"]` to be a nested dict. Endpoint returns `{"error": "publish_context: 'item' must be an object"}` for all REST publish calls. MCP tool (`depthfusion_publish_context`) is unaffected. Fix pending.
+
 ---
 
 ## [v0.6.0-alpha] — 2026-05-23
