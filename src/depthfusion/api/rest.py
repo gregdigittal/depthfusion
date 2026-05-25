@@ -625,6 +625,7 @@ async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check
 @app.post("/context")
 async def publish_context(body: PublishContextBody, _auth: None = Depends(_check_auth)):
     import uuid
+
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_publish_context
     cfg = DepthFusionConfig.from_env()

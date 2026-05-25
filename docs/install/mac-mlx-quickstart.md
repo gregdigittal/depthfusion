@@ -413,5 +413,5 @@ The label inside the plist (`<key>Label</key>`) is what launchd uses — not the
 | Auto-restart | systemd `Restart=always` | launchd `KeepAlive=true` |
 | Mode env var | `vps-gpu` / `vps-cpu` | `mac-mlx` |
 | Port 8080 | vLLM REST | MLX-LM REST |
-| Tool count | 32 tools | 27 tools (fabric tools not active without Redis) |
+| Tool count | 21 canonical tools (post-2026-05-25 parity audit) | 21 canonical tools (same as VPS; fabric tools removed from MCP surface) |
 | Redis / fabric | Optional but supported | Not required; HNSW + graph work without it |

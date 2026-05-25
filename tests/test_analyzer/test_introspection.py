@@ -9,7 +9,6 @@ from depthfusion.mcp.server import (
     _tool_describe_capabilities,
     _tool_graph_status,
     _tool_inspect_discovery,
-    get_enabled_tools,
 )
 
 # ---------------------------------------------------------------------------
@@ -67,12 +66,6 @@ class TestDescribeCapabilities:
                    "embedding_backend", "fusion_gates_enabled", "router_enabled"):
             assert k in flags
 
-    def test_tool_registered(self):
-        from depthfusion.core.config import DepthFusionConfig
-        cfg = DepthFusionConfig()
-        enabled = get_enabled_tools(cfg)
-        assert "depthfusion_describe_capabilities" in enabled
-
 
 # ---------------------------------------------------------------------------
 # S-76: depthfusion_inspect_discovery
@@ -109,12 +102,6 @@ class TestInspectDiscovery:
         result = json.loads(_tool_inspect_discovery({"filename": str(f)}))
         assert result["exists"] is True
         assert result["frontmatter"] == {}
-
-    def test_tool_registered(self):
-        from depthfusion.core.config import DepthFusionConfig
-        cfg = DepthFusionConfig()
-        enabled = get_enabled_tools(cfg)
-        assert "depthfusion_inspect_discovery" in enabled
 
 
 # ---------------------------------------------------------------------------
