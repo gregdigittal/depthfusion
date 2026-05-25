@@ -8,42 +8,31 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_thirty_two_entries():
-    """Total tool count: 32 (E-46 added event_publish, event_seed, agent_trail)."""
-    assert len(TOOLS) == 32
+def test_tools_dict_has_twenty_one_entries():
+    """Canonical 21-tool set after parity audit (removed 11 low-value / unshipped tools)."""
+    assert len(TOOLS) == 21
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
         "depthfusion_tag_session",
         "depthfusion_publish_context",
-        "depthfusion_run_recursive",
-        "depthfusion_tier_status",
         "depthfusion_auto_learn",
         "depthfusion_compress_session",
         "depthfusion_graph_traverse",
         "depthfusion_graph_status",
         "depthfusion_set_scope",
         "depthfusion_confirm_discovery",
-        "depthfusion_prune_discoveries",          # v0.5.1 S-55
         "depthfusion_set_memory_score",           # E-27 / S-70
         "depthfusion_recall_feedback",            # E-27 / S-72
         "depthfusion_pin_discovery",              # E-27 / S-69
-        "depthfusion_describe_capabilities",      # E-28 / S-76
-        "depthfusion_inspect_discovery",          # E-28 / S-76
         "depthfusion_retrieve_context",           # E-31 / S-99
         "depthfusion_record_decision",            # E-31 / S-97
         "depthfusion_record_incident",            # E-31 / S-98
         "depthfusion_mark_superseded",            # E-31 / S-98
         "depthfusion_report_outcome",             # E-31 / S-98
-        "depthfusion_get_cognitive_state",        # E-31 / S-99
         "depthfusion_record_telemetry",           # E-33 / S-106/S-107
         "depthfusion_query_telemetry",            # E-33 / S-106/S-107
-        "depthfusion_surface_skill_candidates",   # E-34 / S-109
         "depthfusion_session_seed",               # E-35 / S-111
-        "depthfusion_hnsw_capability",            # E-45 HNSW fused recall
-        "depthfusion_event_publish",              # E-46 / S-143
-        "depthfusion_event_seed",                 # E-46 / S-143
-        "depthfusion_agent_trail",                # E-46 / S-143
     }
     assert set(TOOLS.keys()) == expected
 
@@ -55,32 +44,32 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 32
+    assert len(enabled) == 21
 
 
-def test_get_enabled_tools_rlm_disabled_excludes_recursive():
-    config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
-    enabled = get_enabled_tools(config)
-    assert "depthfusion_run_recursive" not in enabled
-    # 22 always-on (E-46 +3 fabric tools) + 1 router = 23
-    assert len(enabled) == 23
+def test_get_enabled_tools_rlm_flag_is_orphaned():
+    """rlm_enabled no longer gates any tool after parity audit (run_recursive removed)."""
+    config_on = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
+    config_off = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
+    assert set(get_enabled_tools(config_on)) == set(get_enabled_tools(config_off))
+    # 12 always-on + 1 router = 13
+    assert len(get_enabled_tools(config_off)) == 13
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 22 always-on (E-46 +3 fabric tools) + 1 rlm = 23
-    assert len(enabled) == 23
+    # 12 always-on tools; rlm_enabled orphaned, adds nothing
+    assert len(enabled) == 12
 
 
 def test_get_enabled_tools_both_disabled():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
-    assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    # 22 always-on (E-46 +3 fabric tools) = 22
-    assert len(enabled) == 22
+    # 12 always-on tools only
+    assert len(enabled) == 12
 
 
 def test_core_tools_always_enabled():
@@ -90,7 +79,6 @@ def test_core_tools_always_enabled():
     assert "depthfusion_status" in enabled
     assert "depthfusion_recall_relevant" in enabled
     assert "depthfusion_tag_session" in enabled
-    assert "depthfusion_tier_status" in enabled
     assert "depthfusion_auto_learn" in enabled
     assert "depthfusion_compress_session" in enabled
 
@@ -233,69 +221,6 @@ class TestConfirmDiscovery:
         config = self._cfg()
         result = _handle_tools_call("depthfusion_nonexistent", {}, config)
         assert result["isError"] is True
-
-
-# ---------------------------------------------------------------------------
-# E-46 S-143 T-493 — Event Graph Fabric MCP tool registration
-# ---------------------------------------------------------------------------
-
-class TestFabricToolRegistration:
-    """Tool registration and schema tests for the 3 new E-46 fabric tools."""
-
-    def _cfg(self):
-        return DepthFusionConfig(rlm_enabled=False, router_enabled=False, graph_enabled=False)
-
-    def test_event_publish_always_enabled(self):
-        enabled = get_enabled_tools(self._cfg())
-        assert "depthfusion_event_publish" in enabled
-
-    def test_event_seed_always_enabled(self):
-        enabled = get_enabled_tools(self._cfg())
-        assert "depthfusion_event_seed" in enabled
-
-    def test_agent_trail_always_enabled(self):
-        enabled = get_enabled_tools(self._cfg())
-        assert "depthfusion_agent_trail" in enabled
-
-    def test_event_publish_missing_content_returns_error(self):
-        result = _handle_tools_call(
-            "depthfusion_event_publish",
-            {"agent_id": "agent-a", "project_slug": "proj"},
-            self._cfg(),
-        )
-        assert result["isError"] is False
-        body = json.loads(result["content"][0]["text"])
-        assert "error" in body
-
-    def test_event_publish_missing_agent_returns_error(self):
-        result = _handle_tools_call(
-            "depthfusion_event_publish",
-            {"content": "hello", "project_slug": "proj"},
-            self._cfg(),
-        )
-        assert result["isError"] is False
-        body = json.loads(result["content"][0]["text"])
-        assert "error" in body
-
-    def test_event_seed_missing_projects_returns_error(self):
-        result = _handle_tools_call(
-            "depthfusion_event_seed",
-            {},
-            self._cfg(),
-        )
-        assert result["isError"] is False
-        body = json.loads(result["content"][0]["text"])
-        assert "error" in body
-
-    def test_agent_trail_missing_agent_id_returns_error(self):
-        result = _handle_tools_call(
-            "depthfusion_agent_trail",
-            {},
-            self._cfg(),
-        )
-        assert result["isError"] is False
-        body = json.loads(result["content"][0]["text"])
-        assert "error" in body
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""DepthFusion MCP server — 5 tools, conditionally registered based on feature flags."""
+"""DepthFusion MCP server — 21 tools, conditionally registered based on feature flags."""
 from __future__ import annotations
 
 import json
@@ -40,9 +40,6 @@ TOOLS: dict[str, str] = {
         "a different hash and is stored as a new item; tag-only or metadata-only "
         "differences do not affect the hash and still dedupe."
     ),
-    "depthfusion_run_recursive": "Run recursive LLM on large content",
-    # v0.3.0 additions
-    "depthfusion_tier_status": "Return corpus size, active tier, and promotion estimate",
     "depthfusion_auto_learn": "Trigger auto-learning extraction from recent session files",
     "depthfusion_compress_session": "Compress a specific .tmp session file into a discovery file",
     # v0.4.0 graph tools
@@ -55,15 +52,6 @@ TOOLS: dict[str, str] = {
     ),
     # v0.5.0 CM-5 active confirmation tool
     "depthfusion_confirm_discovery": "Actively confirm a decision or fact for immediate capture",
-    # v0.5.1 TG-14 / S-55 discovery pruner
-    "depthfusion_prune_discoveries": (
-        "Identify stale discovery files in ~/.claude/shared/discoveries/. "
-        "Args: age_days (int, default 90 or DEPTHFUSION_PRUNE_AGE_DAYS), "
-        "confirm (bool, default False). Without confirm=True, returns "
-        "candidates with reasons but does NOT move any files. "
-        "With confirm=True, moves to ~/.claude/shared/discoveries/.archive/ "
-        "(never deletes — reversible)."
-    ),
     # E-27 / S-70 explicit operator override of memory scoring
     "depthfusion_set_memory_score": (
         "Override importance and/or salience scalars on a discovery file (S-70). "
@@ -96,20 +84,6 @@ TOOLS: dict[str, str] = {
         "file intact. Returns {pinned: bool, filename: str} or "
         "{error: str, filename: str}."
     ),
-    # S-76 introspection tools
-    "depthfusion_describe_capabilities": (
-        "Return which retrieval layers and capture mechanisms are engaged in this "
-        "DepthFusion instance. No args required. Response: {tier, mode, flags, "
-        "engaged_layers_per_op: {recall: [...], publish: [...], auto_learn: [...]}}. "
-        "Useful for diagnosing silent no-ops (e.g. why graph or embedding is not "
-        "contributing to recall without reading source code)."
-    ),
-    "depthfusion_inspect_discovery": (
-        "Return parsed frontmatter of a discovery file (S-76). "
-        "Args: filename (str, required) — absolute path to a discovery markdown file. "
-        "Response: {filename, exists, frontmatter: {importance, salience, pinned, "
-        "project, type, ...}} or {filename, exists: false, error}."
-    ),
     # E-31 cognitive tools
     "depthfusion_retrieve_context": (
         "Cognitive retrieval with 8-component scoring and retrieval trace (E-31). "
@@ -140,11 +114,6 @@ TOOLS: dict[str, str] = {
         "Args: project_id (str), memory_id (str), outcome (str), success (bool), "
         "actor (str, default 'unknown'). Response: {status, memory_id, success}."
     ),
-    "depthfusion_get_cognitive_state": (
-        "Return a summary of the current cognitive state for a project (E-31). "
-        "Args: project_id (str). Response: {project_id, total_memories, "
-        "active_memories, total_events, feature_flags}."
-    ),
     # E-33 telemetry tools
     "depthfusion_record_telemetry": (
         "Log a per-tool-call telemetry event for cost, latency, and usage analytics "
@@ -170,17 +139,6 @@ TOOLS: dict[str, str] = {
         "total_duration_ms, avg_duration_ms, total_tokens_in, total_tokens_out, "
         "total_cost_usd}], row_count: int}."
     ),
-    # E-34 S-109 skill surfacing
-    "depthfusion_surface_skill_candidates": (
-        "Scan telemetry for recurring tool patterns and draft candidate skills in SkillForge "
-        "(E-34 S-109). "
-        "Args: threshold (int, optional — min distinct sessions, default from config, usually 3), "
-        "dry_run (bool, optional — default false; if true, returns candidates "
-        "without POSTing to SkillForge). "
-        "Response: {candidates_found: int, candidates_drafted: int, "
-        "already_tracked: int, items: [{pattern_key, name, session_count, "
-        "drafted, skillforge_id}]}."
-    ),
     # E-35 S-111 session-start auto-recall seed; E-46 S-143 fabric_seed extension
     "depthfusion_session_seed": (
         "Run a seed recall query at session start and publish results as high-priority "
@@ -193,33 +151,6 @@ TOOLS: dict[str, str] = {
         "Response: {published: int, query: str, session_id: str} or "
         "{bundle: [...], degraded: bool, session_id: str} for fabric_seed."
     ),
-    # E-45 HNSW capability ping for the agent-ops bridge
-    "depthfusion_hnsw_capability": (
-        "Return current HNSW index capability and state. Called by the agent-ops "
-        "bridge at startup. No args. Returns HNSWCapability: "
-        "{enabled, backend, model, dimension, index_path, entry_count}."
-    ),
-    # E-46 Event Graph Fabric tools (S-143 / T-492)
-    "depthfusion_event_publish": (
-        "Publish content as a MemoryEntity + EventEntity with content-hash dedup (E-46 S-143). "
-        "Identical content published by N agents produces 1 MemoryEntity and N EventEntities. "
-        "Args: content (str, required), agent_id (str, required), project_slug (str, required), "
-        "session_id (str, optional), event_type (str, optional, default 'publish'). "
-        "Response: {memory_id: str, event_id: str, deduped: bool, indexed_in_hnsw: bool}."
-    ),
-    "depthfusion_event_seed": (
-        "Return a ranked context bundle for fabric_seed session warm-up (E-46 S-143). "
-        "Ranking: recall_relevance × recency_decay × log(1 + observer_count). "
-        "Args: projects (str[], required), goal (str, optional), top_k (int, optional, default 5), "
-        "since_hours (float, optional, default 24). "
-        "Response: {bundle: [...], degraded: bool, project_count: int}."
-    ),
-    "depthfusion_agent_trail": (
-        "Return AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for an agent (E-46 S-143). "
-        "Args: agent_id (str, required), project (str, optional), "
-        "since (str, optional — ISO-8601), until (str, optional — ISO-8601). "
-        "Response: {trail: [{entity_id, event_type, memory_refs, first_seen, ...}], count: int}."
-    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -228,40 +159,26 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_recall_relevant": None,       # always enabled
     "depthfusion_tag_session": None,           # always enabled
     "depthfusion_publish_context": "router_enabled",
-    "depthfusion_run_recursive": "rlm_enabled",
-    "depthfusion_tier_status": None,
     "depthfusion_auto_learn": None,
     "depthfusion_compress_session": None,
     "depthfusion_graph_traverse": "graph_enabled",
     "depthfusion_graph_status": "graph_enabled",
     "depthfusion_set_scope": "graph_enabled",
     "depthfusion_confirm_discovery": None,          # always enabled (CM-5)
-    "depthfusion_prune_discoveries": None,          # always enabled (TG-14 / S-55)
     "depthfusion_set_memory_score": None,           # always enabled (S-70)
     "depthfusion_recall_feedback": None,          # always enabled (S-72)
     "depthfusion_pin_discovery": None,            # always enabled (S-69)
-    "depthfusion_describe_capabilities": None,    # always enabled (S-76)
-    "depthfusion_inspect_discovery": None,        # always enabled (S-76)
     # E-31 cognitive tools
     "depthfusion_retrieve_context": "cognitive_retrieval",
     "depthfusion_record_decision": "decision_memory",
     "depthfusion_record_incident": "operational_memory",
     "depthfusion_mark_superseded": "operational_memory",
     "depthfusion_report_outcome": "operational_memory",
-    "depthfusion_get_cognitive_state": None,      # always enabled
     # E-33 telemetry tools
     "depthfusion_record_telemetry": None,         # always enabled (E-33 S-106)
     "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
-    # E-34 skill surfacing
-    "depthfusion_surface_skill_candidates": None, # always enabled (E-34 S-109)
     # E-35 S-111 session-start auto-recall seed
     "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
-    # E-45 HNSW capability ping — always enabled; returns disabled when env flag is off
-    "depthfusion_hnsw_capability": None,
-    # E-46 Event Graph Fabric tools — always enabled (S-143 / T-492)
-    "depthfusion_event_publish": None,
-    "depthfusion_event_seed": None,
-    "depthfusion_agent_trail": None,
 }
 
 
@@ -350,13 +267,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["filename"],
     },
-    "depthfusion_prune_discoveries": {
-        "properties": {
-            "age_days": {"type": "integer", "minimum": 1, "default": 90},
-            "confirm": {"type": "boolean", "default": False},
-        },
-        "required": [],
-    },
     "depthfusion_publish_context": {
         "properties": {
             "item": {
@@ -394,17 +304,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "tags": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["session_id", "tags"],
-    },
-    "depthfusion_run_recursive": {
-        "properties": {
-            "content": {"type": "string"},
-            "strategy": {"type": "string"},
-        },
-        "required": ["content"],
-    },
-    "depthfusion_tier_status": {
-        "properties": {},
-        "required": [],
     },
     "depthfusion_auto_learn": {
         "properties": {
@@ -476,16 +375,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["scope"],
     },
-    "depthfusion_inspect_discovery": {
-        "properties": {
-            "filename": {"type": "string"},
-        },
-        "required": ["filename"],
-    },
-    "depthfusion_describe_capabilities": {
-        "properties": {},
-        "required": [],
-    },
     # E-31 cognitive tools
     "depthfusion_retrieve_context": {
         "properties": {
@@ -540,12 +429,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["project_id", "memory_id", "outcome", "success"],
     },
-    "depthfusion_get_cognitive_state": {
-        "properties": {
-            "project_id": {"type": "string"},
-        },
-        "required": ["project_id"],
-    },
     # E-33 telemetry tools
     "depthfusion_record_telemetry": {
         "properties": {
@@ -575,17 +458,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "period": {"type": "string", "enum": ["day", "week", "month"]},
             "from_dt": {"type": "string"},
             "to_dt": {"type": "string"},
-        },
-        "required": [],
-    },
-    # E-34 S-109
-    "depthfusion_surface_skill_candidates": {
-        "properties": {
-            "threshold": {
-                "type": "integer",
-                "description": "Min distinct sessions (default from config)",
-            },
-            "dry_run": {"type": "boolean", "default": False},
         },
         "required": [],
     },
@@ -627,44 +499,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
         },
         "required": ["session_id"],
-    },
-    # E-45 HNSW capability ping
-    "depthfusion_hnsw_capability": {
-        "properties": {},
-        "required": [],
-    },
-    # E-46 Event Graph Fabric tools (S-143 / T-492)
-    "depthfusion_event_publish": {
-        "properties": {
-            "content": {"type": "string", "description": "Memory content to publish"},
-            "agent_id": {"type": "string", "description": "Publishing agent identifier"},
-            "project_slug": {"type": "string", "description": "Project namespace"},
-            "session_id": {"type": "string"},
-            "event_type": {"type": "string", "default": "publish"},
-        },
-        "required": ["content", "agent_id", "project_slug"],
-    },
-    "depthfusion_event_seed": {
-        "properties": {
-            "projects": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Project slugs to query",
-            },
-            "goal": {"type": "string", "description": "Goal query for recall_relevance ranking"},
-            "top_k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
-            "since_hours": {"type": "number", "minimum": 1, "maximum": 720, "default": 24},
-        },
-        "required": ["projects"],
-    },
-    "depthfusion_agent_trail": {
-        "properties": {
-            "agent_id": {"type": "string", "description": "Agent to look up"},
-            "project": {"type": "string", "description": "Filter by project slug"},
-            "since": {"type": "string", "description": "ISO-8601 lower bound"},
-            "until": {"type": "string", "description": "ISO-8601 upper bound"},
-        },
-        "required": ["agent_id"],
     },
 }
 
@@ -729,10 +563,6 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_tag_session(arguments)
     elif tool_name == "depthfusion_publish_context":
         return _tool_publish_context(arguments, config)
-    elif tool_name == "depthfusion_run_recursive":
-        return _tool_run_recursive(arguments, config)
-    elif tool_name == "depthfusion_tier_status":
-        return _tool_tier_status()
     elif tool_name == "depthfusion_auto_learn":
         return _tool_auto_learn(arguments)
     elif tool_name == "depthfusion_compress_session":
@@ -747,16 +577,10 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_confirm_discovery(arguments)
     elif tool_name == "depthfusion_set_memory_score":
         return _tool_set_memory_score(arguments)
-    elif tool_name == "depthfusion_prune_discoveries":
-        return _tool_prune_discoveries(arguments)
     elif tool_name == "depthfusion_recall_feedback":
         return _tool_recall_feedback(arguments)
     elif tool_name == "depthfusion_pin_discovery":
         return _tool_pin_discovery(arguments)
-    elif tool_name == "depthfusion_describe_capabilities":
-        return _tool_describe_capabilities()
-    elif tool_name == "depthfusion_inspect_discovery":
-        return _tool_inspect_discovery(arguments)
     elif tool_name == "depthfusion_retrieve_context":
         return _tool_retrieve_context(arguments, config)
     elif tool_name == "depthfusion_record_decision":
@@ -767,24 +591,12 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_mark_superseded(arguments, config)
     elif tool_name == "depthfusion_report_outcome":
         return _tool_report_outcome(arguments, config)
-    elif tool_name == "depthfusion_get_cognitive_state":
-        return _tool_get_cognitive_state(arguments, config)
     elif tool_name == "depthfusion_record_telemetry":
         return _tool_record_telemetry(arguments, config)
     elif tool_name == "depthfusion_query_telemetry":
         return _tool_query_telemetry(arguments, config)
-    elif tool_name == "depthfusion_surface_skill_candidates":
-        return _tool_surface_skill_candidates(arguments, config)
     elif tool_name == "depthfusion_session_seed":
         return _tool_session_seed(arguments)
-    elif tool_name == "depthfusion_hnsw_capability":
-        return _tool_hnsw_capability()
-    elif tool_name == "depthfusion_event_publish":
-        return _tool_event_publish(arguments)
-    elif tool_name == "depthfusion_event_seed":
-        return _tool_event_seed(arguments)
-    elif tool_name == "depthfusion_agent_trail":
-        return _tool_agent_trail(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
