@@ -624,17 +624,24 @@ async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check
 
 @app.post("/context")
 async def publish_context(body: PublishContextBody, _auth: None = Depends(_check_auth)):
+    import uuid
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_publish_context
     cfg = DepthFusionConfig.from_env()
-    args: dict = {"content": body.content, "tags": body.tags}
+    meta: dict = dict(body.metadata or {})
     if body.project is not None:
-        args["project"] = body.project
+        meta["project"] = body.project
     if body.session_id is not None:
-        args["session_id"] = body.session_id
-    if body.metadata is not None:
-        args["metadata"] = body.metadata
-    return _parse_tool_result(_tool_publish_context(args, cfg))
+        meta["session_id"] = body.session_id
+    item: dict = {
+        "item_id": str(uuid.uuid4()),
+        "content": body.content,
+        "source_agent": "rest-api",
+        "tags": body.tags,
+    }
+    if meta:
+        item["metadata"] = meta
+    return _parse_tool_result(_tool_publish_context({"item": item}, cfg))
 
 
 @app.post("/context/retrieve")

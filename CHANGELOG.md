@@ -16,10 +16,16 @@ Conventions:
 
 - `docs/install/mac-mlx-quickstart.md` — complete install guide for Apple Silicon Macs: launchd plist setup, MLX-LM inference server, Claude Desktop + Claude Code CLI registration, HNSW cold-start note, troubleshooting section (launchctl load pitfall, duplicate plist labels, zsh paste issues)
 - `docs/install/README.md` updated — Mac MLX guide added to the install guide table
+- `scripts/mac-parity.sh` — idempotent plistlib-based script to add missing E-31 env vars (`DEPTHFUSION_GRAPH_ENABLED`, `DEPTHFUSION_COGNITIVE_RETRIEVAL`, `DEPTHFUSION_DECISION_MEMORY`, `DEPTHFUSION_OPERATIONAL_MEMORY`) to the macOS launchd plist and reload the service; supports `--dry-run`
+
+### Changed
+
+- **Canonical 21-tool set** — parity audit removed 11 low-value / unshipped tools from the MCP server. All platforms now expose exactly 21 tools. Removed: `depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_describe_capabilities`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`. Underlying Python functions are retained; only the MCP surface registration was removed.
+- **REST API feature-flag bug fix** — all 16 endpoint handlers in `api/rest.py` called `DepthFusionConfig()` (bare constructor, all flags False) instead of `DepthFusionConfig.from_env()`. Feature-flagged tools (`graph_*`, `cognitive_retrieval`, `decision_memory`, `operational_memory`) were silently excluded from REST responses on all platforms regardless of env vars. Fixed with global replacement.
 
 ### Fixed
 
-- **REST `/context` endpoint wiring bug** — `POST /context` passes `content` and `tags` as flat keys into `_tool_publish_context`, but the tool expects `arguments["item"]` to be a nested dict. Endpoint returns `{"error": "publish_context: 'item' must be an object"}` for all REST publish calls. MCP tool (`depthfusion_publish_context`) is unaffected. Fix pending.
+- **REST `/context` endpoint wiring bug** — `POST /context` now wraps the request body into the `arguments["item"]` shape expected by `_tool_publish_context`. Previously all REST publish calls returned `{"error": "publish_context: 'item' must be an object"}`. The endpoint now generates an `item_id` (UUID), uses `"rest-api"` as `source_agent`, and folds `project`/`session_id` into `item.metadata`. MCP tool (`depthfusion_publish_context`) was unaffected.
 
 ---
 
