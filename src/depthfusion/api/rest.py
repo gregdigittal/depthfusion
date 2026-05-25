@@ -195,7 +195,7 @@ async def cognitive_state(
     from depthfusion.storage.event_log import EventLog
     from depthfusion.storage.memory_store import MemoryStore
 
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     store = MemoryStore(cfg.memory_store_path)
     log = EventLog(cfg.event_log_path)
     total = store.count(project_id)
@@ -226,7 +226,7 @@ async def list_memories(
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.storage.memory_store import MemoryStore
 
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     store = MemoryStore(cfg.memory_store_path)
     memories = store.query(
         project_id=project_id,
@@ -305,7 +305,7 @@ async def get_sessions(
             from depthfusion.core.config import DepthFusionConfig
             from depthfusion.storage.telemetry_store import TelemetryStore
 
-            cfg = DepthFusionConfig()
+            cfg = DepthFusionConfig.from_env()
             store = TelemetryStore(cfg.telemetry_store_path)
             tel = store.aggregate(
                 project=project,
@@ -374,7 +374,7 @@ async def get_telemetry(
     to_dt = _parse_dt(to, "to")
     offset = _decode_telemetry_cursor(cursor)
 
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     store = TelemetryStore(cfg.telemetry_store_path)
     rows = store.query(
         project=project,
@@ -530,7 +530,7 @@ def _parse_tool_result(result):
 async def status(_auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_status
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     return _parse_tool_result(_tool_status(cfg))
 
 
@@ -556,7 +556,7 @@ async def hnsw_capability(_auth: None = Depends(_check_auth)):
 async def cognitive_state_v2(_auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_get_cognitive_state
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     return _parse_tool_result(_tool_get_cognitive_state({}, cfg))
 
 
@@ -626,7 +626,7 @@ async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check
 async def publish_context(body: PublishContextBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_publish_context
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"content": body.content, "tags": body.tags}
     if body.project is not None:
         args["project"] = body.project
@@ -641,7 +641,7 @@ async def publish_context(body: PublishContextBody, _auth: None = Depends(_check
 async def retrieve_context(body: RetrieveContextBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_retrieve_context
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {}
     if body.id is not None:
         args["id"] = body.id
@@ -686,7 +686,7 @@ async def graph_traverse(body: GraphTraverseBody, _auth: None = Depends(_check_a
 async def run_recursive(body: RunRecursiveBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_run_recursive
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"query": body.query, "max_depth": body.max_depth}
     return _parse_tool_result(_tool_run_recursive(args, cfg))
 
@@ -758,7 +758,7 @@ async def pin_discovery(body: PinDiscoveryBody, _auth: None = Depends(_check_aut
 async def mark_superseded(body: SupersedeBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_mark_superseded
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {
         "project_id": body.project_id,
         "old_memory_id": body.old_memory_id,
@@ -802,7 +802,7 @@ async def set_memory_score(
 async def record_telemetry(body: RecordTelemetryBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_telemetry
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"event": body.event, "data": body.data}
     if body.session_id is not None:
         args["session_id"] = body.session_id
@@ -817,7 +817,7 @@ async def record_telemetry(body: RecordTelemetryBody, _auth: None = Depends(_che
 async def record_decision(body: RecordDecisionBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_decision
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"decision": body.decision, "rationale": body.rationale}
     if body.context is not None:
         args["context"] = body.context
@@ -830,7 +830,7 @@ async def record_decision(body: RecordDecisionBody, _auth: None = Depends(_check
 async def record_incident(body: RecordIncidentBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_incident
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"description": body.description, "severity": body.severity}
     if body.impact is not None:
         args["impact"] = body.impact
@@ -841,7 +841,7 @@ async def record_incident(body: RecordIncidentBody, _auth: None = Depends(_check
 async def report_outcome(body: ReportOutcomeBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_report_outcome
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"task_id": body.task_id, "outcome": body.outcome}
     if body.notes is not None:
         args["notes"] = body.notes
@@ -856,7 +856,7 @@ async def report_outcome(body: ReportOutcomeBody, _auth: None = Depends(_check_a
 async def surface_skill_candidates(body: SkillCandidatesBody, _auth: None = Depends(_check_auth)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_surface_skill_candidates
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     args: dict = {"query": body.query, "limit": body.limit}
     if body.project is not None:
         args["project"] = body.project
@@ -884,7 +884,7 @@ async def get_telemetry_aggregate(
     from_dt = _parse_dt(from_, "from")
     to_dt = _parse_dt(to, "to")
 
-    cfg = DepthFusionConfig()
+    cfg = DepthFusionConfig.from_env()
     store = TelemetryStore(cfg.telemetry_store_path)
     return store.aggregate(
         project=project,
