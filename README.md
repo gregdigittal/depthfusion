@@ -607,3 +607,9 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
+
+---
+
+## License
+
+DepthFusion is released under the [MIT License](LICENSE). Copyright (c) 2026 Greg Morris.
