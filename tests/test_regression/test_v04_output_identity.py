@@ -119,6 +119,11 @@ def fixture_home(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_HAIKU_ENABLED", "false")
     monkeypatch.setenv("DEPTHFUSION_RERANKER_ENABLED", "false")
+    # Pin HNSW off so local-mode recall is deterministic regardless of any
+    # DEPTHFUSION_HNSW_ENABLED exported in the host shell. Without this, the
+    # `hnsw_available` field leaks the host's HNSW state into the golden and
+    # the regression gate fails on machines/CI where the flag/deps differ.
+    monkeypatch.setenv("DEPTHFUSION_HNSW_ENABLED", "false")
     monkeypatch.delenv("DEPTHFUSION_GRAPH_ENABLED", raising=False)
     monkeypatch.delenv("DEPTHFUSION_VECTOR_SEARCH_ENABLED", raising=False)
     monkeypatch.delenv("DEPTHFUSION_FUSION_GATES_ENABLED", raising=False)
