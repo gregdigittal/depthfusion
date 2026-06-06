@@ -8,9 +8,9 @@ from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_twenty_one_entries():
-    """Canonical 21-tool set after parity audit (removed 11 low-value / unshipped tools)."""
-    assert len(TOOLS) == 21
+def test_tools_dict_has_twenty_six_entries():
+    """26-tool set after E-47 Project Context Intelligence & Research (adds 5 tools)."""
+    assert len(TOOLS) == 26
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -33,6 +33,11 @@ def test_tools_dict_has_twenty_one_entries():
         "depthfusion_record_telemetry",           # E-33 / S-106/S-107
         "depthfusion_query_telemetry",            # E-33 / S-106/S-107
         "depthfusion_session_seed",               # E-35 / S-111
+        "depthfusion_register_project",           # E-47 / S-147
+        "depthfusion_list_projects",              # E-47 / S-147
+        "depthfusion_sync_project",               # E-47 / S-148
+        "depthfusion_ingest_project",             # E-47 / S-150
+        "depthfusion_research_topic",             # E-47 / S-152
     }
     assert set(TOOLS.keys()) == expected
 
@@ -44,7 +49,7 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 21
+    assert len(enabled) == 26
 
 
 def test_get_enabled_tools_rlm_flag_is_orphaned():
@@ -52,24 +57,24 @@ def test_get_enabled_tools_rlm_flag_is_orphaned():
     config_on = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
     config_off = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     assert set(get_enabled_tools(config_on)) == set(get_enabled_tools(config_off))
-    # 12 always-on + 1 router = 13
-    assert len(get_enabled_tools(config_off)) == 13
+    # 17 always-on + 1 router = 18
+    assert len(get_enabled_tools(config_off)) == 18
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 12 always-on tools; rlm_enabled orphaned, adds nothing
-    assert len(enabled) == 12
+    # 17 always-on tools (includes 5 E-47); rlm_enabled orphaned, adds nothing
+    assert len(enabled) == 17
 
 
 def test_get_enabled_tools_both_disabled():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 12 always-on tools only
-    assert len(enabled) == 12
+    # 17 always-on tools only (includes 5 E-47 tools)
+    assert len(enabled) == 17
 
 
 def test_core_tools_always_enabled():
