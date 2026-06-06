@@ -27,11 +27,12 @@ vps-cpu = [
     "chromadb>=1.0",
     "fastapi>=0.100",
     "uvicorn>=0.23",
-    # security lower bounds — transitive via chromadb
+    # security lower bounds — transitive via chromadb / fastapi
     "Mako>=1.3.12",
     "PyJWT>=2.12.0",
     "Pygments>=2.20.0",
     "Markdown>=3.8.1",
+    "starlette>=1.0.1",   # CVE: missing Host header validation (Dependabot #35)
 ]
 
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
@@ -44,11 +45,12 @@ vps-gpu = [
     "fastapi>=0.100",
     "uvicorn>=0.23",
     "hnswlib>=0.7",
-    # security lower bounds — transitive via chromadb
+    # security lower bounds — transitive via chromadb / fastapi
     "Mako>=1.3.12",
     "PyJWT>=2.12.0",
     "Pygments>=2.20.0",
     "Markdown>=3.8.1",
+    "starlette>=1.0.1",   # CVE: missing Host header validation (Dependabot #35)
 ]
 
 # `mac-mlx` mode: Apple Silicon GPU inference via mlx_lm.server.
@@ -62,11 +64,12 @@ mac-mlx = [
     "fastapi>=0.100",
     "uvicorn>=0.23",
     "hnswlib>=0.7",
-    # security lower bounds — transitive via chromadb
+    # security lower bounds — transitive via chromadb / fastapi
     "Mako>=1.3.12",
     "PyJWT>=2.12.0",
     "Pygments>=2.20.0",
     "Markdown>=3.8.1",
+    "starlette>=1.0.1",   # CVE: missing Host header validation (Dependabot #35)
 ]
 
 # E-45: standalone HNSW extra — install for the agent-ops bridge integration
@@ -96,6 +99,7 @@ dev = [
     "anthropic>=0.40",       # HaikuBackend tests require the SDK
     "fastapi>=0.100",        # sidecar / UI server tests
     "httpx>=0.27",           # FastAPI TestClient transport
+    "starlette>=1.0.1",      # CVE: missing Host header validation (Dependabot #35)
 ]
 
 [tool.setuptools.packages.find]
