@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-23 (E-46 done — Event Graph Fabric complete; S-141–S-146 all shipped; v0.6.0-alpha)
+> Last updated: 2026-06-06
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2471,3 +2471,96 @@
 - [x] T-503: Write `docs/fabric/tailscale-setup.md` — Tailscale install + DepthFusion config + verification
 - [x] T-504: Write `docs/fabric/api-reference.md` — endpoint docs + StreamBackend Protocol interface
 - [x] T-505: Write `docs/fabric/kafka-flink-migration.md` — migration guide + CEP convergence signal overview; update CHANGELOG for v0.6.0-alpha
+
+---
+
+## E-47: Project Context Intelligence & Research [done]
+
+> Enable DepthFusion to maintain live project knowledge (backlog state, architecture, conventions) and enrich its knowledge base through project ingestion and autonomous deep research, so that recall is immediately useful across machines and sessions.
+
+### S-147: As a DepthFusion user, I want to register my projects in a central projects.json so that DepthFusion knows which projects exist and how to sync them `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `~/.depthfusion/projects.json` (VPS) has a documented schema: `name`, `slug`, `local_path`, `github_url` (optional), `sync_config` (which files to sync), `tags`
+- [x] AC-2: `depthfusion_register_project` MCP tool adds a project entry and persists it to projects.json
+- [x] AC-3: `depthfusion_list_projects` MCP tool returns all registered projects with their sync status and last-synced timestamp
+- [x] AC-4: ProjectRegistry class in `core/project_registry.py` provides CRUD with atomic file writes
+
+**Tasks:**
+- [x] T-506: Define and document projects.json schema; create `core/project_registry.py` with load/save/add/remove/list
+- [x] T-507: Implement `depthfusion_register_project` MCP tool (params: name, slug, local_path, github_url, tags)
+- [x] T-508: Implement `depthfusion_list_projects` MCP tool with last_synced timestamp per project
+- [x] T-509: Write bootstrap helper to pre-populate projects.json from existing agent-hub-context project dirs
+
+### S-148: As a developer, I want DepthFusion to automatically sync my project's backlog and conventions after each session so that any session can answer questions about project state `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: After a sync, `depthfusion_recall` can answer "what stories are active in project X" and "what tasks are done in S-147"
+- [x] AC-2: Synced project context is namespaced by project slug — querying project A does not surface project B's backlog
+- [x] AC-3: Sync ingests: BACKLOG.md (parsed into epic/story/task structure), CLAUDE.md, `.claude/rules/`, top-level git log (last 20 commits)
+- [x] AC-4: A sync run is idempotent — re-syncing unchanged files does not create duplicates
+
+**Tasks:**
+- [x] T-510: Write BACKLOG.md parser that extracts epic/story/task state into structured records (status, IDs, titles, ACs)
+- [x] T-511: Create `ProjectContextStore` in `core/project_context.py` — stores structured project context with project-slug namespace
+- [x] T-512: Implement `depthfusion_sync_project` MCP tool (params: slug; reads from registered local_path)
+- [x] T-513: Wire backlog records into standard recall so `depthfusion_recall` queries return project state results
+
+### S-149: As a developer, I want Claude Code session-end hooks on both Mac and VPS to push project state to DepthFusion automatically so that context is always current `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `scripts/push-project-context.sh` detects the active project (from cwd or `DEPTHFUSION_PROJECT` env var) and calls `depthfusion_sync_project`
+- [x] AC-2: Hook is installed in VPS `~/.claude/settings.json` under `Stop` hooks and fires on every session end
+- [x] AC-3: Hook is installable on Mac via the cross-platform installer (E-44 pattern); documented in `docs/project-sync.md`
+- [x] AC-4: Hook output is visible in DepthFusion telemetry — sync events appear as a distinct event type
+
+**Tasks:**
+- [x] T-514: Write `scripts/push-project-context.sh` (detect project slug from cwd → call sync tool → log result)
+- [x] T-515: Install hook in VPS `~/.claude/settings.json` Stop hooks
+- [x] T-516: Add Mac hook installation step to the cross-platform installer; document in `docs/project-sync.md`
+- [x] T-517: Emit `project_sync` telemetry event with slug, files_synced count, duration_ms
+
+### S-150: As a developer or agent, I want a `depthfusion_ingest_project` MCP tool so that I can bring any project's codebase into DepthFusion by providing a local path or GitHub URL `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Structural ingest (default): ingests CLAUDE.md, README, BACKLOG.md, package/config files, top-level directory listing in < 30 seconds for any repo up to 10k files
+- [x] AC-2: Deep ingest (`depth=full`): additionally embeds all source files; progress is reported via streaming or periodic status; estimated time shown upfront
+- [x] AC-3: GitHub URL ingest fetches via GitHub API (no full clone required for structural pass); authenticated via `GITHUB_TOKEN` env var
+- [x] AC-4: All ingested content is tagged with `project:<slug>` and `source:ingest` so it can be queried or purged by project
+
+**Tasks:**
+- [x] T-518: Design ingest pipeline: structural pass definition + chunking strategy for source files
+- [x] T-519: Implement local path ingest — structural pass (reads file list, key files) → embed → store with project tag
+- [x] T-520: Implement GitHub ingest — GitHub API fetch of tree + key file contents → structural pass; optional full clone for deep pass
+- [x] T-521: Implement `depthfusion_ingest_project` MCP tool (params: path_or_url, slug, depth=`structural`|`full`)
+- [x] T-522: Add progress reporting for deep ingest: emit progress events every 10 files; surface estimated completion
+
+### S-151: As a session starting on any machine, I want DepthFusion to automatically seed me with the active project's context when I name a project so that recall is immediately useful `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_session_seed` accepts an optional `project_slug` param; when provided, injects a project context block (backlog summary, CLAUDE.md key invariants, recent commit log) into the seed response
+- [x] AC-2: Session-start hook on VPS auto-detects cwd project slug and passes it to `depthfusion_session_seed`
+- [x] AC-3: If project has no synced context, seed falls back gracefully with a note: "No project context found for <slug> — run depthfusion_sync_project to register"
+
+**Tasks:**
+- [x] T-523: Extend `depthfusion_session_seed` to accept `project_slug`; fetch and inline project context block when provided
+- [x] T-524: Update VPS session-start hook to detect active project from cwd and pass `project_slug` to session_seed
+- [x] T-525: Write graceful fallback message and log when project slug is unknown
+
+### S-152: As a developer or agent, I want a `depthfusion_research_topic` MCP tool so that I can enrich DepthFusion's knowledge base with researched information on any topic `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_research_topic` accepts: `topic` (string), `depth` (`quick`|`thorough`), optional `project_slug` to auto-link result
+- [x] AC-2: Research pipeline: (1) check existing DepthFusion KB for topic coverage, (2) web search + fetch top sources, (3) GitHub search for relevant repos/discussions, (4) arXiv search for papers if topic is technical, (5) synthesize → store as named knowledge document
+- [x] AC-3: Stored research document is queryable by name and by topic keywords in future sessions
+- [x] AC-4: When `project_slug` is provided, research document is tagged with the project and surfaced in project-scoped recalls
+- [x] AC-5: Agents can call the tool mid-session to fill knowledge gaps autonomously; user sessions can invoke it explicitly
+
+**Tasks:**
+- [x] T-526: Design research pipeline: query planner, source adapters, synthesis prompt, named-document storage format
+- [x] T-527: Implement web search + URL fetch adapter (integrate with existing web search capability)
+- [x] T-528: Implement GitHub search adapter (search repos, READMEs, issues via GitHub API)
+- [x] T-529: Implement arXiv adapter (search API, fetch abstract + key sections for top 3 results)
+- [x] T-530: Implement KB pre-check: query DepthFusion before searching externally; skip sources already covered
+- [x] T-531: Implement `depthfusion_research_topic` MCP tool with pipeline orchestration
+- [x] T-532: Store research output as named knowledge document with tags: `research`, `topic:<slug>`, `project:<slug>` (if provided)

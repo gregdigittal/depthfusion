@@ -149,7 +149,41 @@ TOOLS: dict[str, str] = {
         "projects (str[], optional — required for fabric_seed mode), "
         "goal (str, optional — goal query for fabric_seed ranking). "
         "Response: {published: int, query: str, session_id: str} or "
-        "{bundle: [...], degraded: bool, session_id: str} for fabric_seed."
+        "{bundle: [...], degraded: bool, session_id: str} for fabric_seed. "
+        "Optional: project_slug (str) — include project backlog and context in the seed output."
+    ),
+    # S-147 project registry tools
+    "depthfusion_register_project": (
+        "Register a local project with DepthFusion for context tracking. "
+        "Args: slug (str, required) — short identifier e.g. 'depthfusion'; "
+        "name (str, required) — human-readable name; "
+        "local_path (str, required) — absolute path on this host; "
+        "github_url (str, optional); description (str, optional). "
+        "Response: {registered: bool, slug, name, local_path}"
+    ),
+    "depthfusion_list_projects": (
+        "List all registered projects. No args required. "
+        "Response: {projects: [{slug, name, local_path, github_url, last_synced, description}]}"
+    ),
+    "depthfusion_sync_project": (
+        "Sync a registered project's BACKLOG.md, CLAUDE.md, and recent git log "
+        "into the DepthFusion knowledge base. Args: slug (str, required). "
+        "Response: {synced: bool, slug, results: {backlog?, claude_md?, git_log?}}"
+    ),
+    "depthfusion_ingest_project": (
+        "Ingest a project into the DepthFusion knowledge base. Supports local paths and GitHub URLs. "
+        "Args: slug (str, required); source (str, required) — absolute local path OR GitHub URL "
+        "(e.g. https://github.com/owner/repo or owner/repo); "
+        "mode (str, optional, default 'structural') — 'structural' ingests key files only, "
+        "'full' ingests all source files. "
+        "Response: {ingested: bool, slug, result: {files_ingested, bytes_ingested?, mode, source}}"
+    ),
+    "depthfusion_research_topic": (
+        "Research a topic using web search (DuckDuckGo), arXiv, and GitHub. "
+        "Results are stored in ~/.claude/shared/research/ and published to the DepthFusion KB. "
+        "Args: topic (str, required); slug (str, optional, default 'research') — tag prefix; "
+        "sources (list[str], optional, default ['web','arxiv','github']). "
+        "Response: {researched: bool, topic, saved_to, source_counts: {web, arxiv, github}}"
     ),
 }
 
@@ -179,6 +213,15 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
     # E-35 S-111 session-start auto-recall seed
     "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
+    # S-147 project registry tools
+    "depthfusion_register_project": None,
+    "depthfusion_list_projects": None,
+    # S-148 BACKLOG sync pipeline
+    "depthfusion_sync_project": None,
+    # S-150 project ingest
+    "depthfusion_ingest_project": None,
+    # S-152 topic research
+    "depthfusion_research_topic": None,
 }
 
 
@@ -497,6 +540,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 "type": "string",
                 "description": "Goal query for recall_relevance ranking in fabric_seed mode",
             },
+            "project_slug": {
+                "type": "string",
+                "description": "Project slug used to include project backlog and context in seed output",
+            },
         },
         "required": ["session_id"],
     },
@@ -597,6 +644,16 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_query_telemetry(arguments, config)
     elif tool_name == "depthfusion_session_seed":
         return _tool_session_seed(arguments)
+    elif tool_name == "depthfusion_register_project":
+        return _tool_register_project(arguments)
+    elif tool_name == "depthfusion_list_projects":
+        return _tool_list_projects(arguments)
+    elif tool_name == "depthfusion_sync_project":
+        return _tool_sync_project(arguments)
+    elif tool_name == "depthfusion_ingest_project":
+        return _tool_ingest_project(arguments)
+    elif tool_name == "depthfusion_research_topic":
+        return _tool_research_topic(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
@@ -2959,6 +3016,46 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
 
 def _tool_session_seed(arguments: dict) -> str:
     """Publish top recall results as high-priority session-seed ContextItems (S-111/S-143)."""
+    project_slug = arguments.get("project_slug", "").strip()
+    project_context_prefix = ""
+    if project_slug:
+        try:
+            from depthfusion.core.project_registry import ProjectRegistry
+            from depthfusion.core.project_context import sync_project as _get_project_ctx
+            _registry = ProjectRegistry()
+            _entry = _registry.get(project_slug)
+            if _entry:
+                _ctx_parts = []
+                from pathlib import Path as _Path
+                _backlog = _Path(_entry.local_path) / "BACKLOG.md"
+                if _backlog.exists():
+                    import re as _re
+                    _text = _backlog.read_text(encoding="utf-8")
+                    # Extract active epics summary (first 3000 chars)
+                    _ctx_parts.append(f"# Project: {project_slug}\n\n{_text[:3000]}")
+                _claude_md = _Path(_entry.local_path) / "CLAUDE.md"
+                if _claude_md.exists():
+                    _ctx_parts.append(_claude_md.read_text(encoding="utf-8")[:2000])
+                if _ctx_parts:
+                    project_context_prefix = "\n\n---\n\n".join(_ctx_parts) + "\n\n---\n\n"
+                else:
+                    # AC-3: registered but no BACKLOG.md/CLAUDE.md to draw from
+                    project_context_prefix = (
+                        f"# Project context unavailable\n\n"
+                        f"No project context found for {project_slug} — "
+                        f"the project is registered but has no BACKLOG.md or CLAUDE.md. "
+                        f"Run depthfusion_sync_project to refresh context.\n\n---\n\n"
+                    )
+            else:
+                # AC-3: slug not registered — signal that registration is needed
+                project_context_prefix = (
+                    f"# Project context unavailable\n\n"
+                    f"No project context found for {project_slug} — "
+                    f"run depthfusion_sync_project to register\n\n---\n\n"
+                )
+        except Exception:
+            pass  # project context is optional — don't break the seed
+
     import asyncio
     from pathlib import Path
 
@@ -2966,7 +3063,10 @@ def _tool_session_seed(arguments: dict) -> str:
     mode = arguments.get("mode", "recall")
 
     if not session_id:
-        return json.dumps({"error": "session_id required", "published": 0})
+        result = {"error": "session_id required", "published": 0}
+        if project_slug:
+            result["project_slug"] = project_slug
+        return json.dumps(result)
 
     if mode == "fabric_seed":
         projects = arguments.get("projects") or []
@@ -2989,11 +3089,20 @@ def _tool_session_seed(arguments: dict) -> str:
                 )
             )
             result["session_id"] = session_id
+            if project_slug:
+                result["project_slug"] = project_slug
+                if project_context_prefix:
+                    result["project_context_prefix"] = project_context_prefix
             return json.dumps(result)
         except Exception as exc:
-            return json.dumps({
+            result = {
                 "error": str(exc), "session_id": session_id, "bundle": [], "degraded": True,
-            })
+            }
+            if project_slug:
+                result["project_slug"] = project_slug
+                if project_context_prefix:
+                    result["project_context_prefix"] = project_context_prefix
+            return json.dumps(result)
 
     # Default: recall mode (S-111)
     from depthfusion.hooks.session_start import (
@@ -3012,13 +3121,23 @@ def _tool_session_seed(arguments: dict) -> str:
         git_messages = _recent_git_messages(cwd)
         query = _build_seed_query(project_name, git_messages)
         published = _recall_and_seed(session_id, top_k=top_k, snippet_len=snippet_len)
-        return json.dumps({
+        result = {
             "published": published,
             "query": query,
             "session_id": session_id,
-        })
+        }
+        if project_slug:
+            result["project_slug"] = project_slug
+            if project_context_prefix:
+                result["project_context_prefix"] = project_context_prefix
+        return json.dumps(result)
     except Exception as exc:
-        return json.dumps({"error": str(exc), "published": 0, "session_id": session_id})
+        result = {"error": str(exc), "published": 0, "session_id": session_id}
+        if project_slug:
+            result["project_slug"] = project_slug
+            if project_context_prefix:
+                result["project_context_prefix"] = project_context_prefix
+        return json.dumps(result)
 
 
 # ---------------------------------------------------------------------------
@@ -3174,6 +3293,156 @@ def _tool_agent_trail(arguments: dict) -> str:
         return json.dumps({"trail": trail, "count": len(trail)})
     except Exception as exc:
         return json.dumps({"error": str(exc), "trail": [], "count": 0})
+
+
+from depthfusion.core.project_registry import ProjectRegistry, ProjectEntry as _ProjectEntry
+
+
+def _tool_register_project(arguments: dict) -> str:
+    slug = arguments.get("slug", "").strip()
+    name = arguments.get("name", "").strip()
+    local_path = arguments.get("local_path", "").strip()
+    github_url = arguments.get("github_url", "").strip()
+    description = arguments.get("description", "").strip()
+    if not slug or not name or not local_path:
+        return json.dumps({"error": "slug, name, and local_path are required"})
+    if not Path(local_path).exists():
+        return json.dumps({"error": f"local_path does not exist: {local_path}"})
+    registry = ProjectRegistry()
+    entry = registry.register(_ProjectEntry(
+        slug=slug, name=name, local_path=local_path,
+        github_url=github_url, description=description,
+    ))
+    return json.dumps({
+        "registered": True, "slug": entry.slug,
+        "name": entry.name, "local_path": entry.local_path,
+    })
+
+
+def _tool_list_projects(arguments: dict) -> str:
+    registry = ProjectRegistry()
+    projects = registry.list_projects()
+    return json.dumps({
+        "projects": [
+            {
+                "slug": p.slug, "name": p.name, "local_path": p.local_path,
+                "github_url": p.github_url, "last_synced": p.last_synced,
+                "description": p.description,
+            }
+            for p in projects
+        ]
+    })
+
+
+from depthfusion.core.project_context import sync_project as _sync_project_impl
+
+
+def _tool_sync_project(arguments: dict) -> str:
+    slug = arguments.get("slug", "").strip()
+    if not slug:
+        return json.dumps({"error": "slug is required"})
+    try:
+        from depthfusion.core.project_registry import ProjectRegistry
+    except ImportError:
+        return json.dumps({"error": "ProjectRegistry not available"})
+    registry = ProjectRegistry()
+    entry = registry.get(slug)
+    if not entry:
+        return json.dumps({
+            "error": f"Project not registered: {slug}. Use depthfusion_register_project first."
+        })
+
+    def _publish(slug: str, content: str, tags: list) -> None:
+        _tool_publish_context({
+            "item": {
+                "item_id": f"project_sync:{slug}:{tags[1] if len(tags) > 1 else 'context'}",
+                "content": content,
+                "source_agent": "depthfusion_sync_project",
+                "tags": tags,
+                "priority": "high",
+            }
+        })
+
+    results = _sync_project_impl(slug=slug, local_path=entry.local_path, publish_fn=_publish)
+    registry.update_last_synced(slug)
+    return json.dumps({"synced": True, "slug": slug, "results": results})
+
+
+from depthfusion.core.project_ingest import ProjectIngestor
+
+
+def _tool_ingest_project(arguments: dict) -> str:
+    slug = arguments.get("slug", "").strip()
+    source = arguments.get("source", "").strip()
+    mode = arguments.get("mode", "structural").strip()
+    if not slug or not source:
+        return json.dumps({"error": "slug and source are required"})
+    if mode not in ("structural", "full"):
+        return json.dumps({"error": "mode must be 'structural' or 'full'"})
+
+    def _publish(slug: str, content: str, tags: list) -> None:
+        import hashlib
+        item_id = f"ingest:{slug}:{hashlib.md5(tags[-1].encode()).hexdigest()[:8]}"
+        _tool_publish_context({
+            "item": {
+                "item_id": item_id,
+                "content": content,
+                "source_agent": "depthfusion_ingest_project",
+                "tags": tags,
+                "priority": "normal",
+            }
+        })
+
+    ingestor = ProjectIngestor(publish_fn=_publish)
+    try:
+        is_github = (
+            source.startswith('https://github.com')
+            or source.startswith('http://github.com')
+            or ('/' in source and not source.startswith('/') and not source.startswith('.'))
+        )
+        if is_github:
+            result = ingestor.ingest_github(slug=slug, github_url=source, mode=mode)
+        else:
+            result = ingestor.ingest_local(slug=slug, local_path=source, mode=mode)
+        return json.dumps({"ingested": True, "slug": slug, "result": result})
+    except Exception as e:
+        return json.dumps({"error": str(e), "ingested": False})
+
+
+from depthfusion.core.research import TopicResearcher
+
+
+def _tool_research_topic(arguments: dict) -> str:
+    topic = arguments.get("topic", "").strip()
+    slug = arguments.get("slug", "research").strip() or "research"
+    sources = arguments.get("sources", ["web", "arxiv", "github"])
+    if not topic:
+        return json.dumps({"error": "topic is required"})
+    if not isinstance(sources, list):
+        sources = ["web", "arxiv", "github"]
+
+    def _publish(slug: str, content: str, tags: list) -> None:
+        _tool_publish_context({
+            "item": {
+                "item_id": f"research:{slug}:{tags[2] if len(tags) > 2 else topic}",
+                "content": content,
+                "source_agent": "depthfusion_research_topic",
+                "tags": tags,
+                "priority": "high",
+            }
+        })
+
+    researcher = TopicResearcher(publish_fn=_publish)
+    try:
+        results = researcher.research(topic=topic, slug=slug, sources=sources)
+        return json.dumps({
+            "researched": True,
+            "topic": topic,
+            "saved_to": results.get("saved_to", ""),
+            "source_counts": {k: len(v) for k, v in results["sources"].items()},
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e), "researched": False})
 
 
 if __name__ == "__main__":
