@@ -27,7 +27,7 @@ class _NoTokenOnRedirectHandler(urllib.request.HTTPRedirectHandler):
 INGEST_EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.md', '.yaml', '.yml', '.toml', '.json'}
 SKIP_DIRS = {'.git', '__pycache__', 'node_modules', '.next', 'dist', 'build', '.venv', 'venv', '.mypy_cache'}
 MAX_FILE_SIZE = 100_000  # 100KB per file
-MAX_TOTAL_FILES = 200
+MAX_TOTAL_FILES = 2500
 STRUCTURAL_KEY_FILES = {'BACKLOG.md', 'CLAUDE.md', 'README.md', 'README.rst', 'pyproject.toml', 'package.json'}
 STRUCTURAL_KEY_DIRS = {'core', 'src'}
 
