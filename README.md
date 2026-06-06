@@ -8,7 +8,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.2.0 (2026-05-23). 2000+ tests passing · 0 ruff · 0 mypy. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **21 canonical tools** (post-parity audit; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v1.3.0 (2026-06-06). 2000+ tests passing · 0 ruff · 0 mypy. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **26 canonical tools** (17 always-on, 9 feature-flagged; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ---
 
@@ -108,13 +108,14 @@ E-31 Cognitive Infrastructure Layer (v1.0.0, all enabled by default):
 
 ```
 src/depthfusion/
-├── core/        — types, config, scoring, feedback (RecallStore, FeedbackResult)
+├── core/        — types, config, scoring, feedback (RecallStore, FeedbackResult),
+│                  project_registry, project_context, project_ingest, research
 ├── fusion/      — rrf (k=60), weighted, block_retrieval, reranker, gates (Mamba B/C/Δ)
 ├── session/     — tagger (.meta.yaml), scorer, loader, compactor
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (29 tools gated by feature flags)
+├── mcp/         — server (26 canonical tools: 17 always-on, 9 feature-flagged)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -143,6 +144,8 @@ DepthFusion has three install modes. Pick the one matching your target:
 | `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
+
+**Upgrading to v1.3.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. New modules (`project_registry`, `project_context`, `project_ingest`, `research`) are auto-imported on first MCP tool call. To enable session-end project sync: follow **[docs/project-sync.md](docs/project-sync.md)**.
 
 **Upgrading to v1.2.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. To enable HNSW: set `DEPTHFUSION_HNSW_ENABLED=true` in `~/.claude/depthfusion.env` and `pip install hnswlib>=0.7` into your venv. HNSW is fully optional — BM25-only recall remains the default.
 
@@ -407,11 +410,11 @@ A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) 
 
 ---
 
-## MCP Tools (21 canonical)
+## MCP Tools (26 canonical)
 
-After the 2026-05-25 parity audit, the MCP surface is exactly 21 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed; their underlying Python functions remain in the codebase. The canonical set:
+After the 2026-05-25 parity audit and the E-47 Project Context Intelligence additions, the MCP surface is exactly 26 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the parity audit; their underlying Python functions remain in the codebase. The canonical set:
 
-### Core retrieval & capture (12 always-on)
+### Core retrieval & capture (17 always-on)
 
 | Tool | Description | Required flag |
 |---|---|---|
@@ -426,7 +429,12 @@ After the 2026-05-25 parity audit, the MCP surface is exactly 21 tools across Ma
 | `depthfusion_pin_discovery` | Exempt a discovery from age-based pruning | always |
 | `depthfusion_record_telemetry` | Log a per-tool-call telemetry event (cost, latency, usage) | always |
 | `depthfusion_query_telemetry` | Aggregate telemetry by project, agent, story, sprint, or period | always |
-| `depthfusion_session_seed` | Run a seed recall at session start; publish results as high-priority context | always |
+| `depthfusion_session_seed` | Run a seed recall at session start; publish results as high-priority context. Optional `project_slug` param prepends BACKLOG + CLAUDE.md to seed output. | always |
+| `depthfusion_register_project` | Register a project in the DepthFusion project registry (~/.depthfusion/projects.json) | always |
+| `depthfusion_list_projects` | List all registered projects with slug, name, path, and last-synced timestamp | always |
+| `depthfusion_sync_project` | Sync a registered project's BACKLOG, CLAUDE.md, and git log to the DepthFusion KB | always |
+| `depthfusion_ingest_project` | Deep-ingest a project's source files (local or GitHub) into the KB. Modes: structural (key files only) or full | always |
+| `depthfusion_research_topic` | Research a topic via DuckDuckGo, arXiv, and GitHub; results saved to ~/.claude/shared/research/ and published to the KB | always |
 
 ### Feature-flagged (9 tools)
 
@@ -450,7 +458,9 @@ The following 11 tools were dropped from the MCP surface because they were eithe
 
 Full tool documentation with response shapes: see `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.
 
-The generated CLI (`depthfusion-pp-cli`) exposes all 21 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
+
+The generated CLI (`depthfusion-pp-cli`) exposes all 26 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 
@@ -488,6 +498,30 @@ curl -H "Authorization: Bearer mytoken" \
 ```
 
 Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.md)** · [Tailscale setup](docs/fabric/tailscale-setup.md) · [Kafka/Flink migration](docs/fabric/kafka-flink-migration.md)
+
+---
+
+## Project Context Intelligence (E-47, v1.3.0)
+
+Five new tools give agents the ability to register, sync, ingest, and research across multiple projects. Sessions can be seeded with a project's full BACKLOG and CLAUDE.md context automatically.
+
+### The five tools
+
+| Tool | What it does |
+|---|---|
+| `depthfusion_register_project` | Register a project by slug, local path, and optional GitHub URL. Persists to `~/.depthfusion/projects.json`. |
+| `depthfusion_list_projects` | List all registered projects with slug, name, path, and `last_synced` timestamp. |
+| `depthfusion_sync_project` | Parse a project's BACKLOG.md (epics/stories/tasks), read its CLAUDE.md, and publish the last 20 git commits to the DepthFusion KB. |
+| `depthfusion_ingest_project` | Deep-ingest source files from a local path or GitHub URL. Structural mode (key files only) or full mode (all source). Publishes each file as a searchable KB entry. |
+| `depthfusion_research_topic` | Search DuckDuckGo, arXiv, and GitHub for a topic. Saves results to `~/.claude/shared/research/` and publishes to the KB. |
+
+### Session seed extension
+
+`depthfusion_session_seed` accepts an optional `project_slug` parameter. When provided, it prepends the project's BACKLOG and CLAUDE.md to the seed output — giving new sessions immediate project context without a manual recall.
+
+### Session-end auto-sync
+
+A Stop hook (`scripts/push-project-context.sh`) auto-detects the active project from CWD and syncs it to the KB at session end. See **[docs/project-sync.md](docs/project-sync.md)** for setup instructions.
 
 ---
 
@@ -603,7 +637,7 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 ## Project status & roadmap
 
 - **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port).
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total).
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
