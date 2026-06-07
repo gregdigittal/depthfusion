@@ -1,12 +1,11 @@
 from __future__ import annotations
-import json
-import os
+
 import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 
 @dataclass
@@ -60,7 +59,8 @@ def _format_backlog_context(slug: str, summary: BacklogSummary) -> str:
     lines = [
         f'# Backlog Summary: {slug}',
         f'Last synced: {summary.last_updated}',
-        f'Epics: {len(summary.epics)}, Stories: {len(summary.stories)}, Tasks: {len(summary.tasks)}',
+        f'Epics: {len(summary.epics)}, Stories: {len(summary.stories)}, '
+        f'Tasks: {len(summary.tasks)}',
         '',
     ]
     for epic in summary.epics:

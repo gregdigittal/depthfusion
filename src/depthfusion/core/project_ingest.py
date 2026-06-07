@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 import json
 import os
 import re
-import urllib.request
-import urllib.parse
 import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable
 
 _GITHUB_NAME_RE = re.compile(r'^[A-Za-z0-9_.\-]+$')
 
@@ -24,11 +25,17 @@ class _NoTokenOnRedirectHandler(urllib.request.HTTPRedirectHandler):
         return new_req
 
 
-INGEST_EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.md', '.yaml', '.yml', '.toml', '.json'}
-SKIP_DIRS = {'.git', '__pycache__', 'node_modules', '.next', 'dist', 'build', '.venv', 'venv', '.mypy_cache'}
+INGEST_EXTENSIONS = {
+    '.py', '.ts', '.tsx', '.js', '.jsx', '.md', '.yaml', '.yml', '.toml', '.json',
+}
+SKIP_DIRS = {
+    '.git', '__pycache__', 'node_modules', '.next', 'dist', 'build', '.venv', 'venv', '.mypy_cache',
+}
 MAX_FILE_SIZE = 100_000  # 100KB per file
 MAX_TOTAL_FILES = 2500
-STRUCTURAL_KEY_FILES = {'BACKLOG.md', 'CLAUDE.md', 'README.md', 'README.rst', 'pyproject.toml', 'package.json'}
+STRUCTURAL_KEY_FILES = {
+    'BACKLOG.md', 'CLAUDE.md', 'README.md', 'README.rst', 'pyproject.toml', 'package.json',
+}
 STRUCTURAL_KEY_DIRS = {'core', 'src'}
 
 
@@ -60,7 +67,8 @@ class ProjectIngestor:
                 return True
             if len(rel_parts) == 1 and path.suffix in ('.toml', '.yaml', '.yml'):
                 return True
-            if any(part in STRUCTURAL_KEY_DIRS for part in rel_parts) and path.suffix in ('.py', '.ts', '.tsx'):
+            if (any(part in STRUCTURAL_KEY_DIRS for part in rel_parts)
+                    and path.suffix in ('.py', '.ts', '.tsx')):
                 return True
             return False
 
@@ -89,7 +97,10 @@ class ProjectIngestor:
             except Exception:
                 continue
 
-        return {'files_ingested': files_ingested, 'bytes_ingested': bytes_ingested, 'mode': mode, 'source': 'local'}
+        return {
+            'files_ingested': files_ingested, 'bytes_ingested': bytes_ingested,
+            'mode': mode, 'source': 'local',
+        }
 
     def ingest_github(self, slug: str, github_url: str, mode: str = 'structural') -> dict:
         """Ingest a GitHub repo via API. Uses GITHUB_TOKEN env var if available."""
@@ -121,7 +132,7 @@ class ProjectIngestor:
         # Use custom opener that strips Authorization on cross-host redirects
         _opener = urllib.request.build_opener(_NoTokenOnRedirectHandler)
 
-        def gh_get(path: str) -> object:
+        def gh_get(path: str) -> Any:
             req = urllib.request.Request(
                 f'https://api.github.com/{path}',
                 headers=headers,
@@ -145,7 +156,10 @@ class ProjectIngestor:
         try:
             tree_data = gh_get(f'repos/{owner}/{repo}/git/trees/{branch}?recursive=1')
         except Exception as e:
-            return {'files_ingested': 0, 'mode': mode, 'source': f'github:{owner}/{repo}', 'error': str(e)}
+            return {
+                'files_ingested': 0, 'mode': mode,
+                'source': f'github:{owner}/{repo}', 'error': str(e),
+            }
 
         tree = tree_data.get('tree', [])
         files_ingested = 0

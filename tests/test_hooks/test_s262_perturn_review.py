@@ -11,14 +11,11 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from depthfusion.hooks.post_tool_use import (
     floor_check_before_skill_edit,
     fork_review_pass,
     handle_post_tool_use,
 )
-
 
 # ---------------------------------------------------------------------------
 # floor_check_before_skill_edit (AC-2)
@@ -63,10 +60,6 @@ class TestFloorCheckBeforeSkillEdit:
 
     def test_exception_in_check_is_fail_closed(self, monkeypatch):
         # Simulate Path.is_file() raising an unexpected error.
-        import depthfusion.hooks.post_tool_use as module
-
-        original_tier1_dir = module._TIER1_DIR
-
         def bad_resolve(self):  # noqa: ANN001
             raise RuntimeError("simulated error")
 

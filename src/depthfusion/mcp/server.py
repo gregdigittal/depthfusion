@@ -171,7 +171,8 @@ TOOLS: dict[str, str] = {
         "Response: {synced: bool, slug, results: {backlog?, claude_md?, git_log?}}"
     ),
     "depthfusion_ingest_project": (
-        "Ingest a project into the DepthFusion knowledge base. Supports local paths and GitHub URLs. "
+        "Ingest a project into the DepthFusion knowledge base. "
+        "Supports local paths and GitHub URLs. "
         "Args: slug (str, required); source (str, required) — absolute local path OR GitHub URL "
         "(e.g. https://github.com/owner/repo or owner/repo); "
         "mode (str, optional, default 'structural') — 'structural' ingests key files only, "
@@ -542,7 +543,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             "project_slug": {
                 "type": "string",
-                "description": "Project slug used to include project backlog and context in seed output",
+                "description": "Project slug used to include project backlog and context in seed",
             },
         },
         "required": ["session_id"],
@@ -3021,7 +3022,6 @@ def _tool_session_seed(arguments: dict) -> str:
     if project_slug:
         try:
             from depthfusion.core.project_registry import ProjectRegistry
-            from depthfusion.core.project_context import sync_project as _get_project_ctx
             _registry = ProjectRegistry()
             _entry = _registry.get(project_slug)
             if _entry:
@@ -3029,7 +3029,6 @@ def _tool_session_seed(arguments: dict) -> str:
                 from pathlib import Path as _Path
                 _backlog = _Path(_entry.local_path) / "BACKLOG.md"
                 if _backlog.exists():
-                    import re as _re
                     _text = _backlog.read_text(encoding="utf-8")
                     # Extract active epics summary (first 3000 chars)
                     _ctx_parts.append(f"# Project: {project_slug}\n\n{_text[:3000]}")
@@ -3295,7 +3294,8 @@ def _tool_agent_trail(arguments: dict) -> str:
         return json.dumps({"error": str(exc), "trail": [], "count": 0})
 
 
-from depthfusion.core.project_registry import ProjectRegistry, ProjectEntry as _ProjectEntry
+from depthfusion.core.project_registry import ProjectEntry as _ProjectEntry  # noqa: E402
+from depthfusion.core.project_registry import ProjectRegistry  # noqa: E402
 
 
 def _tool_register_project(arguments: dict) -> str:
@@ -3334,7 +3334,7 @@ def _tool_list_projects(arguments: dict) -> str:
     })
 
 
-from depthfusion.core.project_context import sync_project as _sync_project_impl
+from depthfusion.core.project_context import sync_project as _sync_project_impl  # noqa: E402
 
 
 def _tool_sync_project(arguments: dict) -> str:
@@ -3368,7 +3368,7 @@ def _tool_sync_project(arguments: dict) -> str:
     return json.dumps({"synced": True, "slug": slug, "results": results})
 
 
-from depthfusion.core.project_ingest import ProjectIngestor
+from depthfusion.core.project_ingest import ProjectIngestor  # noqa: E402
 
 
 def _tool_ingest_project(arguments: dict) -> str:
@@ -3409,7 +3409,7 @@ def _tool_ingest_project(arguments: dict) -> str:
         return json.dumps({"error": str(e), "ingested": False})
 
 
-from depthfusion.core.research import TopicResearcher
+from depthfusion.core.research import TopicResearcher  # noqa: E402
 
 
 def _tool_research_topic(arguments: dict) -> str:

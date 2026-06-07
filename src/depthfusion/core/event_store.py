@@ -147,8 +147,10 @@ class RedisStreamBackend:
         self._client = aioredis.from_url(redis_url, decode_responses=True)
 
     async def publish(self, channel: str, payload: dict) -> str:
-        flat = {k: json.dumps(v) if not isinstance(v, str) else v for k, v in payload.items()}
-        entry_id: str = await self._client.xadd(channel, flat)
+        flat: dict[str, str] = {
+            k: json.dumps(v) if not isinstance(v, str) else v for k, v in payload.items()
+        }
+        entry_id: str = await self._client.xadd(channel, flat)  # type: ignore[arg-type]
         return entry_id
 
     async def subscribe(
@@ -156,10 +158,10 @@ class RedisStreamBackend:
         channels: list[str],
         since_id: str = "$",
     ) -> AsyncIterator[tuple[str, dict]]:
-        last_ids = {ch: since_id for ch in channels}
+        last_ids: dict = {ch: since_id for ch in channels}
         while True:
             streams = await self._client.xread(
-                last_ids,
+                last_ids,  # type: ignore[arg-type]
                 count=100,
                 block=1000,
             )

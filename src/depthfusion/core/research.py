@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 import json
 import os
 import re
-import urllib.request
 import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
-
 
 RESEARCH_DIR = Path.home() / '.claude' / 'shared' / 'research'
 MAX_WEB_RESULTS = 10
@@ -17,10 +17,10 @@ MAX_GITHUB_RESULTS = 10
 
 def _ddg_search(query: str) -> list:
     """DuckDuckGo Instant Answer API — no API key required."""
-    url = (
-        'https://api.duckduckgo.com/?'
-        + urllib.parse.urlencode({'q': query, 'format': 'json', 'no_html': '1', 'skip_disambig': '1'})
+    params = urllib.parse.urlencode(
+        {'q': query, 'format': 'json', 'no_html': '1', 'skip_disambig': '1'}
     )
+    url = 'https://api.duckduckgo.com/?' + params
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'DepthFusion/1.0'})
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -131,7 +131,10 @@ def _format_research_doc(topic: str, results: dict) -> str:
         lines.append('## GitHub Repositories')
         for r in gh:
             if 'error' not in r:
-                lines.append(f"- **{r.get('name', '')}** ({r.get('stars', 0)} stars): {r.get('description', '')}")
+                name = r.get('name', '')
+                stars = r.get('stars', 0)
+                desc = r.get('description', '')
+                lines.append(f"- **{name}** ({stars} stars): {desc}")
                 if r.get('url'):
                     lines.append(f"  URL: {r['url']}")
         lines.append('')

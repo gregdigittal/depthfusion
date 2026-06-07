@@ -240,7 +240,8 @@ def handle_post_tool_use(payload: dict) -> None:
     # ------------------------------------------------------------------
     # Sub-path 1: ambient capture (S-110).
     # ------------------------------------------------------------------
-    if _env_bool("DEPTHFUSION_AMBIENT_CAPTURE", True) and tool_name and tool_name not in _skip_tools():
+    if (_env_bool("DEPTHFUSION_AMBIENT_CAPTURE", True)
+            and tool_name and tool_name not in _skip_tools()):
         session_id = (
             payload.get("session_id")
             or payload.get("sessionId")
