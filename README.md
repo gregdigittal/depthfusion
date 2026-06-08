@@ -138,12 +138,46 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 | Mode | Use when | LLM backend | Extras | Step-by-step |
 |---|---|---|---|---|
-| `local` | Laptop / Windows (GPU auto-detected) | BM25 · GPU embeddings if CUDA present | `[local]` | **Mac/Linux:** inline below · **Windows:** [docs/install/windows-quickstart.md](docs/install/windows-quickstart.md) |
+| `local` | Laptop / Windows (GPU auto-detected) | BM25 · GPU embeddings if CUDA present | `[local]` | **Mac/Linux:** inline below · **Windows:** [one-line installer](#windows-standalone-installer) |
 | `vps-cpu` | Cloud VPS, no GPU | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
-| `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
+| `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [one-line installer](#mac-apple-silicon-standalone-installer) |
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
+
+### Standalone installers (recommended for new users)
+
+Self-contained scripts that bootstrap all prerequisites — Homebrew, Python, Git, PyTorch — from a single command. Nothing needs to be installed first.
+
+#### Mac (Apple Silicon) standalone installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-mac-mlx.sh | bash
+```
+
+Installs `mac-mlx` mode: bootstraps Homebrew + Python 3.12, clones the repo, installs all dependencies, selects an MLX model based on your RAM (8/16/32 GB tiers), downloads it, creates two launchd services that auto-start at login (MLX inference on port 8000, REST/MCP on port 7300), and registers with Claude Desktop and Claude Code CLI.
+
+Requirements: Apple Silicon (M1/M2/M3/M4) · macOS 13+ · 8 GB unified memory minimum.
+
+#### Windows standalone installer
+
+```powershell
+iwr https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-windows.ps1 | iex
+```
+
+Installs `local` mode with GPU detection: uses winget to install Git and Python 3.12 if missing, clones the repo, auto-detects NVIDIA GPU (installs PyTorch CUDA if found), installs DepthFusion, registers a Windows startup task (Task Scheduler), and registers with Claude Desktop and Claude Code CLI.
+
+Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https://apps.microsoft.com/detail/9NBLGGH4NNS1) if missing).
+
+#### CEO / non-technical VPS connect runbook
+
+For team members who need to connect to the shared VPS memory hub without a local install:
+
+```
+https://raw.githubusercontent.com/gregdigittal/depthfusion/main/docs/install/ceo-vps-connect.html
+```
+
+Download and open in any browser. Enter the VPS IP at the top — all commands update automatically. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
 
 **Upgrading to v1.3.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. New modules (`project_registry`, `project_context`, `project_ingest`, `research`) are auto-imported on first MCP tool call. To enable session-end project sync: follow **[docs/project-sync.md](docs/project-sync.md)**.
 
@@ -199,6 +233,10 @@ ls ~/.claude/depthfusion-metrics/          # should exist after first MCP call
 
 ### Quick install — `local` mode (Windows)
 
+**Recommended:** use the [standalone one-line installer](#windows-standalone-installer) above — it handles all prerequisites automatically.
+
+Manual install (if you already have Git and Python 3.10+):
+
 ```powershell
 git clone https://github.com/gregdigittal/depthfusion.git $HOME\projects\depthfusion
 cd $HOME\projects\depthfusion
@@ -207,7 +245,7 @@ cd $HOME\projects\depthfusion
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 ```
 
-The installer will prompt for your DepthFusion API key (get it from `claude.ai/settings → API Keys`). It will **refuse** a key starting with `sk-ant-api03-` — those are Claude Code's own billing credentials.
+The installer will prompt for your DepthFusion API key (get it from `console.anthropic.com/settings/keys`). It will **refuse** a key starting with `sk-ant-api03-` — those are Claude Code's own billing credentials.
 
 Full step-by-step: **[docs/install/windows-quickstart.md](docs/install/windows-quickstart.md)**
 
