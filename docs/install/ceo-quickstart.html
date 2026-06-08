@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion Setup — Your Personal AI Memory</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2e3e;
+    --accent: #6c63ff;
+    --teal: #4ecdc4;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e8eaf0;
+    --muted: #7c849a;
+    --code-bg: #0d1117;
+    --code-text: #c9d1d9;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f9; --card: #ffffff; --border: #dde0ea;
+      --text: #1a1d27; --muted: #5c6070;
+      --code-bg: #1a1d27; --code-text: #c9d1d9;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem 2.5rem; text-align: center;
+  }
+  .hero-badge {
+    display: inline-block; background: rgba(108,99,255,.15);
+    color: #a89fff; border: 1px solid rgba(108,99,255,.3);
+    border-radius: 2rem; padding: .25rem .9rem;
+    font-size: .75rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: 1rem;
+  }
+  .hero h1 { font-size: 2.1rem; font-weight: 700; color: #fff; margin-bottom: .5rem; letter-spacing: -.02em; }
+  .hero p { font-size: 1rem; color: var(--muted); max-width: 480px; margin: 0 auto .5rem; }
+  .hero-sub { font-size: .82rem; color: #484f58; margin-top: .75rem; }
+
+  /* ── Layout ── */
+  .container { max-width: 680px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  /* ── Progress bar ── */
+  .progress-bar {
+    display: flex; gap: 0; margin: 2rem 0 0;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .progress-step {
+    flex: 1; padding: .6rem .5rem; text-align: center;
+    font-size: .72rem; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--muted);
+    background: var(--card); border-right: 1px solid var(--border);
+    cursor: default;
+  }
+  .progress-step:last-child { border-right: none; }
+  .progress-step.active { background: var(--accent); color: #fff; }
+  .progress-step.done { background: rgba(34,197,94,.15); color: var(--green); }
+
+  /* ── Section header ── */
+  .section-header {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 2.5rem 0 1.25rem;
+  }
+  .section-badge {
+    width: 2.4rem; height: 2.4rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 1rem; flex-shrink: 0;
+    background: var(--accent); color: #fff;
+  }
+  .section-badge.teal { background: var(--teal); color: #0f1117; }
+  .section-badge.green { background: var(--green); color: #0f1117; }
+  .section-title-text h2 { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+  .section-title-text p { font-size: .85rem; color: var(--muted); margin-top: .1rem; }
+
+  /* ── Step card ── */
+  .step-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.3rem 1.4rem; margin-bottom: 1rem;
+  }
+  .step-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .4rem; }
+  .step-card p { font-size: .9rem; color: var(--muted); margin-bottom: .75rem; }
+  .step-card p:last-child { margin-bottom: 0; }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 9px; overflow: hidden; margin: .6rem 0;
+  }
+  .code-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .45rem .9rem; border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.03);
+  }
+  .code-lang { font-size: .68rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .copy-btn {
+    font-size: .75rem; color: var(--muted); background: none;
+    border: 1px solid var(--border); border-radius: 5px;
+    padding: .2rem .55rem; cursor: pointer; transition: all .15s;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .code-body {
+    padding: .8rem 1rem; font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: .88rem; color: var(--code-text); line-height: 1.55;
+    overflow-x: auto; white-space: pre;
+  }
+
+  /* ── Callouts ── */
+  .callout {
+    border-radius: 9px; padding: .85rem 1rem; font-size: .88rem;
+    display: flex; gap: .65rem; align-items: flex-start; margin: .75rem 0;
+  }
+  .callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info  { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: #bdb5ff; }
+  .callout.warn  { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: #fcd34d; }
+  .callout.tip   { background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.25); color: #99f6f0; }
+  .callout.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+
+  /* ── Big download button ── */
+  .dl-btn {
+    display: inline-flex; align-items: center; gap: .6rem;
+    background: var(--accent); color: #fff; text-decoration: none;
+    font-weight: 700; font-size: .95rem; border-radius: 9px;
+    padding: .75rem 1.4rem; margin: .5rem 0; transition: opacity .15s;
+  }
+  .dl-btn:hover { opacity: .88; }
+  .dl-btn.teal { background: var(--teal); color: #0f1117; }
+
+  /* ── Platform toggle ── */
+  .platform-toggle {
+    display: flex; gap: .4rem; margin-bottom: 1rem;
+  }
+  .ptab {
+    padding: .4rem 1rem; border-radius: 7px; font-size: .88rem;
+    font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted); transition: all .15s;
+  }
+  .ptab.active { background: var(--teal); border-color: var(--teal); color: #0f1117; }
+  .pblock { display: none; }
+  .pblock.active { display: block; }
+
+  /* ── Image hint ── */
+  .img-hint {
+    background: var(--card); border: 1px dashed var(--border);
+    border-radius: 9px; padding: .9rem 1rem;
+    font-size: .82rem; color: var(--muted); font-style: italic; margin: .6rem 0;
+  }
+
+  /* ── Verify box ── */
+  .verify-box {
+    background: var(--card); border: 2px solid var(--green);
+    border-radius: 14px; padding: 1.5rem 1.6rem; margin-top: 2.5rem;
+  }
+  .verify-title { font-size: 1.1rem; font-weight: 700; color: var(--green); margin-bottom: .75rem; }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* ── Troubleshoot ── */
+  details {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 9px; margin-bottom: .6rem; overflow: hidden;
+  }
+  details summary {
+    padding: .9rem 1rem; font-size: .9rem; font-weight: 600;
+    cursor: pointer; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--text);
+  }
+  details summary::after { content: "＋"; color: var(--muted); }
+  details[open] summary::after { content: "－"; }
+  details .detail-body { padding: 0 1rem 1rem; font-size: .88rem; color: var(--muted); line-height: 1.65; }
+  details .detail-body ol, details .detail-body ul {
+    margin: .5rem 0 0 1.2rem; display: flex; flex-direction: column; gap: .4rem;
+  }
+
+  /* ── Footer ── */
+  .footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem 0 1rem; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ HERO -->
+<div class="hero">
+  <div class="hero-badge">Private · Team only</div>
+  <h1>Set up DepthFusion</h1>
+  <p>Give your AI assistant permanent memory shared across the team. Takes about 10 minutes.</p>
+  <p class="hero-sub">This guide is for your specific setup — the server address is already filled in.</p>
+</div>
+
+<div class="container">
+
+  <!-- Progress -->
+  <div class="progress-bar">
+    <div class="progress-step active" id="prog-1">1 · Claude Desktop</div>
+    <div class="progress-step" id="prog-2">2 · Tailscale</div>
+    <div class="progress-step" id="prog-3">3 · Connect</div>
+    <div class="progress-step" id="prog-4">4 · Verify</div>
+  </div>
+
+  <!-- ═══════════════ STEP 1 — CLAUDE DESKTOP -->
+  <div class="section-header">
+    <div class="section-badge">1</div>
+    <div class="section-title-text">
+      <h2>Install Claude Desktop</h2>
+      <p>The app you'll chat with. Skip this step if you already have it.</p>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <h3>Download Claude Desktop</h3>
+    <p>Click the button below. It will download an installer for your computer.</p>
+    <a class="dl-btn" href="https://claude.ai/download" target="_blank">⬇ Download Claude Desktop</a>
+    <p style="margin-top:.75rem;">Open the downloaded file and follow the installer. On Mac it's a drag-to-Applications window. On Windows it's a next → next → finish wizard.</p>
+    <div class="callout info">
+      <div class="callout-icon">💡</div>
+      <div>After installing, open Claude Desktop and sign in with your Anthropic account (or create one — it's free). You don't need to subscribe; the free tier works fine for this.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ═══════════════ STEP 2 — TAILSCALE -->
+  <div class="section-header">
+    <div class="section-badge teal">2</div>
+    <div class="section-title-text">
+      <h2>Join the team network</h2>
+      <p>Tailscale creates a private tunnel to the team server. It runs silently in the background.</p>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <h3>What is Tailscale?</h3>
+    <p>Think of it like a private Wi-Fi network that works over the internet — only approved team devices can connect. Without it, the team server can't be reached from outside the office. Setup takes about 3 minutes and you do it once.</p>
+  </div>
+
+  <div class="step-card">
+    <h3>Download and install Tailscale</h3>
+    <a class="dl-btn teal" href="https://tailscale.com/download" target="_blank">⬇ Download Tailscale</a>
+    <p style="margin-top:.75rem;">Open the downloaded file and install it — same as any other app. Mac users: drag to Applications. Windows users: run the .exe installer.</p>
+  </div>
+
+  <div class="step-card">
+    <h3>Sign in to Tailscale</h3>
+
+    <div class="platform-toggle">
+      <div class="ptab active" id="tab-mac" onclick="switchPlatform('mac')">🍎 Mac</div>
+      <div class="ptab" id="tab-win" onclick="switchPlatform('win')">🪟 Windows</div>
+    </div>
+
+    <div class="pblock active" id="p-mac">
+      <p>After installing, look for the <strong>Tailscale icon in your menu bar</strong> — that's the row of small icons at the very top-right of your screen.</p>
+      <div class="img-hint">📸 The icon looks like a small grid of dots. Click it once to open the menu.</div>
+      <p>Click the icon, then click <strong>Log in</strong>. Your browser will open — sign in with Google or create a free Tailscale account.</p>
+      <div class="callout tip">
+        <div class="callout-icon">✅</div>
+        <div>When you're signed in, the Tailscale icon will turn from grey to a solid colour. That means it's running.</div>
+      </div>
+    </div>
+
+    <div class="pblock" id="p-win">
+      <p>After installing, look for the <strong>Tailscale icon in your system tray</strong> — that's the row of small icons at the bottom-right of your screen, near the clock.</p>
+      <div class="img-hint">📸 The icon might be hidden. Click the small ∧ arrow near the clock to show hidden icons, then look for Tailscale.</div>
+      <p>Right-click the Tailscale icon, then click <strong>Log in</strong>. Your browser will open — sign in with Google or create a free account.</p>
+      <div class="callout tip">
+        <div class="callout-icon">✅</div>
+        <div>When you're signed in, the Tailscale icon will turn from grey to a solid colour. That means it's running.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-card" style="border-color:rgba(245,158,11,.35);">
+    <h3>📧 Message Greg — you need his approval</h3>
+    <p>Tell Greg the email address you used to sign in to Tailscale. He'll approve your device in about a minute, which unlocks access to the team server. You'll know you're approved when the connection command in Step 3 works.</p>
+    <div class="callout warn">
+      <div class="callout-icon">⚠️</div>
+      <div><strong>Don't skip this.</strong> If you run the Step 3 command before Greg approves you, it will fail with a "cannot connect" error. Just wait for him to confirm, then continue.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ═══════════════ STEP 3 — CONNECT -->
+  <div class="section-header">
+    <div class="section-badge">3</div>
+    <div class="section-title-text">
+      <h2>Connect Claude to the team memory</h2>
+      <p>One command links Claude Desktop to the team server.</p>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <h3>Open your terminal / command window</h3>
+
+    <div class="platform-toggle">
+      <div class="ptab active" id="tab2-mac" onclick="switchPlatform2('mac')">🍎 Mac</div>
+      <div class="ptab" id="tab2-win" onclick="switchPlatform2('win')">🪟 Windows</div>
+    </div>
+
+    <div class="pblock active" id="p2-mac">
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>Press <strong>⌘ Command + Space</strong> to open Spotlight. Type <strong>Terminal</strong> and press <strong>Enter</strong>. A window with a blinking cursor will open — that's normal.</div>
+      </div>
+      <div class="img-hint">📸 You'll see text ending with a <code>%</code> symbol and a blinking cursor. That means it's ready.</div>
+    </div>
+
+    <div class="pblock" id="p2-win">
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>Press the <strong>Windows key</strong> on your keyboard, type <strong>PowerShell</strong>, and press <strong>Enter</strong>. A dark window will open.</div>
+      </div>
+      <div class="img-hint">📸 You'll see text starting with <code>PS C:\Users\yourname&gt;</code> and a blinking cursor. That means it's ready.</div>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <h3>Run this command</h3>
+    <p>Click <strong>Copy</strong>, then click inside the terminal window and paste — <strong>⌘ Command + V</strong> on Mac, or <strong>right-click</strong> on Windows — then press <strong>Enter</strong>.</p>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-lang">Terminal / PowerShell</div>
+        <button class="copy-btn" onclick="copyCode(this, 'connect-cmd')">Copy</button>
+      </div>
+      <div class="code-body" id="connect-cmd">claude mcp add depthfusion http://100.112.109.51:7301/sse</div>
+    </div>
+    <p style="margin-top:.6rem;font-size:.85rem;color:var(--muted);">You should see: <code style="color:var(--teal);">Added MCP server depthfusion</code></p>
+    <div class="callout warn">
+      <div class="callout-icon">⚠️</div>
+      <div>
+        <strong>If you see "command not found: claude"</strong> — Claude Code CLI isn't installed on your machine. Use the manual method below instead.
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual fallback -->
+  <details>
+    <summary>📋 Manual method — if "command not found" appeared</summary>
+    <div class="detail-body">
+      <p style="margin-bottom:.75rem;">This edits a settings file directly. It takes 3 extra steps but works the same.</p>
+
+      <p><strong>Mac — Step 1.</strong> In Finder, press <strong>⌘ Command + Shift + G</strong> and paste this path, then press Enter:</p>
+      <div class="code-block" style="margin:.5rem 0 .75rem;">
+        <div class="code-header"><div class="code-lang">Finder path</div><button class="copy-btn" onclick="copyCode(this,'manual-path-mac')">Copy</button></div>
+        <div class="code-body" id="manual-path-mac">~/Library/Application Support/Claude/</div>
+      </div>
+
+      <p><strong>Windows — Step 1.</strong> Press <strong>Windows key + R</strong>, paste this, and press Enter:</p>
+      <div class="code-block" style="margin:.5rem 0 .75rem;">
+        <div class="code-header"><div class="code-lang">Run dialog</div><button class="copy-btn" onclick="copyCode(this,'manual-path-win')">Copy</button></div>
+        <div class="code-body" id="manual-path-win">%APPDATA%\Claude\</div>
+      </div>
+
+      <p style="margin-bottom:.5rem;"><strong>Step 2.</strong> Open <code>claude_desktop_config.json</code> with TextEdit (Mac) or Notepad (Windows). If the file doesn't exist, create a new text file with that exact name.</p>
+
+      <p style="margin-bottom:.5rem;"><strong>Step 3.</strong> Replace the entire file contents with this and save:</p>
+      <div class="code-block" style="margin:.5rem 0;">
+        <div class="code-header"><div class="code-lang">JSON config</div><button class="copy-btn" onclick="copyCode(this,'manual-json')">Copy</button></div>
+        <div class="code-body" id="manual-json">{
+  "mcpServers": {
+    "depthfusion": {
+      "url": "http://100.112.109.51:7301/sse"
+    }
+  }
+}</div>
+      </div>
+    </div>
+  </details>
+
+  <div class="step-card" style="margin-top:1rem;">
+    <h3>Restart Claude Desktop</h3>
+    <div class="platform-toggle">
+      <div class="ptab active" id="tab3-mac" onclick="switchPlatform3('mac')">🍎 Mac</div>
+      <div class="ptab" id="tab3-win" onclick="switchPlatform3('win')">🪟 Windows</div>
+    </div>
+    <div class="pblock active" id="p3-mac">
+      <p>Click the Claude icon in your <strong>menu bar</strong> (top right of screen) → <strong>Quit Claude</strong>. Then reopen Claude from your Applications folder or Dock.</p>
+    </div>
+    <div class="pblock" id="p3-win">
+      <p>Find the Claude icon in your <strong>system tray</strong> (bottom right, near the clock). Right-click it → <strong>Quit</strong>. Then reopen Claude from the Start menu.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ═══════════════ STEP 4 — VERIFY -->
+  <div class="section-header">
+    <div class="section-badge green">4</div>
+    <div class="section-title-text">
+      <h2>Check it's working</h2>
+      <p>One message confirms the team memory is connected.</p>
+    </div>
+  </div>
+
+  <div class="verify-box">
+    <div class="verify-title">✅ Test the connection</div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:.9rem;">Open a <strong>new chat</strong> in Claude Desktop and type exactly this (don't add any other words):</p>
+    <div class="code-block">
+      <div class="code-header"><div class="code-lang">Claude Desktop — new chat</div><button class="copy-btn" onclick="copyCode(this,'verify-cmd')">Copy</button></div>
+      <div class="code-body" id="verify-cmd">depthfusion_status</div>
+    </div>
+    <div class="callout success" style="margin-top:1rem;">
+      <div class="callout-icon">🎉</div>
+      <div><strong>Success:</strong> Claude will respond with something like "DepthFusion is running — version X.X, tools available." You're now sharing memory with the team.</div>
+    </div>
+    <div class="callout warn" style="margin-top:.5rem;">
+      <div class="callout-icon">⚠️</div>
+      <div><strong>If nothing happens or you get an error:</strong> Make sure Tailscale is running (icon is solid, not grey) and Greg has approved your device. Then try closing and reopening Claude Desktop and start a fresh chat.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ═══════════════ TROUBLESHOOTING -->
+  <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Having trouble?</p>
+
+  <details>
+    <summary>The Tailscale icon is grey or says "Not connected"</summary>
+    <div class="detail-body">
+      <p><strong>Mac:</strong> Click the Tailscale icon in your menu bar → Connect. If the icon isn't there, open Spotlight (⌘ Space) and search for Tailscale, then open it.</p>
+      <p style="margin-top:.5rem;"><strong>Windows:</strong> Look in your system tray (bottom-right). Click the ∧ arrow to find hidden icons, right-click Tailscale → Connect.</p>
+      <p style="margin-top:.5rem;">If it asks you to log in again, use the same account you used before.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>"command not found: claude" or "claude is not recognized"</summary>
+    <div class="detail-body">
+      <p>Claude Code CLI isn't installed. Use the <strong>Manual method</strong> (the expandable section just above the Restart step). It takes 3 extra steps and works just as well.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>depthfusion_status gives an error or no response</summary>
+    <div class="detail-body">
+      <ol>
+        <li>Confirm Tailscale is running — icon should be solid, not grey.</li>
+        <li>Message Greg to confirm the server is online and your device is approved.</li>
+        <li>Fully quit Claude Desktop (not just close the window — use Quit from menu/tray).</li>
+        <li>Reopen Claude Desktop and start a <strong>brand new chat</strong>.</li>
+        <li>Type <code>depthfusion_status</code> again.</li>
+      </ol>
+    </div>
+  </details>
+
+  <details>
+    <summary>I need to remove DepthFusion from Claude</summary>
+    <div class="detail-body">
+      <p><strong>If you used the command:</strong> Open Terminal / PowerShell and run:</p>
+      <div class="code-block" style="margin:.5rem 0;">
+        <div class="code-header"><div class="code-lang">Terminal / PowerShell</div><button class="copy-btn" onclick="copyCode(this,'remove-cmd')">Copy</button></div>
+        <div class="code-body" id="remove-cmd">claude mcp remove depthfusion -s user</div>
+      </div>
+      <p style="margin-top:.5rem;"><strong>If you used the manual method:</strong> Open <code>claude_desktop_config.json</code> and delete the <code>"depthfusion"</code> block. Save and restart Claude Desktop.</p>
+    </div>
+  </details>
+
+  <div class="footer">
+    Prepared for you by Greg · DepthFusion v1.4.0 · Questions? Message Greg directly.
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  // Auto-detect platform and activate the right tabs
+  var isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+  if (!isMac) {
+    ['tab-win','tab2-win','tab3-win'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('active'); el.previousElementSibling && el.previousElementSibling.classList.remove('active'); }
+    });
+    ['p-win','p2-win','p3-win'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('active'); el.previousElementSibling && el.previousElementSibling.classList.remove('active'); }
+    });
+  }
+
+  function switchPlatform(p) {
+    ['tab-mac','tab-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    ['p-mac','p-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    document.getElementById('tab-' + p).classList.add('active');
+    document.getElementById('p-' + p).classList.add('active');
+  }
+  function switchPlatform2(p) {
+    ['tab2-mac','tab2-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    ['p2-mac','p2-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    document.getElementById('tab2-' + p).classList.add('active');
+    document.getElementById('p2-' + p).classList.add('active');
+  }
+  function switchPlatform3(p) {
+    ['tab3-mac','tab3-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    ['p3-mac','p3-win'].forEach(function(id) { document.getElementById(id).classList.remove('active'); });
+    document.getElementById('tab3-' + p).classList.add('active');
+    document.getElementById('p3-' + p).classList.add('active');
+  }
+
+  function copyCode(btn, id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText((el.innerText || el.textContent).trim()).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }).catch(function() { btn.textContent = 'Failed'; });
+  }
+</script>
+</body>
+</html>
