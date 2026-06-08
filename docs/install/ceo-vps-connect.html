@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Connect to Your Team Memory</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2e3e;
+    --accent: #6c63ff;
+    --accent2: #4ecdc4;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e8eaf0;
+    --muted: #7c849a;
+    --code-bg: #0d1117;
+    --code-text: #c9d1d9;
+    --step-size: 2.6rem;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f9;
+      --card: #ffffff;
+      --border: #dde0ea;
+      --text: #1a1d27;
+      --muted: #5c6070;
+      --code-bg: #1a1d27;
+      --code-text: #c9d1d9;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem 2.5rem;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(108,99,255,.15);
+    color: #a89fff;
+    border: 1px solid rgba(108,99,255,.3);
+    border-radius: 2rem;
+    padding: .25rem .9rem;
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+  }
+  .hero h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: .6rem;
+    letter-spacing: -.02em;
+  }
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+  .section { margin-top: 2.5rem; }
+  .section-title {
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+  /* Config row */
+  .config-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .config-label {
+    font-size: .82rem;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: .4rem;
+  }
+  .config-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .config-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: .55rem .8rem;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: .9rem;
+    color: var(--accent2);
+    outline: none;
+  }
+  .config-input:focus { border-color: var(--accent); }
+  .hint { font-size: .78rem; color: var(--muted); margin-top: .5rem; }
+  /* Platform tabs */
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+  .tab {
+    padding: .5rem 1.2rem;
+    border-radius: 7px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    transition: all .15s;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .platform-block { display: none; }
+  .platform-block.active { display: block; }
+  /* Steps */
+  .step {
+    display: flex;
+    gap: 1.2rem;
+    margin-bottom: 1.75rem;
+    align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: var(--step-size);
+    height: var(--step-size);
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: .1rem;
+  }
+  .step.done .step-num { background: var(--green); }
+  .step-body { flex: 1; }
+  .step-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: .35rem;
+    color: var(--text);
+  }
+  .step-desc {
+    font-size: .9rem;
+    color: var(--muted);
+    margin-bottom: .75rem;
+  }
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    overflow: hidden;
+    margin: .5rem 0;
+  }
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .5rem .9rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.03);
+  }
+  .code-lang { font-size: .7rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .copy-btn {
+    font-size: .75rem;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: .2rem .55rem;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .code-body { padding: .8rem 1rem; font-family: "SF Mono", Consolas, monospace; font-size: .87rem; color: var(--code-text); line-height: 1.55; overflow-x: auto; }
+  .code-body .cmd { color: #79c0ff; }
+  .code-body .arg { color: var(--accent2); }
+  .code-body .comment { color: #484f58; }
+  /* Callouts */
+  .callout {
+    border-radius: 9px;
+    padding: .9rem 1rem;
+    font-size: .88rem;
+    display: flex;
+    gap: .65rem;
+    align-items: flex-start;
+    margin: .75rem 0;
+  }
+  .callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: #bdb5ff; }
+  .callout.warn { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: #fcd34d; }
+  .callout.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+  /* Prerequisites checklist */
+  .checklist { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+  .checklist li {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: .75rem 1rem;
+    font-size: .92rem;
+  }
+  .check-icon { width: 1.5rem; height: 1.5rem; background: rgba(34,197,94,.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; color: var(--green); }
+  .check-link { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .check-link:hover { text-decoration: underline; }
+  /* Image placeholders */
+  .img-hint {
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: 9px;
+    padding: 1rem;
+    text-align: center;
+    font-size: .82rem;
+    color: var(--muted);
+    margin: .6rem 0;
+    font-style: italic;
+  }
+  /* Verification */
+  .verify-box {
+    background: var(--card);
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 1.4rem 1.5rem;
+    margin-top: 2.5rem;
+  }
+  .verify-title { font-size: 1.05rem; font-weight: 700; color: var(--green); margin-bottom: .6rem; }
+  /* Troubleshoot accordion */
+  details {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    margin-bottom: .6rem;
+    overflow: hidden;
+  }
+  details summary {
+    padding: .9rem 1rem;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text);
+  }
+  details summary::after { content: "＋"; color: var(--muted); font-size: .9rem; }
+  details[open] summary::after { content: "－"; }
+  details .detail-body { padding: 0 1rem 1rem; font-size: .88rem; color: var(--muted); line-height: 1.6; }
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+  /* Footer */
+  .footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem 0 1rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">5-minute setup</div>
+  <h1>Connect to DepthFusion</h1>
+  <p>Give your AI assistant shared team memory. One command and you're done.</p>
+</div>
+
+<div class="container">
+
+  <!-- ─── Config ─── -->
+  <div class="section">
+    <div class="section-title">Your connection details</div>
+    <div class="config-card">
+      <div class="config-label">VPS address (provided by Greg)</div>
+      <div class="config-row">
+        <input class="config-input" id="vps-ip" type="text" placeholder="e.g. 176.9.147.206" oninput="updateCommands()">
+      </div>
+      <p class="hint">Paste the address Greg sent you here — every command on this page will update automatically.</p>
+    </div>
+  </div>
+
+  <!-- ─── Prerequisites ─── -->
+  <div class="section">
+    <div class="section-title">Before you start — make sure you have these</div>
+    <ul class="checklist">
+      <li>
+        <div class="check-icon">✓</div>
+        <div><strong>Claude Desktop</strong> — installed and signed in. &nbsp;<a class="check-link" href="https://claude.ai/download" target="_blank">Download here →</a></div>
+      </li>
+      <li>
+        <div class="check-icon">✓</div>
+        <div><strong>The VPS address</strong> — a number like <code>176.9.147.206</code>. Greg will send this to you.</div>
+      </li>
+      <li>
+        <div class="check-icon">✓</div>
+        <div><strong>10 minutes</strong> — the actual setup takes about 2 minutes, the rest is for reading.</div>
+      </li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- ─── Platform tabs ─── -->
+  <div class="section">
+    <div class="section-title">Choose your computer type</div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchPlatform('mac', this)">🍎 Mac</div>
+      <div class="tab" onclick="switchPlatform('win', this)">🪟 Windows</div>
+    </div>
+
+    <!-- MAC -->
+    <div class="platform-block active" id="platform-mac">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Open Terminal</div>
+          <div class="step-desc">Terminal is the text command window on your Mac. You'll use it once to run a single command.</div>
+          <div class="callout info">
+            <div class="callout-icon">💡</div>
+            <div>Press <strong>⌘ Command + Space</strong> to open Spotlight search. Type <strong>Terminal</strong> and press <strong>Enter</strong>. A black (or white) window will open — that's normal.</div>
+          </div>
+          <div class="img-hint">📸 You'll see a window with a blinking cursor and text like <code>yourname@MacBook ~ %</code></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Run the connection command</div>
+          <div class="step-desc">Click the copy button, then click in the Terminal window and paste with <strong>⌘ Command + V</strong>, then press <strong>Enter</strong>.</div>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-lang">Terminal</div>
+              <button class="copy-btn" onclick="copyCode(this, 'mac-cmd')">Copy</button>
+            </div>
+            <div class="code-body" id="mac-cmd"><span class="cmd">claude mcp add depthfusion \</span>
+  <span class="arg" data-vps="http://YOUR_VPS_IP:7301/sse">http://YOUR_VPS_IP:7301/sse</span></div>
+          </div>
+          <div class="callout warn">
+            <div class="callout-icon">⚠️</div>
+            <div>If you see <strong>"command not found: claude"</strong>, Claude Code CLI isn't installed. Skip to the <a class="check-link" href="#desktop-config-mac">Manual config method</a> below instead.</div>
+          </div>
+          <p style="font-size:.85rem;color:var(--muted);margin-top:.6rem;">You should see: <code style="color:var(--accent2)">Added MCP server depthfusion</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Restart Claude Desktop</div>
+          <div class="step-desc">Fully quit and reopen Claude Desktop so it picks up the new connection.</div>
+          <div class="callout info">
+            <div class="callout-icon">💡</div>
+            <div>Click the Claude icon in your menu bar (top right of screen) → <strong>Quit Claude</strong>. Then open Claude from your Applications folder or Dock.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step done">
+        <div class="step-num">✓</div>
+        <div class="step-body">
+          <div class="step-title">You're connected</div>
+          <div class="step-desc">That's it. Skip down to <a class="check-link" href="#verify">Verify it's working</a>.</div>
+        </div>
+      </div>
+
+      <!-- Manual fallback -->
+      <details id="desktop-config-mac" style="margin-top:1rem;">
+        <summary>📋 Manual method — if the command above didn't work</summary>
+        <div class="detail-body">
+          <p style="margin-bottom:.75rem;">This method edits a config file directly. You'll use it if the <code>claude</code> command wasn't found.</p>
+          <p style="margin-bottom:.5rem;"><strong>Step 1.</strong> Open Finder. Press <strong>⌘ Command + Shift + G</strong> and paste this path:</p>
+          <div class="code-block">
+            <div class="code-header"><div class="code-lang">Finder path</div><button class="copy-btn" onclick="copyCode(this, 'mac-path')">Copy</button></div>
+            <div class="code-body" id="mac-path">~/Library/Application Support/Claude/</div>
+          </div>
+          <p style="margin:.75rem 0 .5rem;"><strong>Step 2.</strong> Open <code>claude_desktop_config.json</code> with TextEdit. If it doesn't exist, create it.</p>
+          <p style="margin-bottom:.5rem;"><strong>Step 3.</strong> Replace the entire file contents with this (keep your VPS address in the url line):</p>
+          <div class="code-block">
+            <div class="code-header"><div class="code-lang">JSON config</div><button class="copy-btn" onclick="copyCode(this, 'mac-json')">Copy</button></div>
+            <div class="code-body" id="mac-json">{
+  "mcpServers": {
+    "depthfusion": {
+      "url": "<span data-vps="http://YOUR_VPS_IP:7301/sse">http://YOUR_VPS_IP:7301/sse</span>"
+    }
+  }
+}</div>
+          </div>
+          <p style="margin-top:.75rem;"><strong>Step 4.</strong> Save the file (⌘S). Quit and restart Claude Desktop.</p>
+        </div>
+      </details>
+
+    </div><!-- /platform-mac -->
+
+    <!-- WINDOWS -->
+    <div class="platform-block" id="platform-win">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Open PowerShell</div>
+          <div class="step-desc">PowerShell is the text command window on Windows. You'll use it once.</div>
+          <div class="callout info">
+            <div class="callout-icon">💡</div>
+            <div>Press the <strong>Windows key</strong> on your keyboard, type <strong>PowerShell</strong>, and press <strong>Enter</strong>. A blue (or dark) window will open.</div>
+          </div>
+          <div class="img-hint">📸 You'll see a window starting with <code>PS C:\Users\yourname&gt;</code></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Run the connection command</div>
+          <div class="step-desc">Click the copy button, then right-click inside the PowerShell window to paste (right-click = paste on Windows), then press <strong>Enter</strong>.</div>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-lang">PowerShell</div>
+              <button class="copy-btn" onclick="copyCode(this, 'win-cmd')">Copy</button>
+            </div>
+            <div class="code-body" id="win-cmd"><span class="cmd">claude mcp add depthfusion</span> <span class="arg" data-vps="http://YOUR_VPS_IP:7301/sse">http://YOUR_VPS_IP:7301/sse</span></div>
+          </div>
+          <div class="callout warn">
+            <div class="callout-icon">⚠️</div>
+            <div>If you see <strong>"claude is not recognized"</strong>, Claude Code CLI isn't installed. Use the <a class="check-link" href="#desktop-config-win">Manual config method</a> below instead.</div>
+          </div>
+          <p style="font-size:.85rem;color:var(--muted);margin-top:.6rem;">You should see: <code style="color:var(--accent2)">Added MCP server depthfusion</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Restart Claude Desktop</div>
+          <div class="step-desc">Right-click the Claude icon in your system tray (bottom right of screen, near the clock) → <strong>Quit</strong>. Then reopen Claude from the Start menu.</div>
+        </div>
+      </div>
+
+      <div class="step done">
+        <div class="step-num">✓</div>
+        <div class="step-body">
+          <div class="step-title">You're connected</div>
+          <div class="step-desc">Skip down to <a class="check-link" href="#verify">Verify it's working</a>.</div>
+        </div>
+      </div>
+
+      <!-- Manual fallback Windows -->
+      <details id="desktop-config-win" style="margin-top:1rem;">
+        <summary>📋 Manual method — if the command above didn't work</summary>
+        <div class="detail-body">
+          <p style="margin-bottom:.75rem;"><strong>Step 1.</strong> Press <strong>Windows key + R</strong>, paste the following into the box, and press Enter:</p>
+          <div class="code-block">
+            <div class="code-header"><div class="code-lang">Run dialog</div><button class="copy-btn" onclick="copyCode(this, 'win-path')">Copy</button></div>
+            <div class="code-body" id="win-path">%APPDATA%\Claude\</div>
+          </div>
+          <p style="margin:.75rem 0 .5rem;"><strong>Step 2.</strong> Open <code>claude_desktop_config.json</code> with Notepad. If it doesn't exist, right-click → New → Text Document, name it <code>claude_desktop_config.json</code>.</p>
+          <p style="margin-bottom:.5rem;"><strong>Step 3.</strong> Replace everything with this:</p>
+          <div class="code-block">
+            <div class="code-header"><div class="code-lang">JSON config</div><button class="copy-btn" onclick="copyCode(this, 'win-json')">Copy</button></div>
+            <div class="code-body" id="win-json">{
+  "mcpServers": {
+    "depthfusion": {
+      "url": "<span data-vps="http://YOUR_VPS_IP:7301/sse">http://YOUR_VPS_IP:7301/sse</span>"
+    }
+  }
+}</div>
+          </div>
+          <p style="margin-top:.75rem;"><strong>Step 4.</strong> Save (Ctrl+S). Quit and restart Claude Desktop.</p>
+        </div>
+      </details>
+
+    </div><!-- /platform-win -->
+  </div><!-- /section -->
+
+  <hr>
+
+  <!-- ─── Verify ─── -->
+  <div id="verify" class="verify-box">
+    <div class="verify-title">✅ Verify it's working</div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Open a new chat in Claude Desktop and type exactly this:</p>
+    <div class="code-block">
+      <div class="code-header"><div class="code-lang">Claude Desktop</div><button class="copy-btn" onclick="copyCode(this, 'verify-cmd')">Copy</button></div>
+      <div class="code-body" id="verify-cmd">depthfusion_status</div>
+    </div>
+    <div class="callout success" style="margin-top:1rem;">
+      <div class="callout-icon">🎉</div>
+      <div><strong>Success looks like:</strong> A response mentioning "DepthFusion", a version number, and tool count. You're now sharing memory with your team.</div>
+    </div>
+    <div class="callout warn" style="margin-top:.5rem;">
+      <div class="callout-icon">⚠️</div>
+      <div><strong>If it doesn't respond or you get an error:</strong> The VPS might be temporarily down, or you may have a typo in the address. Double-check the address in the box at the top of this page, re-run the command, and restart Claude Desktop again.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ─── Troubleshooting ─── -->
+  <div class="section">
+    <div class="section-title">Troubleshooting</div>
+
+    <details>
+      <summary>I don't see a response when I type depthfusion_status</summary>
+      <div class="detail-body">
+        <p>This usually means Claude Desktop hasn't loaded the new MCP server yet.</p>
+        <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.4rem;">
+          <li>Fully quit Claude Desktop (don't just close the window — quit from the menu/tray icon).</li>
+          <li>Reopen it.</li>
+          <li>Start a brand new chat (don't use an existing conversation).</li>
+          <li>Type <code>depthfusion_status</code> again.</li>
+        </ol>
+        <p style="margin-top:.6rem;">If still nothing: confirm the VPS address is entered correctly above and re-run the connection command.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>"command not found: claude" on Mac</summary>
+      <div class="detail-body">
+        <p>This means Claude Code CLI isn't installed on your machine. That's fine — use the <strong>Manual method</strong> (the expandable section inside Step 2 above) which edits a config file directly and doesn't need the CLI.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>"claude is not recognized" on Windows</summary>
+      <div class="detail-body">
+        <p>Same as Mac — Claude Code CLI isn't installed. Use the <strong>Manual method</strong> inside Step 2 for Windows. It takes 2 extra steps but works just as well.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Claude Desktop doesn't have a config file yet</summary>
+      <div class="detail-body">
+        <p>This happens on a fresh Claude Desktop install. Create the file using the Manual method:</p>
+        <ul style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.3rem;">
+          <li><strong>Mac:</strong> Go to <code>~/Library/Application Support/Claude/</code> and create <code>claude_desktop_config.json</code>.</li>
+          <li><strong>Windows:</strong> Go to <code>%APPDATA%\Claude\</code> and create <code>claude_desktop_config.json</code>.</li>
+        </ul>
+        <p style="margin-top:.5rem;">Paste the JSON config from the Manual method above, save, and restart Claude Desktop.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>I get a connection error when testing</summary>
+      <div class="detail-body">
+        <p>This usually means the VPS is temporarily offline or the address has a typo. Check:</p>
+        <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.4rem;">
+          <li>The VPS address at the top of this page — make sure there are no extra spaces.</li>
+          <li>Message Greg to confirm the server is running.</li>
+          <li>Wait 5 minutes and try again (the server may be restarting).</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>I need to remove or reset the connection</summary>
+      <div class="detail-body">
+        <p>To remove DepthFusion from Claude Desktop:</p>
+        <p><strong>Mac Terminal:</strong> <code>claude mcp remove depthfusion -s user</code></p>
+        <p style="margin-top:.4rem;"><strong>Windows PowerShell:</strong> <code>claude mcp remove depthfusion -s user</code></p>
+        <p style="margin-top:.4rem;"><strong>Manual:</strong> Open the config file and delete the <code>"depthfusion"</code> block, then restart Claude Desktop.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="footer">DepthFusion v1.3.0 · Built by your team · Questions? Message Greg directly.</div>
+
+</div><!-- /container -->
+
+<script>
+  function updateCommands() {
+    var ip = document.getElementById('vps-ip').value.trim() || 'YOUR_VPS_IP';
+    var url = 'http://' + ip + ':7301/sse';
+    document.querySelectorAll('[data-vps]').forEach(function(el) {
+      el.textContent = url;
+      el.dataset.vps = url;
+    });
+    // Also update the mac-cmd and win-cmd code bodies
+    var macCmd = document.getElementById('mac-cmd');
+    if (macCmd) {
+      macCmd.innerHTML = '<span class="cmd">claude mcp add depthfusion \\</span>\n  <span class="arg" data-vps="' + url + '">' + url + '</span>';
+    }
+    var winCmd = document.getElementById('win-cmd');
+    if (winCmd) {
+      winCmd.innerHTML = '<span class="cmd">claude mcp add depthfusion</span> <span class="arg" data-vps="' + url + '">' + url + '</span>';
+    }
+    var jsons = ['mac-json', 'win-json'];
+    jsons.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = '{\n  "mcpServers": {\n    "depthfusion": {\n      "url": "<span data-vps="' + url + '">' + url + '</span>"\n    }\n  }\n}';
+      }
+    });
+  }
+
+  function switchPlatform(platform, tabEl) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.platform-block').forEach(b => b.classList.remove('active'));
+    tabEl.classList.add('active');
+    document.getElementById('platform-' + platform).classList.add('active');
+  }
+
+  function copyCode(btn, id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var text = el.innerText || el.textContent;
+    navigator.clipboard.writeText(text.trim()).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }).catch(function() {
+      btn.textContent = 'Copy failed';
+    });
+  }
+</script>
+
+</body>
+</html>
