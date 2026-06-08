@@ -57,3 +57,7 @@ dmypy.json
 .codex
 text.txt
 .remember/
+
+# Private VPS connect scripts (contain credentials — never commit)
+scripts/connect-vps.sh
+scripts/connect-vps.ps1
