@@ -274,7 +274,7 @@
 <body>
 
 <div class="hero">
-  <div class="hero-badge">5-minute setup</div>
+  <div class="hero-badge">10-minute setup</div>
   <h1>Connect to DepthFusion</h1>
   <p>Give your AI assistant shared team memory. One command and you're done.</p>
 </div>
@@ -285,11 +285,11 @@
   <div class="section">
     <div class="section-title">Your connection details</div>
     <div class="config-card">
-      <div class="config-label">VPS address (provided by Greg)</div>
+      <div class="config-label">Team network address (provided by Greg)</div>
       <div class="config-row">
-        <input class="config-input" id="vps-ip" type="text" placeholder="e.g. 176.9.147.206" oninput="updateCommands()">
+        <input class="config-input" id="vps-ip" type="text" placeholder="e.g. 100.64.x.x" oninput="updateCommands()">
       </div>
-      <p class="hint">Paste the address Greg sent you here — every command on this page will update automatically.</p>
+      <p class="hint">Paste the Tailscale address Greg sent you here — every command on this page will update automatically.</p>
     </div>
   </div>
 
@@ -303,20 +303,88 @@
       </li>
       <li>
         <div class="check-icon">✓</div>
-        <div><strong>The VPS address</strong> — a number like <code>176.9.147.206</code>. Greg will send this to you.</div>
+        <div><strong>Tailscale</strong> — a free app for the secure team network. You'll install it in Step 1 below if you don't have it. &nbsp;<a class="check-link" href="https://tailscale.com/download" target="_blank">Download page →</a></div>
       </li>
       <li>
         <div class="check-icon">✓</div>
-        <div><strong>10 minutes</strong> — the actual setup takes about 2 minutes, the rest is for reading.</div>
+        <div><strong>The team network address</strong> — a number starting with <code>100.</code> (e.g. <code>100.64.x.x</code>). Greg will send this to you once you're on Tailscale.</div>
+      </li>
+      <li>
+        <div class="check-icon">✓</div>
+        <div><strong>10–15 minutes</strong> — mostly waiting for Tailscale to connect and Greg to approve you. The actual commands take under 1 minute.</div>
       </li>
     </ul>
   </div>
 
   <hr>
 
+  <!-- ─── Tailscale join ─── -->
+  <div class="section">
+    <div class="section-title" style="color:var(--accent2);letter-spacing:.12em;">Step 1 of 2 — Join the team network</div>
+    <div class="config-card" style="border-color:rgba(78,205,196,.35);">
+      <p style="font-size:.92rem;margin-bottom:1.25rem;color:var(--muted);">DepthFusion uses <strong style="color:var(--text);">Tailscale</strong> to create a private, encrypted network between your computer and the team server. You set it up once and it runs silently in the background forever after.</p>
+
+      <div class="step">
+        <div class="step-num" style="background:var(--accent2);color:#0f1117;font-size:.95rem;">1</div>
+        <div class="step-body">
+          <div class="step-title">Download and install Tailscale</div>
+          <div class="step-desc">Go to the Tailscale download page and get the version for your computer.</div>
+          <div class="code-block">
+            <div class="code-header"><div class="code-lang">Browser</div><button class="copy-btn" onclick="copyCode(this, 'ts-dl')">Copy link</button></div>
+            <div class="code-body" id="ts-dl">https://tailscale.com/download</div>
+          </div>
+          <div class="callout info" style="margin-top:.75rem;">
+            <div class="callout-icon">💡</div>
+            <div>Open the downloaded file and click through the installer — it's a standard next → next → finish installer. No special options needed.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num" style="background:var(--accent2);color:#0f1117;font-size:.95rem;">2</div>
+        <div class="step-body">
+          <div class="step-title">Sign in to Tailscale</div>
+          <div class="step-desc">After installing, Tailscale will ask you to log in. You can use Google, Microsoft, or create a free account with your email.</div>
+          <div class="callout info">
+            <div class="callout-icon">💡</div>
+            <div>
+              <strong>Mac:</strong> Click the Tailscale icon in your <strong>menu bar</strong> (top-right of screen) → <strong>Log in</strong>. Your browser will open — follow the prompts.<br>
+              <br>
+              <strong>Windows:</strong> Find the Tailscale icon in your <strong>system tray</strong> (bottom-right, near the clock — may be hidden behind a ^ arrow). Right-click it → <strong>Log in</strong>. Your browser will open.
+            </div>
+          </div>
+          <div class="img-hint">📸 After signing in, the icon will turn from grey to a solid colour. That means Tailscale is running.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num" style="background:var(--accent2);color:#0f1117;font-size:.95rem;">3</div>
+        <div class="step-body">
+          <div class="step-title">Message Greg to get approved</div>
+          <div class="step-desc">Tell Greg the email address you used to sign in to Tailscale. He'll approve your device — this takes about 1 minute on his end.</div>
+          <div class="callout warn">
+            <div class="callout-icon">⚠️</div>
+            <div>You <strong>must wait for Greg's approval</strong> before the connection will work. Until approved, you're on Tailscale but not yet on the team network. The icon will be solid but you can't reach the server yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num" style="background:var(--accent2);color:#0f1117;font-size:.95rem;">4</div>
+        <div class="step-body">
+          <div class="step-title">Get the team address from Greg</div>
+          <div class="step-desc">Once he approves you, Greg will send you an address that starts with <code>100.</code> — for example, <code>100.94.12.34</code>. Enter it in the box at the top of this page and continue to Step 2 below.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr>
+
   <!-- ─── Platform tabs ─── -->
   <div class="section">
-    <div class="section-title">Choose your computer type</div>
+    <div class="section-title">Step 2 of 2 — Connect Claude Desktop</div>
     <div class="tabs">
       <div class="tab active" onclick="switchPlatform('mac', this)">🍎 Mac</div>
       <div class="tab" onclick="switchPlatform('win', this)">🪟 Windows</div>
@@ -514,6 +582,19 @@
     <div class="section-title">Troubleshooting</div>
 
     <details>
+      <summary>The Tailscale icon is grey or says "Disconnected"</summary>
+      <div class="detail-body">
+        <p>Tailscale is installed but not connected. Try these in order:</p>
+        <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.4rem;">
+          <li><strong>Mac:</strong> Click the Tailscale icon in your menu bar → <strong>Connect</strong>. If you don't see the icon, open Spotlight (⌘ Space) and search for Tailscale.</li>
+          <li><strong>Windows:</strong> Find Tailscale in your system tray (bottom-right near the clock, might be behind a ∧ arrow). Right-click → <strong>Connect</strong>.</li>
+          <li>If it asks you to log in again, sign in with the same account you used before.</li>
+          <li>If the icon turns solid but the connection still fails, your approval may have expired — message Greg to re-approve you.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
       <summary>I don't see a response when I type depthfusion_status</summary>
       <div class="detail-body">
         <p>This usually means Claude Desktop hasn't loaded the new MCP server yet.</p>
@@ -556,12 +637,14 @@
     <details>
       <summary>I get a connection error when testing</summary>
       <div class="detail-body">
-        <p>This usually means the VPS is temporarily offline or the address has a typo. Check:</p>
-        <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.4rem;">
-          <li>The VPS address at the top of this page — make sure there are no extra spaces.</li>
-          <li>Message Greg to confirm the server is running.</li>
-          <li>Wait 5 minutes and try again (the server may be restarting).</li>
+        <p>Most connection errors are one of these:</p>
+        <ol style="margin:.5rem 0 .75rem 1.2rem;display:flex;flex-direction:column;gap:.4rem;">
+          <li><strong>Tailscale not running</strong> — check the Tailscale icon. If it's grey or says "Disconnected", click it and reconnect.</li>
+          <li><strong>Not approved yet</strong> — message Greg and make sure he's approved your device in Tailscale.</li>
+          <li><strong>Wrong address</strong> — the team address at the top must start with <code>100.</code> and have no extra spaces.</li>
+          <li><strong>Server temporarily offline</strong> — message Greg to confirm it's running, then wait 5 minutes and try again.</li>
         </ol>
+        <p>Quick test: if Tailscale is running and connected, you should see your Tailscale icon as a solid colour (not grey).</p>
       </div>
     </details>
 
@@ -576,7 +659,7 @@
     </details>
   </div>
 
-  <div class="footer">DepthFusion v1.3.0 · Built by your team · Questions? Message Greg directly.</div>
+  <div class="footer">DepthFusion v1.4.0 · Built by your team · Questions? Message Greg directly.</div>
 
 </div><!-- /container -->
 
