@@ -1,0 +1,24 @@
+{
+  "conversations": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain the difference between a list and a tuple in Python."
+        },
+        {
+          "role": "assistant",
+          "content": "A list is mutable — you can add, remove, or change elements after creation. A tuple is immutable — once created, its elements cannot be modified. Tuples are slightly more memory-efficient and can be used as dictionary keys."
+        },
+        {
+          "role": "user",
+          "content": "When should I prefer a tuple over a list?"
+        },
+        {
+          "role": "assistant",
+          "content": "Prefer a tuple when the data should not change (e.g. coordinates, RGB values, database records), when you need it as a dict key or set element, or when you want to signal immutability to other developers."
+        }
+      ]
+    }
+  ]
+}

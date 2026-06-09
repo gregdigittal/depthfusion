@@ -1,0 +1,45 @@
+[
+  {
+    "title": "Python async patterns",
+    "mapping": {
+      "aaa00000-0000-0000-0000-000000000001": {
+        "message": null
+      },
+      "aaa00000-0000-0000-0000-000000000002": {
+        "message": {
+          "author": {"role": "user"},
+          "content": {"parts": ["Can you explain async/await in Python?"]},
+          "create_time": 1700000000.0
+        }
+      },
+      "aaa00000-0000-0000-0000-000000000003": {
+        "message": {
+          "author": {"role": "assistant"},
+          "content": {"parts": ["Sure! async/await lets you write non-blocking code. You define a coroutine with `async def` and suspend it with `await`."]},
+          "create_time": 1700000060.0
+        }
+      },
+      "aaa00000-0000-0000-0000-000000000004": {
+        "message": {
+          "author": {"role": "tool"},
+          "content": {"parts": ["[tool output — should be skipped]"]},
+          "create_time": 1700000090.0
+        }
+      },
+      "aaa00000-0000-0000-0000-000000000005": {
+        "message": {
+          "author": {"role": "user"},
+          "content": {"parts": ["What's the difference between asyncio.gather and asyncio.wait?"]},
+          "create_time": 1700000120.0
+        }
+      },
+      "aaa00000-0000-0000-0000-000000000006": {
+        "message": {
+          "author": {"role": "assistant"},
+          "content": {"parts": ["`asyncio.gather` returns results in the same order as inputs. `asyncio.wait` gives you sets of done/pending tasks and is more flexible for partial completion handling."]},
+          "create_time": 1700000180.0
+        }
+      }
+    }
+  }
+]
