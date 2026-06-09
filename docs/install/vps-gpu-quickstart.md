@@ -52,9 +52,9 @@ For the rest of this guide, "Gemma 4" without qualification means the
 nvidia-smi                  # must show GPU; ≥ 20 GB VRAM for Gemma 4 26B AWQ
 nvcc --version              # CUDA 12.0+
 
-# Python — 3.10 or newer; "or newer" means any modern Python is fine.
-# Ubuntu 24.04 ships 3.12 as default. Don't try to install 3.10
-# specifically on 24.04 — it's not in the repos and isn't needed.
+# Python — 3.11 or newer; "or newer" means any modern Python is fine.
+# Ubuntu 24.04 ships 3.12 as default. 3.11 is the minimum required.
+# Don't try to install 3.11 specifically on 24.04 — 3.12 is the default.
 python3 --version
 
 # Build tools + venv module (fresh-install gotcha — venv isn't

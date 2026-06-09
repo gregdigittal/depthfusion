@@ -14,14 +14,14 @@ echo "====================="
 
 # 1. Python version check
 if ! command -v python3 &>/dev/null; then
-    echo "Error: python3 not found. Install Python 3.10+ and try again." >&2
+    echo "Error: python3 not found. Install Python 3.11+ and try again." >&2
     exit 1
 fi
 PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
 PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
-    echo "Error: Python 3.10+ required (found $PY_VER)" >&2
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
+    echo "Error: Python 3.11+ required (found $PY_VER)" >&2
     exit 1
 fi
 echo "✓ Python $PY_VER"

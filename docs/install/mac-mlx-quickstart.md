@@ -7,7 +7,7 @@
 
 At the end you'll have:
 
-- DepthFusion REST API on `127.0.0.1:7300` (27 MCP tools)
+- DepthFusion REST API on `127.0.0.1:7300` (29 MCP tools)
 - MLX-LM inference server on `127.0.0.1:8080` (Gemma 4 26B 4-bit by default)
 - Both services auto-start and auto-restart on crash via launchd
 - `depthfusion` registered as a **global** (user-level) MCP in Claude Code CLI
@@ -18,7 +18,7 @@ At the end you'll have:
 ## 0. Prerequisites
 
 ```bash
-# Python 3.11 or 3.12 recommended; 3.10 minimum.
+# Python 3.11 or later (3.11 minimum; 3.12 recommended).
 python3 --version
 
 # Homebrew (for git, if not already present)
@@ -233,7 +233,7 @@ launchctl list | grep depthfusion
 curl -s http://127.0.0.1:7300/health
 # → {"status":"ok"}
 
-# Confirm 27 tools are active
+# Confirm 29 tools are active
 curl -s http://127.0.0.1:7300/status | python3 -m json.tool | grep tool_count
 ```
 
@@ -413,5 +413,5 @@ The label inside the plist (`<key>Label</key>`) is what launchd uses — not the
 | Auto-restart | systemd `Restart=always` | launchd `KeepAlive=true` |
 | Mode env var | `vps-gpu` / `vps-cpu` | `mac-mlx` |
 | Port 8080 | vLLM REST | MLX-LM REST |
-| Tool count | 21 canonical tools (post-2026-05-25 parity audit) | 21 canonical tools (same as VPS; fabric tools removed from MCP surface) |
+| Tool count | 29 canonical tools | 29 canonical tools |
 | Redis / fabric | Optional but supported | Not required; HNSW + graph work without it |

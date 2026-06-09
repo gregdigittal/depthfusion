@@ -15,10 +15,10 @@ Write-Host "DepthFusion Installer"
 Write-Host "====================="
 
 # 1. Python version check
-try { $PyOut = & python --version 2>&1 } catch { Write-Error "python not found. Install Python 3.10+ from python.org."; exit 1 }
+try { $PyOut = & python --version 2>&1 } catch { Write-Error "python not found. Install Python 3.11+ from python.org."; exit 1 }
 if ($PyOut -match "Python (\d+)\.(\d+)") {
     $Major = [int]$Matches[1]; $Minor = [int]$Matches[2]
-    if ($Major -lt 3 -or ($Major -eq 3 -and $Minor -lt 10)) { Write-Error "Python 3.10+ required (found $PyOut)"; exit 1 }
+    if ($Major -lt 3 -or ($Major -eq 3 -and $Minor -lt 11)) { Write-Error "Python 3.11+ required (found $PyOut)"; exit 1 }
 }
 Write-Host "✓ $PyOut"
 
