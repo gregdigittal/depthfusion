@@ -109,12 +109,12 @@
   <div class="card">
     <div class="code-block">
       <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'pull')">Copy</button></div>
-      <div class="code-body" id="pull">cd ~/projects/depthfusion && git pull && uv sync</div>
+      <div class="code-body" id="pull">cd ~/projects/depthfusion && git pull && uv sync --extra mac-mlx</div>
     </div>
     <p>You'll see git output, then <code>uv</code> installing any new dependencies. When it finishes, you're running the latest code.</p>
     <div class="callout tip">
       <div class="callout-icon">ℹ️</div>
-      <div><code>uv sync</code> reads <code>pyproject.toml</code> and updates the <code>.venv</code> atomically — equivalent to <code>pip install -e .</code> but faster and locked.</div>
+      <div><code>uv sync --extra mac-mlx</code> reads <code>pyproject.toml</code> and updates the <code>.venv</code> with the full Mac MLX stack atomically — equivalent to <code>pip install -e ".[mac-mlx]"</code> but faster and locked. Omitting <code>--extra mac-mlx</code> strips MLX, torch, sentence-transformers, and ChromaDB from the environment.</div>
     </div>
   </div>
 
@@ -199,7 +199,7 @@ launchctl load  ~/Library/LaunchAgents/com.depthfusion.mlx-server.plist</div>
       <div class="code-block" style="margin:.5rem 0;">
         <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'uv-path')">Copy</button></div>
         <div class="code-body" id="uv-path">source $HOME/.local/bin/env 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
-cd ~/projects/depthfusion && git pull && uv sync</div>
+cd ~/projects/depthfusion && git pull && uv sync --extra mac-mlx</div>
       </div>
       <p>If that still fails, install uv: <code>curl -LsSf https://astral.sh/uv/install.sh | sh</code> then open a new Terminal window.</p>
     </div>
@@ -238,9 +238,9 @@ cd ~/projects/depthfusion && git pull && uv sync</div>
         <div class="code-body" id="rollback">cd ~/projects/depthfusion
 git log --oneline -5        # find the commit you want to go back to
 git checkout &lt;commit-hash&gt;  # replace with the hash from above
-uv sync</div>
+uv sync --extra mac-mlx</div>
       </div>
-      <p>Then restart services and Claude Desktop as in Steps 3 and 4. To return to the latest: <code>git checkout main && uv sync</code>.</p>
+      <p>Then restart services and Claude Desktop as in Steps 3 and 4. To return to the latest: <code>git checkout main && uv sync --extra mac-mlx</code>.</p>
     </div>
   </details>
 
