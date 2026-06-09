@@ -212,8 +212,8 @@ fi
     echo "DEPTHFUSION_HAIKU_ENABLED=true"
     echo "DEPTHFUSION_REST_API=true"
 } >> "$ENV_FILE"
-# Deduplicate (last value wins — use awk to keep last occurrence of each key)
-awk -F= '!seen[$1]++' <(tac "$ENV_FILE") | tac > "${ENV_FILE}.dedup"
+# Deduplicate (last value wins — two-pass awk; avoids tac which is Linux-only)
+awk -F= 'FNR==NR{last[$1]=NR; next} last[$1]==FNR' "$ENV_FILE" "$ENV_FILE" > "${ENV_FILE}.dedup"
 mv "${ENV_FILE}.dedup" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 success "API key and config written to $ENV_FILE"
