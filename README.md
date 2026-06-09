@@ -8,7 +8,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.3.0 (2026-06-06). 2000+ tests passing · 0 ruff · 0 mypy. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **26 canonical tools** (17 always-on, 9 feature-flagged; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v1.2.0 (2026-06-09). 2080+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ---
 
@@ -115,7 +115,7 @@ src/depthfusion/
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (26 canonical tools: 17 always-on, 9 feature-flagged)
+├── mcp/         — server (29 canonical tools: 17 always-on, 9 feature-flagged, 3 bridge)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -143,6 +143,11 @@ DepthFusion has three install modes. Pick the one matching your target:
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
 | `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [one-line installer](#mac-apple-silicon-standalone-installer) |
 
+**Idiot-proof HTML runbooks (open in any browser):**
+- **[docs/install/local-install.html](docs/install/local-install.html)** — single machine setup for Mac Apple Silicon and Windows/Intel Mac. Auto-detects your platform, copy buttons throughout.
+- **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)** — full VPS + Tailscale setup. Role-selector: admin (Ubuntu provisioning, systemd, firewall) or team member (Claude Desktop + Tailscale + connect command).
+- **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** — 4-step guide for non-technical team members connecting to an existing shared server.
+
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
 ### Standalone installers (recommended for new users)
@@ -169,15 +174,11 @@ Installs `local` mode with GPU detection: uses winget to install Git and Python 
 
 Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https://apps.microsoft.com/detail/9NBLGGH4NNS1) if missing).
 
-#### CEO / non-technical VPS connect runbook
+#### Team member / non-technical VPS connect runbook
 
-For team members who need to connect to the shared VPS memory hub without a local install:
+For team members who need to connect to the shared VPS memory hub without a local install, open **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** in any browser. 4 steps: install Claude Desktop, install Tailscale, run one `claude mcp add` command, verify with `depthfusion_status`. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
 
-```
-https://raw.githubusercontent.com/gregdigittal/depthfusion/main/docs/install/ceo-vps-connect.html
-```
-
-Download and open in any browser. Enter the VPS IP at the top — all commands update automatically. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
+For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
 
 **Upgrading to v1.3.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. New modules (`project_registry`, `project_context`, `project_ingest`, `research`) are auto-imported on first MCP tool call. To enable session-end project sync: follow **[docs/project-sync.md](docs/project-sync.md)**.
 
@@ -448,9 +449,9 @@ A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) 
 
 ---
 
-## MCP Tools (26 canonical)
+## MCP Tools (29 canonical)
 
-After the 2026-05-25 parity audit and the E-47 Project Context Intelligence additions, the MCP surface is exactly 26 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the parity audit; their underlying Python functions remain in the codebase. The canonical set:
+After E-48 (Multi-Provider Context Bridge), the MCP surface is 29 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; their underlying Python functions remain in the codebase. The canonical set:
 
 ### Core retrieval & capture (17 always-on)
 
@@ -473,6 +474,16 @@ After the 2026-05-25 parity audit and the E-47 Project Context Intelligence addi
 | `depthfusion_sync_project` | Sync a registered project's BACKLOG, CLAUDE.md, and git log to the DepthFusion KB | always |
 | `depthfusion_ingest_project` | Deep-ingest a project's source files (local or GitHub) into the KB. Modes: structural (key files only) or full | always |
 | `depthfusion_research_topic` | Research a topic via DuckDuckGo, arXiv, and GitHub; results saved to ~/.claude/shared/research/ and published to the KB | always |
+
+### Multi-provider context bridge (3 always-on, E-48)
+
+| Tool | Description | Required flag |
+|---|---|---|
+| `depthfusion_bridge` | Delegate a prompt to an external LLM (GPT-4o, Gemini, DeepSeek, etc.) via OpenRouter. Injects relevant recalled memories as context; stores the response back into shared memory. | always |
+| `depthfusion_ingest_conversation` | Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek export format. Stores assistant-turn fragments with provenance tagging so they become searchable via `recall_relevant`. | always |
+| `depthfusion_list_providers` | List configured bridge providers, their health status, and how many memories each has contributed. Returns immediately without a network call. | always |
+
+Requires `OPENROUTER_API_KEY` in `depthfusion.env` for bridge and ingest tools to be healthy. `list_providers` always works and reports which providers are configured.
 
 ### Feature-flagged (9 tools)
 
@@ -498,7 +509,7 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 
 For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
 
-The generated CLI (`depthfusion-pp-cli`) exposes all 26 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+The generated CLI (`depthfusion-pp-cli`) exposes all 29 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 
@@ -675,7 +686,7 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 ## Project status & roadmap
 
 - **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total).
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total).
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
