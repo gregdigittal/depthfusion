@@ -8,6 +8,14 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+constraints = [
+    { name = "mako", specifier = ">=1.3.12" },
+    { name = "markdown", specifier = ">=3.8.1" },
+    { name = "pygments", specifier = ">=2.20.0" },
+    { name = "pyjwt", specifier = ">=2.12.0" },
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.2"
