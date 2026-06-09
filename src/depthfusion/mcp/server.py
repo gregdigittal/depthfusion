@@ -16,6 +16,11 @@ from depthfusion.core.types import ContextItem
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
 from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
+from depthfusion.parsers import parse_conversation
+try:
+    from depthfusion.backends.openrouter import OpenRouterBackend
+except Exception:  # pragma: no cover — optional module in older environments
+    OpenRouterBackend = None
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +191,26 @@ TOOLS: dict[str, str] = {
         "sources (list[str], optional, default ['web','arxiv','github']). "
         "Response: {researched: bool, topic, saved_to, source_counts: {web, arxiv, github}}"
     ),
+    "depthfusion_bridge": (
+        "Delegate a prompt to an external LLM via OpenRouter with shared DepthFusion memory. "
+        "Recalls relevant context, sends to provider, stores response fragments. "
+        "Args: model (str, required) — OpenRouter model string e.g. openai/gpt-4o, "
+        "google/gemini-1.5-pro, deepseek/deepseek-chat; "
+        "prompt (str, required); context_tags (list[str], optional) — sub_scope filter. "
+        "Response: {response, model, memories_injected, fragments_stored}"
+    ),
+    "depthfusion_ingest_conversation": (
+        "Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek into DepthFusion memory. "
+        "Args: provider (str, required) — chatgpt|gemini|deepseek|generic; "
+        "data (str, required) — raw conversation export JSON or text. "
+        "Response: {fragments_stored, skipped, provider, errors}"
+    ),
+    "depthfusion_list_providers": (
+        "List configured bridge providers and their status. "
+        "Shows which providers are ready for depthfusion_bridge calls. "
+        "No arguments required. "
+        "Response: {providers: [{name, configured, healthy, memory_count}]}"
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -223,6 +248,9 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_ingest_project": None,
     # S-152 topic research
     "depthfusion_research_topic": None,
+    "depthfusion_bridge": None,
+    "depthfusion_ingest_conversation": None,
+    "depthfusion_list_providers": None,
 }
 
 
@@ -548,6 +576,36 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": ["session_id"],
     },
+    "depthfusion_bridge": {
+        "properties": {
+            "model": {"type": "string", "description": "OpenRouter model string e.g. openai/gpt-4o"},
+            "prompt": {"type": "string", "description": "The prompt to send to the provider"},
+            "context_tags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional sub_scope tags to filter recalled memories",
+            },
+        },
+        "required": ["model", "prompt"],
+    },
+    "depthfusion_ingest_conversation": {
+        "properties": {
+            "provider": {
+                "type": "string",
+                "enum": ["chatgpt", "gemini", "deepseek", "generic"],
+                "description": "Conversation export format",
+            },
+            "data": {
+                "type": "string",
+                "description": "Raw conversation export JSON or text",
+            },
+        },
+        "required": ["provider", "data"],
+    },
+    "depthfusion_list_providers": {
+        "properties": {},
+        "required": [],
+    },
 }
 
 
@@ -599,6 +657,148 @@ def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
             "isError": True,
             "content": [{"type": "text", "text": f"Tool error: {exc}"}],
         }
+
+
+def _tool_bridge(arguments: dict) -> str:
+    import hashlib
+    import json
+
+    if OpenRouterBackend is None:
+        return json.dumps({"error": "OPENROUTER_API_KEY not configured", "model": ""})
+
+    model = str(arguments.get("model", "openai/gpt-4o"))
+    prompt = str(arguments.get("prompt", ""))
+    if not prompt:
+        return json.dumps({"error": "prompt is required"})
+
+    context_tags = arguments.get("context_tags") or []
+    if isinstance(context_tags, str):
+        context_tags = [context_tags]
+    recall_args: dict = {"query": prompt, "top_k": 5}
+    if context_tags:
+        recall_args["sub_scope"] = context_tags[0] if len(context_tags) == 1 else context_tags
+
+    try:
+        recall_raw = _tool_recall(recall_args)
+        recall_data = json.loads(recall_raw)
+        blocks = recall_data.get("blocks", recall_data.get("results", []))
+    except Exception:
+        blocks = []
+
+    memory_ctx = "\n\n".join(
+        b.get("content", "") for b in blocks if b.get("content")
+    )
+    system = f"Relevant memory context:\n{memory_ctx}" if memory_ctx else None
+
+    backend = OpenRouterBackend(model=model)
+    if not backend.healthy():
+        return json.dumps({"error": "OPENROUTER_API_KEY not configured", "model": model})
+
+    try:
+        response = backend.complete(prompt, max_tokens=2048, system=system, model=model)
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "model": model})
+
+    fragments_stored = 0
+    try:
+        item_payload = {
+            "item_id": (
+                "bridge:"
+                + hashlib.sha256(
+                    f"{model}:{prompt}:{response}".encode("utf-8")
+                ).hexdigest()[:16]
+            ),
+            "content": f"[Bridge response from {model}]\nPrompt: {prompt}\n\nResponse: {response}",
+            "source_agent": "depthfusion_bridge",
+            "tags": ["bridge", f"provider:{model}"],
+            "metadata": {"sub_scope": f"provider:{model}"},
+        }
+        if context_tags:
+            item_payload["metadata"]["context_tags"] = context_tags
+        publish_args = {"item": item_payload}
+        _tool_publish_context(publish_args)
+        fragments_stored = 1
+    except Exception:
+        pass
+
+    return json.dumps({
+        "response": response,
+        "model": model,
+        "memories_injected": len(blocks),
+        "fragments_stored": fragments_stored,
+    })
+
+
+def _tool_ingest_conversation(arguments: dict) -> str:
+    import hashlib
+    import json
+
+    provider = str(arguments.get("provider", "generic"))
+    data = str(arguments.get("data", ""))
+    if not data:
+        return json.dumps({"error": "data is required", "provider": provider, "fragments_stored": 0, "skipped": 0})
+
+    try:
+        messages = parse_conversation(provider, data)
+    except Exception as exc:
+        return json.dumps({
+            "error": str(exc),
+            "provider": provider,
+            "fragments_stored": 0,
+            "skipped": 0,
+        })
+
+    fragments_stored = 0
+    skipped = 0
+    errors: list[str] = []
+    for index, msg in enumerate(messages):
+        if msg.get("role") not in ("assistant", "model"):
+            skipped += 1
+            continue
+        content = str(msg.get("content", "")).strip()
+        if len(content) < 20:
+            skipped += 1
+            continue
+        try:
+            item_payload = {
+                "item_id": (
+                    f"ingest:{provider}:{index}:"
+                    + hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
+                ),
+                "content": content,
+                "source_agent": "depthfusion_ingest_conversation",
+                "tags": [f"provider:{provider}:ingested"],
+                "metadata": {"sub_scope": f"provider:{provider}:ingested"},
+            }
+            publish_args = {"item": item_payload}
+            _tool_publish_context(publish_args)
+            fragments_stored += 1
+        except Exception as exc:
+            errors.append(str(exc))
+            skipped += 1
+    return json.dumps({
+        "fragments_stored": fragments_stored,
+        "skipped": skipped,
+        "provider": provider,
+        "errors": errors,
+    })
+
+
+def _tool_list_providers() -> str:
+    import json
+    import os
+
+    providers = []
+    key = os.environ.get("OPENROUTER_API_KEY")
+    backend = OpenRouterBackend() if key and OpenRouterBackend is not None else None
+    providers.append({
+        "name": "openrouter",
+        "configured": bool(key),
+        "healthy": backend.healthy() if backend else False,
+        "memory_count": 0,
+        "models": ["openai/gpt-4o", "google/gemini-1.5-pro", "deepseek/deepseek-chat"],
+    })
+    return json.dumps({"providers": providers})
 
 
 def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
@@ -655,6 +855,12 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
         return _tool_ingest_project(arguments)
     elif tool_name == "depthfusion_research_topic":
         return _tool_research_topic(arguments)
+    elif tool_name == "depthfusion_bridge":
+        return _tool_bridge(arguments)
+    elif tool_name == "depthfusion_ingest_conversation":
+        return _tool_ingest_conversation(arguments)
+    elif tool_name == "depthfusion_list_providers":
+        return _tool_list_providers()
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
