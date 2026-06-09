@@ -8,7 +8,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.2.0 (2026-06-09). 2080+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v1.2.0 (2026-06-09). 2151+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ---
 
@@ -180,8 +180,6 @@ For team members who need to connect to the shared VPS memory hub without a loca
 
 For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
 
-**Upgrading to v1.3.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. New modules (`project_registry`, `project_context`, `project_ingest`, `research`) are auto-imported on first MCP tool call. To enable session-end project sync: follow **[docs/project-sync.md](docs/project-sync.md)**.
-
 **Upgrading to v1.2.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. To enable HNSW: set `DEPTHFUSION_HNSW_ENABLED=true` in `~/.claude/depthfusion.env` and `pip install hnswlib>=0.7` into your venv. HNSW is fully optional — BM25-only recall remains the default.
 
 **Upgrading to v1.1.0?** → **[docs/install/upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md)** — covers E-44 (Windows installer, fcntl compat, CI matrix). Pull + reinstall, no schema changes.
@@ -193,7 +191,7 @@ For the full two-part guide that covers both server setup (admin) and client onb
 
 ### Prerequisites
 
-- Python ≥ 3.10 (3.10–3.13 supported; Ubuntu 24.04 ships 3.12 by default)
+- Python ≥ 3.11 (3.11–3.13 supported; Ubuntu 24.04 ships 3.12 by default)
 - `pip` ≥ 23.0
 - `git` (to clone)
 - A working `~/.claude/` directory (Claude Code installed and run at least once)
@@ -236,7 +234,7 @@ ls ~/.claude/depthfusion-metrics/          # should exist after first MCP call
 
 **Recommended:** use the [standalone one-line installer](#windows-standalone-installer) above — it handles all prerequisites automatically.
 
-Manual install (if you already have Git and Python 3.10+):
+Manual install (if you already have Git and Python 3.11+):
 
 ```powershell
 git clone https://github.com/gregdigittal/depthfusion.git $HOME\projects\depthfusion
@@ -550,7 +548,7 @@ Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.m
 
 ---
 
-## Project Context Intelligence (E-47, v1.3.0)
+## Project Context Intelligence (E-47, v1.2.0)
 
 Five new tools give agents the ability to register, sync, ingest, and research across multiple projects. Sessions can be seeded with a project's full BACKLOG and CLAUDE.md context automatically.
 
@@ -660,7 +658,7 @@ The `tests/conftest.py` autouse fixture redirects bare `MetricsCollector()` call
 
 ## Dependencies
 
-- **Python** ≥ 3.10 (3.10–3.13 supported)
+- **Python** ≥ 3.11 (3.11–3.13 supported)
 - `numpy` ≥ 1.24
 - `pyyaml` ≥ 6.0
 - `structlog` ≥ 24.0
