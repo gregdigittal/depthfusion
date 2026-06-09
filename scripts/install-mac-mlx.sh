@@ -227,24 +227,28 @@ echo "  Detected unified memory: ${MEM_GB} GB"
 echo ""
 
 if [[ "$MEM_GB" -ge 32 ]]; then
-    echo "  [1] Qwen2.5-32B-Instruct-4bit  (~20 GB download)  highest quality  ← recommended"
-    echo "  [2] Qwen2.5-14B-Instruct-4bit  (~9 GB)            balanced"
-    echo "  [3] gemma-3-12b-it-4bit        (~7 GB)            fast"
+    echo "  [1] gemma-4-26b-a4b-it-4bit     (~14 GB)  Gemma 4 MoE · 4B active  ← recommended"
+    echo "  [2] Qwen2.5-32B-Instruct-4bit   (~20 GB)  highest Qwen quality"
+    echo "  [3] Qwen2.5-14B-Instruct-4bit   (~9 GB)   balanced"
+    echo "  [4] gemma-3-12b-it-4bit         (~7 GB)   fast / low RAM"
+    echo ""
+    read -r -p "  Choose [1/2/3/4] or Enter for recommended: " CHOICE
+    case "${CHOICE:-1}" in
+        2) MODEL="mlx-community/Qwen2.5-32B-Instruct-4bit" ;;
+        3) MODEL="mlx-community/Qwen2.5-14B-Instruct-4bit" ;;
+        4) MODEL="mlx-community/gemma-3-12b-it-4bit" ;;
+        *) MODEL="mlx-community/gemma-4-26b-a4b-it-4bit" ;;
+    esac
+elif [[ "$MEM_GB" -ge 16 ]]; then
+    echo "  [1] gemma-4-26b-a4b-it-4bit     (~14 GB)  Gemma 4 MoE · 4B active  ← recommended"
+    echo "  [2] Qwen2.5-14B-Instruct-4bit   (~9 GB)   balanced"
+    echo "  [3] gemma-3-12b-it-4bit         (~7 GB)   fast / low RAM"
     echo ""
     read -r -p "  Choose [1/2/3] or Enter for recommended: " CHOICE
     case "${CHOICE:-1}" in
         2) MODEL="mlx-community/Qwen2.5-14B-Instruct-4bit" ;;
         3) MODEL="mlx-community/gemma-3-12b-it-4bit" ;;
-        *) MODEL="mlx-community/Qwen2.5-32B-Instruct-4bit" ;;
-    esac
-elif [[ "$MEM_GB" -ge 16 ]]; then
-    echo "  [1] Qwen2.5-14B-Instruct-4bit  (~9 GB)            balanced  ← recommended"
-    echo "  [2] gemma-3-12b-it-4bit        (~7 GB)            fast"
-    echo ""
-    read -r -p "  Choose [1/2] or Enter for recommended: " CHOICE
-    case "${CHOICE:-1}" in
-        2) MODEL="mlx-community/gemma-3-12b-it-4bit" ;;
-        *) MODEL="mlx-community/Qwen2.5-14B-Instruct-4bit" ;;
+        *) MODEL="mlx-community/gemma-4-26b-a4b-it-4bit" ;;
     esac
 else
     echo "  gemma-3-12b-it-4bit  (~7 GB)  ← only option for <16 GB"
@@ -472,7 +476,7 @@ success "Claude Desktop registered ($DESKTOP_CONFIG)"
 # Claude Code CLI registration (optional — may not be installed)
 if command -v claude &>/dev/null; then
     claude mcp remove depthfusion -s user 2>/dev/null || true
-    claude mcp add depthfusion --scope user "$VENV_PYTHON" -m depthfusion.mcp.server
+    claude mcp add depthfusion --scope user -- "$VENV_PYTHON" -m depthfusion.mcp.server
     success "Claude Code CLI registered (user-scoped MCP)"
 else
     warn "Claude Code CLI not found — skipping CLI registration (Claude Desktop is registered)."
