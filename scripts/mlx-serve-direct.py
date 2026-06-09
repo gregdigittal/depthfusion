@@ -147,7 +147,20 @@ class Handler(BaseHTTPRequestHandler):
 # Serve
 # ---------------------------------------------------------------------------
 
+import socket as _socket
+
+
+class _Server(HTTPServer):
+    # Explicitly set SO_REUSEADDR so launchd restarts don't hit EADDRINUSE
+    # while the OS is still draining TIME_WAIT from the previous instance.
+    allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
+
 try:
-    HTTPServer((args.host, args.port), Handler).serve_forever()
+    _Server((args.host, args.port), Handler).serve_forever()
 except KeyboardInterrupt:
     print("\n[mlx-serve] stopped.")
