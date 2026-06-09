@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "depthfusion"
-version = "1.2.0"
+version = "1.2.1"
 description = "Depth-aware memory fusion for Claude Code — Cognitive Infrastructure Layer with event-sourced memory, typed memories, cognitive scoring, contradiction detection, and explainable retrieval"
 requires-python = ">=3.11"
 license = "MIT"
