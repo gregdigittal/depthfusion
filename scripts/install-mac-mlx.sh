@@ -12,7 +12,7 @@
 #   1. Verifies Apple Silicon (arm64) and macOS 13+
 #   2. Installs Xcode Command Line Tools if missing
 #   3. Installs Homebrew if missing
-#   4. Installs Python 3.12 via Homebrew if < 3.10 found
+#   4. Installs Python 3.12 via Homebrew if < 3.11 found
 #   5. Clones the DepthFusion repo (or updates it if already present)
 #   6. Creates a dedicated venv at ~/.depthfusion-venv
 #   7. Installs the mac-mlx extras (mlx-lm, sentence-transformers, chromadb, …)
@@ -98,15 +98,15 @@ command -v brew &>/dev/null || die "Homebrew not found after install — open a 
 success "Homebrew $(brew --version | head -1 | awk '{print $2}')"
 
 # =============================================================================
-# STEP 4 — Python 3.10+
+# STEP 4 — Python 3.11+
 # =============================================================================
 PYTHON_BIN=""
-for candidate in python3.12 python3.11 python3.10 python3; do
+for candidate in python3.12 python3.11 python3; do
     if command -v "$candidate" &>/dev/null; then
         ver=$("$candidate" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
         major=$(echo "$ver" | cut -d. -f1)
         minor=$(echo "$ver" | cut -d. -f2)
-        if [[ "$major" -gt 3 ]] || { [[ "$major" -eq 3 ]] && [[ "$minor" -ge 10 ]]; }; then
+        if [[ "$major" -gt 3 ]] || { [[ "$major" -eq 3 ]] && [[ "$minor" -ge 11 ]]; }; then
             PYTHON_BIN=$(command -v "$candidate")
             PYTHON_VER="$ver"
             break
@@ -115,7 +115,7 @@ for candidate in python3.12 python3.11 python3.10 python3; do
 done
 
 if [[ -z "$PYTHON_BIN" ]]; then
-    info "Python 3.10+ not found — installing Python 3.12 via Homebrew …"
+    info "Python 3.11+ not found — installing Python 3.12 via Homebrew …"
     brew install python@3.12
     PYTHON_BIN="$(brew --prefix)/bin/python3.12"
     PYTHON_VER="$("$PYTHON_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")"

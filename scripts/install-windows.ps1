@@ -10,7 +10,7 @@
 #   1. Verifies Windows 10/11 (64-bit) and PowerShell 5.1+
 #   2. Sets ExecutionPolicy to RemoteSigned for this user
 #   3. Installs Git via winget if missing
-#   4. Installs Python 3.12 via winget if Python 3.10+ not present
+#   4. Installs Python 3.12 via winget if Python 3.11+ not present
 #   5. Clones the DepthFusion repo (or updates it if already present)
 #   6. Creates a dedicated venv at %USERPROFILE%\.depthfusion-venv
 #   7. Detects NVIDIA GPU — installs CUDA-enabled PyTorch if found
@@ -127,20 +127,20 @@ if (-not $GitBin) {
 Write-Ok "Git: $GitBin"
 
 # =============================================================================
-# STEP 5 — Python 3.10+
+# STEP 5 — Python 3.11+
 # =============================================================================
-Write-Step "Checking Python 3.10+..."
+Write-Step "Checking Python 3.11+..."
 $PythonBin = ""
 $PythonVer  = ""
 
-foreach ($candidate in @("python3.12", "python3.11", "python3.10", "python3", "python")) {
+foreach ($candidate in @("python3.12", "python3.11", "python3", "python")) {
     try {
         $bin = (Get-Command $candidate -ErrorAction SilentlyContinue).Source
         if (-not $bin) { continue }
         $verOut = & $bin -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
         if ($verOut -match "^(\d+)\.(\d+)$") {
             $major = [int]$Matches[1]; $minor = [int]$Matches[2]
-            if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 10)) {
+            if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 11)) {
                 $PythonBin = $bin; $PythonVer = $verOut; break
             }
         }
@@ -148,7 +148,7 @@ foreach ($candidate in @("python3.12", "python3.11", "python3.10", "python3", "p
 }
 
 if (-not $PythonBin) {
-    Write-Step "Python 3.10+ not found — installing Python 3.12 via winget..."
+    Write-Step "Python 3.11+ not found — installing Python 3.12 via winget..."
     winget install --id Python.Python.3.12 -e --accept-package-agreements --accept-source-agreements
     $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
                 [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
