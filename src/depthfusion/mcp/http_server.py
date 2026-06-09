@@ -19,7 +19,10 @@ import json
 import logging
 import os
 import uuid
+from importlib.metadata import version as _pkg_version
 from typing import AsyncGenerator, Optional
+
+_VERSION = _pkg_version("depthfusion")
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -30,7 +33,7 @@ from depthfusion.mcp.server import _process_request
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DepthFusion MCP HTTP/SSE", version="1.0.0")
+app = FastAPI(title="DepthFusion MCP HTTP/SSE", version=_VERSION)
 
 _MCP_SESSIONS: dict[str, asyncio.Queue] = {}
 
@@ -70,7 +73,7 @@ def _check_mcp_auth(authorization: Optional[str] = Header(default=None)) -> None
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "transport": "sse", "version": "1.0.0"}
+    return {"status": "ok", "transport": "sse", "version": _VERSION}
 
 
 @app.get("/sse")
