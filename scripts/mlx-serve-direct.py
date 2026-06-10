@@ -102,15 +102,18 @@ class Handler(BaseHTTPRequestHandler):
                 prompt = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
 
             # Generate (main thread — Metal-safe)
-            # temp renamed to temperature in mlx_lm 0.31.x
-            response_text = mlx_lm.generate(
-                model,
-                tokenizer,
-                prompt=prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                verbose=True,
-            )
+            # mlx_lm API: temperature kwarg removed in 0.21+; use sampler instead.
+            import inspect as _inspect
+            _gen_kwargs: dict = dict(max_tokens=max_tokens, verbose=True)
+            if "temperature" in _inspect.signature(mlx_lm.generate).parameters:
+                _gen_kwargs["temperature"] = temperature
+            else:
+                try:
+                    from mlx_lm.sample_utils import make_sampler as _make_sampler
+                except ImportError:
+                    from mlx_lm.utils import make_sampler as _make_sampler  # type: ignore[no-redef]
+                _gen_kwargs["sampler"] = _make_sampler(temp=temperature)
+            response_text = mlx_lm.generate(model, tokenizer, prompt=prompt, **_gen_kwargs)
 
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
