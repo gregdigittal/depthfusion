@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import depthfusion.mcp.server as server
+import depthfusion.mcp.tools.bridge as _bridge_module
 
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "chatgpt-sample.json"
@@ -79,11 +80,12 @@ class TestBridge:
 
     def test_bridge_calls_openrouter_and_stores_fragment(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-        monkeypatch.setattr(server, "OpenRouterBackend", _fake_backend_factory(response="bridge reply"))
-        monkeypatch.setattr(server, "_tool_recall", lambda arguments: json.dumps({"blocks": [{"content": "recalled memory"}]}))
+        # After server.py split, patch at the module where _tool_bridge looks up these names.
+        monkeypatch.setattr(_bridge_module, "OpenRouterBackend", _fake_backend_factory(response="bridge reply"))
+        monkeypatch.setattr(_bridge_module, "_tool_recall", lambda arguments: json.dumps({"blocks": [{"content": "recalled memory"}]}))
 
         publish_mock = MagicMock(return_value=json.dumps({"ok": True}))
-        monkeypatch.setattr(server, "_tool_publish_context", publish_mock)
+        monkeypatch.setattr(_bridge_module, "_tool_publish_context", publish_mock)
 
         body = _loads(
             server._tool_bridge(
@@ -113,7 +115,7 @@ class TestBridge:
             def complete(self, prompt: str, *, max_tokens: int, system: str | None = None, model: str | None = None) -> str:
                 raise RuntimeError("network failure")
 
-        monkeypatch.setattr(server, "OpenRouterBackend", _ErrorBackend)
+        monkeypatch.setattr(_bridge_module, "OpenRouterBackend", _ErrorBackend)
 
         body = _loads(server._tool_bridge({"model": "openai/gpt-4o", "prompt": "hello"}))
 
