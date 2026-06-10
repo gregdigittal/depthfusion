@@ -5,20 +5,23 @@ export const meta = {
   phases: [{ title: 'Tickets' }, { title: 'Green' }],
 }
 
+// args may arrive as a JSON string depending on Workflow runtime version — normalise.
+const a = typeof args === 'string' ? JSON.parse(args) : (args || {})
+
 phase('Tickets')
 const done = new Set()
 const results = []
-let remaining = [...args.tickets]
+let remaining = [...a.tickets]
 
 while (remaining.length) {
   const wave = remaining.filter(t => (t.dependsOn || []).every(d => done.has(d)))
   if (!wave.length) throw new Error('dependency cycle among: ' + remaining.map(t => t.ticketId).join(', '))
-  log(`lane ${args.lane}: wave of ${wave.length} ticket(s): ${wave.map(t => t.ticketId).join(', ')}`)
+  log(`lane ${a.lane}: wave of ${wave.length} ticket(s): ${wave.map(t => t.ticketId).join(', ')}`)
 
   const waveResults = await parallel(wave.map(t => () =>
     workflow('v2-consensus-ticket', {
       ticketId: t.ticketId, spec: t.spec, workClass: t.workClass,
-      worktree: args.worktree, baseRef: args.baseRef, tiebreakModel: args.tiebreakModel,
+      worktree: a.worktree, baseRef: a.baseRef, tiebreakModel: a.tiebreakModel,
     })))
 
   for (let i = 0; i < wave.length; i++) {
@@ -27,18 +30,18 @@ while (remaining.length) {
     // splits and failures do NOT unblock dependents — the lane continues with
     // whatever is still unblocked (consensus protocol: ticket halts, lane doesn't)
     if (r.status === 'approved' || r.status === 'approved-after-rebuttal') done.add(wave[i].ticketId)
-    else log(`lane ${args.lane}: ${wave[i].ticketId} → ${r.status} (held for adjudication; dependents stay blocked)`)
+    else log(`lane ${a.lane}: ${wave[i].ticketId} → ${r.status} (held for adjudication; dependents stay blocked)`)
   }
   remaining = remaining.filter(t => !wave.find(w => w.ticketId === t.ticketId))
 }
 
 phase('Green')
-const green = await workflow('v2-test-green-loop', { worktree: args.worktree, maxAttempts: 3 })
+const green = await workflow('v2-test-green-loop', { worktree: a.worktree, maxAttempts: 3 })
 
 const splits = results.filter(r => r.status === 'split')
 const failed = results.filter(r => !['approved', 'approved-after-rebuttal', 'split'].includes(r.status))
 return {
-  lane: args.lane,
+  lane: a.lane,
   approved: results.filter(r => r.status.startsWith('approved')).map(r => r.ticket),
   splits,          // → Fable-5 adjudication
   failed,          // → Fable-5 triage

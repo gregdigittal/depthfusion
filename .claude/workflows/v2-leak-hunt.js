@@ -36,7 +36,10 @@ const FINDERS = [
   { key: 'probe-sse', prompt: w => `Fabric/SSE probe. Subscribe to /v1/events/stream and /v1/events/seed as the outsider while owner-scoped events publish. Findings = any event payload or seed bundle item the outsider's ACL does not allow.` },
 ]
 
-const maxDry = args.maxDryRounds || 2
+// args may arrive as a JSON string depending on Workflow runtime version — normalise.
+const a = typeof args === 'string' ? JSON.parse(args) : (args || {})
+
+const maxDry = a.maxDryRounds || 2
 const seen = new Set(), confirmed = []
 const key = f => `${f.surface}:${f.path}:${f.claim.slice(0, 80)}`
 let dry = 0, round = 0
@@ -46,7 +49,7 @@ while (dry < maxDry) {
   phase('Find')
   log(`leak-hunt round ${round} (dry streak ${dry}/${maxDry}, confirmed so far: ${confirmed.length})`)
   const found = (await parallel(FINDERS.map(f => () =>
-    agent(f.prompt(args) + '\nReturn structured findings only — no prose. Empty array if nothing found.',
+    agent(f.prompt(a) + '\nReturn structured findings only — no prose. Empty array if nothing found.',
       { schema: FINDINGS, phase: 'Find', label: `find:${f.key}#${round}` }))))
     .filter(Boolean).flatMap(r => r.findings)
 
