@@ -76,13 +76,13 @@ These are measured on the harness and goldset; the CIQS *quality* projections ab
 <table align="center" style="border-collapse:separate;border-spacing:0;width:100%;max-width:980px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(27,31,36,0.12);">
   <thead>
     <tr>
-      <th align="left" style="padding:13px 16px;background:linear-gradient(90deg,#4f46e5 0%,#7c3aed 50%,#9333ea 100%);color:#ffffff;font-weight:700;border:none;letter-spacing:0.2px;">Feature</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#4338ca 0%,#6d28d9 100%);color:#ffffff;font-weight:800;border:none;border-left:2px solid rgba(255,255,255,0.25);">DepthFusion</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Vanilla&nbsp;CC</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Continue.dev</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Cursor</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Copilot</th>
-      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">RAG&nbsp;Plugin</th>
+      <th align="left" style="padding:13px 16px;background-color:#4f46e5;color:#ffffff;font-weight:700;border:none;letter-spacing:0.2px;">Feature</th>
+      <th align="center" style="padding:13px 10px;background-color:#4338ca;color:#ffffff;font-weight:800;border:none;border-left:2px solid rgba(255,255,255,0.25);">DepthFusion</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Vanilla&nbsp;CC</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Continue.dev</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Cursor</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Copilot</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">RAG&nbsp;Plugin</th>
     </tr>
   </thead>
   <tbody>
