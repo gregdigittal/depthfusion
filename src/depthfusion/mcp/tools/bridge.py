@@ -13,7 +13,6 @@ from typing import Any
 
 from depthfusion.capture.event_hook import emit_if_high_importance
 from depthfusion.core.types import ContextItem
-from depthfusion.parsers import parse_conversation
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
 from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
@@ -97,74 +96,4 @@ def _tool_bridge(arguments: dict) -> str:
         "memories_injected": len(blocks),
         "fragments_stored": fragments_stored,
     })
-
-def _tool_ingest_conversation(arguments: dict) -> str:
-    import hashlib
-    import json
-
-    provider = str(arguments.get("provider", "generic"))
-    data = str(arguments.get("data", ""))
-    if not data:
-        return json.dumps({"error": "data is required", "provider": provider, "fragments_stored": 0, "skipped": 0})
-
-    try:
-        messages = parse_conversation(provider, data)
-    except Exception as exc:
-        return json.dumps({
-            "error": str(exc),
-            "provider": provider,
-            "fragments_stored": 0,
-            "skipped": 0,
-        })
-
-    fragments_stored = 0
-    skipped = 0
-    errors: list[str] = []
-    for index, msg in enumerate(messages):
-        if msg.get("role") not in ("assistant", "model"):
-            skipped += 1
-            continue
-        content = str(msg.get("content", "")).strip()
-        if len(content) < 20:
-            skipped += 1
-            continue
-        try:
-            item_payload = {
-                "item_id": (
-                    f"ingest:{provider}:{index}:"
-                    + hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
-                ),
-                "content": content,
-                "source_agent": "depthfusion_ingest_conversation",
-                "tags": [f"provider:{provider}:ingested"],
-                "metadata": {"sub_scope": f"provider:{provider}:ingested"},
-            }
-            publish_args = {"item": item_payload}
-            _tool_publish_context(publish_args)
-            fragments_stored += 1
-        except Exception as exc:
-            errors.append(str(exc))
-            skipped += 1
-    return json.dumps({
-        "fragments_stored": fragments_stored,
-        "skipped": skipped,
-        "provider": provider,
-        "errors": errors,
-    })
-
-def _tool_list_providers() -> str:
-    import json
-    import os
-
-    providers = []
-    key = os.environ.get("OPENROUTER_API_KEY")
-    backend = OpenRouterBackend() if key and OpenRouterBackend is not None else None
-    providers.append({
-        "name": "openrouter",
-        "configured": bool(key),
-        "healthy": backend.healthy() if backend else False,
-        "memory_count": 0,
-        "models": ["openai/gpt-4o", "google/gemini-1.5-pro", "deepseek/deepseek-chat"],
-    })
-    return json.dumps({"providers": providers})
 
