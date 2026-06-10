@@ -1,3 +1,4 @@
+<!-- G0-AC3: provider conformance evidence -->
 # T-539 — Five-Provider Smoke Test Results
 
 **Date:** 2026-06-10  
