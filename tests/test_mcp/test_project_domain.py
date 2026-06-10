@@ -16,6 +16,7 @@ from depthfusion.mcp.tools.project import (
     _tool_ingest_project,
     _tool_list_projects,
     _tool_register_project,
+    _tool_session_seed,
     _tool_sync_project,
     register_project,
 )
@@ -230,3 +231,35 @@ def test_ingest_project_exception():
 def test_register_project_callable():
     """Lines 260-262: stub must not raise."""
     register_project()
+
+
+# ── _tool_session_seed early returns ─────────────────────────────────────────
+
+def test_session_seed_empty_session_id():
+    """Lines 139-141, 177-181, 183-187: empty session_id → immediate error JSON.
+
+    Covers the leading setup lines (139-181) plus the early-exit branch.
+    project_slug absent so the project-context block (142-175) is skipped.
+    """
+    result = _tool_session_seed({"session_id": ""})
+    data = json.loads(result)
+    assert data["error"] == "session_id required"
+    assert data["published"] == 0
+    assert "project_slug" not in data
+
+
+def test_session_seed_empty_session_id_with_project_slug():
+    """Lines 185-186: project_slug present in early-exit result."""
+    result = _tool_session_seed({"session_id": "", "project_slug": "my-proj"})
+    data = json.loads(result)
+    assert data["error"] == "session_id required"
+    assert data["project_slug"] == "my-proj"
+
+
+def test_session_seed_fabric_mode_no_projects():
+    """Lines 189-194: fabric_seed mode with no projects list → error JSON."""
+    result = _tool_session_seed({"session_id": "s1", "mode": "fabric_seed"})
+    data = json.loads(result)
+    assert "error" in data
+    assert "projects" in data["error"]
+    assert data["session_id"] == "s1"
