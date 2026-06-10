@@ -53,6 +53,7 @@ dmypy.json
 # Local tooling — Claude Code, agent-hub, Codex
 .claude/*
 !.claude/workflows/
+!.claude/v2-routing.yaml
 .pm/
 .rollback/
 .codex

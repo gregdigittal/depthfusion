@@ -6,7 +6,7 @@ set -euo pipefail
 GIT_RANGE="${1?git range required}"
 CHECKLIST="${3:-correctness,security,conventions,test coverage}"
 
-DIFF=$(git diff "$GIT_RANGE" 2>/dev/null || git show "$GIT_RANGE" 2>/dev/null)
+DIFF=$(git diff "$GIT_RANGE" 2>/dev/null || git show "$GIT_RANGE" 2>/dev/null || true)
 if [[ -z "$DIFF" ]]; then
   echo '{"reviewer":"gemini","verdict":"approve","findings":[],"note":"empty diff"}'
   exit 0

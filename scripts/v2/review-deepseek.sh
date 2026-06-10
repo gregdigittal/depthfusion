@@ -8,7 +8,7 @@ GIT_RANGE="${1?git range required (e.g. HEAD~1..HEAD)}"
 CHECKLIST="${3:-correctness,security,conventions,test coverage}"
 
 # Get the diff
-DIFF=$(git diff "$GIT_RANGE" 2>/dev/null || git show "$GIT_RANGE" 2>/dev/null)
+DIFF=$(git diff "$GIT_RANGE" 2>/dev/null || git show "$GIT_RANGE" 2>/dev/null || true)
 if [[ -z "$DIFF" ]]; then
   echo '{"reviewer":"deepseek","verdict":"approve","findings":[],"note":"empty diff"}'
   exit 0
