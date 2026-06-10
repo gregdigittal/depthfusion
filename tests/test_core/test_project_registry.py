@@ -1,7 +1,17 @@
 """Coverage for depthfusion.core.project_registry (lines 26-59).
 
-Uses the REAL ProjectRegistry with a tmp_path so every method body is executed
-rather than bypassed by mocking. All 22 previously-missed statements are hit.
+Why we use a real ProjectRegistry with tmp_path rather than mocking:
+  Mocking would allow test code to bypass the actual method implementations,
+  leaving dead code and logic errors undetected. By using the REAL ProjectRegistry
+  with a tmp_path fixture for file I/O, every method body executes in its true
+  state, catching bugs that mocks would hide. This is especially critical for
+  file persistence and state management code.
+
+Invariant being protected:
+  All 22 previously-missed statements in the ProjectRegistry implementation are
+  now hit. This module-level docstring serves as the canonical reference for
+  coverage status. Each test function is annotated with the specific line numbers
+  it covers; together they form a complete coverage audit of the target module.
 """
 from __future__ import annotations
 
