@@ -51,7 +51,8 @@ dmypy.json
 .worktrees/
 
 # Local tooling — Claude Code, agent-hub, Codex
-.claude/
+.claude/*
+!.claude/workflows/
 .pm/
 .rollback/
 .codex
