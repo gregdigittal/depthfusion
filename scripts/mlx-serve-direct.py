@@ -115,10 +115,24 @@ class Handler(BaseHTTPRequestHandler):
                 _gen_kwargs["sampler"] = _make_sampler(temp=temperature)
             response_text = mlx_lm.generate(model, tokenizer, prompt=prompt, **_gen_kwargs)
 
-            # Strip Gemma 4 thinking block (<|channel>thought ... \n\n) from response.
-            # The thinking section precedes the actual answer; callers only need the answer.
-            import re as _re
-            response_text = _re.sub(r"<\|channel>thought.*?(?:\n\n|\Z)", "", response_text, flags=_re.DOTALL).strip()
+            # Gemma 4 emits chain-of-thought inside a <|channel>thought block.
+            # Strip it and return only the final clean answer.
+            if "<|channel>thought" in response_text:
+                # Drop the thinking section entirely; the final answer follows after it.
+                # The model emits <|channel>response (or just text) after thinking ends.
+                if "<|channel>response" in response_text:
+                    response_text = response_text.split("<|channel>response", 1)[-1].strip()
+                else:
+                    # No explicit end marker: take the last non-bullet paragraph as the answer.
+                    after = response_text.split("<|channel>thought", 1)[-1]
+                    paragraphs = [p.strip() for p in after.split("\n\n") if p.strip()]
+                    # Walk from the end; pick the first paragraph that reads like a sentence.
+                    for para in reversed(paragraphs):
+                        if not para.lstrip().startswith(("*", "-", "#")):
+                            response_text = para
+                            break
+                    else:
+                        response_text = paragraphs[-1] if paragraphs else after.strip()
 
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
