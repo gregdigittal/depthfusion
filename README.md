@@ -8,7 +8,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.2.1 (2026-06-09). 2151+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v1.2.2 (2026-06-10). 2151+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ---
 
@@ -64,7 +64,7 @@ mac-mlx mode (Apple Silicon, unified memory):
   query → BM25 (top-10) + local embeddings → RRF fusion → Gemma/Qwen reranker → top-k
   Uses mlx_lm.server (OpenAI-compatible) on port 8000.
   Same quality chain as vps-gpu; haiku fallback when mlx_lm.server is not running.
-  Model options: gemma-3-12b (~7 GB), Qwen2.5-14B (~9 GB), Qwen2.5-32B (~20 GB).
+  Model options: gemma-4-26b-a4b-it-4bit (~14 GB, recommended ≥16 GB), Qwen2.5-14B (~9 GB), Qwen2.5-32B (~20 GB), gemma-3-12b (~7 GB).
 
 Auto-capture (vps-cpu / vps-gpu):
   PreCompact hook  → snapshot active state
@@ -160,7 +160,7 @@ Self-contained scripts that bootstrap all prerequisites — Homebrew, Python, Gi
 curl -fsSL https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-mac-mlx.sh | bash
 ```
 
-Installs `mac-mlx` mode: bootstraps Homebrew + Python 3.12, clones the repo, installs all dependencies, selects an MLX model based on your RAM (8/16/32 GB tiers), downloads it, creates two launchd services that auto-start at login (MLX inference on port 8000, REST/MCP on port 7300), and registers with Claude Desktop and Claude Code CLI.
+Installs `mac-mlx` mode: bootstraps Homebrew + Python 3.12, clones the repo, installs all dependencies, selects an MLX model based on your RAM (Gemma 4 26B recommended for ≥16 GB; Qwen2.5-14B or gemma-3-12b for tighter RAM), downloads it, creates two launchd services that auto-start at login (MLX inference on port 8000, REST/MCP on port 7300), and registers with Claude Desktop and Claude Code CLI.
 
 Requirements: Apple Silicon (M1/M2/M3/M4) · macOS 13+ · 8 GB unified memory minimum.
 
@@ -179,6 +179,8 @@ Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https:
 For team members who need to connect to the shared VPS memory hub without a local install, open **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** in any browser. 4 steps: install Claude Desktop, install Tailscale, run one `claude mcp add` command, verify with `depthfusion_status`. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
 
 For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
+
+**Upgrading to v1.2.2?** Pull + re-run the installer (or just `git pull` on your dev checkout). Patch release only: Gemma 4 26B (`mlx-community/gemma-4-26b-a4b-it-4bit`) is now the recommended MLX model for ≥16 GB unified memory; the installer menu reflects this. MLX server now sets `SO_REUSEADDR` explicitly so launchd restarts no longer hit `EADDRINUSE` on macOS. Fixed `claude mcp add` argument parsing (`--` flag prevents `-m` from being consumed by the Claude CLI). No dep or schema changes.
 
 **Upgrading to v1.2.1?** Pull + re-run the installer (or just `git pull` on your dev checkout). Patch release only: the macOS standalone installer now correctly writes launchd plists (`tac` is Linux-only; fixed with portable awk). Also ensures `uv sync --extra mac-mlx` is documented throughout the local update guide so mac-mlx dependencies are never accidentally stripped. No dep or schema changes.
 
@@ -686,7 +688,7 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 ## Project status & roadmap
 
 - **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide.
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide. v1.2.2 patch: Gemma 4 26B added as recommended MLX model for ≥16 GB; `SO_REUSEADDR` fix in `mlx-serve-direct.py` prevents `EADDRINUSE` on launchd restarts; `claude mcp add` `--` flag fix.
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
