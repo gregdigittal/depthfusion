@@ -14,7 +14,9 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 ## Performance Impact
 
-DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude Code Information-retrieval Quality Score) suite. Categories: **A** = retrieval precision, **D** = continuity (cross-session memory). Higher is better; vanilla Claude Code baseline is ~76.5.
+DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude Code Information-retrieval Quality Score) suite. Categories: **A** = retrieval precision, **B** = lexical scoring monotonicity, **C** = output identity / T-121 gate, **D** = continuity (cross-session memory). Higher is better; vanilla Claude Code baseline is ~76.5.
+
+> **How to read this section.** The numbers below come from three *different* measurements that are easy to conflate, so we keep them apart deliberately: (1) the **CIQS quality suite** (retrieval quality vs. baseline), (2) **real-session recall latency** (what users actually feel, end-to-end through the MCP path), and (3) the **BM25 core micro-benchmark** (the isolated lexical ranking kernel). The headline credibility claim is the **regression-suite health** — not any single precision figure.
 
 ### Measured (live data)
 
@@ -24,6 +26,22 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 | v0.2.0 local | ~83–85 | BM25 + block chunking | 42% | <50 ms | Manual `/learn` required |
 | v0.3.0 local | ~85 | BM25 (unchanged) | 42% | <50 ms | Zero new deps |
 | v0.6.0a1+ recall (real sessions, 2026-05-07) | not benchmarked | not benchmarked | not benchmarked | **37–372 ms** (n=4 events) | Production-path validated post-S-79 |
+
+The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall latency** — the full MCP path: corpus load from disk, HNSW vector search, RRF fusion, the ~15 ms CognitiveScorer pass, and MCP transport. This is the latency users actually experience. The sub-millisecond figure in the micro-benchmark below is the BM25 ranking kernel **only** and is not comparable.
+
+#### BM25 core micro-benchmark (`scripts/benchmark.py`, n=8 goldset, local — v1.2.2)
+
+| Metric | Value | Scope |
+|---|---|---|
+| precision@1 | 1.000 | per-query micro-corpus |
+| precision@5 | 1.000 | per-query micro-corpus |
+| hit_rate@5 | 1.000 | per-query micro-corpus |
+| p50 latency | 0.043 ms | ranking kernel only |
+| p95 latency | 0.135 ms | ranking kernel only |
+| fallback_rate | 0.0 | local BM25, no API |
+| cost_estimate | $0.00 | local BM25, no API |
+
+<sub>Run 2026-06-10 (`git 95832cd`, mode=local, top_k=5, 8 queries). Isolated lexical ranking over per-query micro-corpora (3–N docs each); for every query, a fresh in-memory BM25 index is built over only that query's tiny corpus and the top-k is ranked. p99 (≈0.12 ms) is interpolated from 8 points and is **estimated**. This is a **regression sentinel** — it proves the lexical core still perfectly separates relevant from distractor chunks on a hand-curated set. It is **not** a production-quality measure (the goldset is too small and too easy — at n=8 with perfect scores there is no discriminating power left) and **not** an end-to-end-latency measure (it excludes corpus loading, vector search, fusion, cognitive scoring, and MCP transport, which is why it reads ~1000× faster than the real-session range above).</sub>
 
 ### Estimated (projection)
 
@@ -38,6 +56,147 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 - **Contradiction prevention** — ContradictionEngine catches conflicting advice across sessions; estimated 40% reduction in contradictory guidance delivered to Claude
 - **Token efficiency** — cognitive pre-filtering reduces irrelevant context surfaced per session; estimated 15–25% reduction in context tokens consumed at scale
 - **8-component scoring overhead** — CognitiveScorer adds ~15 ms vs RRF-only; well within the 1500 ms p95 budget
+
+### Benchmark suite health (v1.2.2, current)
+
+The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v1.2.2 (`git 95832cd`):
+
+- **2151 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
+  - **Cat A** — retrieval precision, no-regression sentinel
+  - **Cat B** — BM25 score monotonicity + source-weight tier ordering
+  - **Cat C** — output identity passes the T-121 gate
+  - **Cat D** — fallback returns all available blocks + block-schema integrity
+- **Weighted fusion vs. RRF** — over 50 queries, weighted fusion wins 45, RRF wins 2, 3 ties → **90.0% win rate** (threshold 70%), confirming the fusion strategy substantially outperforms plain RRF.
+
+These are measured on the harness and goldset; the CIQS *quality* projections above remain estimated until re-measured against a live multi-thousand-session corpus and eval set (tracked as E-26 Cat D AC-3, benchmark-blocked).
+
+## Why DepthFusion?
+
+<table align="center" style="border-collapse:separate;border-spacing:0;width:100%;max-width:980px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(27,31,36,0.12);">
+  <thead>
+    <tr>
+      <th align="left" style="padding:13px 16px;background:linear-gradient(90deg,#4f46e5 0%,#7c3aed 50%,#9333ea 100%);color:#ffffff;font-weight:700;border:none;letter-spacing:0.2px;">Feature</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#4338ca 0%,#6d28d9 100%);color:#ffffff;font-weight:800;border:none;border-left:2px solid rgba(255,255,255,0.25);">DepthFusion</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Vanilla&nbsp;CC</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Continue.dev</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Cursor</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">Copilot</th>
+      <th align="center" style="padding:13px 10px;background:linear-gradient(90deg,#6d28d9 0%,#9333ea 100%);color:#ede9fe;font-weight:500;border:none;">RAG&nbsp;Plugin</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cross-session memory</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Fully local / offline mode</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Self-hosted (own your data)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Recall latency (warm, end-to-end)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">37–372&nbsp;ms</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">n/a</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~200&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~300&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~250&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">100–500&nbsp;ms</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Per-query cost</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0&nbsp;✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;API</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Host</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Multi-provider bridge (import GPT/Gemini/DeepSeek)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">MCP-native (29 tools)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Hybrid retrieval (BM25 + vector + RRF)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cognitive scoring &amp; contradiction detection</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Decision / outcome-aware recall</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Conversation ingestion from other AI tools</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;border-bottom:none;font-weight:600;color:#1f2328;">Open source</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+  </tbody>
+</table>
+<p align="center"><sub>✅ full support&nbsp;&nbsp;•&nbsp;&nbsp;⚠️ partial / varies by config&nbsp;&nbsp;•&nbsp;&nbsp;❌ not supported&nbsp;&nbsp;|&nbsp;&nbsp;Compares the <strong>local / free tier</strong> of each product. Latency = warm recall, end-to-end. DepthFusion's 37–372 ms is measured (n=4 real sessions); competitor values are approximate, drawn from public docs and may vary by configuration.</sub></p>
 
 ---
 
