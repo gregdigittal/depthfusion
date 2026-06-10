@@ -257,3 +257,7 @@ def _tool_session_seed(arguments: dict) -> str:
                 result["project_context_prefix"] = project_context_prefix
         return json.dumps(result)
 
+def register_project() -> None:
+    """Register project domain tools (stub for v2 tooling framework)."""
+    pass
+

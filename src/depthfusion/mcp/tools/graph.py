@@ -515,3 +515,7 @@ def _tool_agent_trail(arguments: dict) -> str:
         return json.dumps({"trail": trail, "count": len(trail)})
     except Exception as exc:
         return json.dumps({"error": str(exc), "trail": [], "count": 0})
+
+def register_graph() -> None:
+    """Register graph domain tools (stub for v2 tooling framework)."""
+    pass

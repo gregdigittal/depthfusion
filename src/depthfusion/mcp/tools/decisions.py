@@ -212,3 +212,7 @@ def _tool_get_cognitive_state(arguments: dict, config: Any) -> str:
             "autonomic": getattr(config, "autonomic", False),
         },
     })
+
+def register_decisions() -> None:
+    """Register decisions domain tools (stub for v2 tooling framework)."""
+    pass

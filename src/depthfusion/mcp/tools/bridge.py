@@ -97,3 +97,7 @@ def _tool_bridge(arguments: dict) -> str:
         "fragments_stored": fragments_stored,
     })
 
+def register_bridge() -> None:
+    """Register bridge domain tools (stub for v2 tooling framework)."""
+    pass
+

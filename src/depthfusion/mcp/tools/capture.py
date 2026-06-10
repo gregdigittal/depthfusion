@@ -361,3 +361,7 @@ def _tool_ingest_conversation(arguments: dict) -> str:
         "provider": provider,
         "errors": errors,
     })
+
+def register_capture() -> None:
+    """Register capture domain tools (stub for v2 tooling framework)."""
+    pass

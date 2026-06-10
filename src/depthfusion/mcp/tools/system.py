@@ -92,3 +92,7 @@ def _tool_research_topic(arguments: dict) -> str:
     except Exception as e:
         return json.dumps({"error": str(e), "researched": False})
 
+def register_system() -> None:
+    """Register system domain tools (stub for v2 tooling framework)."""
+    pass
+

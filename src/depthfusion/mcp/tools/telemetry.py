@@ -344,3 +344,7 @@ def _tool_surface_skill_candidates(arguments: dict, config: Any) -> str:
             "items": items,
         }
     )
+
+def register_telemetry() -> None:
+    """Register telemetry domain tools (stub for v2 tooling framework)."""
+    pass

@@ -224,3 +224,7 @@ def _tool_retrieve_context(arguments: dict, config: Any) -> str:
         "memories": [_memory_block(s, m) for s, m in top],
         "count": len(top),
     })
+
+def register_recall() -> None:
+    """Register recall domain tools (stub for v2 tooling framework)."""
+    pass
