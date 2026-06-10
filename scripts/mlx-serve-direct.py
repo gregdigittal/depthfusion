@@ -90,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             messages = body.get("messages", [])
-            max_tokens = body.get("max_tokens", 512)
+            max_tokens = body.get("max_tokens", 1024)
             temperature = float(body.get("temperature", 0.0))
 
             # Apply chat template
@@ -114,6 +114,11 @@ class Handler(BaseHTTPRequestHandler):
                     from mlx_lm.utils import make_sampler as _make_sampler  # type: ignore[no-redef]
                 _gen_kwargs["sampler"] = _make_sampler(temp=temperature)
             response_text = mlx_lm.generate(model, tokenizer, prompt=prompt, **_gen_kwargs)
+
+            # Strip Gemma 4 thinking block (<|channel>thought ... \n\n) from response.
+            # The thinking section precedes the actual answer; callers only need the answer.
+            import re as _re
+            response_text = _re.sub(r"<\|channel>thought.*?(?:\n\n|\Z)", "", response_text, flags=_re.DOTALL).strip()
 
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",

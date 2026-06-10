@@ -14,7 +14,7 @@ echo
 echo "=== Inference test ==="
 RESPONSE=$(curl -s "$BASE/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -d '{"model":"mlx-community/gemma-4-26b-a4b-it-4bit","messages":[{"role":"user","content":"In one sentence, what is DepthFusion?"}],"max_tokens":80}')
+  -d '{"model":"mlx-community/gemma-4-26b-a4b-it-4bit","messages":[{"role":"user","content":"In one sentence, what is DepthFusion?"}],"max_tokens":512}')
 echo "$RESPONSE" | python3 -m json.tool
 echo
 echo "=== Answer ==="
