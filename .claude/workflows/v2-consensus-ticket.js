@@ -99,47 +99,49 @@ Return structured output: reviewer="codex-spot", verdict approve|object, finding
 }
 
 // ---- pipeline ----
-const route = ROUTING[args.workClass]
-if (!route) throw new Error(`unknown workClass: ${args.workClass}`)
+// args may arrive as a JSON string depending on Workflow runtime version — normalise.
+const a = typeof args === 'string' ? JSON.parse(args) : (args || {})
+const route = ROUTING[a.workClass]
+if (!route) throw new Error(`unknown workClass: ${a.workClass}`)
 
 phase('Dev')
-log(`${args.ticketId}: dev=${route.dev}, reviewers=${route.reviewers.join('+')}`)
-const impl = await agent(devPrompt(args), { ...devOpts(route.dev, 'Dev'), schema: IMPL_RESULT, label: `dev:${args.ticketId}` })
-if (!impl) return { ticket: args.ticketId, status: 'dev-failed' }
-if (!impl.testsPassed) return { ticket: args.ticketId, status: 'dev-tests-red', impl }
+log(`${a.ticketId}: dev=${route.dev}, reviewers=${route.reviewers.join('+')}`)
+const impl = await agent(devPrompt(a), { ...devOpts(route.dev, 'Dev'), schema: IMPL_RESULT, label: `dev:${a.ticketId}` })
+if (!impl) return { ticket: a.ticketId, status: 'dev-failed' }
+if (!impl.testsPassed) return { ticket: a.ticketId, status: 'dev-tests-red', impl }
 
 phase('Review')
 const reviews = (await parallel(route.reviewers.map(r => () =>
-  agent(reviewerPrompt(r, args, impl), { schema: REVIEW_VERDICT, phase: 'Review', label: `rev:${r}:${args.ticketId}` })
+  agent(reviewerPrompt(r, a, impl), { schema: REVIEW_VERDICT, phase: 'Review', label: `rev:${r}:${a.ticketId}` })
 ))).filter(Boolean)
 const objections = reviews.flatMap(r => r.verdict === 'object' ? r.findings.filter(f => f.severity !== 'low') : [])
-if (!objections.length) return { ticket: args.ticketId, status: 'approved', impl, reviews }
+if (!objections.length) return { ticket: a.ticketId, status: 'approved', impl, reviews }
 
 phase('Rebut')
-log(`${args.ticketId}: ${objections.length} objection(s) — rebuttal round`)
+log(`${a.ticketId}: ${objections.length} objection(s) — rebuttal round`)
 const rebut = await agent(
-  `Rebuttal round for ticket ${args.ticketId} in worktree ${args.worktree}. Independent reviewers raised these findings:
+  `Rebuttal round for ticket ${a.ticketId} in worktree ${a.worktree}. Independent reviewers raised these findings:
 ${JSON.stringify(objections, null, 2)}
 For each: FIX it (amend with a new [skip-review] commit) or DEFEND it (precise technical justification, citing code). Return structured output: same shape as before plus defended:[claims you defend with reasons].`,
-  { ...devOpts(route.dev, 'Rebut'), schema: { ...IMPL_RESULT, required: ['summary', 'filesTouched', 'testsPassed', 'commit'] }, label: `rebut:${args.ticketId}` })
-if (!rebut) return { ticket: args.ticketId, status: 'split', positions: { impl, reviews } }
+  { ...devOpts(route.dev, 'Rebut'), schema: { ...IMPL_RESULT, required: ['summary', 'filesTouched', 'testsPassed', 'commit'] }, label: `rebut:${a.ticketId}` })
+if (!rebut) return { ticket: a.ticketId, status: 'split', positions: { impl, reviews } }
 
 const reReviews = (await parallel(route.reviewers.map(r => () =>
-  agent(reviewerPrompt(r, args, rebut) + '\nThis is a RE-REVIEW after a rebuttal. Concede fixed/validly-defended findings; maintain only what is still wrong.',
-    { schema: REVIEW_VERDICT, phase: 'Rebut', label: `rerev:${r}:${args.ticketId}` })
+  agent(reviewerPrompt(r, a, rebut) + '\nThis is a RE-REVIEW after a rebuttal. Concede fixed/validly-defended findings; maintain only what is still wrong.',
+    { schema: REVIEW_VERDICT, phase: 'Rebut', label: `rerev:${r}:${a.ticketId}` })
 ))).filter(Boolean)
 const stillObjecting = reReviews.filter(r => r.verdict === 'object')
-if (!stillObjecting.length) return { ticket: args.ticketId, status: 'approved-after-rebuttal', impl: rebut, reviews: reReviews }
+if (!stillObjecting.length) return { ticket: a.ticketId, status: 'approved-after-rebuttal', impl: rebut, reviews: reReviews }
 
 phase('Verdict')
 const advisory = await agent(
-  `Tiebreak advisory for ticket ${args.ticketId}. Use ToolSearch to load mcp__depthfusion__depthfusion_bridge, then call it with model="${args.tiebreakModel || 'openai/gpt-4o'}" and a prompt containing BOTH positions below. Relay the external model's judgment as structured output (lean: dev|reviewers|mixed).
+  `Tiebreak advisory for ticket ${a.ticketId}. Use ToolSearch to load mcp__depthfusion__depthfusion_bridge, then call it with model="${a.tiebreakModel || 'openai/gpt-4o'}" and a prompt containing BOTH positions below. Relay the external model's judgment as structured output (lean: dev|reviewers|mixed).
 DEV position: ${JSON.stringify({ summary: rebut.summary, defended: rebut.defended || [] })}
 REVIEWER position: ${JSON.stringify(stillObjecting.flatMap(r => r.findings))}`,
-  { schema: ADVISORY, phase: 'Verdict', label: `tiebreak:${args.ticketId}` })
+  { schema: ADVISORY, phase: 'Verdict', label: `tiebreak:${a.ticketId}` })
 
 return {
-  ticket: args.ticketId,
+  ticket: a.ticketId,
   status: 'split',
   positions: { impl: rebut, reviews: stillObjecting, advisory },
 }

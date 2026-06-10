@@ -16,10 +16,13 @@ const EVIDENCE = {
   },
 }
 
+// args may arrive as a JSON string depending on Workflow runtime version — normalise.
+const a = typeof args === 'string' ? JSON.parse(args) : (args || {})
+
 phase('Verify')
-const rows = (await parallel(args.criteria.map(c => () =>
+const rows = (await parallel(a.criteria.map(c => () =>
   agent(
-    `Verify gate criterion ${c.id} for gate ${args.gate} in ${args.worktree}.
+    `Verify gate criterion ${c.id} for gate ${a.gate} in ${a.worktree}.
 CRITERION: ${c.description}
 ${c.evidenceCmd ? `Suggested evidence command: ${c.evidenceCmd}` : ''}
 Rules: met=true requires EXECUTED evidence (run the command, cite the output tail / commit hash / passing test id). An assertion without execution is met=false with caveats="unverifiable". Do not fix anything — verify only.`,
@@ -28,9 +31,9 @@ Rules: met=true requires EXECUTED evidence (run the command, cite the output tai
 
 phase('Critic')
 const critic = await agent(
-  `Completeness critic for gate ${args.gate}. Evidence table:
+  `Completeness critic for gate ${a.gate}. Evidence table:
 ${JSON.stringify(rows, null, 2)}
-Criteria list: ${args.criteria.map(c => c.id + ': ' + c.description).join(' | ')}
+Criteria list: ${a.criteria.map(c => c.id + ': ' + c.description).join(' | ')}
 What is missing? Unverified claims, criteria with weak evidence, gate-relevant risks nobody checked. Return structured output.`,
   { schema: { type: 'object', required: ['gaps'], properties: {
     gaps: { type: 'array', items: { type: 'string' } },
@@ -38,7 +41,7 @@ What is missing? Unverified claims, criteria with weak evidence, gate-relevant r
 
 const unmet = rows.filter(r => !r.met)
 return {
-  gate: args.gate,
+  gate: a.gate,
   verdict: unmet.length === 0 && (critic?.gaps || []).length === 0 ? 'PASS' : 'HOLD',
   evidence: rows,
   unmet: unmet.map(r => r.criterion),
