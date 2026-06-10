@@ -141,10 +141,13 @@ class TestSingleBackendResolution:
         _minimal_corpus(tmp_path)
 
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
 
         # Patch _detect_current_backends to simulate the new S-83 hook:
         # when a fallback_chain dict is passed, populate it with [name]
         # for each capability (single-backend resolution).
+        # After T-535a, _tool_recall lives in recall.py and resolves
+        # _detect_current_backends from that module's namespace.
         def fake_detect(perf_ms=None, fallback_chain=None):
             backends = {c: "null" for c in SIX_CAPS}
             if perf_ms is not None:
@@ -155,7 +158,7 @@ class TestSingleBackendResolution:
                     fallback_chain[cap] = ["null"]
             return backends
 
-        monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
+        monkeypatch.setattr(_recall_module, "_detect_current_backends", fake_detect)
 
         srv_mod._tool_recall({"query": "fallback chain", "top_k": 2})
 
@@ -321,11 +324,13 @@ class TestAggregatorReadsStructuredField:
         _minimal_corpus(tmp_path)
 
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.metrics.aggregator import MetricsAggregator
         from depthfusion.metrics.collector import MetricsCollector
 
         # Stub _detect_current_backends so reranker reports a chain and
         # other caps report single backends.
+        # After T-535a, _tool_recall lives in recall.py; patch there.
         def fake_detect(perf_ms=None, fallback_chain=None):
             backends = {
                 "reranker": "gemma+haiku+null",
@@ -345,7 +350,7 @@ class TestAggregatorReadsStructuredField:
                     fallback_chain[cap] = ["null"]
             return backends
 
-        monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
+        monkeypatch.setattr(_recall_module, "_detect_current_backends", fake_detect)
 
         # Run two recall queries so per_capability_fallback has a non-trivial
         # set of names (validates the set-merge logic).
