@@ -22,7 +22,9 @@ from depthfusion.parsers.documents.base import DocumentParser, DocumentRecord  #
 _MAX_CHUNK_CHARS: int = 2000
 
 # Matches any HTML/XML tag (opening, closing, or self-closing).
-_TAG_RE: re.Pattern[str] = re.compile(r"<[^>]+>", re.DOTALL)
+# The ``>`` is made optional (``>?``) to handle malformed/dangling opening
+# chevrons (e.g. text that ends mid-tag without a closing ``>``).
+_TAG_RE: re.Pattern[str] = re.compile(r"<[^>]*>?", re.DOTALL)
 
 # Matches a markdown heading (1–6 ``#`` characters followed by text).
 _HEADING_RE: re.Pattern[str] = re.compile(r"^#{1,6}\s+(.+)", re.MULTILINE)
@@ -73,7 +75,12 @@ def _extract_heading_path(text: str) -> list[str]:
 
 
 def _split_at_sentences(paragraph: str) -> list[str]:
-    """Split a long paragraph at sentence boundaries into pieces ≤ _MAX_CHUNK_CHARS."""
+    """Split a long paragraph at sentence boundaries into pieces ≤ _MAX_CHUNK_CHARS.
+
+    If an individual sentence is itself longer than *_MAX_CHUNK_CHARS* it is
+    hard-split at exactly *_MAX_CHUNK_CHARS* characters as a final backstop so
+    that no returned chunk ever exceeds the limit.
+    """
     sentences = _SENTENCE_END_RE.split(paragraph)
     chunks: list[str] = []
     current: list[str] = []
@@ -84,9 +91,13 @@ def _split_at_sentences(paragraph: str) -> list[str]:
             continue
         if current_len + len(s) + 1 > _MAX_CHUNK_CHARS and current:
             chunks.append(" ".join(current))
-            current = [s]
-            current_len = len(s)
-        else:
+            current = []
+            current_len = 0
+        # Hard-split a sentence that is itself longer than the max chunk size.
+        while len(s) > _MAX_CHUNK_CHARS:
+            chunks.append(s[:_MAX_CHUNK_CHARS])
+            s = s[_MAX_CHUNK_CHARS:]
+        if s:
             current.append(s)
             current_len += len(s) + 1
     if current:
@@ -133,6 +144,9 @@ class GenericParser:
     ]
 
     def parse(self, source_id: str, data: bytes) -> list[DocumentRecord]:  # noqa: D102
+        # Guard against callers passing None instead of bytes.
+        if data is None:
+            data = b""
         text = _decode(data)
 
         # HTML detection: strip tags when the decoded text starts with ``<``.

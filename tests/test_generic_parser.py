@@ -141,6 +141,11 @@ class TestEdgeCases:
         assert records[0].content == ""
         assert records[0].chunks == []
 
+    def test_parse_none_data_does_not_crash(self, parser: GenericParser) -> None:
+        """T-592 None guard: passing None instead of bytes must not raise."""
+        result = parser.parse("none.txt", None)  # type: ignore[arg-type]
+        assert isinstance(result, list)
+
     def test_source_id_preserved(self, parser: GenericParser) -> None:
         records = parser.parse("my/path/file.txt", b"Content here.")
         assert records[0].source_id == "my/path/file.txt"
