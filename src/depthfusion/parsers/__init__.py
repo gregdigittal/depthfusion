@@ -46,6 +46,14 @@ def parse_conversation(provider: str, data: str) -> list[dict]:
     return [{"role": m.role, "content": m.content, "timestamp": m.timestamp} for m in messages]
 
 
+from depthfusion.parsers.documents.base import (
+    QuarantineEntry,
+    QuarantineStore,
+    get_quarantine,
+    get_quarantine_store,
+    quarantine,
+)
+
 __all__ = [
     "ChatGPTParser",
     "ConversationMessage",
@@ -54,4 +62,10 @@ __all__ = [
     "GenericParser",
     "GeminiParser",
     "parse_conversation",
+    # Document quarantine (T-590 / T-591)
+    "QuarantineEntry",
+    "QuarantineStore",
+    "get_quarantine",
+    "get_quarantine_store",
+    "quarantine",
 ]
