@@ -1,0 +1,53 @@
+# DepthFusion V2 — Microsoft Sensitivity Label Mapping
+#
+# Maps Microsoft Information Protection (MIP) sensitivity labels from
+# SharePoint / Microsoft 365 to DepthFusion ClassificationLevel values.
+#
+# Supported ClassificationLevel values:
+#   public        - Freely shareable; no restrictions
+#   internal      - Internal use only; no external export
+#   confidential  - Restricted audience; no caching; redacted in search
+#   restricted    - Highest sensitivity; admin-only access
+#
+# Labels not listed here default to 'confidential' (safe default-deny).
+# Label matching is case-insensitive.
+#
+# User-editable: add or modify entries to match your organisation's label scheme.
+
+mappings:
+  # ── Public / General ────────────────────────────────────────────────────
+  "Public":                   public
+  "General":                  public
+  "Non-Business":             public
+
+  # ── Internal / General Business Use ─────────────────────────────────────
+  "General Business":         internal
+  "Internal":                 internal
+  "Internal Use Only":        internal
+  "Company Internal":         internal
+  "Business Use":             internal
+
+  # ── Confidential ─────────────────────────────────────────────────────────
+  "Confidential":             confidential
+  "Confidential - Finance":   confidential
+  "Confidential - Legal":     confidential
+  "Confidential - HR":        confidential
+  "Confidential - Anyone":    confidential
+  "Confidential / Recipients Only": confidential
+  "PII":                      confidential
+  "Personal Data":            confidential
+
+  # ── Highly Confidential / Restricted ─────────────────────────────────────
+  "Highly Confidential":      restricted
+  "Highly Confidential - Anyone": restricted
+  "Highly Confidential / Recipients Only": restricted
+  "Secret":                   restricted
+  "Top Secret":               restricted
+  "Restricted":               restricted
+  "Restricted Access":        restricted
+  "MSFT Confidential":        restricted
+  "Microsoft Confidential":   restricted
+
+# Default level applied when an incoming label has no entry above.
+# Must be 'confidential' or 'restricted' — never 'public' or 'internal'.
+default_level: confidential
