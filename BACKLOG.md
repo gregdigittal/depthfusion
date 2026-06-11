@@ -2956,3 +2956,316 @@
 **Tasks:**
 - [ ] T-635: Signing + notarization pipeline — Sonnet dev, DS rev
 - [ ] T-636: Updater + channel config — Sonnet dev, Gemini rev
+
+---
+
+## E-57: UI Features — Search, Documents, Graph, Dashboards [backlog]
+
+> The product surface: unified search across memories + documents, a citation-preserving document viewer, interactive graph exploration, and BI dashboards — every view rendered from security-trimmed APIs only. Depends on E-51 (Query API v2). **Lane C, Phase 2.**
+
+### S-184: As a user, I want unified search with facets so that one query spans memories, discoveries, and documents `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation
+- [ ] AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)
+- [ ] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
+
+**Tasks:**
+- [ ] T-637: Search screen + facet components — Sonnet dev, Gemini rev
+- [ ] T-638: Result cards with citation locators + classification chips — Sonnet dev, Gemini rev
+- [ ] T-639: Query orchestration hook (debounce, cancel, cache-fallback) — Sonnet dev, DS rev
+- [ ] T-640: Search latency benchmark harness — Ollama dev, Sonnet rev
+
+### S-185: As a user, I want a document viewer with highlighted hits so that I read sources without leaving the app `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Renders extracted document content (blocks/tables/slides) with hit highlighting and jump-to-locator
+- [ ] AC-2: Original-file access (open/download) is policy-gated by E-59 — viewer works even when download is denied
+- [ ] AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires
+
+**Tasks:**
+- [ ] T-641: Block-based viewer with highlight + locator jump — Sonnet dev, Gemini rev
+- [ ] T-642: Policy-gated original-file action wiring — Sonnet dev, DS rev
+- [ ] T-643: Watermark overlay component — Haiku dev, Gemini rev
+
+### S-186: As an analyst, I want interactive graph exploration so that I can map entities and relationships visually `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Force-directed graph view over trimmed traversal API; expand-on-click, filter by entity type/source
+- [ ] AC-2: Node inspector shows provenance (source records the entity came from, ACL-visible only)
+- [ ] AC-3: 1k-node neighborhood renders at interactive framerate
+
+**Tasks:**
+- [ ] T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — Sonnet dev, Gemini rev
+- [ ] T-645: Node inspector with provenance panel — Sonnet dev, Gemini rev
+- [ ] T-646: Render performance pass (level-of-detail, viewport culling) — Sonnet dev, DS rev
+
+### S-187: As a leader, I want in-app dashboards so that corpus and activity KPIs are visible without external BI tools `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Dashboard tiles over `/query/*/aggregate`: corpus growth, top entities, ingestion health, my-team activity
+- [ ] AC-2: Tiles respect principal trim; layout persists per user
+
+**Tasks:**
+- [ ] T-647: Tile framework + chart components — Sonnet dev, Gemini rev
+- [ ] T-648: Default dashboard pack + persistence — Haiku dev, Gemini rev
+
+---
+
+## E-58: Intelligent Offline Cache — ML-Driven, Encrypted [backlog]
+
+> An encrypted local cache (SQLCipher, key in OS keychain) that holds a *relevant subset* of the corpus — selected by a lightweight relevance model trained on the user's local work patterns — never the whole database. Cache contents are bounded by the user's rights and a classification ceiling, and leases expire so a revoked user's cache dies on schedule. **Lane C, Phase 3.**
+
+### S-188: As the app, I want an encrypted local cache store so that offline data is unreadable outside the signed-in session `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: SQLCipher database in Rust core; key generated per device, wrapped by OS keychain (Keychain/DPAPI), never written to disk in plaintext
+- [ ] AC-2: Cache schema mirrors record + chunk + embedding subset with ACL + classification + lease columns
+- [ ] AC-3: Tamper check on open (HMAC over schema + lease table); failure → cache wipe + re-sync
+- [ ] AC-4: Only records where the principal is in `acl_allow` AND classification ≤ user's offline ceiling are ever cached
+
+**Tasks:**
+- [ ] T-649: SQLCipher integration in Rust core + key wrap via keychain — Opus dev, DS+GM rev
+- [ ] T-650: Cache schema + ACL/ceiling admission filter — Opus dev, DS rev
+- [ ] T-651: Tamper detection + wipe/re-sync path — Sonnet dev, DS rev
+
+### S-189: As a user, I want the cache to learn what I work on so that offline mode has what I need without holding everything `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Local signal collection (queries, opened docs, projects, entities, recency) stored on-device only — never uploaded
+- [ ] AC-2: Relevance scorer ranks candidate records: embedding similarity to the user's activity centroid + recency + access frequency (logistic blend); runs on-device (Ollama/MLX embeddings or cached server embeddings)
+- [ ] AC-3: Cache fill respects a configurable size budget (default 2 GB) with score-ordered eviction; hit-rate telemetry (local) shows ≥ 80% offline hit rate in dogfood
+- [ ] AC-4: Pre-fetch runs opportunistically when online + idle; user can pin projects/folders to force-include
+- [ ] AC-5: Cold-start: first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure
+
+**Tasks:**
+- [ ] T-652: Local activity signal store + privacy guard (on-device only) — Sonnet dev, DS rev
+- [ ] T-653: Relevance scorer (centroid + recency/frequency blend) — Opus dev, DS rev
+- [ ] T-654: Budgeted fill/eviction engine + pinning — Sonnet dev, DS rev
+- [ ] T-655: Idle-time prefetch scheduler — Sonnet dev, Gemini rev
+- [ ] T-656: Offline hit-rate telemetry + dogfood report — Haiku dev, Sonnet rev
+
+### S-190: As a security owner, I want cache leases + remote revocation so that a departed employee's offline data expires `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Every cached record carries a lease (default 7 days, classification-scaled: confidential = 48h); expired leases purge on app start and on a background timer — online or offline
+- [ ] AC-2: Lease renewal piggybacks on any authenticated server contact; renewal denied → purge
+- [ ] AC-3: Admin device-revoke (S-158) → next contact returns revoke signal → full cache + token wipe; offline devices die at lease expiry regardless
+- [ ] AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator
+
+**Tasks:**
+- [ ] T-657: Lease issuance/renewal protocol + classification scaling — Opus dev, DS rev
+- [ ] T-658: Purge engine (startup + timer + revoke signal) — Sonnet dev, DS rev
+- [ ] T-659: Offline query engine over cache + UI indicator — Sonnet dev, Gemini rev
+- [ ] T-660: Revocation E2E test matrix (online revoke, offline expiry, clock tamper) — Opus dev, DS rev
+
+---
+
+## E-59: Export Controls & IP Protection [backlog]
+
+> Rights-based limits on what leaves the app: copy, export, download, and print are policy decisions, not UI conveniences. Enforced in the Rust core (webview never holds exportable originals), fully audited, with sensible friction — protect IP without making daily work miserable. **Lane C, Phase 3.**
+
+### S-191: As a policy owner, I want export policy by role × classification so that extraction rights are explicit `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Policy matrix (role × classification → view / copy-text / export-extract / download-original / print) stored server-side, versioned, admin-editable
+- [ ] AC-2: Defaults: viewer = view only; analyst = +copy/export ≤ internal; contributor = +download ≤ confidential; admin = all (still audited)
+- [ ] AC-3: Policy evaluated via E-50 decision point; offline evaluation uses the signed policy snapshot in the cache
+
+**Tasks:**
+- [ ] T-661: Export policy schema + admin CRUD + versioning — Sonnet dev, DS rev
+- [ ] T-662: Signed policy snapshot for offline enforcement — Opus dev, DS rev
+
+### S-192: As the app, I want enforcement in the Rust core so that export limits can't be bypassed from the webview `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Clipboard, file-save, and print actions are Rust-mediated IPC commands that consult policy; denied actions return a typed denial the UI explains
+- [ ] AC-2: Original files stream through the Rust core to disk only on allow — no blob URLs of originals in the webview
+- [ ] AC-3: Copy-text allowed content gets per-principal provenance footer appended when classification ≥ confidential
+- [ ] AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)
+
+**Tasks:**
+- [ ] T-663: Policy-gated clipboard/save/print IPC commands — Opus dev, DS+GM rev
+- [ ] T-664: Original-file streaming gate in Rust core — Opus dev, DS rev
+- [ ] T-665: Provenance footer + watermark policy hooks — Sonnet dev, Gemini rev
+- [ ] T-666: Red-team bypass checklist execution + residual-risk doc — Opus dev, DS rev
+
+### S-193: As a security owner, I want export auditing + anomaly flags so that bulk extraction attempts are visible `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Every export-class action (allowed or denied) lands in the audit log with principal, record, action, decision, device
+- [ ] AC-2: Server-side rate heuristics flag bursts (e.g. > N exports / hour, cross-project sweeps) → admin notification
+- [ ] AC-3: Server API enforces per-principal export rate limits as backstop to client enforcement
+
+**Tasks:**
+- [ ] T-667: Export audit events + server backstop rate limits — Sonnet dev, DS rev
+- [ ] T-668: Anomaly heuristics + admin alert channel — Sonnet dev, Gemini rev
+
+---
+
+## E-60: Audit, Observability & Admin Console [backlog]
+
+> Enterprise operability: a tamper-evident audit log spanning auth, authz, ingestion, sync, and export; metrics that tell you the system is healthy; and an admin surface to manage users, roles, devices, and policies without SSH. **Lane D, Phase 4.**
+
+### S-194: As a compliance owner, I want a unified tamper-evident audit log so that every security-relevant event is provable `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Append-only audit store with hash chaining (each entry includes hash of predecessor); verification CLI detects truncation/mutation
+- [ ] AC-2: Event taxonomy covers: sign-in/out, token issuance, authz denials, ACL changes, role changes, ingestion runs, sync sessions, exports, admin actions
+- [ ] AC-3: Retention policy + export-to-file for compliance review; audit reads are admin-only and themselves audited
+
+**Tasks:**
+- [ ] T-669: Hash-chained audit store + verification CLI — Opus dev, DS rev
+- [ ] T-670: Wire all V2 subsystems to audit taxonomy — Sonnet dev, DS rev
+- [ ] T-671: Retention + compliance export — Haiku dev, Sonnet rev
+
+### S-195: As an operator, I want service health metrics + alerts so that ingestion lag or auth failures surface before users complain `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `/metrics` (Prometheus format) on the API: request rates/latency, authz denial rate, ingestion lag, sync backlog, cache-lease renewals
+- [ ] AC-2: Grafana dashboard JSON committed; alert rules for: ingestion stalled > 1h, authz denial spike, token-validation failures
+
+**Tasks:**
+- [ ] T-672: Prometheus metrics endpoint + instrumentation — Sonnet dev, DS rev
+- [ ] T-673: Grafana dashboard + alert rules — Ollama dev, Sonnet rev
+
+### S-196: As an admin, I want an admin console in the desktop app so that users, roles, devices, and policies are manageable without SSH `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Admin-role-gated screens: user/role assignment, device list + revoke, classification mapping table, export policy editor, ingestion scope + status
+- [ ] AC-2: All mutations confirm + audit; destructive actions (revoke, role downgrade) require typed confirmation
+- [ ] AC-3: Audit log viewer with filter by principal/action/date
+
+**Tasks:**
+- [ ] T-674: Admin screens: users/roles/devices — Sonnet dev, Gemini rev
+- [ ] T-675: Policy + classification editors — Sonnet dev, Gemini rev
+- [ ] T-676: Ingestion management + audit viewer — Sonnet dev, DS rev
+
+---
+
+## E-61: Performance, Scale & Security Hardening [backlog]
+
+> Prove the system holds at enterprise corpus sizes and survives adversarial review: load benchmarks with ACL filtering on, dependency + secret hygiene, and an internal penetration pass before any merge to main. **Lane D, Phase 4.**
+
+### S-197: As an operator, I want load benchmarks at target scale so that latency SLOs are verified, not hoped for `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Synthetic corpus: 250k chunks, 50k documents, 500 principals, realistic ACL skew; load generator hits search/query/aggregate concurrently
+- [ ] AC-2: SLOs verified: search P95 < 300ms server-side with trimming on; ingestion sustained ≥ 200 docs/h during query load
+- [ ] AC-3: Regression: benchmark runs in CI weekly; > 20% latency regression fails the build
+
+**Tasks:**
+- [ ] T-677: Synthetic corpus + principal/ACL generator — Sonnet dev, DS rev
+- [ ] T-678: Load harness + SLO assertions — Sonnet dev, DS rev
+- [ ] T-679: Weekly CI benchmark job + regression gate — Haiku dev, Sonnet rev
+
+### S-198: As a security owner, I want supply-chain + secret hygiene gates so that the dependency surface is controlled `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `pip-audit` / `cargo audit` / `npm audit` in CI; high-severity findings block merge
+- [ ] AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release
+
+**Tasks:**
+- [ ] T-680: Audit + secret-scan CI jobs — Ollama dev, Sonnet rev
+- [ ] T-681: SBOM generation in release pipeline — Ollama dev, Sonnet rev
+
+### S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation
+- [ ] AC-2: All criticals fixed + regression-tested; findings report archived in `docs/decisions/`
+- [ ] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
+
+**Tasks:**
+- [ ] T-682: Attack plan + tooling — DS dev, Gemini rev
+- [ ] T-683: Execute attacks, file findings — DS+GM dev, Opus triage
+- [ ] T-684: Fix criticals + regression tests — Opus dev, DS rev
+
+---
+
+## E-62: Documentation Refresh & V2 Enablement [backlog]
+
+> Close the documentation gap found in the V1 review and ship V2-grade docs: accurate capability reference, security model, admin runbooks, UI user guide, and updated API/BI docs. Docs are merge-gating, not an afterthought. **Lane D, Phase 4.**
+
+### S-200: As a maintainer, I want the V1 docs corrected so that README and guides match actual capabilities before V2 lands `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: README capability matrix audited against code (feature flags, MCP tool list, API route inventory) and corrected
+- [ ] AC-2: Stale docs marked superseded with pointers to V2 equivalents (sync-guide → Sync v2, bi-connectivity → v2 auth)
+
+**Tasks:**
+- [ ] T-685: Capability audit + README correction PR — Gemini dev, Sonnet rev
+- [ ] T-686: Supersede/redirect pass over docs/ — Ollama dev, Gemini rev
+
+### S-201: As an adopter, I want V2 security + admin documentation so that deployment and governance are self-service `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Security model doc: identity, RBAC, ACLs, classification, leases, export policy — one canonical reference
+- [ ] AC-2: Admin runbooks: Entra app registration, SharePoint grants, user onboarding/offboarding, device revoke, incident response
+- [ ] AC-3: UI user guide with screenshots; ingestion + sync operations guide
+
+**Tasks:**
+- [ ] T-687: Security model reference — Sonnet dev, DS rev
+- [ ] T-688: Admin runbooks — Gemini dev, Sonnet rev
+- [ ] T-689: UI user guide + ops guide — Gemini dev, Sonnet rev
+
+---
+
+## E-63: V2 Integration, Pilot & Merge Readiness [backlog]
+
+> The landing sequence: full-stack integration testing across lanes, a structured team pilot on real (scoped) SharePoint data, migration tooling for existing V1 instances, and the final merge gate review. **All lanes.**
+
+### S-202: As the program, I want cross-lane integration test suites so that the four lanes compose into one system `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: E2E scenarios automated: sign-in → SharePoint doc search → cited view → policy-gated export; offline flight-mode round trip; admin revoke → device wipe; sync between two instances with divergent ACLs
+- [ ] AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels
+
+**Tasks:**
+- [ ] T-690: Staging stack compose (API + ingestion + two app instances) — Sonnet dev, DS rev
+- [ ] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
+- [ ] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
+
+### S-203: As a V1 operator, I want migration tooling so that existing instances upgrade without data loss `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion migrate v2`: schema migration (ACL columns via S-160 backfill), config translation, token → identity bootstrap
+- [ ] AC-2: Dry-run mode reports planned changes; rollback restores pre-migration snapshot
+- [ ] AC-3: Verified on a copy of the production VPS dataset
+
+**Tasks:**
+- [ ] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
+- [ ] T-694: Production-copy migration rehearsal + report — Haiku dev, Opus rev
+
+### S-204: As the team, I want a structured pilot so that real usage validates V2 before merge `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: 2-week pilot: ≥ 3 team members (Mac + Windows), one scoped SharePoint site, defined success metrics (search relevance rating, offline hit rate, zero authz incidents)
+- [ ] AC-2: Feedback triaged into fix-before-merge vs post-merge backlog
+
+**Tasks:**
+- [ ] T-695: Pilot plan + metric instrumentation — Haiku dev, Gemini rev
+- [ ] T-696: Pilot execution support + feedback triage — Sonnet dev, Opus rev
+
+### S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Checklist verified: G1–G4 gates green, pen-test criticals closed, pilot success metrics met, docs complete, migration rehearsed, CI fully green
+- [ ] AC-2: Final consensus review of the merge diff by Deepseek + Gemini; unresolved disagreements surfaced with pros/cons before merge
+- [ ] AC-3: Tagged release + rollback plan documented
+
+**Tasks:**
+- [ ] T-697: Merge-gate checklist execution — Opus dev, DS+GM rev
+- [ ] T-698: Merge, tag, release notes, rollback plan — Sonnet dev, Opus rev
+
+### S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill is proven before legacy memories and SharePoint data coexist `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: S-160 backfill executed on a copy of the production VPS dataset with `acl_allow=[owner]`, `classification=internal`; record counts reconciled per store (all six)
+- [ ] AC-2: Post-migration verification: a second (non-owner) test principal retrieves zero legacy records across REST, MCP tools, and fabric SSE; owner retrieval is lossless vs pre-migration baseline
+- [ ] AC-3: Bulk per-project grant command widens one test project to a test group; revocation removes access within one lease period
+- [ ] AC-4: Rehearsal report (timings, anomalies, rollback drill) archived in docs/decisions/ — pilot (S-204) is blocked until this passes
+
+**Tasks:**
+- [ ] T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — Opus dev, DS rev
+- [ ] T-700: Bulk grant/revoke drill + rehearsal report — Sonnet dev, Opus rev
