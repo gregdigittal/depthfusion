@@ -1,4 +1,13 @@
+import { useEffect, useState } from 'react'
+import { getAppInfo, type AppInfo } from './lib/ipc'
+
 function App() {
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+
+  useEffect(() => {
+    getAppInfo().then(setAppInfo).catch(console.error)
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
@@ -7,7 +16,9 @@ function App() {
           DF
         </div>
         <h1 className="text-xl font-semibold tracking-tight">DepthFusion</h1>
-        <span className="text-xs text-gray-500 ml-auto">v2.0.0</span>
+        {appInfo && (
+          <span className="text-xs text-gray-500 ml-auto">v{appInfo.version}</span>
+        )}
       </header>
 
       {/* Main content */}
