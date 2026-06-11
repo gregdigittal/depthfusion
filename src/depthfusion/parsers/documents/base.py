@@ -30,6 +30,7 @@ Usage::
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 
 
@@ -76,6 +77,7 @@ class QuarantineStore:
 
     def __init__(self) -> None:
         self._entries: dict[str, QuarantineEntry] = {}
+        self._lock = threading.RLock()
 
     # ------------------------------------------------------------------
     # Mutation API
@@ -83,7 +85,8 @@ class QuarantineStore:
 
     def add(self, entry: QuarantineEntry) -> None:
         """Add or update (upsert) a :class:`QuarantineEntry` by source_id."""
-        self._entries[entry.source_id] = entry
+        with self._lock:
+            self._entries[entry.source_id] = entry
 
     def remove(self, source_id: str) -> bool:
         """Remove the entry for *source_id*.
@@ -91,10 +94,11 @@ class QuarantineStore:
         Returns:
             ``True`` if an entry existed and was removed; ``False`` otherwise.
         """
-        if source_id in self._entries:
-            del self._entries[source_id]
-            return True
-        return False
+        with self._lock:
+            if source_id in self._entries:
+                del self._entries[source_id]
+                return True
+            return False
 
     def record_retry_failure(
         self,
@@ -111,17 +115,18 @@ class QuarantineStore:
 
         Silently does nothing if *source_id* is not found in the store.
         """
-        entry = self._entries.get(source_id)
-        if entry is None:
-            return
+        with self._lock:
+            entry = self._entries.get(source_id)
+            if entry is None:
+                return
 
-        entry.retry_count += 1
-        entry.last_error = error
+            entry.retry_count += 1
+            entry.last_error = error
 
-        if entry.retry_count >= entry.max_retries:
-            entry.next_retry_at = ""
-        else:
-            entry.next_retry_at = next_retry_iso
+            if entry.retry_count >= entry.max_retries:
+                entry.next_retry_at = ""
+            else:
+                entry.next_retry_at = next_retry_iso
 
     # ------------------------------------------------------------------
     # Query API
@@ -129,11 +134,13 @@ class QuarantineStore:
 
     def get(self, source_id: str) -> QuarantineEntry | None:
         """Return the entry for *source_id*, or ``None`` if not present."""
-        return self._entries.get(source_id)
+        with self._lock:
+            return self._entries.get(source_id)
 
     def list_all(self) -> list[QuarantineEntry]:
         """Return all entries (any state)."""
-        return list(self._entries.values())
+        with self._lock:
+            return list(self._entries.values())
 
     def list_retryable(self, now_iso: str) -> list[QuarantineEntry]:
         """Return entries that are eligible for a retry at *now_iso*.
@@ -144,17 +151,19 @@ class QuarantineStore:
         2. ``next_retry_at == ""`` **or** ``next_retry_at <= now_iso``
            (the scheduled window has arrived).
         """
-        result: list[QuarantineEntry] = []
-        for entry in self._entries.values():
-            if entry.retry_count >= entry.max_retries:
-                continue
-            if entry.next_retry_at == "" or entry.next_retry_at <= now_iso:
-                result.append(entry)
-        return result
+        with self._lock:
+            result: list[QuarantineEntry] = []
+            for entry in self._entries.values():
+                if entry.retry_count >= entry.max_retries:
+                    continue
+                if entry.next_retry_at == "" or entry.next_retry_at <= now_iso:
+                    result.append(entry)
+            return result
 
     def exhausted(self) -> list[QuarantineEntry]:
         """Return entries where ``retry_count >= max_retries``."""
-        return [e for e in self._entries.values() if e.retry_count >= e.max_retries]
+        with self._lock:
+            return [e for e in self._entries.values() if e.retry_count >= e.max_retries]
 
 
 # ---------------------------------------------------------------------------
