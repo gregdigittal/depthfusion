@@ -293,6 +293,68 @@ class OidcClient:
                 f"{body.get('error_description', '')}".strip()
             )
 
+    async def device_login(
+        self,
+        jwks_cache: JwksCache,
+        *,
+        poll_interval: float | None = None,
+        max_wait: float = 900.0,
+        message_callback=None,
+    ) -> Principal:
+        """Orchestrate device-code login for CLI sessions.
+
+        Calls :meth:`start_device_code`, surfaces the ``user_code`` via
+        ``message_callback`` (defaults to printing to stderr), then polls
+        until a :class:`~depthfusion.identity.models.Principal` is returned.
+
+        Parameters
+        ----------
+        jwks_cache:
+            Shared :class:`~depthfusion.identity.jwks_cache.JwksCache` used to
+            validate the returned ID token.
+        poll_interval:
+            Override the polling interval (seconds).  When ``None`` the
+            server-recommended interval from the device-code response is used.
+        max_wait:
+            Maximum total seconds to wait for the user to complete login.
+            Defaults to 900 (15 minutes).
+        message_callback:
+            Optional callable that receives the :class:`DeviceCodeResult` and
+            is responsible for displaying the login instructions to the user.
+            When omitted, a default message is printed to *stderr*.
+
+        Returns
+        -------
+        Principal
+            The authenticated caller.
+
+        Raises
+        ------
+        OidcFlowError
+            If the device-code request fails, the user denies access, or the
+            flow times out.
+        """
+        result = await self.start_device_code()
+        if message_callback is not None:
+            message_callback(result)
+        else:
+            import sys
+
+            uri = result.verification_uri_complete or result.verification_uri
+            print(f"  Open: {uri}", file=sys.stderr)
+            print(f"  Code: {result.user_code}", file=sys.stderr)
+            print(f"  Expires in {result.expires_in}s.", file=sys.stderr)
+
+        effective_interval = (
+            poll_interval if poll_interval is not None else float(result.interval)
+        )
+        return await self.poll_device_code(
+            result.device_code,
+            jwks_cache,
+            max_wait,
+            effective_interval,
+        )
+
     # ------------------------------------------------------------------ #
     # Internals                                                          #
     # ------------------------------------------------------------------ #
