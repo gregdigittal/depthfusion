@@ -7,10 +7,10 @@ Implements:
   GET  /v1/graph/agent/{agent_id}/trail    — provenance trail for one agent (S-144)
   GET  /v1/graph/memory/{entity_id}/observers — agents that received a memory (S-144)
 
-Authentication: Bearer token required whenever DEPTHFUSION_API_TOKEN is set.
-Redis stays loopback-only; the Tailscale interface is handled by rest.py.
+Authentication: all routes require a verified Principal via require_principal from
+depthfusion.api.auth (RS256 JWT / Entra ID). Redis stays loopback-only.
 
-S-142 / T-484; S-143 / T-490; S-144 / T-494 T-495
+S-142 / T-484; S-143 / T-490; S-144 / T-494 T-495; T-550 (auth sweep)
 """
 from __future__ import annotations
 
@@ -21,28 +21,16 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from depthfusion.api.auth import require_principal
+from depthfusion.identity.models import Principal
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
-
-def _check_fabric_auth(authorization: Optional[str] = Header(default=None)) -> None:
-    """Enforce Bearer token whenever DEPTHFUSION_API_TOKEN is configured.
-
-    Stricter than _check_auth in rest.py: does not require DEPTHFUSION_API_PUBLIC=1.
-    Any non-loopback bind (e.g. Tailscale) must carry a token.
-    """
-    token = os.getenv("DEPTHFUSION_API_TOKEN", "")
-    if token and authorization != f"Bearer {token}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +87,7 @@ class PublishEventBody(BaseModel):
 @router.post("/v1/events/publish")
 async def publish_event(
     body: PublishEventBody,
-    _auth: None = Depends(_check_fabric_auth),
+    principal: Principal = Depends(require_principal),
 ):
     """Record an agent publish event in the graph and notify via stream.
 
@@ -127,7 +115,7 @@ async def stream_events(
     projects: str = Query(..., description="Comma-separated project slugs"),
     since_id: str = Query(default="$", description="Redis Stream entry ID for replay"),
     consumer_id: Optional[str] = Query(default=None),
-    _auth: None = Depends(_check_fabric_auth),
+    principal: Principal = Depends(require_principal),
 ):
     """SSE stream of EventEntity objects from the live event graph fabric.
 
@@ -189,7 +177,7 @@ async def events_seed(
     goal: str = Query(default="", description="Goal query for recall_relevance ranking"),
     top_k: int = Query(default=5, ge=1, le=20),
     since_hours: float = Query(default=24.0, gt=0.0, le=720.0),
-    _auth: None = Depends(_check_fabric_auth),
+    principal: Principal = Depends(require_principal),
 ):
     """Return a ranked context bundle for fabric_seed session warm-up.
 
@@ -228,7 +216,7 @@ async def agent_trail(
     project: Optional[str] = Query(default=None, description="Filter by project slug"),
     since: Optional[str] = Query(default=None, description="ISO-8601 lower bound (inclusive)"),
     until: Optional[str] = Query(default=None, description="ISO-8601 upper bound (inclusive)"),
-    _auth: None = Depends(_check_fabric_auth),
+    principal: Principal = Depends(require_principal),
 ):
     """Return AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for ``agent_id``.
 
@@ -288,7 +276,7 @@ async def agent_trail(
 @router.get("/v1/graph/memory/{entity_id}/observers")
 async def memory_observers(
     entity_id: str,
-    _auth: None = Depends(_check_fabric_auth),
+    principal: Principal = Depends(require_principal),
 ):
     """Return all distinct ``agent_id`` values that have an AGENT_RECEIVED edge to ``entity_id``.
 

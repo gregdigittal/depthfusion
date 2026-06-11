@@ -8,9 +8,9 @@ Transport: two-endpoint SSE pattern (MCP spec 2025-03-26)
 
 Security:
   - Default bind: 127.0.0.1:7301 (loopback)
-  - DEPTHFUSION_MCP_PUBLIC=1 → binds 0.0.0.0 (requires DEPTHFUSION_MCP_TOKEN)
-  - Bearer token validated on every /sse and /messages request
-  - startup raises ValueError if public bind requested without token
+  - DEPTHFUSION_MCP_PUBLIC=1 → binds 0.0.0.0 (requires OIDC env vars)
+  - All non-health routes require a verified Principal via require_principal
+  - startup raises ValueError if public bind requested without OIDC config
 """
 from __future__ import annotations
 
@@ -25,10 +25,12 @@ from typing import AsyncGenerator, Optional
 _VERSION = _pkg_version("depthfusion")
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from depthfusion.api.auth import require_principal
 from depthfusion.core.config import DepthFusionConfig
+from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import _process_request
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ _PING_INTERVAL = 30.0
 
 
 # ---------------------------------------------------------------------------
-# Auth + binding helpers (mirrors api/rest.py pattern exactly)
+# Binding helpers
 # ---------------------------------------------------------------------------
 
 def get_mcp_bind_host() -> str:
@@ -52,19 +54,13 @@ def get_mcp_bind_host() -> str:
 
 def validate_mcp_public_bind() -> None:
     if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1" and not os.getenv(
-        "DEPTHFUSION_MCP_TOKEN", ""
+        "DEPTHFUSION_JWKS_URI", ""
     ):
         raise ValueError(
-            "DEPTHFUSION_MCP_TOKEN must be set when DEPTHFUSION_MCP_PUBLIC=1. "
+            "DEPTHFUSION_JWKS_URI (and DEPTHFUSION_OIDC_ISSUER / DEPTHFUSION_OIDC_AUDIENCE) "
+            "must be set when DEPTHFUSION_MCP_PUBLIC=1. "
             "Public bind without bearer token authentication is forbidden."
         )
-
-
-def _check_mcp_auth(authorization: Optional[str] = Header(default=None)) -> None:
-    token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1" and token:
-        if authorization != f"Bearer {token}":
-            raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +75,7 @@ async def health():
 @app.get("/sse")
 async def sse_endpoint(
     request: Request,
-    _auth: None = Depends(_check_mcp_auth),
+    principal: Principal = Depends(require_principal),
 ) -> StreamingResponse:
     session_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
@@ -117,7 +113,7 @@ async def sse_endpoint(
 async def messages_endpoint(
     request: Request,
     sessionId: str,
-    _auth: None = Depends(_check_mcp_auth),
+    principal: Principal = Depends(require_principal),
 ):
     if sessionId not in _MCP_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found or expired")
@@ -127,7 +123,7 @@ async def messages_endpoint(
 
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
-        None, _process_request, body, config
+        None, _process_request, body, config, principal
     )
 
     if response:

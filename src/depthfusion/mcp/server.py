@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from depthfusion.router.bus import ContextBus
+from depthfusion.mcp.authz import AuthorizationError, check_tool_access
+from depthfusion.identity.models import Principal
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +138,26 @@ def _handle_tools_list(config: Any) -> dict:
         "tools": [_make_tool_schema(n, TOOLS[n]) for n in enabled]
     }
 
-def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
-    """Dispatch a tool call and return MCP-formatted result."""
+def _handle_tools_call(
+    tool_name: str,
+    arguments: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> dict:
+    """Dispatch a tool call and return MCP-formatted result.
+
+    Parameters
+    ----------
+    tool_name:
+        The MCP tool identifier (e.g. ``"depthfusion_recall_relevant"``).
+    arguments:
+        Caller-supplied arguments.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller bound to this session.  ``None`` for
+        unauthenticated stdio sessions (will be rejected by authz).
+    """
     if tool_name not in TOOLS:
         return {
             "isError": True,
@@ -151,9 +171,18 @@ def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
             "content": [{"type": "text", "text": f"Tool {tool_name} is disabled by config"}],
         }
 
+    # Principal binding + capability check (T-578 / T-579)
+    try:
+        check_tool_access(tool_name, principal)
+    except AuthorizationError as exc:
+        return {
+            "isError": True,
+            "content": [{"type": "text", "text": f"Authorization denied: {exc}"}],
+        }
+
     # Dispatch to tool implementations
     try:
-        result_text = _dispatch_tool(tool_name, arguments, config)
+        result_text = _dispatch_tool(tool_name, arguments, config, principal)
         return {
             "isError": False,
             "content": [{"type": "text", "text": result_text}],
@@ -164,8 +193,28 @@ def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
             "content": [{"type": "text", "text": f"Tool error: {exc}"}],
         }
 
-def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
-    """Route tool calls to their implementations."""
+def _dispatch_tool(
+    tool_name: str,
+    arguments: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> str:
+    """Route tool calls to their implementations.
+
+    Parameters
+    ----------
+    tool_name:
+        The MCP tool identifier.
+    arguments:
+        Caller-supplied arguments.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller.  By the time this function is called,
+        ``check_tool_access`` has already validated the principal — callers
+        that skip ``_handle_tools_call`` must call ``check_tool_access``
+        themselves.
+    """
     if tool_name == "depthfusion_status":
         return _tool_status(config)
     elif tool_name == "depthfusion_recall_relevant":
@@ -227,8 +276,25 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
-def _process_request(request: dict, config: Any) -> dict:
-    """Process a single JSON-RPC request and return the response."""
+def _process_request(
+    request: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> dict:
+    """Process a single JSON-RPC request and return the response.
+
+    Parameters
+    ----------
+    request:
+        Parsed JSON-RPC 2.0 request object.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller bound to this MCP session.  ``None`` for
+        unauthenticated stdio sessions — tool calls will be rejected by the
+        capability check unless the tool is accessible without a principal
+        (currently none are).
+    """
     method = request.get("method", "")
     req_id = request.get("id")
     params = request.get("params", {})
@@ -244,7 +310,7 @@ def _process_request(request: dict, config: Any) -> dict:
     elif method == "tools/call":
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
-        result = _handle_tools_call(tool_name, arguments, config)
+        result = _handle_tools_call(tool_name, arguments, config, principal)
     elif method == "notifications/initialized":
         # Notification — no response needed
         return {}

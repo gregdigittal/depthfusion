@@ -2,6 +2,13 @@
 
 Provides filtered, cursor-paginated access to discovery files and session
 (recall) events without modifying or indexing the underlying storage.
+
+T-575: All query functions accept a ``principal`` argument.  Discovery records
+are trimmed to those the principal can see (acl_allow check via
+:mod:`depthfusion.authz.frontmatter`).  Session / aggregate data carries no
+per-record ACL today, so the principal is accepted but not further filtered —
+callers are expected to supply it so future column-level trimming can be added
+without a signature change.
 """
 from __future__ import annotations
 
@@ -11,7 +18,10 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from depthfusion.identity.models import Principal
 
 _DISCOVERIES_DIR = Path.home() / ".claude" / "shared" / "discoveries"
 _METRICS_DIR = Path.home() / ".claude" / "depthfusion-metrics"
@@ -35,6 +45,42 @@ def _decode_cursor(cursor: Optional[str]) -> Optional[int]:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# ACL helper
+# ---------------------------------------------------------------------------
+
+def _principal_can_see(content: str, principal: "Optional[Principal]") -> bool:
+    """Return True if *principal* is allowed to read a discovery file.
+
+    When *principal* is None (unauthenticated / no trimming requested) we
+    allow access — callers are responsible for ensuring a principal is always
+    supplied on authenticated routes.
+
+    The check reads ``acl_allow`` from the document's YAML frontmatter via
+    :func:`depthfusion.authz.frontmatter.parse_acl`.  When frontmatter is
+    absent the default from ``parse_acl`` applies (``acl_allow=["greg"]``,
+    ``classification=internal``).
+
+    Allowed when at least one of ``principal.principal_id`` or any item in
+    ``principal.groups`` appears in the parsed ``acl_allow`` list.
+    """
+    if principal is None:
+        return True
+
+    try:
+        from depthfusion.authz.frontmatter import parse_acl
+        acl = parse_acl(content)
+    except Exception:
+        # Malformed ACL frontmatter → fail-closed.
+        return False
+
+    allowed_ids: set[str] = {principal.principal_id}
+    for g in (principal.groups or []):
+        allowed_ids.add(g)
+
+    return bool(set(acl.acl_allow) & allowed_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -104,8 +150,15 @@ def query_discoveries(
     cursor: Optional[str] = None,
     limit: int = 100,
     discoveries_dir: Optional[Path] = None,
+    principal: "Optional[Principal]" = None,
 ) -> dict[str, Any]:
-    """Return paginated discovery records matching filters."""
+    """Return paginated discovery records matching filters.
+
+    T-575: only records visible to *principal* (via acl_allow frontmatter) are
+    included.  When *principal* is None, no ACL trimming is applied — this is
+    intentional for the legacy/internal path; callers on authenticated routes
+    MUST supply the principal.
+    """
     base = discoveries_dir or _DISCOVERIES_DIR
     pattern = str(base / "*.md")
     all_files = sorted(glob.glob(pattern))
@@ -113,7 +166,14 @@ def query_discoveries(
     records: list[dict] = []
     for fp in all_files:
         try:
-            rec = _discovery_record(Path(fp))
+            path = Path(fp)
+            # ACL check — read full text once; pass to both _principal_can_see
+            # and _discovery_record (which re-reads; acceptable for filesystem).
+            content = path.read_text(errors="replace")
+            if not _principal_can_see(content, principal):
+                continue
+
+            rec = _discovery_record(path)
         except Exception:
             continue
 
@@ -197,8 +257,15 @@ def query_sessions(
     cursor: Optional[str] = None,
     limit: int = 100,
     metrics_dir: Optional[Path] = None,
+    principal: "Optional[Principal]" = None,
 ) -> dict[str, Any]:
-    """Return paginated recall session event records matching filters."""
+    """Return paginated recall session event records matching filters.
+
+    T-575: *principal* is accepted and threaded through for future per-row
+    trimming.  Session JSONL files do not carry per-record acl_allow today so
+    no rows are filtered beyond what the authenticated route gate already
+    enforces.
+    """
     base = metrics_dir or _METRICS_DIR
     recall_files = _recall_files_in_range(base, from_dt, to_dt)
 
@@ -259,12 +326,18 @@ def query_aggregate(
     from_dt: Optional[datetime] = None,
     to_dt: Optional[datetime] = None,
     metrics_dir: Optional[Path] = None,
+    principal: "Optional[Principal]" = None,
 ) -> dict[str, Any]:
     """Return aggregated statistics over recall session events.
 
     Streams directly from JSONL files — does not materialise all events in
     memory. The latency p95 sample list is capped at 100k values to avoid
     unbounded memory growth on very large datasets.
+
+    T-575: *principal* is accepted for API consistency and future trimming.
+    Aggregate statistics are computed over the records the caller can see; the
+    session JSONL format does not carry per-record ACL today so no rows are
+    dropped by principal checks here.
     """
     base = metrics_dir or _METRICS_DIR
     recall_files = _recall_files_in_range(base, from_dt, to_dt)

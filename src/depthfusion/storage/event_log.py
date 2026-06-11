@@ -10,6 +10,18 @@ from depthfusion.core.file_locking import flock_ex, flock_sh, flock_un
 from depthfusion.core.memory import MemoryEvent
 
 
+def _validate_event_acl(event: MemoryEvent) -> None:
+    """T-562: reject event writes where acl_allow is missing or empty.
+
+    acl_allow is carried in event.payload["extra"]["acl_allow"].
+    Raises ValueError("acl_allow is required") if missing or empty.
+    """
+    extra = event.payload.get("extra", {}) if isinstance(event.payload, dict) else {}
+    acl_allow = extra.get("acl_allow")
+    if not acl_allow:
+        raise ValueError("acl_allow is required")
+
+
 class EventLog:
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -32,6 +44,8 @@ class EventLog:
                         pass
 
     def append(self, event: MemoryEvent) -> bool:
+        # T-562: enforce ACL stamp before any write.
+        _validate_event_acl(event)
         with self._lock:
             if event.event_id in self._seen_ids:
                 return False
