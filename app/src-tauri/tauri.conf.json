@@ -51,7 +51,7 @@
         "https://releases.depthfusion.app/{{target}}/{{arch}}/{{current_version}}"
       ],
       "dialog": false,
-      "pubkey": ""
+      "pubkey": "SadII2LTpKLN6HmOYdc2Dol7JoJlCbsBZn+Um7Am8E0="
     }
   }
 }
