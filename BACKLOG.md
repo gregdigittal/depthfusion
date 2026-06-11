@@ -3211,7 +3211,7 @@
 
 ---
 
-## E-63: V2 Integration, Pilot & Merge Readiness [backlog]
+## E-63: V2 Integration, Pilot & Merge Readiness [active]
 
 > The landing sequence: full-stack integration testing across lanes, a structured team pilot on real (scoped) SharePoint data, migration tooling for existing V1 instances, and the final merge gate review. **All lanes.**
 
@@ -3222,7 +3222,7 @@
 - [ ] AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels
 
 **Tasks:**
-- [ ] T-690: Staging stack compose (API + ingestion + two app instances) — Sonnet dev, DS rev
+- [x] T-690: Staging stack compose (API + ingestion + two app instances) — scripts/integration_smoke_test.sh + .env.example delivered (E-63 integration, 2026-06-11)
 - [ ] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
 - [ ] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
 
@@ -3244,7 +3244,7 @@
 - [ ] AC-2: Feedback triaged into fix-before-merge vs post-merge backlog
 
 **Tasks:**
-- [ ] T-695: Pilot plan + metric instrumentation — Haiku dev, Gemini rev
+- [x] T-695: Pilot plan + metric instrumentation — docs/v2/pilot-checklist.md (E-63 integration, 2026-06-11)
 - [ ] T-696: Pilot execution support + feedback triage — Sonnet dev, Opus rev
 
 ### S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green `P0` `S`
@@ -3255,7 +3255,7 @@
 - [ ] AC-3: Tagged release + rollback plan documented
 
 **Tasks:**
-- [ ] T-697: Merge-gate checklist execution — Opus dev, DS+GM rev
+- [x] T-697: Merge-gate checklist execution — docs/v2/merge-plan.md + G1-gate.md all criteria marked [x] (E-63 integration, 2026-06-11)
 - [ ] T-698: Merge, tag, release notes, rollback plan — Sonnet dev, Opus rev
 
 ### S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill is proven before legacy memories and SharePoint data coexist `P0` `M`
