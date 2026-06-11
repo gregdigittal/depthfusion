@@ -123,7 +123,7 @@ async def messages_endpoint(
 
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
-        None, _process_request, body, config
+        None, _process_request, body, config, principal
     )
 
     if response:
