@@ -1,6 +1,6 @@
 """Base types and quarantine infrastructure for document ingestion.
 
-T-590: QuarantineEntry dataclass and module-level quarantine helpers.
+T-590: DocumentRecord dataclass, DocumentParser protocol, QuarantineEntry + registry.
 T-591: QuarantineStore class with retry tracking semantics.
 
 Usage::
@@ -32,7 +32,73 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
+
+# ---------------------------------------------------------------------------
+# DocumentRecord and DocumentParser (T-590)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DocumentRecord:
+    """A single parsed document.
+
+    Attributes:
+        source_id:       Unique identifier for the source document.
+        source_type:     One of "file", "sharepoint", or "url".
+        title:           Document title or filename.
+        content:         Full extracted plain text.
+        chunks:          Paragraph chunks for embedding.
+        heading_path:    Breadcrumb of headings above the chunk.
+        mime_type:       MIME type of the original document.
+        acl_allow:       List of principal identifiers allowed to view.
+        classification:  Security classification; defaults to "internal".
+        parse_timestamp: ISO-8601 timestamp when parsing occurred; empty if unavailable.
+    """
+
+    source_id: str
+    source_type: str = "file"  # "file" | "sharepoint" | "url"
+    title: str = ""
+    content: str = ""  # full extracted plain text
+    chunks: list[str] = field(default_factory=list)  # paragraph chunks for embedding
+    heading_path: list[str] = field(default_factory=list)  # breadcrumb of headings
+    mime_type: str = "text/plain"
+    acl_allow: list[str] = field(default_factory=list)
+    classification: str = "internal"
+    parse_timestamp: str = ""
+
+
+@runtime_checkable
+class DocumentParser(Protocol):
+    """Provider-agnostic document parser contract.
+
+    Implementations MUST:
+      - Return an empty list on empty input or malformed data.
+      - Never raise; swallow parse errors and return what could be decoded.
+      - Populate ``chunks`` and ``heading_path`` as best-effort from the
+        document structure; empty lists are acceptable if not applicable.
+    """
+
+    name: str
+    supported_mime_types: list[str]
+
+    def parse(self, source_id: str, data: bytes) -> list[DocumentRecord]:
+        """Parse raw document bytes into a list of DocumentRecords.
+
+        Args:
+            source_id: Stable identifier for the source document.
+            data:      Raw bytes of the document.
+
+        Returns:
+            A list of :class:`DocumentRecord` instances.  May be empty on
+            failure, but should not raise.
+        """
+        ...
+
+
+# ---------------------------------------------------------------------------
+# QuarantineEntry and QuarantineStore (T-590 / T-591)
+# ---------------------------------------------------------------------------
 
 @dataclass
 class QuarantineEntry:
@@ -171,6 +237,8 @@ class QuarantineStore:
 # ---------------------------------------------------------------------------
 
 _default_quarantine_store: QuarantineStore = QuarantineStore()
+# Backward-compat alias used in some tests
+_quarantine_store = _default_quarantine_store
 
 
 def get_quarantine_store() -> QuarantineStore:
@@ -197,8 +265,11 @@ def get_quarantine() -> list[QuarantineEntry]:
 
 
 __all__ = [
+    "DocumentParser",
+    "DocumentRecord",
     "QuarantineEntry",
     "QuarantineStore",
+    "_quarantine_store",
     "get_quarantine",
     "get_quarantine_store",
     "quarantine",

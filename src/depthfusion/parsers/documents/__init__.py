@@ -50,6 +50,10 @@ class DocumentParserRegistry:
         """Return all registered MIME types."""
         return list(self._registry.keys())
 
+    def registered_types(self) -> list[str]:
+        """Alias for supported_types() — return all registered MIME types."""
+        return self.supported_types()
+
 
 # Module-level default registry singleton
 _default_registry = DocumentParserRegistry()
