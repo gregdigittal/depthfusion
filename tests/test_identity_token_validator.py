@@ -35,6 +35,7 @@ from depthfusion.identity import (  # noqa: E402
     Principal,
     TokenValidator,
 )
+from depthfusion.identity.oidc_client import OidcClient  # noqa: E402
 from depthfusion.identity.errors import (  # noqa: E402
     JwksFetchError,
     TokenExpiredError,
@@ -299,3 +300,16 @@ def test_device_code_result_defaults() -> None:
     assert result.interval == 5
     assert result.verification_uri_complete is None
     assert result.message is None
+
+
+# --------------------------------------------------------------------------- #
+# build_pkce_url CSRF state                                                    #
+# --------------------------------------------------------------------------- #
+def test_build_pkce_url_returns_state_value() -> None:
+    client = OidcClient(
+        client_id="test-client",
+        tenant_id="test-tenant",
+    )
+    url, verifier, nonce, state = client.build_pkce_url()
+    assert len(state) >= 16
+    assert state != nonce  # distinct values

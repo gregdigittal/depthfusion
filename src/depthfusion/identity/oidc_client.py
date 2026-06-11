@@ -128,16 +128,18 @@ class OidcClient:
     # ------------------------------------------------------------------ #
     # Authorization-code flow (PKCE)                                     #
     # ------------------------------------------------------------------ #
-    def build_pkce_url(self) -> tuple[str, str, str]:
+    def build_pkce_url(self) -> tuple[str, str, str, str]:
         """Build a PKCE authorization-request URL.
 
         Returns
         -------
-        (url, verifier, nonce):
+        (url, verifier, nonce, state):
             ``url`` is the authorize endpoint the user-agent should visit.
             ``verifier`` is the PKCE code_verifier to keep and pass to
             :meth:`exchange_code`. ``nonce`` must be validated against the
-            returned ID token.
+            returned ID token. ``state`` must be stored and validated against
+            the ``state`` parameter returned in the redirect callback to
+            prevent CSRF attacks.
         """
         verifier = _generate_pkce_verifier()
         challenge = _pkce_challenge(verifier)
@@ -155,7 +157,7 @@ class OidcClient:
             "response_mode": "query",
         }
         url = f"{self._authorize_endpoint}?{urlencode(params)}"
-        return url, verifier, nonce
+        return url, verifier, nonce, state
 
     async def exchange_code(
         self,
