@@ -2628,8 +2628,8 @@
 
 **Tasks:**
 - [x] T-544: Add `src/depthfusion/identity/` package: OIDC client, JWKS cache, token validator — Opus dev, DS+GM rev
-- [ ] T-545: Device-code flow for CLI sessions — Sonnet dev, DS rev
-- [ ] T-546: Principal store (SQLite table: `principal_id, upn, groups, last_seen`) — Sonnet dev, DS rev
+- [x] T-545: Device-code flow for CLI sessions — Sonnet dev, DS rev
+- [x] T-546: Principal store (SQLite table: `principal_id, upn, groups, last_seen`) — Sonnet dev, DS rev
 - [x] T-547: Entra app registration runbook + test-tenant fixtures — Ollama dev, Sonnet rev
 - [ ] T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — Haiku dev, Opus rev
 
@@ -2642,7 +2642,7 @@
 - [ ] AC-4: 100% route coverage verified by an automated route-walker test
 
 **Tasks:**
-- [ ] T-549: `require_principal` dependency + error envelope — Opus dev, DS+GM rev
+- [x] T-549: `require_principal` dependency + error envelope — Opus dev, DS+GM rev
 - [ ] T-550: Sweep all ~42 REST routes + fabric + MCP HTTP routes onto the dependency — Sonnet dev, Gemini rev (whole-file audit)
 - [ ] T-551: Legacy-token compatibility shim + deprecation telemetry — Sonnet dev, DS rev
 - [ ] T-552: Route-walker test asserting every registered route enforces auth — Haiku dev, Opus rev
@@ -2927,7 +2927,7 @@
 **Tasks:**
 - [x] T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — Sonnet dev, Gemini rev
 - [x] T-627: CI build matrix (mac universal, win x64) + artifact upload — Sonnet dev, DS rev
-- [ ] T-628: Typed IPC layer + CSP hardening — Opus dev, DS rev
+- [x] T-628: Typed IPC layer + CSP hardening — Opus dev, DS rev
 
 ### S-181: As a team member, I want to sign in inside the app so that my session is my corporate identity `P0` `M`
 
