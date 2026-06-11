@@ -23,6 +23,9 @@ pub fn run() {
             auth::commands::start_login,
             auth::commands::handle_deep_link,
             auth::commands::poll_auth_state,
+            auth::commands::store_tokens,
+            auth::commands::load_tokens,
+            auth::commands::clear_tokens,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

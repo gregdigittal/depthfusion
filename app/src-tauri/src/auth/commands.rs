@@ -1,10 +1,11 @@
-/// Tauri IPC commands for the OIDC auth flow.
+/// Tauri IPC commands for the OIDC auth flow and token vault.
 
 use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 use super::oidc::{self, OidcConfig, OidcError, TokenSet};
+use super::vault;
 
 fn default_config() -> OidcConfig {
     OidcConfig {
@@ -51,18 +52,50 @@ pub async fn handle_deep_link(raw_url: String) -> Result<TokenSet, String> {
 
 /// Poll the current auth state.
 ///
-/// The frontend calls this after `startLogin()` and retries until either a
-/// `TokenSet` is available (set by `handle_deep_link`) or the user cancels.
-///
-/// This command is intentionally thin — the actual state is held server-side
-/// until the deep-link fires and the Rust side calls `handle_deep_link`.
-/// For now it returns `null` (None) so the frontend can detect "not yet authed".
-///
-/// A richer implementation (T-630) will check the vault for a cached session.
+/// Returns the cached `TokenSet` from the OS keychain if one exists, otherwise
+/// `None` (frontend should then trigger `startLogin()`).
 #[tauri::command]
 pub async fn poll_auth_state() -> Option<TokenSet> {
-    // Phase 1: no persistent vault yet — the deep-link command drives completion.
-    // The TypeScript layer will call handle_deep_link once the URL arrives via the
-    // deep-link plugin event, so this stub is sufficient for the OIDC handshake.
-    None
+    // T-630: check the vault for a cached session.
+    match vault::load_tokens() {
+        Ok(Some(vt)) => {
+            // Re-export vault::TokenSet as the canonical oidc::TokenSet shape.
+            Some(TokenSet {
+                access_token: vt.access_token,
+                id_token: vt.id_token,
+                refresh_token: vt.refresh_token,
+                expires_in: vt.expires_in,
+                token_type: vt.token_type,
+            })
+        }
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Vault IPC commands (T-630)
+// ---------------------------------------------------------------------------
+
+/// Store a `TokenSet` in the OS keychain.
+///
+/// Overwrites any previously stored session.
+#[tauri::command]
+pub fn store_tokens(tokens: vault::TokenSet) -> Result<(), String> {
+    vault::store_tokens(&tokens).map_err(|e| e.to_string())
+}
+
+/// Load the `TokenSet` from the OS keychain.
+///
+/// Returns `null` (None) when no entry is present — not an error.
+#[tauri::command]
+pub fn load_tokens() -> Result<Option<vault::TokenSet>, String> {
+    vault::load_tokens().map_err(|e| e.to_string())
+}
+
+/// Delete the stored `TokenSet` from the OS keychain.
+///
+/// Idempotent — succeeds even when no entry exists.
+#[tauri::command]
+pub fn clear_tokens() -> Result<(), String> {
+    vault::clear_tokens().map_err(|e| e.to_string())
 }
