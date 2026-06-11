@@ -4,11 +4,24 @@ Mounts under the main app at prefix ``/v2/analytics``.
 
 Authentication
 --------------
-The endpoint uses :func:`_get_principal_id` which resolves the caller's
-principal from the ``Authorization: Bearer <token>`` header via
-``depthfusion.identity.fastapi_deps.require_principal`` when the
-identity package is available, or falls back to a simple token-based
-identity for compatibility with pre-identity deployments.
+The endpoint validates the Bearer token via
+``depthfusion.identity.TokenValidator`` (RS256, JWKS-backed) when the
+identity package and the three required env vars are available:
+
+    DEPTHFUSION_JWKS_URI      — JWKS endpoint URL
+    DEPTHFUSION_OIDC_ISSUER   — Expected ``iss`` claim
+    DEPTHFUSION_OIDC_AUDIENCE — Expected ``aud`` claim
+
+The validated ``sub`` claim is used as the principal_id.  The raw bearer
+token is never stored, logged, or returned.
+
+Dev / test fallback
+-------------------
+If the identity stack is unavailable *and*
+``DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1`` is set, a SHA-256 prefix of the
+token is used as a stable dev principal_id.  This mode MUST NOT be
+enabled in production — the startup log will emit a prominent WARNING.
+A 503 is returned in all other unauthenticated cases.
 
 ACL enforcement
 ---------------
@@ -18,10 +31,11 @@ parameter.  This ensures a caller can only see their own usage events.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
@@ -29,6 +43,71 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 analytics_router = APIRouter(prefix="/v2/analytics", tags=["analytics"])
+
+# ---------------------------------------------------------------------------
+# Module-level validator (built once at import time)
+# ---------------------------------------------------------------------------
+
+_ALLOW_UNAUTH: bool = os.getenv("DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# _module_validator is None when the identity stack is unavailable OR when
+# the required env vars are not configured.
+_module_validator: Any = None
+
+try:
+    from depthfusion.identity.jwks_cache import JwksCache  # type: ignore[import]
+    from depthfusion.identity.token_validator import TokenValidator  # type: ignore[import]
+
+    _issuer = os.environ.get("DEPTHFUSION_OIDC_ISSUER", "").strip()
+    _audience = os.environ.get("DEPTHFUSION_OIDC_AUDIENCE", "").strip()
+
+    if _issuer and _audience:
+        # JwksCache.from_env() reads DEPTHFUSION_JWKS_URI; raises JwksFetchError
+        # if unset — let that propagate so misconfiguration is visible at startup.
+        _jwks = JwksCache.from_env()
+        _module_validator = TokenValidator(
+            jwks_cache=_jwks,
+            expected_issuer=_issuer,
+            expected_audience=_audience,
+        )
+        logger.info(
+            "analytics: JWT validation enabled (issuer=%r, audience=%r)",
+            _issuer,
+            _audience,
+        )
+    else:
+        if _ALLOW_UNAUTH:
+            logger.warning(
+                "analytics: DEPTHFUSION_OIDC_ISSUER or DEPTHFUSION_OIDC_AUDIENCE "
+                "not set; DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1 active — "
+                "dev token-hash fallback enabled (NOT for production)"
+            )
+        else:
+            logger.error(
+                "analytics: DEPTHFUSION_OIDC_ISSUER / DEPTHFUSION_OIDC_AUDIENCE "
+                "not configured and DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS is unset. "
+                "All /v2/analytics requests will return 503."
+            )
+except ImportError:
+    if _ALLOW_UNAUTH:
+        logger.warning(
+            "analytics: identity stack not installed; "
+            "DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1 active — "
+            "dev token-hash fallback enabled (NOT for production)"
+        )
+    else:
+        logger.error(
+            "analytics: identity stack not installed and "
+            "DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS is unset. "
+            "All /v2/analytics requests will return 503. "
+            "Install depthfusion-identity or set DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1 "
+            "for development."
+        )
+
 
 # ---------------------------------------------------------------------------
 # DB path resolution
@@ -46,26 +125,16 @@ def _default_db_path() -> Path:
 # Principal resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_principal_id(authorization: Optional[str]) -> str:
-    """Extract a principal_id from the Authorization header.
+async def _resolve_principal_id(authorization: Optional[str]) -> str:
+    """Validate the Authorization header and return the principal's sub claim.
 
-    Tries the full identity stack first; falls back to the bearer token
-    value itself (useful in dev/test without OIDC configured).
+    Returns the validated JWT ``sub`` claim — an opaque stable identifier,
+    not a credential.  The return value is safe to store, log, and use as a
+    database key.
 
-    Raises HTTP 401 when no credential is present.
+    Raises ``HTTP 401`` on missing / malformed / invalid credentials.
+    Raises ``HTTP 503`` if no authentication mechanism is configured.
     """
-    # Try the full identity stack if available
-    try:
-        from depthfusion.identity.fastapi_deps import make_require_principal  # type: ignore[import]
-        from depthfusion.identity.token_validator import TokenValidator  # type: ignore[import]
-
-        # If identity stack is present, defer to it
-        # (In test contexts this path is typically mocked)
-        _ = make_require_principal
-        _ = TokenValidator
-    except ImportError:
-        pass  # Identity package not installed in this lane — use simple fallback
-
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -88,11 +157,46 @@ def _resolve_principal_id(authorization: Optional[str]) -> str:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # In the absence of the full identity stack, treat the token value as
-    # the principal_id.  This is appropriate for internal deployments where
-    # the token IS the principal (e.g. service-account keys, API keys).
-    # Enterprise deployments with OIDC should deploy with the identity package.
-    return token
+    # --- Production path: validate RS256 JWT and return sub claim ----------
+    if _module_validator is not None:
+        try:
+            claims: dict[str, Any] = await _module_validator.validate(token)
+        except Exception as exc:
+            # Log by exception class only — never log the token itself.
+            logger.debug("analytics: token validation failed: %s", type(exc).__name__)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "detail": "Token validation failed"},
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from None
+        sub = claims.get("sub")
+        if not sub or not isinstance(sub, str):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "detail": "Token missing sub claim"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return sub
+
+    # --- Dev fallback (explicit opt-in only) --------------------------------
+    if _ALLOW_UNAUTH:
+        # Return a short hash of the token — stable per-token identity that
+        # can safely appear in logs without exposing the credential itself.
+        return "dev-" + hashlib.sha256(token.encode()).hexdigest()[:16]
+
+    # --- No auth mechanism configured ---------------------------------------
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "error": "auth_unavailable",
+            "detail": (
+                "Analytics endpoint is not configured for authentication. "
+                "Set DEPTHFUSION_OIDC_ISSUER, DEPTHFUSION_OIDC_AUDIENCE, and "
+                "DEPTHFUSION_JWKS_URI, or DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1 "
+                "for development."
+            ),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +218,8 @@ class AnalyticsSummaryResponse(BaseModel):
 # Endpoint
 # ---------------------------------------------------------------------------
 
+_MAX_PERIOD_DAYS = 365  # Reject windows beyond the longest supported analytics range
+
 @analytics_router.get(
     "/summary",
     response_model=AnalyticsSummaryResponse,
@@ -121,30 +227,34 @@ class AnalyticsSummaryResponse(BaseModel):
     description=(
         "Returns aggregated usage counts (searches, ingests, syncs) for the "
         "requesting principal over the specified period.  The principal is "
-        "derived from the Bearer token — callers can only see their own metrics."
+        "derived from the validated Bearer token — callers can only see "
+        "their own metrics."
     ),
 )
 async def get_analytics_summary(
     period: str = Query(
         default="7d",
-        description="Look-back window, e.g. ``7d``, ``30d``, ``1d``.",
-        pattern=r"^\d+d$",
+        description="Look-back window, e.g. ``7d``, ``30d``, ``1d``. Max 365d.",
+        pattern=r"^[1-9]\d{0,3}d$",  # 1d–9999d; prefix keeps int parse bounded
     ),
     authorization: Optional[str] = Header(default=None),
     db_path: Path = Depends(_default_db_path),
 ) -> AnalyticsSummaryResponse:
     """Return usage summary for the authenticated principal."""
-    principal_id = _resolve_principal_id(authorization)
+    principal_id = await _resolve_principal_id(authorization)
 
     # Parse period string ("7d" → 7)
     try:
         period_days = int(period.removesuffix("d"))
-        if period_days < 1:
-            raise ValueError("period_days must be >= 1")
+        if not (1 <= period_days <= _MAX_PERIOD_DAYS):
+            raise ValueError(f"period_days must be 1–{_MAX_PERIOD_DAYS}")
     except (ValueError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid period format {period!r}. Use e.g. '7d', '30d'.",
+            detail=(
+                f"Invalid period {period!r}. Use e.g. '7d', '30d'. "
+                f"Max {_MAX_PERIOD_DAYS}d."
+            ),
         )
 
     from .aggregation import AggregationService
