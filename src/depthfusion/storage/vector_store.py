@@ -1,10 +1,14 @@
 """ChromaDB vector store wrapper for DepthFusion Tier 2."""
 from __future__ import annotations
 
+import json as _json_mod
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from depthfusion.identity.models import Principal, cast
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +151,20 @@ class ChromaDBStore:
                 metadatas=[metadata],
             )
 
-    def query(self, query_text: str, top_k: int = 20) -> list[dict]:
-        """Return top_k most similar documents.
+    def query(
+        self,
+        query_text: str,
+        top_k: int = 20,
+        *,
+        principal: "Optional[Principal]" = None,
+    ) -> list[dict]:
+        """Return top_k most similar documents, filtered by principal ACL.
+
+        T-571/T-572: every retrieval call carries the requesting Principal.
+        When principal is not None, only documents whose acl_allow metadata
+        includes principal.principal_id or any of principal.groups are
+        returned.  When principal is None, no ACL filter is applied (internal
+        / system callers only).
 
         Uses the DepthFusion embedding backend for the query vector when
         healthy; falls back to Chroma's built-in auto-embedding otherwise.
@@ -177,11 +193,36 @@ class ChromaDBStore:
         metadatas = results.get("metadatas") or []
         if not ids or not ids[0]:
             return []
+
+        # Build principal allowed set for ACL filtering.
+        allowed_ids: Optional[set[str]] = None
+        if principal is not None:
+            allowed_ids = {principal.principal_id}
+            for g in (principal.groups or []):
+                allowed_ids.add(g)
+
         output = []
         for i, doc_id in enumerate(ids[0]):
             dist = distances[0][i] if distances and distances[0] else 0.0
             content = documents[0][i] if documents and documents[0] else ""
             metadata = metadatas[0][i] if metadatas and metadatas[0] else {}
+
+            # T-572: ACL filter — check acl_allow in document metadata.
+            if allowed_ids is not None:
+                acl_raw = metadata.get("acl_allow")
+                # acl_allow is stored as JSON string or list in ChromaDB.
+                if isinstance(acl_raw, str):
+                    try:
+                        acl_list: list[str] = _json_mod.loads(acl_raw)
+                    except (ValueError, TypeError):
+                        acl_list = [acl_raw] if acl_raw.strip() else []
+                elif isinstance(acl_raw, list):
+                    acl_list = acl_raw
+                else:
+                    acl_list = []
+                if not (set(acl_list) & allowed_ids):
+                    continue  # not authorized — skip this document
+
             output.append({
                 "chunk_id": doc_id,
                 "content": content,

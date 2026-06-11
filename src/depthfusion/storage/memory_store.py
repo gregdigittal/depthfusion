@@ -6,9 +6,12 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from depthfusion.core.memory_object import MemoryObject
+
+if TYPE_CHECKING:
+    from depthfusion.identity.models import Principal
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +83,17 @@ SELECT rowid, content, summary,
        COALESCE(json_extract(data_json, '$.concepts_text'), '')
 FROM memories
 """
+
+
+def _principal_allowed(acl_allow: object, allowed_ids: "set[str]") -> bool:
+    """Return True if any member of allowed_ids appears in acl_allow.
+
+    acl_allow may be a list[str] or None/missing.  Returns False when
+    acl_allow is absent or empty (absent == deny).
+    """
+    if not acl_allow or not isinstance(acl_allow, list):
+        return False
+    return bool(set(acl_allow) & allowed_ids)
 
 
 def _validate_acl_fields(acl_allow: list[str]) -> None:
@@ -219,6 +233,53 @@ class MemoryStore:
         else:
             cur = self._conn.execute("SELECT COUNT(*) FROM memories")
         return cur.fetchone()[0]
+
+    def search(
+        self,
+        query: str,
+        *,
+        principal: "Optional[Any]" = None,
+        project_id: Optional[str] = None,
+        include_archived: bool = False,
+        limit: int = 50,
+    ) -> list["MemoryObject"]:
+        """Search memories by FTS query, filtered by principal ACL.
+
+        T-571: every retrieval call carries the requesting Principal.
+        Only records where principal.principal_id or any of principal.groups
+        appears in acl_allow are returned.  When principal is None, no ACL
+        filter is applied (internal / system callers only).
+
+        Falls back to the full corpus query when FTS is unavailable.
+        """
+        # Build candidate pool via FTS then ACL-filter, or full-scan + ACL-filter.
+        candidates = self.query(
+            project_id=project_id,
+            include_archived=include_archived,
+            limit=limit * 4,  # over-fetch; ACL filter will trim
+        )
+
+        if not query or not query.strip():
+            filtered = candidates
+        else:
+            # Try FTS for pre-filtering, then ACL-filter the results.
+            fts_ids = self._fts_search(query, limit=limit * 4)
+            if fts_ids:
+                id_set = set(fts_ids)
+                filtered = [m for m in candidates if m.id in id_set]
+            else:
+                filtered = candidates
+
+        if principal is not None:
+            allowed: set[str] = {principal.principal_id}
+            for g in (principal.groups or []):
+                allowed.add(g)
+            filtered = [
+                m for m in filtered
+                if _principal_allowed(m.extra.get("acl_allow"), allowed)
+            ]
+
+        return filtered[:limit]
 
     def _fts_search(self, query: str, limit: int = 50) -> list[str]:
         """Return memory IDs ranked by FTS5 relevance for `query`.

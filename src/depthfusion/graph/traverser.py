@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from depthfusion.graph.types import Edge, Entity, TraversalResult
 
 if TYPE_CHECKING:
     from depthfusion.graph.store import ChromaGraphStore, JSONGraphStore, SQLiteGraphStore
+    from depthfusion.identity.models import Principal
 
 # Threshold: entities below this are excluded from query expansion
 _CONFIDENCE_THRESHOLD = 0.70
@@ -21,13 +22,30 @@ _BOOST_PER_WEIGHT_UNIT = 0.10
 logger = logging.getLogger(__name__)
 
 
+def _graph_entity_allowed(entity: "Entity", allowed_ids: "set[str]") -> bool:
+    """Return True if the principal is allowed to see this entity.
+
+    T-571/T-572: checks entity.metadata["acl_allow"].  Returns True when
+    acl_allow is absent (no ACL stamped — legacy entities visible to all
+    principals) or when any allowed_id appears in acl_allow.
+    """
+    acl_allow = entity.metadata.get("acl_allow")
+    if acl_allow is None:
+        return True  # legacy — no ACL stamp means unrestricted
+    if not isinstance(acl_allow, list) or not acl_allow:
+        return False
+    return bool(set(acl_allow) & allowed_ids)
+
+
 def traverse(
     entity_id: str,
     store: "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore",
     depth: int = 1,
     relationship_filter: list[str] | None = None,
     time_window_hours: float | None = None,
-) -> TraversalResult | None:
+    *,
+    principal: "Principal | None" = None,
+) -> "TraversalResult | None":
     """Walk the graph from entity_id up to `depth` hops.
 
     Returns TraversalResult with all reachable (entity, edge) pairs,
@@ -45,10 +63,22 @@ def traverse(
             without `delta_hours` in metadata are INCLUDED (back-compat:
             non-temporal edges like CO_OCCURS or Haiku-inferred semantic
             edges don't carry a time delta and should not be filtered out).
+        principal: T-571 — when provided, only entities/edges the principal
+            is authorized to see are included in the result.
     """
     origin = store.get_entity(entity_id)
     if origin is None:
         return None
+
+    # Build allowed_ids set once for ACL checks.
+    allowed_ids: set[str] | None = None
+    if principal is not None:
+        allowed_ids = {principal.principal_id}
+        for g in (principal.groups or []):
+            allowed_ids.add(g)
+        # ACL-check the origin entity itself.
+        if not _graph_entity_allowed(origin, allowed_ids):
+            return None
 
     visited: set[str] = {entity_id}
     connected: list[tuple[Entity, Edge]] = []
@@ -72,6 +102,13 @@ def traverse(
                 if neighbor_id not in visited:
                     neighbor = store.get_entity(neighbor_id)
                     if neighbor:
+                        # T-571: ACL filter — skip neighbor entities the
+                        # principal cannot see.
+                        if allowed_ids is not None and not _graph_entity_allowed(
+                            neighbor, allowed_ids
+                        ):
+                            visited.add(neighbor_id)  # mark visited to avoid retry
+                            continue
                         connected.append((neighbor, edge))
                         next_frontier.add(neighbor_id)
                         visited.add(neighbor_id)
