@@ -2643,9 +2643,9 @@
 
 **Tasks:**
 - [x] T-549: `require_principal` dependency + error envelope — Opus dev, DS+GM rev
-- [ ] T-550: Sweep all ~42 REST routes + fabric + MCP HTTP routes onto the dependency — Sonnet dev, Gemini rev (whole-file audit)
-- [ ] T-551: Legacy-token compatibility shim + deprecation telemetry — Sonnet dev, DS rev
-- [ ] T-552: Route-walker test asserting every registered route enforces auth — Haiku dev, Opus rev
+- [x] T-550: Sweep all ~42 REST routes + fabric + MCP HTTP routes onto the dependency — Sonnet dev, Gemini rev (whole-file audit)
+- [x] T-551: Legacy-token compatibility shim + deprecation telemetry — Sonnet dev, DS rev
+- [x] T-552: Route-walker test asserting every registered route enforces auth — Haiku dev, Opus rev
 
 ### S-158: As an instance (VPS, laptop, Mac/MLX), I want a service identity so that machine-to-machine sync is authenticated and revocable per device `P0` `M`
 
