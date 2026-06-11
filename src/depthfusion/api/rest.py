@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from depthfusion.api.auth import require_principal
 from depthfusion.api.events import router as events_router
 from depthfusion.api.role_admin import router as role_admin_router
+from depthfusion.api.admin_console import router as admin_console_router
 from depthfusion.identity.models import Principal
 
 log = logging.getLogger(__name__)
@@ -43,6 +44,9 @@ app.include_router(events_router)
 
 # Mount the role-admin router (T-558)
 app.include_router(role_admin_router)
+
+# Mount the admin console router (E-60 / T-672..T-676)
+app.include_router(admin_console_router)
 
 
 def get_bind_host() -> str:
