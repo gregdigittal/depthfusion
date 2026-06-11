@@ -1,31 +1,36 @@
 openapi: "3.1.0"
 info:
   title: DepthFusion Query API
-  version: "1.0.0"
+  version: "2.0.0"
   description: |
     REST query endpoints for BI tools (Metabase, Grafana, Power BI, n8n).
     Binds loopback (127.0.0.1:7300) by default; expose via SSH tunnel or
     Cloudflare Tunnel for remote access.
 
-    Authentication: set DEPTHFUSION_QUERY_API_KEY env var and pass
-    X-DepthFusion-Key header on every request.
+    Authentication (V2): all query endpoints require a validated OIDC Bearer
+    token via ``Authorization: Bearer <token>``.  Results are trimmed to the
+    records visible to the authenticated principal (acl_allow check on
+    discovery files; session/aggregate endpoints are principal-scoped for
+    future row-level trimming).
+
+    Legacy API-key auth (``X-DepthFusion-Key``) has been retired in V2.
 
 servers:
   - url: http://127.0.0.1:7300
     description: Local (loopback) — access via SSH tunnel for remote BI
 
 security:
-  - ApiKeyAuth: []
+  - BearerAuth: []
 
 components:
   securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-DepthFusion-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
       description: |
-        Required when DEPTHFUSION_QUERY_API_KEY is set. Omit for
-        loopback-only localhost access without the env var configured.
+        OIDC RS256 JWT validated against DEPTHFUSION_JWKS_URI.
+        Results are trimmed to records visible to the authenticated principal.
 
   schemas:
     Cursor:
@@ -104,6 +109,9 @@ components:
             $ref: "#/components/schemas/DiscoveryRecord"
         total:
           type: integer
+          description: |
+            Count of records visible to the authenticated principal.
+            Does NOT include records the principal cannot see.
         count:
           type: integer
         next_cursor:
@@ -153,10 +161,14 @@ components:
 paths:
   /query/discoveries:
     get:
-      summary: Query discovery files
+      summary: Query discovery files (principal-scoped)
       description: |
         Return paginated records from ~/.claude/shared/discoveries/*.md files.
         YAML frontmatter fields (date, project, tags) are used for filtering.
+
+        **V2 ACL trimming**: only files whose ``acl_allow`` frontmatter includes
+        the authenticated principal's ID or one of their group memberships are
+        returned.  The ``total`` field reflects only the visible count.
       parameters:
         - name: project
           in: query
@@ -199,23 +211,26 @@ paths:
             default: 100
       responses:
         "200":
-          description: Paged discovery records
+          description: Paged discovery records (trimmed to principal view)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/PagedDiscoveries"
         "401":
-          description: Invalid or missing API key
+          description: Missing or invalid Bearer token
         "422":
           description: Invalid parameter (e.g. malformed date)
 
   /query/sessions:
     get:
-      summary: Query recall session events
+      summary: Query recall session events (principal-scoped)
       description: |
         Return paginated recall query events from
         ~/.claude/depthfusion-metrics/YYYY-MM-DD-recall.jsonl files.
         The `agent` parameter maps to the `mode` field (e.g. vps, vps-gpu).
+
+        **V2**: the principal is required; per-row ACL trimming will be applied
+        when session JSONL files gain acl_allow columns.
       parameters:
         - name: project
           in: query
@@ -258,16 +273,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/PagedSessions"
         "401":
-          description: Invalid or missing API key
+          description: Missing or invalid Bearer token
         "422":
           description: Invalid parameter
 
   /query/aggregate:
     get:
-      summary: Aggregate session statistics
+      summary: Aggregate session statistics (principal-scoped)
       description: |
         Return count, latency statistics, mode distribution, and config version
         distribution over recall events in the given date range.
+
+        **V2**: principal is required; aggregate counts reflect only
+        principal-visible records.
       parameters:
         - name: from
           in: query
@@ -283,12 +301,12 @@ paths:
           description: End datetime (ISO-8601)
       responses:
         "200":
-          description: Aggregated statistics
+          description: Aggregated statistics (trimmed to principal view)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AggregateResult"
         "401":
-          description: Invalid or missing API key
+          description: Missing or invalid Bearer token
         "422":
           description: Invalid parameter

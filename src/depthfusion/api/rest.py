@@ -252,6 +252,7 @@ async def get_discoveries(
             tags=tag_list,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
@@ -281,6 +282,7 @@ async def get_sessions(
             to_dt=to_dt,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
@@ -316,7 +318,7 @@ async def get_aggregate(
     from_dt = _parse_dt(from_, "from")
     to_dt = _parse_dt(to, "to")
 
-    return query_aggregate(from_dt=from_dt, to_dt=to_dt)
+    return query_aggregate(from_dt=from_dt, to_dt=to_dt, principal=principal)
 
 
 def _decode_telemetry_cursor(cursor: Optional[str]) -> int:
@@ -715,6 +717,7 @@ async def list_discoveries(
             tags=tag_list,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
