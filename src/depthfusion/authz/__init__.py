@@ -1,4 +1,5 @@
 """DepthFusion V2 Authorization — ACL enforcement, frontmatter parsing, and RBAC roles."""
+from .capability_check import AuthorizationError, require_capability
 from .frontmatter import ACLFrontmatter, parse_acl, write_acl
 from .roles import (
     Capability,
@@ -10,7 +11,9 @@ from .roles import (
 
 __all__ = [
     "ACLFrontmatter",
+    "AuthorizationError",
     "parse_acl",
+    "require_capability",
     "write_acl",
     "Capability",
     "Role",
