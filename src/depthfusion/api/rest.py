@@ -22,7 +22,8 @@ from typing import Optional
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
@@ -38,6 +39,11 @@ app = FastAPI(
     version="1.0.0",
     openapi_url="/openapi.json",
 )
+
+# HTTP gzip compression — E-61 performance hardening.
+# minimum_size=500: payloads smaller than 500 bytes are not worth compressing
+# (overhead exceeds gain). Starlette GZipMiddleware respects Accept-Encoding.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Mount the Event Graph Fabric router (S-142 / T-486)
 app.include_router(events_router)

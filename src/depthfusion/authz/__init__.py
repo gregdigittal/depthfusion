@@ -1,4 +1,4 @@
-"""DepthFusion V2 Authorization — ACL enforcement, frontmatter parsing, and RBAC roles."""
+"""DepthFusion V2 Authorization — ACL enforcement, frontmatter parsing, RBAC roles, and export controls."""
 from .capability_check import AuthorizationError, require_capability
 from .frontmatter import ACLFrontmatter, parse_acl, write_acl
 from .roles import (
@@ -7,6 +7,14 @@ from .roles import (
     ROLE_CAPABILITIES,
     RoleStore,
     has_capability,
+)
+from depthfusion.authz.export_controls import (
+    ClassificationLevel,
+    ExportFormat,
+    ExportPolicy,
+    ExportPolicyMatrix,
+    ExportDecision,
+    check_export_allowed,
 )
 
 __all__ = [
@@ -20,4 +28,10 @@ __all__ = [
     "ROLE_CAPABILITIES",
     "RoleStore",
     "has_capability",
+    "ClassificationLevel",
+    "ExportFormat",
+    "ExportPolicy",
+    "ExportPolicyMatrix",
+    "ExportDecision",
+    "check_export_allowed",
 ]
