@@ -6,10 +6,19 @@ Public surface:
 * :class:`JwksCache` — TTL'd, concurrency-safe JWKS fetcher.
 * :class:`TokenValidator` — RS256 JWT validation (signature + claims).
 * :class:`OidcClient` — public-client PKCE auth-code and device-code flows.
+* :class:`DeviceKeychain` — OS-keychain device enrollment (T-553).
+* :class:`DeviceCredential` — persisted device-bound credential.
 * Error hierarchy: :class:`IdentityError` and subclasses.
 """
 from __future__ import annotations
 
+from .device_keychain import (
+    DeviceCredential,
+    DeviceKeychain,
+    DeviceKeychainError,
+    EnrollmentError,
+    KeychainNotAvailableError,
+)
 from .errors import (
     IdentityError,
     JwksFetchError,
@@ -28,11 +37,13 @@ __all__ = [
     # models
     "Principal",
     "DeviceCodeResult",
+    "DeviceCredential",
     # services
     "JwksCache",
     "TokenValidator",
     "OidcClient",
     "PrincipalStore",
+    "DeviceKeychain",
     # FastAPI integration
     "PrincipalDep",
     "make_require_principal",
@@ -42,4 +53,7 @@ __all__ = [
     "TokenInvalidError",
     "JwksFetchError",
     "OidcFlowError",
+    "DeviceKeychainError",
+    "EnrollmentError",
+    "KeychainNotAvailableError",
 ]
