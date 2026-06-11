@@ -342,8 +342,13 @@ class HNSWStore:
         that returns the ``acl_allow`` list for a given discovery_id.  When
         *acl_resolver* is None but *principal* is set, the filter falls back
         to checking the ``_acl_cache`` attribute on the store itself (populated
-        via :meth:`register_acl`).  When neither is available, no ACL filter
-        is applied even when a principal is provided (degraded but non-crashing).
+        via :meth:`register_acl`).
+
+        **Fail-closed policy:** when a principal is supplied but neither an
+        *acl_resolver* nor an ``_acl_cache`` is available, the call raises
+        ``RuntimeError`` rather than silently returning unfiltered results.
+        Returning everything to an authenticated caller whose ACL cannot be
+        resolved is a data-leak; raising is the safe default.
 
         Each hit is ``{"discovery_id": str, "score": float, "label": int}``
         where ``score`` is cosine similarity (1.0 = identical).  Returns
@@ -391,6 +396,17 @@ class HNSWStore:
                 # Fallback: use the in-memory ACL cache populated via register_acl().
                 _cache: dict[str, list[str]] = self._acl_cache  # type: ignore[attr-defined]
                 _acl_fn = _cache.get
+            else:
+                # Fail-closed: a principal was supplied but no ACL source is
+                # available. Returning unfiltered results would silently widen
+                # access; raise instead so the caller can surface the
+                # misconfiguration rather than leaking data.
+                raise RuntimeError(
+                    "ACL filter requested (principal supplied) but no "
+                    "acl_resolver or _acl_cache is available. "
+                    "Call register_acl() on the store or pass acl_resolver "
+                    "to search()."
+                )
 
         results: list[dict[str, Any]] = []
         for label_val, dist in zip(row_labels, row_dists):
@@ -404,8 +420,10 @@ class HNSWStore:
             score = max(0.0, min(1.0, 1.0 - float(dist)))
 
             # T-572: ACL filter for HNSW results.
-            if allowed_ids is not None and _acl_fn is not None:
-                acl_allow = _acl_fn(discovery_id)
+            # _acl_fn is guaranteed non-None when allowed_ids is set — the
+            # setup block above raises RuntimeError if no ACL source exists.
+            if allowed_ids is not None:
+                acl_allow = _acl_fn(discovery_id)  # type: ignore[misc]
                 if not acl_allow or not (set(acl_allow) & allowed_ids):
                     continue  # not authorized
 
