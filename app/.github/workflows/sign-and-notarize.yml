@@ -1,0 +1,142 @@
+name: Sign and Notarize
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-macos:
+    name: Build, Sign and Notarize (macOS universal)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Decode and import the certificate into a temporary keychain
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm certificate.p12
+
+      - name: Build Tauri app (mac-universal)
+        working-directory: app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npx tauri build --target universal-apple-darwin
+
+      - name: Notarize .dmg
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH=$(find app/src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" | head -1)
+          echo "Notarizing: $DMG_PATH"
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DepthFusion-mac-universal
+          path: app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 7
+
+  build-windows:
+    name: Build and Sign (Windows x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Import Windows code-signing certificate
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $certBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          $certPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+          echo "WINDOWS_CERTIFICATE_PATH=$certPath" >> $env:GITHUB_ENV
+
+      - name: Build Tauri app (win-x64)
+        working-directory: app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npx tauri build --target x86_64-pc-windows-msvc
+
+      - name: Sign MSI with signtool
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $msiPath = Get-ChildItem -Path "app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1 -ExpandProperty FullName
+          Write-Output "Signing: $msiPath"
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+            /f "$env:WINDOWS_CERTIFICATE_PATH" `
+            /p "$env:WINDOWS_CERTIFICATE_PASSWORD" `
+            /tr "http://timestamp.digicert.com" `
+            /td sha256 `
+            /fd sha256 `
+            "$msiPath"
+
+      - name: Upload .msi artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DepthFusion-win-x64
+          path: app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          retention-days: 7

@@ -1,5 +1,6 @@
 mod auth;
 mod commands;
+mod updater;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_app_info,
             commands::ping,
@@ -27,6 +29,7 @@ pub fn run() {
             auth::commands::load_tokens,
             auth::commands::clear_tokens,
             auth::commands::logout,
+            updater::check_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

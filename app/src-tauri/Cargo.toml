@@ -34,3 +34,4 @@ tokio = { version = "1", features = ["sync"] }
 once_cell = "1"
 reqwest = { version = "0.12", features = ["json"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+tauri-plugin-updater = "2"

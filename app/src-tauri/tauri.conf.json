@@ -44,6 +44,14 @@
       "desktop": {
         "schemes": ["depthfusion"]
       }
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.depthfusion.app/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "dialog": false,
+      "pubkey": ""
     }
   }
 }
