@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import { getAppInfo, type AppInfo } from './lib/ipc'
+import { SettingsPage } from './SettingsPage'
+
+type Route = 'home' | 'settings'
 
 function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [route, setRoute] = useState<Route>('home')
 
   useEffect(() => {
     getAppInfo().then(setAppInfo).catch(console.error)
   }, [])
+
+  if (route === 'settings') {
+    return <SettingsPage onBack={() => setRoute('home')} />
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
@@ -19,6 +27,14 @@ function App() {
         {appInfo && (
           <span className="text-xs text-gray-500 ml-auto">v{appInfo.version}</span>
         )}
+        <button
+          onClick={() => setRoute('settings')}
+          className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded"
+          aria-label="Settings"
+          title="Settings"
+        >
+          ⚙
+        </button>
       </header>
 
       {/* Main content */}
