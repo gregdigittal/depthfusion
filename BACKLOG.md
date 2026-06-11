@@ -2655,9 +2655,9 @@
 - [ ] AC-3: Device records carry owner principal + platform + last-sync timestamp
 
 **Tasks:**
-- [ ] T-553: Device enrollment + keychain storage (macOS Keychain, Windows DPAPI, Linux secret-service) — Opus dev, DS rev
-- [ ] T-554: Device registry table + admin CLI (`depthfusion devices list|revoke`) — Sonnet dev, DS rev
-- [ ] T-555: Lease-based credential refresh (default 24h) with clock-skew tolerance — Sonnet dev, Gemini rev
+- [x] T-553: Device enrollment + keychain storage (macOS Keychain, Windows DPAPI, Linux secret-service) — Opus dev, DS rev
+- [x] T-554: Device registry table + admin CLI (`depthfusion devices list|revoke`) — Sonnet dev, DS rev
+- [x] T-555: Lease-based credential refresh (default 24h) with clock-skew tolerance — Sonnet dev, Gemini rev
 
 ---
 
@@ -2672,10 +2672,10 @@
 - [ ] AC-2: Role assignments stored and enforced; admin CLI for assignment and audit
 
 **Tasks:**
-- [ ] T-556: Role/capability schema + migration — Opus dev, DS rev
-- [ ] T-557: Capability-check service (`authz.require(principal, capability, resource)`) — Opus dev, DS+GM rev
-- [ ] T-558: Admin CLI + API for role management with audit events — Sonnet dev, DS rev
-- [ ] T-559: Capability matrix doc + tests per role — Haiku dev, Sonnet rev
+- [x] T-556: Role/capability schema + migration — Opus dev, DS rev
+- [x] T-557: Capability-check service (`authz.require(principal, capability, resource)`) — Opus dev, DS+GM rev
+- [x] T-558: Admin CLI + API for role management with audit events — Sonnet dev, DS rev
+- [x] T-559: Capability matrix doc + tests per role — Haiku dev, Sonnet rev
 
 ### S-160: As the storage layer, I want per-record ACL columns on every store so that visibility filtering is possible at query time `P0` `L`
 
@@ -2685,11 +2685,11 @@
 - [ ] AC-3: Write path enforces ACL stamps — record without `acl_allow` is rejected
 
 **Tasks:**
-- [ ] T-560: ACL schema design doc (record shape, group expansion strategy, deny semantics) — Opus dev, DS+GM rev
-- [ ] T-561: Migrations for all six stores + backfill script with dry-run — Sonnet dev, DS rev
-- [ ] T-562: Write-path enforcement in MemoryStore/VectorStore/EventLog/Graph — Sonnet dev, DS rev
-- [ ] T-563: Discovery front-matter ACL parser + writer — Sonnet dev, Gemini rev
-- [ ] T-564: Migration rehearsal on a copy of the VPS dataset; record timings — Haiku dev, Sonnet rev
+- [x] T-560: ACL schema design doc (record shape, group expansion strategy, deny semantics) — Opus dev, DS+GM rev
+- [x] T-561: Migrations for all six stores + backfill script with dry-run — Sonnet dev, DS rev
+- [x] T-562: Write-path enforcement in MemoryStore/VectorStore/EventLog/Graph — Sonnet dev, DS rev
+- [x] T-563: Discovery front-matter ACL parser + writer — Sonnet dev, Gemini rev
+- [x] T-564: Migration rehearsal on a copy of the VPS dataset; record timings — Haiku dev, Sonnet rev
 
 ### S-161: As a compliance owner, I want classification labels with handling rules so that sensitive content gets stricter treatment automatically `P0` `M`
 
@@ -2698,9 +2698,9 @@
 - [ ] AC-2: Sensitivity-label mapping config maps SharePoint sensitivity labels → DepthFusion classification
 
 **Tasks:**
-- [ ] T-565: Classification taxonomy + handling-rules policy module — Opus dev, DS rev
-- [ ] T-566: Sensitivity-label mapping config + validation — Sonnet dev, DS rev
-- [ ] T-567: Policy unit tests incl. default-deny on unknown labels — Haiku dev, Opus rev
+- [x] T-565: Classification taxonomy + handling-rules policy module — Opus dev, DS rev
+- [x] T-566: Sensitivity-label mapping config + validation — Sonnet dev, DS rev
+- [x] T-567: Policy unit tests incl. default-deny on unknown labels — Haiku dev, Opus rev
 
 ### S-162: As the platform, I want a central policy decision point so that every subsystem asks one engine "can X do Y to Z" `P1` `M`
 
@@ -2727,10 +2727,10 @@
 - [ ] AC-3: Leak counters in telemetry; zero-leak assertion in CI
 
 **Tasks:**
-- [ ] T-571: Thread principal context through retrieval interfaces — Sonnet dev, DS rev
-- [ ] T-572: HNSW/Chroma metadata ACL filter + BM25 doc-mask — Opus dev, DS+GM rev
-- [ ] T-573: Post-rank verification + leak counters in telemetry — Sonnet dev, DS rev
-- [ ] T-574: Retrieval benchmark with/without trimming; publish to `docs/benchmarks/` — Haiku dev, Sonnet rev
+- [x] T-571: Thread principal context through retrieval interfaces — Sonnet dev, DS rev
+- [x] T-572: HNSW/Chroma metadata ACL filter + BM25 doc-mask — Opus dev, DS+GM rev
+- [x] T-573: Post-rank verification + leak counters in telemetry — Sonnet dev, DS rev
+- [x] T-574: Retrieval benchmark with/without trimming; publish to `docs/benchmarks/` — Haiku dev, Sonnet rev
 
 ### S-164: As a BI consumer, I want Query API v2 with principal-scoped results so that dashboards only show what the viewer may see `P0` `M`
 
@@ -2936,9 +2936,9 @@
 - [ ] AC-2: Rust-side token vault using OS keychain; sign-out wipes local credentials
 
 **Tasks:**
-- [ ] T-629: System-browser OIDC flow + deep-link handling (mac/win) — Opus dev, DS+GM rev
-- [ ] T-630: Rust-side token vault (keychain/DPAPI) + session handle API — Opus dev, DS rev
-- [ ] T-631: Sign-out + local wipe flow with tests — Sonnet dev, DS rev
+- [x] T-629: System-browser OIDC flow + deep-link handling (mac/win) — Opus dev, DS+GM rev
+- [x] T-630: Rust-side token vault (keychain/DPAPI) + session handle API — Opus dev, DS rev
+- [x] T-631: Sign-out + local wipe flow with tests — Sonnet dev, DS rev
 
 ### S-182: As the app, I want a resilient API client with offline detection so that every feature degrades gracefully off-network `P0` `M`
 
@@ -2954,8 +2954,8 @@
 ### S-183: As a release owner, I want signing + auto-update so that the team always runs current, trusted builds `P1` `M`
 
 **Tasks:**
-- [ ] T-635: Signing + notarization pipeline — Sonnet dev, DS rev
-- [ ] T-636: Updater + channel config — Sonnet dev, Gemini rev
+- [x] T-635: Signing + notarization pipeline — Sonnet dev, DS rev
+- [x] T-636: Updater + channel config — Sonnet dev, Gemini rev
 
 ---
 
