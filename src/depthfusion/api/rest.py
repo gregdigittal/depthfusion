@@ -27,6 +27,7 @@ from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
 from depthfusion.api.events import router as events_router
+from depthfusion.api.role_admin import router as role_admin_router
 from depthfusion.identity.models import Principal
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ app = FastAPI(
 
 # Mount the Event Graph Fabric router (S-142 / T-486)
 app.include_router(events_router)
+
+# Mount the role-admin router (T-558)
+app.include_router(role_admin_router)
 
 
 def get_bind_host() -> str:
