@@ -1,9 +1,10 @@
-/// Tauri IPC commands for the OIDC auth flow and token vault.
+/// Tauri IPC commands for the OIDC auth flow, token vault, and sign-out.
 
 use std::collections::HashMap;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
+use super::logout;
 use super::oidc::{self, OidcConfig, OidcError, TokenSet};
 use super::vault;
 
@@ -98,4 +99,43 @@ pub fn load_tokens() -> Result<Option<vault::TokenSet>, String> {
 #[tauri::command]
 pub fn clear_tokens() -> Result<(), String> {
     vault::clear_tokens().map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Sign-out / local wipe (T-631)
+// ---------------------------------------------------------------------------
+
+/// Sign the user out and wipe all locally stored session data.
+///
+/// Clears:
+///   - OS keychain token vault
+///   - Tauri `AppData` / `userData` directory
+///   - Any `depthfusion-*` temp files
+///
+/// Non-fatal wipe errors (e.g. a temp file already removed by the OS) are
+/// collected and returned as a single error string so the frontend can decide
+/// whether to surface a warning. If the vault itself fails to clear, that is
+/// considered fatal and returned as `Err`.
+#[tauri::command]
+pub fn logout(app: AppHandle) -> Result<(), String> {
+    // Retrieve the app's local data directory from Tauri's path resolver.
+    let app_data_dir: Option<std::path::PathBuf> = app
+        .path()
+        .app_local_data_dir()
+        .ok();
+
+    let errors = logout::wipe_local_state(app_data_dir);
+
+    // If any error came from the vault step, treat as fatal.
+    let fatal: Vec<_> = errors.iter().filter(|e| e.step == "vault").collect();
+    if !fatal.is_empty() {
+        return Err(fatal.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("; "));
+    }
+
+    // Non-fatal errors (temp files, app_data) — log them but don't block sign-out.
+    for e in &errors {
+        log::warn!("[logout] non-fatal wipe error: {e}");
+    }
+
+    Ok(())
 }

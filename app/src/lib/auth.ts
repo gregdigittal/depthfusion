@@ -172,6 +172,41 @@ export function signOut(): void {
   setState({ status: 'idle' })
 }
 
+/**
+ * Full sign-out with local data wipe (T-631).
+ *
+ * Calls the Rust `logout` IPC command which:
+ *   - Clears the OS keychain token vault
+ *   - Removes the Tauri app local data directory
+ *   - Deletes any `depthfusion-*` temp files
+ *
+ * After the Rust wipe succeeds, JS-side state is cleared and the caller is
+ * redirected to the login screen.
+ *
+ * @param navigate  Optional callback to perform the redirect (e.g. a React
+ *                  Router `navigate('/')` call).  When omitted the function
+ *                  reloads the window instead.
+ * @throws {string} If the Rust vault wipe fails.
+ */
+export async function logout(navigate?: () => void): Promise<void> {
+  // Tear down the deep-link listener so the pending auth flow is cancelled.
+  _deepLinkUnlisten?.()
+  _deepLinkUnlisten = null
+
+  // Ask Rust to wipe the vault, app data dir, and temp files.
+  await invoke<void>('logout')
+
+  // Clear JS-side state.
+  setState({ status: 'idle' })
+
+  // Redirect to the login screen.
+  if (navigate) {
+    navigate()
+  } else {
+    window.location.reload()
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

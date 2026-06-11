@@ -26,6 +26,7 @@ pub fn run() {
             auth::commands::store_tokens,
             auth::commands::load_tokens,
             auth::commands::clear_tokens,
+            auth::commands::logout,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
