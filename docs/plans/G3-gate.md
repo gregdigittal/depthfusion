@@ -93,12 +93,13 @@ Sample audit query output: _______________________________________________
 
 - [ ] No open issues labelled `P0` in the tracker at gate declaration time
 - [ ] Any P0 that was open during Phase 3 is resolved and verified (not just closed)
-- [ ] V2-DEC-001 (expression_eval.py DoS) resolved: `resolved: true` set or superseded decision file exists
+- [x] V2-DEC-001 (expression_eval.py DoS) resolved: all four guards (F2/F3/F5/F6) implemented, lane halt lifted
 
 **Evidence:**
 ```
 Open issue count at gate: _______________________________________________
-V2-DEC-001 resolution commit / superseding decision: _______________________________________________
+V2-DEC-001 resolution commit: 6a7ec67 (fix(security): resolve V2-DEC-001 — four DoS guards)
+V2-DEC-001 status: RESOLVED 2026-06-11 — see docs/decisions/V2-DEC-001.md
 ```
 
 ### C6 — CI green on v2-enterprise
@@ -123,7 +124,7 @@ Coverage: _______________________________________________
 | Export DRM bypass | Confirm exported files are not re-importable by an unpermissioned user (test round-trip) |
 | BI credential leakage | Confirm BI service principal cannot be used to access SharePoint directly beyond what DepthFusion exposes |
 | Audit log retention | Confirm audit records survive application restart (persisted, not in-memory) |
-| V2-DEC-001 closure | If expression_eval.py DoS guards are not in by G3, block gate on C5 |
+| V2-DEC-001 closure | ✅ RESOLVED 2026-06-11 (commit 6a7ec67) — lane halt lifted, C5 unblocked |
 
 ---
 

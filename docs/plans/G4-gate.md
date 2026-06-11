@@ -36,7 +36,7 @@ Each criterion requires **evidence** — a commit hash, test name, command outpu
 - [ ] All automated security tests in the E-61 suite pass (unit, integration, adversarial ACL, DoS surface)
 - [ ] Penetration test engagement completed; report received and reviewed
 - [ ] All penetration test findings severity HIGH or CRITICAL remediated and re-verified
-- [ ] V2-DEC-001 (expression_eval.py DoS): confirmed `resolved: true`; the four guards (F2/F3/F5/F6) are present and tested
+- [x] V2-DEC-001 (expression_eval.py DoS): confirmed `resolved: true`; all four guards (F2/F3/F5/F6) present and tested (25 passing)
 - [ ] No OWASP Top 10 items outstanding as unmitigated (accepted risk must be documented with ADR)
 
 **Evidence:**
@@ -45,7 +45,7 @@ E-61 test run: _______________________________________________
 Pen-test firm / date: _______________________________________________
 Pen-test report ID or reference: _______________________________________________
 All-findings resolution table: _______________________________________________
-V2-DEC-001 resolution commit: _______________________________________________
+V2-DEC-001 resolution commit: 6a7ec67 — docs/decisions/V2-DEC-001.md (RESOLVED 2026-06-11)
 ```
 
 ### C2 — Migration guide validated on VPS clone
@@ -110,13 +110,13 @@ Skipped test delta from v1: _______________________________________________
 
 - [ ] Zero open P0 issues at gate declaration time
 - [ ] All open P1 issues either resolved or have explicit acceptance ADR signed by Fable-5
-- [ ] V2-DEC-001 lane-halt lifted (resolved: true or superseded)
+- [x] V2-DEC-001 lane-halt lifted (resolved: true, commit 6a7ec67, 2026-06-11)
 
 **Evidence:**
 ```
 Open issue count P0: _______________________________________________
 Open issue count P1 (with disposition): _______________________________________________
-V2-DEC-001 resolution: _______________________________________________
+V2-DEC-001 resolution: RESOLVED 2026-06-11 — commit 6a7ec67, docs/decisions/V2-DEC-001.md
 ```
 
 ---
