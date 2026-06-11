@@ -2627,10 +2627,10 @@
 - [ ] AC-4: Refresh handled server-side; access tokens never written to disk unencrypted
 
 **Tasks:**
-- [ ] T-544: Add `src/depthfusion/identity/` package: OIDC client, JWKS cache, token validator — Opus dev, DS+GM rev
+- [x] T-544: Add `src/depthfusion/identity/` package: OIDC client, JWKS cache, token validator — Opus dev, DS+GM rev
 - [ ] T-545: Device-code flow for CLI sessions — Sonnet dev, DS rev
 - [ ] T-546: Principal store (SQLite table: `principal_id, upn, groups, last_seen`) — Sonnet dev, DS rev
-- [ ] T-547: Entra app registration runbook + test-tenant fixtures — Ollama dev, Sonnet rev
+- [x] T-547: Entra app registration runbook + test-tenant fixtures — Ollama dev, Sonnet rev
 - [ ] T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — Haiku dev, Opus rev
 
 ### S-157: As the API server, I want auth middleware on every route so that no endpoint serves data without a verified principal `P0` `M`
@@ -2768,8 +2768,8 @@
 - [ ] AC-3: Explicit non-goals stated (no peer-to-peer in V2; hub-and-spoke only)
 
 **Tasks:**
-- [ ] T-581: Sync v2 design doc + sequence diagrams — Opus dev, DS+GM rev
-- [ ] T-582: Conflict policy spec (vector-clock-lite vs last-writer-wins per store) — Opus dev, DS rev
+- [x] T-581: Sync v2 design doc + sequence diagrams — Opus dev, DS+GM rev
+- [x] T-582: Conflict policy spec (vector-clock-lite vs last-writer-wins per store) — Opus dev, DS rev
 
 ### S-167: As an enrolled device, I want delta sync trimmed to my principal so that I never receive records I cannot see `P0` `L`
 
@@ -2792,7 +2792,7 @@
 - [ ] AC-1: `sync.sh` prints a deprecation error and exits non-zero in V2; gated at G1
 
 **Tasks:**
-- [ ] T-588: Deprecation gate in `sync.sh` + audited override — Ollama dev, Sonnet rev
+- [x] T-588: Deprecation gate in `sync.sh` + audited override — Ollama dev, Sonnet rev
 - [ ] T-589: Migration runbook + rewritten sync guide — Haiku dev, Gemini rev
 
 ---
@@ -2808,9 +2808,9 @@
 - [ ] AC-2: Generic fallback parser handles plain text, markdown, HTML
 
 **Tasks:**
-- [ ] T-590: `parsers/documents/base.py`: protocol, DocumentRecord, registry — Sonnet dev, DS rev
-- [ ] T-591: Quarantine store + retry semantics — Sonnet dev, DS rev
-- [ ] T-592: Generic fallback parser (plain text, markdown, html) — Ollama dev, Sonnet rev
+- [x] T-590: `parsers/documents/base.py`: protocol, DocumentRecord, registry — Sonnet dev, DS rev
+- [x] T-591: Quarantine store + retry semantics — Sonnet dev, DS rev
+- [x] T-592: Generic fallback parser (plain text, markdown, html) — Ollama dev, Sonnet rev
 
 ### S-170: As a knowledge consumer, I want Office parsers (docx, xlsx, pptx) so that company documents become searchable content `P0` `L`
 
@@ -2925,8 +2925,8 @@
 - [ ] AC-3: Typed IPC layer + CSP hardening in place before any webview feature lands
 
 **Tasks:**
-- [ ] T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — Sonnet dev, Gemini rev
-- [ ] T-627: CI build matrix (mac universal, win x64) + artifact upload — Sonnet dev, DS rev
+- [x] T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — Sonnet dev, Gemini rev
+- [x] T-627: CI build matrix (mac universal, win x64) + artifact upload — Sonnet dev, DS rev
 - [ ] T-628: Typed IPC layer + CSP hardening — Opus dev, DS rev
 
 ### S-181: As a team member, I want to sign in inside the app so that my session is my corporate identity `P0` `M`
