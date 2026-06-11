@@ -1,38 +1,29 @@
-"""depthfusion.parsers.documents — document parser protocol and registry.
-
-Provides a MIME-type-keyed registry of :class:`DocumentParser` implementations
-that normalise raw document bytes (PDF, DOCX, HTML, plain text, …) into
-:class:`DocumentRecord` instances ready for chunking and embedding.
+"""depthfusion.parsers.documents — document ingestion types and quarantine store.
 
 Public API::
 
     from depthfusion.parsers.documents import (
-        DocumentParser,
-        DocumentParserRegistry,
-        DocumentRecord,
         QuarantineEntry,
-        get_quarantine,
+        QuarantineStore,
         quarantine,
+        get_quarantine,
+        get_quarantine_store,
     )
 """
 from __future__ import annotations
 
 from depthfusion.parsers.documents.base import (
-    DocumentParser,
-    DocumentParserRegistry,
-    DocumentRecord,
     QuarantineEntry,
+    QuarantineStore,
     get_quarantine,
-    get_registry,
+    get_quarantine_store,
     quarantine,
 )
 
 __all__ = [
-    "DocumentRecord",
-    "DocumentParser",
-    "DocumentParserRegistry",
     "QuarantineEntry",
+    "QuarantineStore",
     "get_quarantine",
-    "get_registry",
+    "get_quarantine_store",
     "quarantine",
 ]
