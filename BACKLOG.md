@@ -2631,7 +2631,7 @@
 - [x] T-545: Device-code flow for CLI sessions — Sonnet dev, DS rev
 - [x] T-546: Principal store (SQLite table: `principal_id, upn, groups, last_seen`) — Sonnet dev, DS rev
 - [x] T-547: Entra app registration runbook + test-tenant fixtures — Ollama dev, Sonnet rev
-- [ ] T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — Haiku dev, Opus rev
+- [x] T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — Haiku dev, Opus rev
 
 ### S-157: As the API server, I want auth middleware on every route so that no endpoint serves data without a verified principal `P0` `M`
 
