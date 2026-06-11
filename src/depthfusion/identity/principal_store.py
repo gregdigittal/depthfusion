@@ -11,6 +11,7 @@ import os
 import sqlite3
 import threading
 import time
+from contextlib import closing
 from pathlib import Path
 
 from .models import Principal
@@ -67,7 +68,7 @@ class PrincipalStore:
 
     def _init_db(self) -> None:
         with self._lock:
-            with self._connect() as conn:
+            with closing(self._connect()) as conn:
                 conn.executescript(_DDL)
 
     @staticmethod
@@ -92,7 +93,7 @@ class PrincipalStore:
             The principal to persist.
         """
         with self._lock:
-            with self._connect() as conn:
+            with closing(self._connect()) as conn:
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO principals
@@ -107,6 +108,7 @@ class PrincipalStore:
                         time.time(),
                     ),
                 )
+                conn.commit()
 
     def get(self, principal_id: str) -> Principal | None:
         """Return the principal with *principal_id*, or ``None`` if not found.
@@ -117,7 +119,7 @@ class PrincipalStore:
             The ``sub`` claim / primary key to look up.
         """
         with self._lock:
-            with self._connect() as conn:
+            with closing(self._connect()) as conn:
                 row = conn.execute(
                     "SELECT * FROM principals WHERE principal_id = ?",
                     (principal_id,),
@@ -135,7 +137,7 @@ class PrincipalStore:
             Maximum number of records to return (default 10).
         """
         with self._lock:
-            with self._connect() as conn:
+            with closing(self._connect()) as conn:
                 rows = conn.execute(
                     "SELECT * FROM principals ORDER BY last_seen DESC LIMIT ?",
                     (limit,),
