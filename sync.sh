@@ -10,6 +10,16 @@
 
 set -euo pipefail
 
+# V2 deprecation gate (T-588 / R-1)
+if [[ -z "${DEPTHFUSION_SYNC_OVERRIDE:-}" ]]; then
+  echo "ERROR: sync.sh is retired in DepthFusion V2." >&2
+  echo "       Use the V2 sync protocol. See docs/decisions/sync-v2-design.md" >&2
+  echo "       To override (audited): DEPTHFUSION_SYNC_OVERRIDE=1 ./sync.sh" >&2
+  exit 1
+fi
+echo "WARNING: sync.sh deprecation override active — logging usage." >&2
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) OVERRIDE host=$(hostname) user=${USER:-unknown}" >> /tmp/depthfusion-sync-override.log
+
 VPS_HOST="gregmorris@77.42.45.197"
 VPS_CLAUDE_DIR="/home/gregmorris/.claude"
 LOCAL_CLAUDE_DIR="$HOME/.claude"
