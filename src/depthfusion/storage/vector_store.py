@@ -26,6 +26,31 @@ def is_chromadb_available() -> bool:
     return _CHROMADB_AVAILABLE
 
 
+def _validate_vector_acl(metadata: dict) -> None:
+    """T-562: reject vector writes where acl_allow is missing or empty.
+
+    In ChromaDB, acl_allow is stored as metadata["acl_allow"] (JSON-serialized list
+    or plain list). Raises ValueError("acl_allow is required") if absent or empty.
+    """
+    import json as _json
+    raw = metadata.get("acl_allow")
+    if raw is None:
+        raise ValueError("acl_allow is required")
+    # acl_allow may be a JSON string (e.g. '["greg"]') or already a list.
+    if isinstance(raw, str):
+        try:
+            parsed = _json.loads(raw)
+        except (ValueError, TypeError):
+            parsed = [raw] if raw.strip() else []
+        if not parsed:
+            raise ValueError("acl_allow is required")
+    elif isinstance(raw, list):
+        if not raw:
+            raise ValueError("acl_allow is required")
+    else:
+        raise ValueError("acl_allow is required")
+
+
 def _admission_score(content: str) -> float:
     """Cheap pre-indexing quality gate score in [0.0, 1.0].
 
@@ -86,6 +111,8 @@ class ChromaDBStore:
         Uses the DepthFusion embedding backend when healthy; falls back to
         Chroma's built-in auto-embedding when the backend is unavailable.
         """
+        # T-562: enforce ACL stamp before any write.
+        _validate_vector_acl(metadata)
         _score = _admission_score(content)
         if _score < _ADMISSION_DROP_THRESHOLD:
             logger.debug(

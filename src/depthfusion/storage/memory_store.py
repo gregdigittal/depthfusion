@@ -82,6 +82,17 @@ FROM memories
 """
 
 
+def _validate_acl_fields(acl_allow: list[str]) -> None:
+    """Raise ValueError if acl_allow is missing or empty.
+
+    T-562: every write path in every store must call this before persisting.
+    acl_allow=None or acl_allow=[] are both rejected — absence equals deny and
+    an unprotected record must never be silently written.
+    """
+    if not acl_allow:
+        raise ValueError("acl_allow is required")
+
+
 class MemoryStore:
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -122,6 +133,11 @@ class MemoryStore:
                 pass
 
     def upsert(self, memory: MemoryObject) -> None:
+        # T-562: enforce ACL stamp before any write.
+        raw_acl = (memory.extra or {}).get("acl_allow")
+        # Normalize: only a non-empty list passes; None/empty-list/non-list all fail.
+        acl_allow: list[str] = raw_acl if isinstance(raw_acl, list) else []
+        _validate_acl_fields(acl_allow)
         data = memory.to_dict()
         # T-390: denormalize facts/concepts into FTS5-searchable text fields.
         # Stored as space-joined strings inside data_json so triggers can

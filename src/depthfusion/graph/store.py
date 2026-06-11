@@ -16,6 +16,16 @@ _DEFAULT_JSON_PATH = Path.home() / ".claude" / "depthfusion-graph.json"
 _DEFAULT_MIN_CONFIDENCE = 0.7
 
 
+def _validate_graph_acl(acl_allow: list[str] | None) -> None:
+    """T-562: reject entity/edge writes where acl_allow is missing or empty.
+
+    acl_allow is stored in entity.metadata["acl_allow"] / edge.metadata["acl_allow"].
+    Raises ValueError("acl_allow is required") if missing or empty list.
+    """
+    if not acl_allow:
+        raise ValueError("acl_allow is required")
+
+
 def _min_confidence() -> float:
     """Return the minimum confidence threshold for graph writes.
 
@@ -156,6 +166,8 @@ class JSONGraphStore:
         )
 
     def upsert_entity(self, entity: Entity) -> None:
+        # T-562: enforce ACL stamp before any write.
+        _validate_graph_acl(entity.metadata.get("acl_allow"))
         if entity.confidence < _min_confidence():
             return  # silently skip low-confidence entities
         self._data["entities"][entity.entity_id] = _entity_to_dict(entity)
@@ -166,6 +178,8 @@ class JSONGraphStore:
         return _dict_to_entity(d) if d else None
 
     def upsert_edge(self, edge: Edge) -> None:
+        # T-562: enforce ACL stamp before any write.
+        _validate_graph_acl(edge.metadata.get("acl_allow"))
         self._data["edges"][edge.edge_id] = _edge_to_dict(edge)
         self._save()
 
@@ -255,6 +269,8 @@ class SQLiteGraphStore:
         self._conn.commit()
 
     def upsert_entity(self, entity: Entity) -> None:
+        # T-562: enforce ACL stamp before any write.
+        _validate_graph_acl(entity.metadata.get("acl_allow"))
         if entity.confidence < _min_confidence():
             return  # silently skip low-confidence entities
         self._conn.execute(
@@ -282,6 +298,8 @@ class SQLiteGraphStore:
         )
 
     def upsert_edge(self, edge: Edge) -> None:
+        # T-562: enforce ACL stamp before any write.
+        _validate_graph_acl(edge.metadata.get("acl_allow"))
         self._conn.execute(
             """INSERT OR REPLACE INTO edges
                (edge_id, source_id, target_id, relationship, weight, signals,
