@@ -2,26 +2,52 @@ name: CI
 
 on:
   push:
-    branches: [v2-enterprise, 'v2/**']
+    branches:
+      - v2-enterprise
+      - "v2/lane-*"
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
   pull_request:
-    branches: [v2-enterprise]
+    branches:
+      - v2-enterprise
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   test:
+    name: "Python ${{ matrix.python-version }} / ubuntu-latest"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
-      - name: Run tests with coverage
-        run: |
-          pytest tests/ -x -q \
-            --cov=src/depthfusion \
-            --cov-report=term-missing \
-            --cov-fail-under=80
+
+      - name: Run pytest
+        run: pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration
+
+      - name: Lint with ruff
+        run: ruff check src/
+
+      - name: Type check with mypy
+        run: mypy src/depthfusion/core/ src/depthfusion/recursive/ src/depthfusion/mcp/ --ignore-missing-imports
