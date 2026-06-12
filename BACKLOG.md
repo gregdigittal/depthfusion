@@ -2661,15 +2661,15 @@
 
 ---
 
-## E-50: Authorization Model — RBAC + Record ACLs + Classification [backlog]
+## E-50: Authorization Model — RBAC + Record ACLs + Classification [done]
 
 > The heart of V2. Roles govern capabilities; per-record ACLs govern visibility; classification labels govern handling (export, cache, redaction). Designed so SharePoint ACLs map losslessly onto DepthFusion records (E-54 depends on this schema). Follows E-49. **Lane A.**
 
 ### S-159: As an admin, I want RBAC roles so that capabilities are granted by role, not by possession of a token `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Role schema with 4+ canonical roles (owner, admin, member, viewer) + extensible capability matrix
-- [ ] AC-2: Role assignments stored and enforced; admin CLI for assignment and audit
+- [x] AC-1: Role schema with 4+ canonical roles (owner, admin, member, viewer) + extensible capability matrix
+- [x] AC-2: Role assignments stored and enforced; admin CLI for assignment and audit
 
 **Tasks:**
 - [x] T-556: Role/capability schema + migration — Opus dev, DS rev
@@ -2680,9 +2680,9 @@
 ### S-160: As the storage layer, I want per-record ACL columns on every store so that visibility filtering is possible at query time `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `acl_allow` (list of principals/groups) + `classification` columns on all six stores: MemoryStore, VectorStore, EventLog, FileIndex, GraphStore, discoveries frontmatter
-- [ ] AC-2: V1 records backfilled: `acl_allow=[greg]`, `classification=internal` (per V2-DEC-002)
-- [ ] AC-3: Write path enforces ACL stamps — record without `acl_allow` is rejected
+- [x] AC-1: `acl_allow` (list of principals/groups) + `classification` columns on all six stores: MemoryStore, VectorStore, EventLog, FileIndex, GraphStore, discoveries frontmatter
+- [x] AC-2: V1 records backfilled: `acl_allow=[greg]`, `classification=internal` (per V2-DEC-002)
+- [x] AC-3: Write path enforces ACL stamps — record without `acl_allow` is rejected
 
 **Tasks:**
 - [x] T-560: ACL schema design doc (record shape, group expansion strategy, deny semantics) — Opus dev, DS+GM rev
@@ -2694,8 +2694,8 @@
 ### S-161: As a compliance owner, I want classification labels with handling rules so that sensitive content gets stricter treatment automatically `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Classification taxonomy defined (internal, confidential, restricted, public) with export/cache/redaction rules per level
-- [ ] AC-2: Sensitivity-label mapping config maps SharePoint sensitivity labels → DepthFusion classification
+- [x] AC-1: Classification taxonomy defined (internal, confidential, restricted, public) with export/cache/redaction rules per level
+- [x] AC-2: Sensitivity-label mapping config maps SharePoint sensitivity labels → DepthFusion classification
 
 **Tasks:**
 - [x] T-565: Classification taxonomy + handling-rules policy module — Opus dev, DS rev
@@ -2705,26 +2705,26 @@
 ### S-162: As the platform, I want a central policy decision point so that every subsystem asks one engine "can X do Y to Z" `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `PolicyEngine.decide(principal, action, resource)` returns allow/deny with reason
-- [ ] AC-2: All access checks routed through PolicyEngine; ad-hoc checks removed
+- [x] AC-1: `PolicyEngine.decide(principal, action, resource)` returns allow/deny with reason
+- [x] AC-2: All access checks routed through PolicyEngine; ad-hoc checks removed
 
 **Tasks:**
-- [ ] T-568: PolicyEngine implementation + decision cache — Opus dev, DS+GM rev
-- [ ] T-569: Wire API/service layers through PolicyEngine; remove ad-hoc checks — Sonnet dev, Gemini rev
-- [ ] T-570: Property-based tests (no path returns allow when ACL excludes principal) — Sonnet dev, Opus rev
+- [x] T-568: PolicyEngine implementation + decision cache — Opus dev, DS+GM rev
+- [x] T-569: Wire API/service layers through PolicyEngine; remove ad-hoc checks — Sonnet dev, Gemini rev
+- [x] T-570: Property-based tests (no path returns allow when ACL excludes principal) — Sonnet dev, Opus rev
 
 ---
 
-## E-51: Security-Trimmed Retrieval & Query API v2 [backlog]
+## E-51: Security-Trimmed Retrieval & Query API v2 [done]
 
 > ACL pre-filtering so unauthorized records never enter candidate sets. Depends on E-50 (ACL columns + PolicyEngine). **Lane A, Phase 2.**
 
 ### S-163: As the retrieval pipeline, I want ACL pre-filtering in BM25/HNSW/hybrid so that unauthorized records never enter candidate sets `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: HNSW/Chroma metadata filter + BM25 doc-mask applied before candidate scoring
-- [ ] AC-2: Post-rank verification pass confirms no unauthorized record survived fusion
-- [ ] AC-3: Leak counters in telemetry; zero-leak assertion in CI
+- [x] AC-1: HNSW/Chroma metadata filter + BM25 doc-mask applied before candidate scoring
+- [x] AC-2: Post-rank verification pass confirms no unauthorized record survived fusion
+- [x] AC-3: Leak counters in telemetry; zero-leak assertion in CI
 
 **Tasks:**
 - [x] T-571: Thread principal context through retrieval interfaces — Sonnet dev, DS rev
@@ -2735,8 +2735,8 @@
 ### S-164: As a BI consumer, I want Query API v2 with principal-scoped results so that dashboards only show what the viewer may see `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: All query/aggregate endpoints return only principal-visible records
-- [ ] AC-2: Aggregate-leak tests pass (counts/facets must not reveal hidden records)
+- [x] AC-1: All query/aggregate endpoints return only principal-visible records
+- [x] AC-2: Aggregate-leak tests pass (counts/facets must not reveal hidden records)
 
 **Tasks:**
 - [x] T-575: Port query endpoints to principal auth + trimmed data access — Sonnet dev, DS rev
@@ -2746,7 +2746,7 @@
 ### S-165: As an MCP client, I want all 29 MCP tools principal-bound so that agent access obeys the same ACLs as humans `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `_dispatch_tool` in `mcp/server.py` binds principal to every tool call
+- [x] AC-1: `_dispatch_tool` in `mcp/server.py` binds principal to every tool call
 - [x] AC-2: Capability annotations on all 29 tools; MCP authz test suite passes
 
 **Tasks:**
