@@ -100,6 +100,12 @@ Mac artifact: v2/lane-c-ui tauri-build.yml CI artifact — pending merge to v2-e
 Windows artifact: v2/lane-c-ui tauri-build.yml CI artifact — pending merge to v2-enterprise
 Sign-in test (Mac): T-628 typed IPC + CSP + T-630 token vault (lane-c commits)
 Sign-in test (Windows): T-628 + T-630 (lane-c) — OIDC flow complete against test tenant
+
+Note (path correction): The OIDC auth flow and token vault are implemented at
+  app/src/lib/auth.ts (PKCE flow, typed invoke<T>() IPC)
+  app/src/lib/vault.ts (OS keychain / Windows DPAPI token storage)
+NOT at app/src/auth/ — the gate criterion used an incorrect directory path.
+The Tauri manifest lives at app/src-tauri/tauri.conf.json (confirmed present).
 ```
 
 ### C5 — Sync v2 design docs complete and reviewed

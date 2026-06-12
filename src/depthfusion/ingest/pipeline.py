@@ -139,8 +139,8 @@ class IngestPipeline:
         Returns:
             The populated :class:`ParsedDocument`.
         """
-        import tempfile
         import pathlib
+        import tempfile
 
         ext_map = {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",

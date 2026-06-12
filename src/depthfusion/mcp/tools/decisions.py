@@ -3,20 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
-import sys
-import threading
-import time
-from pathlib import Path
 from typing import Any
 
-from depthfusion.capture.event_hook import emit_if_high_importance
-from depthfusion.core.types import ContextItem
-from depthfusion.parsers import parse_conversation
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments

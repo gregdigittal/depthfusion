@@ -28,7 +28,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from .errors import JwksFetchError, TokenExpiredError, TokenInvalidError
+from .errors import TokenExpiredError, TokenInvalidError
 from .jwks_cache import JwksCache
 
 _EXPECTED_ALG = "RS256"

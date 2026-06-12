@@ -7,37 +7,34 @@ import os
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
-from depthfusion.router.bus import ContextBus
-from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 from depthfusion.identity.models import Principal
+from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 
 logger = logging.getLogger(__name__)
 
 # Tool registry (TOOLS, _TOOL_FLAGS, TOOL_SCHEMAS, get_enabled_tools)
 from depthfusion.mcp.tools._registry import (  # noqa: E402
-    TOOLS,
     TOOL_SCHEMAS,
-    _TOOL_FLAGS,
+    TOOLS,
     get_enabled_tools,
 )
 
-# Server state and infrastructure helpers
-from depthfusion.mcp.tools._state import (  # noqa: E402
-    _get_context_bus,
-    _get_fabric_store,
-    _get_hnsw_store,
-    _hnsw_enabled,
-    _register_hnsw_shutdown,
+# Recall implementation helpers (re-exported for test patching compatibility)
+from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
+    _backend_name_to_chain,
+    _detect_current_backends,
+    _sanitise_project_slug,
+    _split_into_blocks,
+    _tool_recall_impl,
+    _trim_to_sentence,
 )
 
-# Tool implementations — recall domain
-from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
-    _tool_recall,
-    _tool_recall_feedback,
-    _tool_retrieve_context,
+# Server state and infrastructure helpers
+# Tool implementations — bridge domain
+from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
+    _tool_bridge,
 )
 
 # Tool implementations — capture domain
@@ -50,6 +47,16 @@ from depthfusion.mcp.tools.capture import (  # noqa: E402,F401
     _tool_prune_discoveries,
     _tool_publish_context,
     _tool_tag_session,
+)
+
+# Tool implementations — decisions domain
+from depthfusion.mcp.tools.decisions import (  # noqa: E402,F401
+    _tool_get_cognitive_state,
+    _tool_mark_superseded,
+    _tool_record_decision,
+    _tool_record_incident,
+    _tool_report_outcome,
+    _tool_run_recursive,
 )
 
 # Tool implementations — graph domain
@@ -65,14 +72,27 @@ from depthfusion.mcp.tools.graph import (  # noqa: E402,F401
     _tool_set_scope,
 )
 
-# Tool implementations — decisions domain
-from depthfusion.mcp.tools.decisions import (  # noqa: E402,F401
-    _tool_get_cognitive_state,
-    _tool_mark_superseded,
-    _tool_record_decision,
-    _tool_record_incident,
-    _tool_report_outcome,
-    _tool_run_recursive,
+# Tool implementations — project domain
+from depthfusion.mcp.tools.project import (  # noqa: E402,F401
+    _tool_ingest_project,
+    _tool_list_projects,
+    _tool_register_project,
+    _tool_session_seed,
+    _tool_sync_project,
+)
+
+# Tool implementations — recall domain
+from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
+    _tool_recall,
+    _tool_recall_feedback,
+    _tool_retrieve_context,
+)
+
+# Tool implementations — system domain
+from depthfusion.mcp.tools.system import (  # noqa: E402,F401
+    _tool_list_providers,
+    _tool_research_topic,
+    _tool_status,
 )
 
 # Tool implementations — telemetry domain
@@ -85,37 +105,6 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _tool_record_telemetry,
     _tool_surface_skill_candidates,
     _tool_tier_status,
-)
-
-# Tool implementations — project domain
-from depthfusion.mcp.tools.project import (  # noqa: E402,F401
-    _tool_ingest_project,
-    _tool_list_projects,
-    _tool_register_project,
-    _tool_session_seed,
-    _tool_sync_project,
-)
-
-# Tool implementations — system domain
-from depthfusion.mcp.tools.system import (  # noqa: E402,F401
-    _tool_list_providers,
-    _tool_research_topic,
-    _tool_status,
-)
-
-# Tool implementations — bridge domain
-from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
-    _tool_bridge,
-)
-
-# Recall implementation helpers (re-exported for test patching compatibility)
-from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
-    _backend_name_to_chain,
-    _detect_current_backends,
-    _sanitise_project_slug,
-    _split_into_blocks,
-    _tool_recall_impl,
-    _trim_to_sentence,
 )
 
 

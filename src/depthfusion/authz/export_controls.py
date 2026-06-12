@@ -119,7 +119,11 @@ class ExportPolicyMatrix(BaseModel):
         """Return the policy for *level*, falling back to most-restrictive if absent."""
         return self.policies.get(
             level,
-            ExportPolicy(allowed_export_formats=[], watermark_required=True, approval_required=True),
+            ExportPolicy(
+                allowed_export_formats=[],
+                watermark_required=True,
+                approval_required=True,
+            ),
         )
 
 

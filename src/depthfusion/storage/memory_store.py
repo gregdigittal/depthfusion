@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from depthfusion.core.memory_object import MemoryObject
 
 if TYPE_CHECKING:
-    from depthfusion.identity.models import Principal
+    pass
 
 logger = logging.getLogger(__name__)
 

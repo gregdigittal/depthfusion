@@ -34,7 +34,6 @@ import threading
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-
 # ---------------------------------------------------------------------------
 # DocumentRecord and DocumentParser (T-590)
 # ---------------------------------------------------------------------------

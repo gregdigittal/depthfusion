@@ -14,7 +14,6 @@ from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from .collector import KNOWN_EVENT_TYPES, AnalyticsCollector
 from .store import _connect, init_db
 
 logger = logging.getLogger(__name__)
@@ -89,8 +88,12 @@ class AggregationService:
                         if period not in SUPPORTED_PERIODS:
                             continue
                         start, end = _period_bounds(period, reference_date)
-                        start_ts = datetime(start.year, start.month, start.day, tzinfo=timezone.utc).isoformat()
-                        end_ts = datetime(end.year, end.month, end.day, 23, 59, 59, tzinfo=timezone.utc).isoformat()
+                        start_ts = datetime(
+                            start.year, start.month, start.day, tzinfo=timezone.utc
+                        ).isoformat()
+                        end_ts = datetime(
+                            end.year, end.month, end.day, 23, 59, 59, tzinfo=timezone.utc
+                        ).isoformat()
 
                         # Count per event_type for this principal + window
                         counts = conn.execute(
@@ -106,7 +109,8 @@ class AggregationService:
                             event_type, count = row[0], row[1]
                             conn.execute(
                                 "INSERT OR REPLACE INTO analytics_rollups"
-                                " (principal_id, event_type, period, period_start, count, computed_at)"
+                                " (principal_id, event_type, period,"
+                                " period_start, count, computed_at)"
                                 " VALUES (?, ?, ?, ?, ?, ?)",
                                 (
                                     principal_id,

@@ -5,25 +5,20 @@ import json
 import logging
 import os
 import re
-import sys
-import threading
 import time
 from pathlib import Path
-from typing import Any
 
-from depthfusion.capture.event_hook import emit_if_high_importance
-from depthfusion.core.types import ContextItem
-from depthfusion.parsers import parse_conversation
 from depthfusion.retrieval.bm25 import BM25 as _BM25
 from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
+
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments
     OpenRouterBackend = None  # type: ignore[assignment,misc]
 
+from depthfusion.mcp.tools._state import _get_hnsw_store
+
 logger = logging.getLogger("depthfusion.mcp.server")
-from depthfusion.mcp.tools._state import _get_hnsw_store, _get_context_bus, _get_fabric_store
 
 ## ---------------------------------------------------------------------------
 ## Block extraction: chunk files on H2 headers for finer-grained retrieval
@@ -209,7 +204,6 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
       * `fusion_gates` — `pipeline.apply_fusion_gates` wall-clock time
         (only when `DEPTHFUSION_FUSION_GATES_ENABLED=true`)
     """
-    import time
     from pathlib import Path
 
     if perf_ms is None:

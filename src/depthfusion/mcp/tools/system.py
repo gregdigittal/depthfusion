@@ -4,19 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
-import sys
-import threading
-import time
-from pathlib import Path
 from typing import Any
 
-from depthfusion.capture.event_hook import emit_if_high_importance
-from depthfusion.core.types import ContextItem
-from depthfusion.parsers import parse_conversation
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments
@@ -24,10 +13,9 @@ except Exception:  # pragma: no cover — optional module in older environments
 
 logger = logging.getLogger("depthfusion.mcp.server")
 
-from depthfusion.mcp.tools._state import _get_hnsw_store, _get_context_bus, _get_fabric_store  # noqa: E402
+from depthfusion.core.research import TopicResearcher  # noqa: E402
 from depthfusion.mcp.tools._registry import get_enabled_tools  # noqa: E402
 from depthfusion.mcp.tools.capture import _tool_publish_context  # noqa: E402
-from depthfusion.core.research import TopicResearcher  # noqa: E402
 
 
 def _tool_status(config: Any) -> str:
@@ -46,7 +34,6 @@ def _tool_status(config: Any) -> str:
 
 def _tool_list_providers() -> str:
     import json
-    import os
 
     providers = []
     key = os.environ.get("OPENROUTER_API_KEY")

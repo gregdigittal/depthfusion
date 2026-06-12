@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import structlog
 
-from depthfusion.authz.roles import Capability, ROLE_CAPABILITIES, Role
+from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
 from depthfusion.identity.models import Principal
 
 log = structlog.get_logger(__name__)

@@ -4,31 +4,21 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
-import sys
-import threading
 import time
-from pathlib import Path
 from typing import Any
 
-from depthfusion.capture.event_hook import emit_if_high_importance
-from depthfusion.core.types import ContextItem
-from depthfusion.parsers import parse_conversation
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments
     OpenRouterBackend = None  # type: ignore[assignment,misc]
 
-logger = logging.getLogger("depthfusion.mcp.server")
-from depthfusion.mcp.tools._state import _get_hnsw_store, _get_context_bus, _get_fabric_store
 from depthfusion.mcp.tools._shared import (
-    _tool_recall_impl,
-    _sanitise_project_slug,
     _detect_current_backends,
+    _tool_recall_impl,
 )
+from depthfusion.mcp.tools._state import _get_hnsw_store
+
+logger = logging.getLogger("depthfusion.mcp.server")
 
 
 def _tool_recall(arguments: dict) -> str:
@@ -45,7 +35,6 @@ def _tool_recall(arguments: dict) -> str:
     break recall.
     """
     import hashlib
-    import time
 
     t0 = time.monotonic()
     event_subtype = "ok"

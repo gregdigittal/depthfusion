@@ -33,7 +33,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status

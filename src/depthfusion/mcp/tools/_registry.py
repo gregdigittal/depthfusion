@@ -179,7 +179,7 @@ TOOLS: dict[str, str] = {
         "Response: {response, model, memories_injected, fragments_stored}"
     ),
     "depthfusion_ingest_conversation": (
-        "Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek into DepthFusion memory. "
+        "Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek into DepthFusion memory. "  # noqa: E501
         "Args: provider (str, required) — chatgpt|gemini|deepseek|generic; "
         "data (str, required) — raw conversation export JSON or text. "
         "Response: {fragments_stored, skipped, provider, errors}"
@@ -557,7 +557,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
     },
     "depthfusion_bridge": {
         "properties": {
-            "model": {"type": "string", "description": "OpenRouter model string e.g. openai/gpt-4o"},
+            "model": {"type": "string", "description": "OpenRouter model string e.g. openai/gpt-4o"},  # noqa: E501
             "prompt": {"type": "string", "description": "The prompt to send to the provider"},
             "context_tags": {
                 "type": "array",

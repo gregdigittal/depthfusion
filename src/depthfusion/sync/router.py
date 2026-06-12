@@ -18,16 +18,16 @@ Authentication: all routes require a verified Principal via
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from typing import Annotated, Optional
+from datetime import datetime
+from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, field_validator
 
 from depthfusion.api.auth import require_principal
 from depthfusion.identity.models import Principal
-from depthfusion.sync.engine import Record, SyncEngine, SyncResult, _VALID_CLASSIFICATIONS
+from depthfusion.sync.engine import _VALID_CLASSIFICATIONS, Record, SyncEngine, SyncResult
 
 log = structlog.get_logger(__name__)
 

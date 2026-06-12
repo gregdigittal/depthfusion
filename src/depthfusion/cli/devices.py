@@ -18,7 +18,6 @@ from pathlib import Path
 
 from depthfusion.identity.device_registry import DeviceRegistry
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

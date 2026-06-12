@@ -24,11 +24,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import time
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -36,8 +35,8 @@ from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
-from depthfusion.authz.roles import Capability, Role, ROLE_CAPABILITIES
-from depthfusion.identity.device_registry import DeviceRegistry, DeviceRecord
+from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
+from depthfusion.identity.device_registry import DeviceRecord, DeviceRegistry
 from depthfusion.identity.models import Principal
 
 log = structlog.get_logger(__name__)
@@ -303,7 +302,7 @@ async def list_devices(
 
 
 @router.get("/metrics")
-async def prometheus_metrics() -> str:  # type: ignore[return]
+async def prometheus_metrics():  # type: ignore[return]
     """Prometheus-format metrics endpoint.
 
     Returns

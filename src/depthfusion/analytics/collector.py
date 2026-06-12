@@ -129,7 +129,9 @@ class AnalyticsCollector:
                     ).fetchall()
             return [dict(r) for r in rows]
         except Exception:  # noqa: BLE001
-            logger.exception("analytics: failed to query recent events for principal=%r", principal_id)
+            logger.exception(
+                "analytics: failed to query recent events for principal=%r", principal_id
+            )
             return []
 
     def count_events(

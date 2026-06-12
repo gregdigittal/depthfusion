@@ -20,9 +20,7 @@ import logging
 import os
 import uuid
 from importlib.metadata import version as _pkg_version
-from typing import AsyncGenerator, Optional
-
-_VERSION = _pkg_version("depthfusion")
+from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -32,6 +30,8 @@ from depthfusion.api.auth import require_principal
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import _process_request
+
+_VERSION = _pkg_version("depthfusion")
 
 logger = logging.getLogger(__name__)
 

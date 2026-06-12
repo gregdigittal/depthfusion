@@ -220,7 +220,7 @@ class ChromaDBStore:
                     except (ValueError, TypeError):
                         acl_list = [acl_raw] if acl_raw.strip() else []
                 elif isinstance(acl_raw, list):
-                    acl_list = acl_raw
+                    acl_list = [str(v) for v in acl_raw]
                 else:
                     acl_list = []
                 if not (set(acl_list) & allowed_ids):

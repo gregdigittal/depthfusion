@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import logging
 import sqlite3
 import uuid
 from contextlib import closing

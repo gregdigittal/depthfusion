@@ -27,7 +27,6 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-
 _DDL = """
 CREATE TABLE IF NOT EXISTS devices (
     device_id          TEXT PRIMARY KEY,

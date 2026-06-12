@@ -18,18 +18,17 @@ import logging
 import os
 import subprocess
 import threading
+from datetime import datetime, timezone
 from typing import Optional
 
-from datetime import datetime, timezone
-
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
+from depthfusion.api.admin_console import router as admin_console_router
 from depthfusion.api.auth import require_principal
 from depthfusion.api.events import router as events_router
 from depthfusion.api.role_admin import router as role_admin_router
-from depthfusion.api.admin_console import router as admin_console_router
 from depthfusion.identity.models import Principal
 
 log = logging.getLogger(__name__)
@@ -579,7 +578,10 @@ async def session_seed(body: SessionSeedBody, principal: Principal = Depends(req
 
 
 @app.post("/session/compress")
-async def session_compress(body: CompressSessionBody, principal: Principal = Depends(require_principal)):
+async def session_compress(
+    body: CompressSessionBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_compress_session
     args = {}
     if body.max_tokens is not None:
@@ -607,7 +609,10 @@ async def recall(body: RecallBody, principal: Principal = Depends(require_princi
 
 
 @app.post("/recall/feedback")
-async def recall_feedback(body: RecallFeedbackBody, principal: Principal = Depends(require_principal)):
+async def recall_feedback(
+    body: RecallFeedbackBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_recall_feedback
     args: dict = {"recall_id": body.recall_id, "rating": body.rating}
     if body.notes is not None:
@@ -620,7 +625,10 @@ async def recall_feedback(body: RecallFeedbackBody, principal: Principal = Depen
 # ---------------------------------------------------------------------------
 
 @app.post("/context")
-async def publish_context(body: PublishContextBody, principal: Principal = Depends(require_principal)):
+async def publish_context(
+    body: PublishContextBody,
+    principal: Principal = Depends(require_principal),
+):
     import uuid
 
     from depthfusion.core.config import DepthFusionConfig
@@ -643,7 +651,10 @@ async def publish_context(body: PublishContextBody, principal: Principal = Depen
 
 
 @app.post("/context/retrieve")
-async def retrieve_context(body: RetrieveContextBody, principal: Principal = Depends(require_principal)):
+async def retrieve_context(
+    body: RetrieveContextBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_retrieve_context
     cfg = DepthFusionConfig.from_env()
@@ -679,7 +690,10 @@ async def graph_status(principal: Principal = Depends(require_principal)):
 
 
 @app.post("/graph/traverse")
-async def graph_traverse(body: GraphTraverseBody, principal: Principal = Depends(require_principal)):
+async def graph_traverse(
+    body: GraphTraverseBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_graph_traverse
     args: dict = {"from": body.from_node, "depth": body.depth, "direction": body.direction}
     if body.filter_tags is not None:
@@ -734,13 +748,19 @@ async def list_discoveries(
 
 
 @app.post("/discoveries/inspect")
-async def inspect_discovery(body: InspectDiscoveryBody, principal: Principal = Depends(require_principal)):
+async def inspect_discovery(
+    body: InspectDiscoveryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_inspect_discovery
     return _parse_tool_result(_tool_inspect_discovery({"filename": body.filename}))
 
 
 @app.post("/discoveries/confirm")
-async def confirm_discovery(body: ConfirmDiscoveryBody, principal: Principal = Depends(require_principal)):
+async def confirm_discovery(
+    body: ConfirmDiscoveryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_confirm_discovery
     args: dict = {"text": body.text}
     if body.project is not None:
@@ -778,7 +798,10 @@ async def mark_superseded(body: SupersedeBody, principal: Principal = Depends(re
 
 
 @app.post("/discoveries/prune")
-async def prune_discoveries(body: PruneDiscoveriesBody, principal: Principal = Depends(require_principal)):
+async def prune_discoveries(
+    body: PruneDiscoveriesBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_prune_discoveries
     args: dict = {"older_than_days": body.older_than_days}
     if body.status is not None:
@@ -805,7 +828,10 @@ async def set_memory_score(
 # ---------------------------------------------------------------------------
 
 @app.post("/telemetry")
-async def record_telemetry(body: RecordTelemetryBody, principal: Principal = Depends(require_principal)):
+async def record_telemetry(
+    body: RecordTelemetryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_telemetry
     cfg = DepthFusionConfig.from_env()
@@ -820,7 +846,10 @@ async def record_telemetry(body: RecordTelemetryBody, principal: Principal = Dep
 # ---------------------------------------------------------------------------
 
 @app.post("/decisions")
-async def record_decision(body: RecordDecisionBody, principal: Principal = Depends(require_principal)):
+async def record_decision(
+    body: RecordDecisionBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_decision
     cfg = DepthFusionConfig.from_env()
@@ -833,7 +862,10 @@ async def record_decision(body: RecordDecisionBody, principal: Principal = Depen
 
 
 @app.post("/incidents")
-async def record_incident(body: RecordIncidentBody, principal: Principal = Depends(require_principal)):
+async def record_incident(
+    body: RecordIncidentBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_incident
     cfg = DepthFusionConfig.from_env()
@@ -844,7 +876,10 @@ async def record_incident(body: RecordIncidentBody, principal: Principal = Depen
 
 
 @app.post("/outcomes")
-async def report_outcome(body: ReportOutcomeBody, principal: Principal = Depends(require_principal)):
+async def report_outcome(
+    body: ReportOutcomeBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_report_outcome
     cfg = DepthFusionConfig.from_env()
@@ -859,7 +894,10 @@ async def report_outcome(body: ReportOutcomeBody, principal: Principal = Depends
 # ---------------------------------------------------------------------------
 
 @app.post("/skills/candidates")
-async def surface_skill_candidates(body: SkillCandidatesBody, principal: Principal = Depends(require_principal)):
+async def surface_skill_candidates(
+    body: SkillCandidatesBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_surface_skill_candidates
     cfg = DepthFusionConfig.from_env()
