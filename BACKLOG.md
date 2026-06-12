@@ -2756,7 +2756,7 @@
 
 ---
 
-## E-52: Sync v2 — ACL-Aware Replication [active]
+## E-52: Sync v2 — ACL-Aware Replication [done]
 
 > Retire wholesale rsync (`sync.sh`). Sync v2 is a service-mediated protocol: each enrolled device pulls only records its owner principal can see, pushes with ACL stamps, and honors revocation. Design docs run in Phase 1 (Lane D); build lands in Phase 2. **Lane D.**
 
@@ -2793,7 +2793,7 @@
 
 **Tasks:**
 - [x] T-588: Deprecation gate in `sync.sh` + audited override — Ollama dev, Sonnet rev
-- [ ] T-589: Migration runbook + rewritten sync guide — Haiku dev, Gemini rev
+- [x] T-589: Migration runbook + rewritten sync guide — Haiku dev, Gemini rev
 
 ---
 
@@ -2820,9 +2820,9 @@
 
 **Tasks:**
 - [x] T-593: docx parser (python-docx) with heading-path chunk metadata — Sonnet dev, DS rev
-- [ ] T-594: xlsx parser (openpyxl) with table/header inference — Sonnet dev, DS rev
-- [ ] T-595: pptx parser (python-pptx) incl. speaker notes — Sonnet dev, DS rev
-- [ ] T-596: Golden corpus + snapshot tests — Ollama dev, Sonnet rev
+- [x] T-594: xlsx parser (openpyxl) with table/header inference — Sonnet dev, DS rev
+- [x] T-595: pptx parser (python-pptx) incl. speaker notes — Sonnet dev, DS rev
+- [x] T-596: Golden corpus + snapshot tests — Ollama dev, Sonnet rev
 
 ### S-171: As a knowledge consumer, I want PDF + OCR parsing so that agreements and scans are searchable `P0` `L`
 
@@ -2851,7 +2851,7 @@
 
 ---
 
-## E-54: SharePoint Connector — Microsoft Graph [backlog]
+## E-54: SharePoint Connector — Microsoft Graph [active]
 
 > Continuous, incremental, permission-faithful ingestion of SharePoint sites via Microsoft Graph. Depends on G1 (ACL schema from E-50) + E-53 (parsers). **Lane B, Phase 2.**
 
@@ -2859,15 +2859,15 @@
 
 **Tasks:**
 - [x] T-604: Graph client with cert auth + token cache — Opus dev, DS rev
-- [ ] T-605: Site scope management CLI/API — Sonnet dev, DS rev
+- [x] T-605: Site scope management CLI/API — Sonnet dev, DS rev
 - [ ] T-606: Grant runbook (Sites.Selected consent flow) + health check — Haiku dev, Sonnet rev
 
 ### S-174: As the connector, I want delta-query incremental sync so that only changed items are fetched after the initial crawl `P0` `L`
 
 **Tasks:**
 - [x] T-607: Drive walker + initial crawl with download pipeline into E-53 — Sonnet dev, DS rev
-- [ ] T-608: Delta cursor store + incremental apply (add/update/delete) — Sonnet dev, DS rev
-- [ ] T-609: Transactional batch commit + resume logic — Opus dev, DS rev
+- [x] T-608: Delta cursor store + incremental apply (add/update/delete) — Sonnet dev, DS rev
+- [x] T-609: Transactional batch commit + resume logic — Opus dev, DS rev
 - [ ] T-610: Pilot-site E2E test + delta verification — Haiku dev, Sonnet rev
 
 ### S-175: As the security model, I want SharePoint permissions mapped to record ACLs so that DepthFusion never widens access beyond SharePoint `P0` `L`
@@ -2875,15 +2875,15 @@
 **Tasks:**
 - [x] T-611: Effective-permission resolver with inheritance handling — Opus dev, DS+GM rev
 - [x] T-612: ACL mapping + chunk inheritance writer — Sonnet dev, DS rev
-- [ ] T-613: Permission-change delta handling (ACL-only update path) — Sonnet dev, DS rev
-- [ ] T-614: Fail-closed tests: unresolvable, broken-inheritance, external-share cases — Haiku dev, Opus rev
+- [x] T-613: Permission-change delta handling (ACL-only update path) — Sonnet dev, DS rev
+- [x] T-614: Fail-closed tests: unresolvable, broken-inheritance, external-share cases — Haiku dev, Opus rev
 
 ### S-176: As an operator, I want throttling resilience + sync observability so that Graph 429s and big crawls don't require babysitting `P1` `M`
 
 **Tasks:**
-- [ ] T-615: Throttle-aware request layer — Sonnet dev, DS rev
-- [ ] T-616: Sync telemetry + status CLI — Ollama dev, Sonnet rev
-- [ ] T-617: Scheduler integration + lock — Haiku dev, DS rev
+- [x] T-615: Throttle-aware request layer — Sonnet dev, DS rev
+- [x] T-616: Sync telemetry + status CLI — Ollama dev, Sonnet rev
+- [x] T-617: Scheduler integration + lock — Haiku dev, DS rev
 
 ---
 
@@ -2913,16 +2913,16 @@
 
 ---
 
-## E-56: Desktop UI Shell — Tauri 2 + React/TypeScript [active]
+## E-56: Desktop UI Shell — Tauri 2 + React/TypeScript [done]
 
 > Tauri 2 + React/TS desktop app for Mac and Windows. IPC hardening + token vault in Rust core. Signs in via corporate identity (E-49). **Lane C.**
 
 ### S-180: As a developer, I want the Tauri 2 + React scaffold with CI builds so that Mac and Windows artifacts exist from the first week `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Tauri 2 + React + Tailwind + strict TS config compiles; `cargo build` passes
-- [ ] AC-2: CI matrix produces mac-universal + win-x64 artifacts on every PR
-- [ ] AC-3: Typed IPC layer + CSP hardening in place before any webview feature lands
+- [x] AC-1: Tauri 2 + React + Tailwind + strict TS config compiles; `cargo build` passes
+- [x] AC-2: CI matrix produces mac-universal + win-x64 artifacts on every PR
+- [x] AC-3: Typed IPC layer + CSP hardening in place before any webview feature lands
 
 **Tasks:**
 - [x] T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — Sonnet dev, Gemini rev
@@ -2932,8 +2932,8 @@
 ### S-181: As a team member, I want to sign in inside the app so that my session is my corporate identity `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: System-browser OIDC flow with deep-link callback (mac/win)
-- [ ] AC-2: Rust-side token vault using OS keychain; sign-out wipes local credentials
+- [x] AC-1: System-browser OIDC flow with deep-link callback (mac/win)
+- [x] AC-2: Rust-side token vault using OS keychain; sign-out wipes local credentials
 
 **Tasks:**
 - [x] T-629: System-browser OIDC flow + deep-link handling (mac/win) — Opus dev, DS+GM rev
@@ -2943,8 +2943,8 @@
 ### S-182: As the app, I want a resilient API client with offline detection so that every feature degrades gracefully off-network `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: OpenAPI→TS client generated in CI; offline state machine with write queue
-- [ ] AC-2: Profile/server config UI persisted across restarts
+- [x] AC-1: OpenAPI→TS client generated in CI; offline state machine with write queue
+- [x] AC-2: Profile/server config UI persisted across restarts
 
 **Tasks:**
 - [x] T-632: OpenAPI→TS client generation in CI — Ollama dev, Sonnet rev
@@ -2959,7 +2959,7 @@
 
 ---
 
-## E-57: UI Features — Search, Documents, Graph, Dashboards [backlog]
+## E-57: UI Features — Search, Documents, Graph, Dashboards [active]
 
 > The product surface: unified search across memories + documents, a citation-preserving document viewer, interactive graph exploration, and BI dashboards — every view rendered from security-trimmed APIs only. Depends on E-51 (Query API v2). **Lane C, Phase 2.**
 
@@ -2971,10 +2971,10 @@
 - [ ] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
 
 **Tasks:**
-- [ ] T-637: Search screen + facet components — Sonnet dev, Gemini rev
-- [ ] T-638: Result cards with citation locators + classification chips — Sonnet dev, Gemini rev
-- [ ] T-639: Query orchestration hook (debounce, cancel, cache-fallback) — Sonnet dev, DS rev
-- [ ] T-640: Search latency benchmark harness — Ollama dev, Sonnet rev
+- [x] T-637: Search screen + facet components — Sonnet dev, Gemini rev
+- [x] T-638: Result cards with citation locators + classification chips — Sonnet dev, Gemini rev
+- [x] T-639: Query orchestration hook (debounce, cancel, cache-fallback) — Sonnet dev, DS rev
+- [x] T-640: Search latency benchmark harness — Ollama dev, Sonnet rev
 
 ### S-185: As a user, I want a document viewer with highlighted hits so that I read sources without leaving the app `P0` `L`
 
@@ -2984,9 +2984,9 @@
 - [ ] AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires
 
 **Tasks:**
-- [ ] T-641: Block-based viewer with highlight + locator jump — Sonnet dev, Gemini rev
-- [ ] T-642: Policy-gated original-file action wiring — Sonnet dev, DS rev
-- [ ] T-643: Watermark overlay component — Haiku dev, Gemini rev
+- [x] T-641: Block-based viewer with highlight + locator jump — Sonnet dev, Gemini rev
+- [x] T-642: Policy-gated original-file action wiring — Sonnet dev, DS rev
+- [x] T-643: Watermark overlay component — Haiku dev, Gemini rev
 
 ### S-186: As an analyst, I want interactive graph exploration so that I can map entities and relationships visually `P1` `L`
 
@@ -2996,9 +2996,9 @@
 - [ ] AC-3: 1k-node neighborhood renders at interactive framerate
 
 **Tasks:**
-- [ ] T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — Sonnet dev, Gemini rev
-- [ ] T-645: Node inspector with provenance panel — Sonnet dev, Gemini rev
-- [ ] T-646: Render performance pass (level-of-detail, viewport culling) — Sonnet dev, DS rev
+- [x] T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — Sonnet dev, Gemini rev
+- [x] T-645: Node inspector with provenance panel — Sonnet dev, Gemini rev
+- [x] T-646: Render performance pass (level-of-detail, viewport culling) — Sonnet dev, DS rev
 
 ### S-187: As a leader, I want in-app dashboards so that corpus and activity KPIs are visible without external BI tools `P2` `M`
 
@@ -3007,8 +3007,8 @@
 - [ ] AC-2: Tiles respect principal trim; layout persists per user
 
 **Tasks:**
-- [ ] T-647: Tile framework + chart components — Sonnet dev, Gemini rev
-- [ ] T-648: Default dashboard pack + persistence — Haiku dev, Gemini rev
+- [x] T-647: Tile framework + chart components — Sonnet dev, Gemini rev
+- [x] T-648: Default dashboard pack + persistence — Haiku dev, Gemini rev
 
 ---
 

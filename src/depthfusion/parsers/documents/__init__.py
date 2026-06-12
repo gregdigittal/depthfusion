@@ -29,6 +29,8 @@ from depthfusion.parsers.documents.base import (
     quarantine,
 )
 from depthfusion.parsers.documents.generic import GenericParser
+from depthfusion.parsers.documents.pptx import PptxParser
+from depthfusion.parsers.documents.xlsx import XlsxParser
 
 
 class DocumentParserRegistry:
@@ -58,6 +60,8 @@ class DocumentParserRegistry:
 # Module-level default registry singleton
 _default_registry = DocumentParserRegistry()
 _default_registry.register(GenericParser())
+_default_registry.register(XlsxParser())
+_default_registry.register(PptxParser())
 
 
 def get_registry() -> DocumentParserRegistry:
@@ -72,6 +76,8 @@ __all__ = [
     "DocumentRecord",
     # Parsers
     "GenericParser",
+    "PptxParser",
+    "XlsxParser",
     "get_registry",
     # Quarantine store
     "QuarantineEntry",
