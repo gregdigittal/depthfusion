@@ -146,7 +146,7 @@ INGEST_RESP=$(curl -sf -X POST "${BASE_URL}/context" \
     -H "Content-Type: application/json" \
     -H "${AUTH_HEADER}" \
     -d "{
-        \"text\": \"${TEST_CONTENT}\",
+        \"content\": \"${TEST_CONTENT}\",
         \"tags\": ${TEST_TAGS},
         \"project\": \"smoke-test\"
     }") || fail "POST /context returned non-200 (server log: ${TMPDIR_SMOKE}/server.log)"
