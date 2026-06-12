@@ -26,7 +26,8 @@ from __future__ import annotations
 import functools
 from typing import Any, Callable
 
-from depthfusion.authz.capability_check import AuthorizationError, require_capability
+from depthfusion.authz import get_policy_engine
+from depthfusion.authz.capability_check import AuthorizationError
 from depthfusion.authz.roles import Capability
 from depthfusion.identity.models import Principal
 
@@ -172,7 +173,16 @@ def check_tool_access(
     required = TOOL_CAPABILITIES[tool_name]
     # Use the principal's own id as the ACL so that the capability check is
     # the only gate (tool-level authz, not per-record authz).
-    require_capability(principal, required, _open_acl_for(principal.principal_id))
+    decision = get_policy_engine().decide(
+        principal,
+        required,
+        {"acl_allow": _open_acl_for(principal.principal_id)},
+    )
+    if not decision.allow:
+        raise AuthorizationError(
+            principal_id=principal.principal_id,
+            reason=decision.reason,
+        )
 
 
 __all__ = [

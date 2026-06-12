@@ -40,6 +40,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
 
 from depthfusion.api.auth import require_principal
+from depthfusion.authz import get_policy_engine
 from depthfusion.authz.roles import Capability, Role, RoleStore
 from depthfusion.identity.models import Principal
 
@@ -104,30 +105,17 @@ def _write_audit_event(
     )
 
 
-def _require_capability(principal: Principal, capability: Capability) -> None:
-    """Check that the principal holds ``capability`` via their group membership.
-
-    Groups in principal.groups that match Role enum values are treated as
-    role assignments.  Raises 403 if the capability is not present.
-    """
-    from depthfusion.authz.roles import ROLE_CAPABILITIES
-
-    role_values = {r.value for r in Role}
-    caps: set[Capability] = set()
-    for group in principal.groups:
-        if group in role_values:
-            caps |= ROLE_CAPABILITIES[Role(group)]
-
-    if capability not in caps:
+def _enforce(principal: Principal, capability: Capability) -> None:
+    """Raise 403 if *principal* is denied *capability* by the PolicyEngine."""
+    decision = get_policy_engine().decide(
+        principal,
+        capability,
+        {"acl_allow": [principal.principal_id]},
+    )
+    if not decision.allow:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": "forbidden",
-                "detail": (
-                    f"Principal '{principal.principal_id}' does not hold "
-                    f"capability '{capability.value}'."
-                ),
-            },
+            detail={"error": "forbidden", "detail": decision.reason},
         )
 
 
@@ -201,7 +189,7 @@ async def manage_role(
     action : ``"assign"`` | ``"revoke"``
         Whether to grant or remove the role (default: ``"assign"``).
     """
-    _require_capability(principal, Capability.ASSIGN_ROLES)
+    _enforce(principal, Capability.ASSIGN_ROLES)
 
     role = Role(body.role)
     actor = principal.principal_id
@@ -227,6 +215,10 @@ async def manage_role(
             result=result,
         )
 
+    # Flush stale policy decisions for the affected principal so that the
+    # new role takes effect immediately (not after the 60s cache TTL).
+    get_policy_engine().invalidate(body.principal_id)
+
     return RoleAssignmentResponse(
         principal_id=body.principal_id,
         role=role.value,
@@ -244,7 +236,7 @@ async def list_roles(
 
     Requires the ``view_audit_log`` capability (admin or owner).
     """
-    _require_capability(principal, Capability.VIEW_AUDIT_LOG)
+    _enforce(principal, Capability.VIEW_AUDIT_LOG)
 
     assignments = store.list_assignments()
     items = [

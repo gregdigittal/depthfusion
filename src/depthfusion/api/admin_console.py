@@ -35,7 +35,8 @@ from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
-from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
+from depthfusion.authz import get_policy_engine
+from depthfusion.authz.roles import Capability
 from depthfusion.identity.device_registry import DeviceRecord, DeviceRegistry
 from depthfusion.identity.models import Principal
 
@@ -111,23 +112,22 @@ def _default_identity_db() -> Path:
     return data_dir / "identity.db"
 
 
-def _require_capability(principal: Principal, capability: Capability) -> None:
-    """Raise 403 if *principal* does not hold *capability*."""
-    role_values = {r.value for r in Role}
-    caps: set[Capability] = set()
-    for group in principal.groups:
-        if group in role_values:
-            caps |= ROLE_CAPABILITIES[Role(group)]
-    if capability not in caps:
+def _enforce(principal: Principal, capability: Capability) -> None:
+    """Raise 403 if *principal* is denied *capability* by the PolicyEngine.
+
+    System-level resources (audit log, devices) carry no per-record ACL, so we
+    use a self-admitted sentinel: ``acl_allow=[principal_id]``.  The decision
+    cache makes repeat calls cheap.
+    """
+    decision = get_policy_engine().decide(
+        principal,
+        capability,
+        {"acl_allow": [principal.principal_id]},
+    )
+    if not decision.allow:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": "forbidden",
-                "detail": (
-                    f"Principal '{principal.principal_id}' does not hold "
-                    f"capability '{capability.value}'."
-                ),
-            },
+            detail={"error": "forbidden", "detail": decision.reason},
         )
 
 
@@ -199,7 +199,7 @@ async def query_audit_log(
 
     Requires ``VIEW_AUDIT_LOG`` capability.  The read itself is audited.
     """
-    _require_capability(principal, Capability.VIEW_AUDIT_LOG)
+    _enforce(principal, Capability.VIEW_AUDIT_LOG)
 
     since_ts: Optional[float] = None
     if since is not None:
@@ -244,7 +244,7 @@ async def admin_health(
 
     Requires ``VIEW_AUDIT_LOG`` capability.
     """
-    _require_capability(principal, Capability.VIEW_AUDIT_LOG)
+    _enforce(principal, Capability.VIEW_AUDIT_LOG)
 
     identity_db = _default_identity_db()
     audit_db = _default_audit_db()
@@ -283,7 +283,7 @@ async def list_devices(
 
     Requires ``MANAGE_DEVICES`` capability.
     """
-    _require_capability(principal, Capability.MANAGE_DEVICES)
+    _enforce(principal, Capability.MANAGE_DEVICES)
 
     registry = _get_device_registry()
     devices: list[DeviceRecord] = registry.list_all()
