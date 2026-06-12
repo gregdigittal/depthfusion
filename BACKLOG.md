@@ -2860,7 +2860,7 @@
 **Tasks:**
 - [x] T-604: Graph client with cert auth + token cache — Opus dev, DS rev
 - [x] T-605: Site scope management CLI/API — Sonnet dev, DS rev
-- [ ] T-606: Grant runbook (Sites.Selected consent flow) + health check — Haiku dev, Sonnet rev
+- [x] T-606: Grant runbook (Sites.Selected consent flow) + health check — Haiku dev, Sonnet rev
 
 ### S-174: As the connector, I want delta-query incremental sync so that only changed items are fetched after the initial crawl `P0` `L`
 
@@ -2959,15 +2959,15 @@
 
 ---
 
-## E-57: UI Features — Search, Documents, Graph, Dashboards [active]
+## E-57: UI Features — Search, Documents, Graph, Dashboards [done]
 
 > The product surface: unified search across memories + documents, a citation-preserving document viewer, interactive graph exploration, and BI dashboards — every view rendered from security-trimmed APIs only. Depends on E-51 (Query API v2). **Lane C, Phase 2.**
 
 ### S-184: As a user, I want unified search with facets so that one query spans memories, discoveries, and documents `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation
-- [ ] AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)
+- [x] AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation
+- [x] AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)
 - [ ] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
 
 **Tasks:**
@@ -2979,9 +2979,9 @@
 ### S-185: As a user, I want a document viewer with highlighted hits so that I read sources without leaving the app `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Renders extracted document content (blocks/tables/slides) with hit highlighting and jump-to-locator
-- [ ] AC-2: Original-file access (open/download) is policy-gated by E-59 — viewer works even when download is denied
-- [ ] AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires
+- [x] AC-1: Renders extracted document content (blocks/tables/slides) with hit highlighting and jump-to-locator
+- [x] AC-2: Original-file access (open/download) is policy-gated by E-59 — viewer works even when download is denied
+- [x] AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires
 
 **Tasks:**
 - [x] T-641: Block-based viewer with highlight + locator jump — Sonnet dev, Gemini rev
@@ -2991,9 +2991,9 @@
 ### S-186: As an analyst, I want interactive graph exploration so that I can map entities and relationships visually `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Force-directed graph view over trimmed traversal API; expand-on-click, filter by entity type/source
-- [ ] AC-2: Node inspector shows provenance (source records the entity came from, ACL-visible only)
-- [ ] AC-3: 1k-node neighborhood renders at interactive framerate
+- [x] AC-1: Force-directed graph view over trimmed traversal API; expand-on-click, filter by entity type/source
+- [x] AC-2: Node inspector shows provenance (source records the entity came from, ACL-visible only)
+- [x] AC-3: 1k-node neighborhood renders at interactive framerate
 
 **Tasks:**
 - [x] T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — Sonnet dev, Gemini rev
@@ -3003,8 +3003,8 @@
 ### S-187: As a leader, I want in-app dashboards so that corpus and activity KPIs are visible without external BI tools `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Dashboard tiles over `/query/*/aggregate`: corpus growth, top entities, ingestion health, my-team activity
-- [ ] AC-2: Tiles respect principal trim; layout persists per user
+- [x] AC-1: Dashboard tiles over `/query/*/aggregate`: corpus growth, top entities, ingestion health, my-team activity
+- [x] AC-2: Tiles respect principal trim; layout persists per user
 
 **Tasks:**
 - [x] T-647: Tile framework + chart components — Sonnet dev, Gemini rev
