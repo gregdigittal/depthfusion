@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 from depthfusion.mcp.tools._registry import (  # noqa: E402
     TOOL_SCHEMAS,
     TOOLS,
+    _TOOL_FLAGS,
     get_enabled_tools,
 )
 
