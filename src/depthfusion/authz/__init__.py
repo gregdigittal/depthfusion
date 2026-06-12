@@ -10,6 +10,7 @@ from depthfusion.authz.export_controls import (
 
 from .capability_check import AuthorizationError, require_capability
 from .frontmatter import ACLFrontmatter, parse_acl, write_acl
+from .policy_engine import PolicyDecision, PolicyEngine, get_policy_engine
 from .roles import (
     ROLE_CAPABILITIES,
     Capability,
@@ -35,4 +36,7 @@ __all__ = [
     "ExportPolicyMatrix",
     "ExportDecision",
     "check_export_allowed",
+    "PolicyDecision",
+    "PolicyEngine",
+    "get_policy_engine",
 ]
