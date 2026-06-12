@@ -140,7 +140,7 @@ def _tool_mark_superseded(arguments: dict, config: Any) -> str:
         memory_id=old_id,
         event_type=MemoryEventType.SUPERSEDED,
         project_id=project_id,
-        payload={"new_id": new_id, "reason": reason},
+        payload={"new_id": new_id, "reason": reason, "extra": {"acl_allow": [project_id]}},
         actor=actor,
         timestamp=datetime.now(timezone.utc),
     )
@@ -182,7 +182,7 @@ def _tool_report_outcome(arguments: dict, config: Any) -> str:
         memory_id=memory_id,
         event_type=MemoryEventType.OUTCOME_RECORDED,
         project_id=project_id,
-        payload={"outcome": outcome, "success": success},
+        payload={"outcome": outcome, "success": success, "extra": {"acl_allow": [project_id]}},
         actor=actor,
         timestamp=datetime.now(timezone.utc),
     )

@@ -250,7 +250,7 @@ class TestTraverseWithTimeWindow:
                 entity_id=make_entity_id(sid, "session", "test"),
                 name=sid, type="session", project="test",
                 source_files=[], confidence=1.0,
-                first_seen=now_iso, metadata={},
+                first_seen=now_iso, metadata={"acl_allow": ["depthfusion"]},
             ))
         a = make_entity_id("sess-a", "session", "test")
         b = make_entity_id("sess-b", "session", "test")
@@ -260,14 +260,14 @@ class TestTraverseWithTimeWindow:
             edge_id=make_edge_id(b, a, "PRECEDED_BY"),
             source_id=b, target_id=a, relationship="PRECEDED_BY",
             weight=1.0, signals=["temporal", "vocabulary_overlap"],
-            metadata={"delta_hours": 4.0, "overlap": 3},
+            metadata={"acl_allow": ["depthfusion"], "delta_hours": 4.0, "overlap": 3},
         ))
         # c PRECEDED_BY a, delta=72h (outside 48h window)
         store.upsert_edge(Edge(
             edge_id=make_edge_id(c, a, "PRECEDED_BY"),
             source_id=c, target_id=a, relationship="PRECEDED_BY",
             weight=1.0, signals=["temporal"],
-            metadata={"delta_hours": 72.0, "overlap": 5},
+            metadata={"acl_allow": ["depthfusion"], "delta_hours": 72.0, "overlap": 5},
         ))
         return store, a, b, c
 
@@ -307,13 +307,13 @@ class TestTraverseWithTimeWindow:
             store.upsert_entity(Entity(
                 entity_id=eid, name=name, type="class", project="test",
                 source_files=[], confidence=1.0,
-                first_seen="2026-04-20T10:00:00", metadata={},
+                first_seen="2026-04-20T10:00:00", metadata={"acl_allow": ["depthfusion"]},
             ))
         # CO_OCCURS edge with no delta_hours in metadata
         store.upsert_edge(Edge(
             edge_id=make_edge_id(a, b, "CO_OCCURS"),
             source_id=a, target_id=b, relationship="CO_OCCURS",
-            weight=1.0, signals=["co_occurrence"], metadata={},
+            weight=1.0, signals=["co_occurrence"], metadata={"acl_allow": ["depthfusion"]},
         ))
         result = traverse(a, store, time_window_hours=1.0)
         assert result is not None

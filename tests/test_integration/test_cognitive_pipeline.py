@@ -52,7 +52,8 @@ def test_full_decision_lifecycle(cognitive_env, tmp_path):
     outcome_event = MemoryEvent(
         str(uuid.uuid4()), decision.id, MemoryEventType.OUTCOME_RECORDED,
         "proj-integration",
-        {"outcome": "Works well in prod", "success": True},
+        {"outcome": "Works well in prod", "success": True,
+         "extra": {"acl_allow": ["proj-integration"]}},
         "test", datetime.now(timezone.utc),
     )
     log.append(outcome_event)
@@ -140,7 +141,7 @@ def test_event_log_replay_filters_by_project(cognitive_env, tmp_path):
     for proj in ("proj-a", "proj-b"):
         e = MemoryEvent(
             str(uuid.uuid4()), str(uuid.uuid4()), MemoryEventType.CREATED,
-            proj, {}, "test", datetime.now(timezone.utc),
+            proj, {"extra": {"acl_allow": [proj]}}, "test", datetime.now(timezone.utc),
         )
         log.append(e)
 

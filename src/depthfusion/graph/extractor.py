@@ -66,7 +66,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "class", self._project),
                     name=name, type="class", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         for match in _SNAKE_FUNC_RE.finditer(content):
@@ -77,7 +77,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "function", self._project),
                     name=name, type="function", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         for match in _FILE_RE.finditer(content):
@@ -88,7 +88,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "file", self._project),
                     name=name, type="file", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         return entities
@@ -159,7 +159,7 @@ class HaikuExtractor:
                 entity_id=make_entity_id(name, etype, self._project),
                 name=name, type=etype, project=self._project,
                 source_files=[source_file], confidence=0.85,
-                first_seen=_now_iso(), metadata={},
+                first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
             ))
         return entities
 

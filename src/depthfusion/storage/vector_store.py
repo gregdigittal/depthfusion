@@ -5,10 +5,10 @@ import json as _json_mod
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
-    from depthfusion.identity.models import Principal, cast
+    from depthfusion.identity.models import Principal
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class ChromaDBStore:
         Uses the DepthFusion embedding backend when healthy; falls back to
         Chroma's built-in auto-embedding when the backend is unavailable.
         """
-        # T-562: enforce ACL stamp before any write.
+        # T-562: enforce ACL stamp before any write (uses original metadata).
         _validate_vector_acl(metadata)
         _score = _admission_score(content)
         if _score < _ADMISSION_DROP_THRESHOLD:
@@ -126,13 +126,16 @@ class ChromaDBStore:
                 _ADMISSION_DROP_THRESHOLD,
             )
             return
+        # ChromaDB metadata values must be scalars (str/int/float/bool).
+        # Strip list-valued fields (e.g. acl_allow) — validation already ran above.
+        chroma_meta = {k: v for k, v in metadata.items() if not isinstance(v, (list, dict))}
         embedding = self._get_embedding([content])
         if embedding is not None:
             self._collection.upsert(
                 ids=[doc_id],
                 embeddings=cast(Any, [embedding[0]]),
                 documents=[content],
-                metadatas=[metadata],
+                metadatas=[chroma_meta],
             )
         else:
             try:
@@ -148,7 +151,7 @@ class ChromaDBStore:
             self._collection.upsert(
                 ids=[doc_id],
                 documents=[content],
-                metadatas=[metadata],
+                metadatas=[chroma_meta],
             )
 
     def query(

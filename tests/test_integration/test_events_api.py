@@ -6,13 +6,30 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+
+def _install_fake_principal(app):
+    """Override _require_principal_dep so tests bypass the OIDC 503 sentinel.
+
+    In V2, OIDC (require_principal) replaced Bearer-token per-request auth.
+    Without OIDC env vars, _UnconfiguredPrincipalDep raises HTTP 503 on every
+    protected route.  This override installs a no-op that returns a fake principal
+    so protected routes behave as if a valid user is authenticated.
+    """
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.identity.models import Principal
+    fake = Principal(principal_id="greg", upn="greg@test.local")
+    original = dict(app.dependency_overrides)
+    app.dependency_overrides[_require_principal_dep] = lambda: fake
+    return original
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    """TestClient with a clean in-memory graph and no Redis dependency."""
+    """TestClient with a clean in-memory graph, no Redis, and auth bypassed."""
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
     monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
@@ -22,13 +39,18 @@ def client(tmp_path, monkeypatch):
     import depthfusion.api.events as ev_mod
     ev_mod._event_store = None
 
-    from depthfusion.api.rest import app
-    return TestClient(app, raise_server_exceptions=True)
+    from importlib import reload
+    import depthfusion.api.rest as rest_module
+    reload(rest_module)
+    original = _install_fake_principal(rest_module.app)
+    yield TestClient(rest_module.app, raise_server_exceptions=True)
+    rest_module.app.dependency_overrides.clear()
+    rest_module.app.dependency_overrides.update(original)
 
 
 @pytest.fixture()
 def authed_client(tmp_path, monkeypatch):
-    """TestClient with Bearer token auth configured."""
+    """TestClient without auth override — for documenting V2 503 behavior."""
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
     monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
@@ -38,7 +60,7 @@ def authed_client(tmp_path, monkeypatch):
     ev_mod._event_store = None
 
     from depthfusion.api.rest import app
-    return TestClient(app, raise_server_exceptions=True)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 # ---------------------------------------------------------------------------
@@ -88,28 +110,30 @@ def test_publish_event_missing_required_fields(client):
 # ---------------------------------------------------------------------------
 
 def test_publish_returns_401_without_token(authed_client):
+    """V2: Bearer-token auth removed; OIDC not configured in test env → 503."""
     resp = authed_client.post("/v1/events/publish", json={
         "agent_id": "agent-a",
         "project_slug": "proj",
         "memory_refs": ["m1"],
     })
-    assert resp.status_code == 401
+    assert resp.status_code == 503
 
 
 def test_publish_returns_401_with_wrong_token(authed_client):
+    """V2: Bearer-token auth removed; wrong token header has no effect → 503."""
     resp = authed_client.post(
         "/v1/events/publish",
         json={"agent_id": "agent-a", "project_slug": "proj", "memory_refs": ["m1"]},
         headers={"Authorization": "Bearer wrong-token"},
     )
-    assert resp.status_code == 401
+    assert resp.status_code == 503
 
 
-def test_publish_succeeds_with_correct_token(authed_client):
-    resp = authed_client.post(
+def test_publish_succeeds_with_correct_token(client):
+    """V2: auth is bypassed via dependency_overrides in client fixture → 200."""
+    resp = client.post(
         "/v1/events/publish",
         json={"agent_id": "agent-a", "project_slug": "proj", "memory_refs": ["m1"]},
-        headers={"Authorization": "Bearer test-token-secret"},
     )
     assert resp.status_code == 200
     assert "event_id" in resp.json()
@@ -135,8 +159,9 @@ def test_stream_returns_error_frame_when_no_backend(client):
 
 
 def test_stream_returns_401_without_token(authed_client):
+    """V2: Bearer-token auth removed; OIDC not configured in test env → 503."""
     resp = authed_client.get("/v1/events/stream?projects=test-proj")
-    assert resp.status_code == 401
+    assert resp.status_code == 503
 
 
 def test_stream_with_mocked_backend(tmp_path, monkeypatch):
@@ -155,8 +180,11 @@ def test_stream_with_mocked_backend(tmp_path, monkeypatch):
     stream = InMemoryStreamBackend()
     ev_mod._event_store = EventStore(graph=graph, stream=stream)
 
-    from depthfusion.api.rest import app
-    client = TestClient(app, raise_server_exceptions=True)
+    from importlib import reload
+    import depthfusion.api.rest as rest_module
+    reload(rest_module)
+    _install_fake_principal(rest_module.app)
+    client = TestClient(rest_module.app, raise_server_exceptions=True)
 
     # Publish one event so the stream has something to yield
     pub_resp = client.post("/v1/events/publish", json={
@@ -235,7 +263,7 @@ def test_get_tailscale_ip_returns_ip_on_success():
 # ---------------------------------------------------------------------------
 
 def _fabric_client(tmp_path, monkeypatch):
-    """TestClient wired to a real in-memory EventStore (no Redis, no auth)."""
+    """TestClient wired to a real in-memory EventStore (no Redis, auth bypassed)."""
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
     monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
     monkeypatch.delenv("DEPTHFUSION_REDIS_URL", raising=False)
@@ -244,8 +272,11 @@ def _fabric_client(tmp_path, monkeypatch):
     import depthfusion.api.events as ev_mod
     ev_mod._event_store = None
 
-    from depthfusion.api.rest import app
-    return TestClient(app, raise_server_exceptions=True)
+    from importlib import reload
+    import depthfusion.api.rest as rest_module
+    reload(rest_module)
+    _install_fake_principal(rest_module.app)
+    return TestClient(rest_module.app, raise_server_exceptions=True)
 
 
 def _setup_fabric_store(tmp_path):
@@ -324,6 +355,8 @@ class TestAgentTrail:
         assert timestamps == sorted(timestamps)
 
     def test_trail_requires_auth_when_token_set(self, tmp_path, monkeypatch):
+        """V2: OIDC replaced Bearer-token auth.  Without OIDC env vars → 503.
+        With dependency_overrides bypass → 200 regardless of token header."""
         monkeypatch.setenv("DEPTHFUSION_MODE", "local")
         monkeypatch.setenv("DEPTHFUSION_GRAPH_JSON", str(tmp_path / "graph.json"))
         monkeypatch.setenv("DEPTHFUSION_API_TOKEN", "trail-secret")
@@ -332,19 +365,22 @@ class TestAgentTrail:
         import depthfusion.api.events as ev_mod
         ev_mod._event_store = None
 
-        from depthfusion.api.rest import app
-        client = TestClient(app, raise_server_exceptions=True)
+        from importlib import reload
+        import depthfusion.api.rest as rest_module
+        reload(rest_module)
 
-        # No token → 401
-        resp = client.get("/v1/graph/agent/any-agent/trail")
-        assert resp.status_code == 401
+        # Without auth override → 503 (OIDC not configured in test environment)
+        unconfigured = TestClient(rest_module.app, raise_server_exceptions=False)
+        resp = unconfigured.get("/v1/graph/agent/any-agent/trail")
+        assert resp.status_code == 503
 
-        # Correct token → 200
-        resp = client.get(
-            "/v1/graph/agent/any-agent/trail",
-            headers={"Authorization": "Bearer trail-secret"},
-        )
+        # With dependency_overrides bypass → 200
+        original = _install_fake_principal(rest_module.app)
+        configured = TestClient(rest_module.app, raise_server_exceptions=True)
+        resp = configured.get("/v1/graph/agent/any-agent/trail")
         assert resp.status_code == 200
+        rest_module.app.dependency_overrides.clear()
+        rest_module.app.dependency_overrides.update(original)
 
     def test_trail_three_agents_all_indexed(self, tmp_path, monkeypatch):
         """3 concurrent-style agents each publish; all three appear in their respective trails."""
@@ -410,8 +446,11 @@ class TestMemoryObservers:
         store = _setup_fabric_store(tmp_path)
         ev_mod._event_store = store
 
-        from depthfusion.api.rest import app
-        client = TestClient(app, raise_server_exceptions=True)
+        from importlib import reload
+        import depthfusion.api.rest as rest_module
+        reload(rest_module)
+        _install_fake_principal(rest_module.app)
+        client = TestClient(rest_module.app, raise_server_exceptions=True)
 
         # Publish content to create a MemoryEntity via publish_memory
         r = asyncio.run(store.publish_memory(
@@ -425,7 +464,7 @@ class TestMemoryObservers:
             store.graph.upsert_edge(Edge(
                 edge_id=f"{memory_id}-recv-{agent}", source_id=memory_id, target_id=agent,
                 relationship="AGENT_RECEIVED", weight=1.0, signals=["fabric"],
-                metadata={"agent_id": agent, "timestamp": f"2026-01-01T00:0{i}:00+00:00"},
+                metadata={"acl_allow": ["depthfusion"], "agent_id": agent, "timestamp": f"2026-01-01T00:0{i}:00+00:00"},
             ))
 
         resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
@@ -436,6 +475,8 @@ class TestMemoryObservers:
         assert agent_ids == {"agent-b", "agent-c"}
 
     def test_observers_requires_auth_when_token_set(self, tmp_path, monkeypatch):
+        """V2: OIDC replaced Bearer-token auth.  Without OIDC env vars → 503.
+        With dependency_overrides bypass → 200 regardless of token header."""
         import asyncio
 
         import depthfusion.api.events as ev_mod
@@ -452,19 +493,22 @@ class TestMemoryObservers:
         r = asyncio.run(store.publish_memory("content", "agent-x", "proj"))
         memory_id = r["memory_id"]
 
-        from depthfusion.api.rest import app
-        client = TestClient(app, raise_server_exceptions=True)
+        from importlib import reload
+        import depthfusion.api.rest as rest_module
+        reload(rest_module)
 
-        # No token → 401
-        resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
-        assert resp.status_code == 401
+        # Without auth override → 503 (OIDC not configured in test environment)
+        unconfigured = TestClient(rest_module.app, raise_server_exceptions=False)
+        resp = unconfigured.get(f"/v1/graph/memory/{memory_id}/observers")
+        assert resp.status_code == 503
 
-        # Correct token → 200
-        resp = client.get(
-            f"/v1/graph/memory/{memory_id}/observers",
-            headers={"Authorization": "Bearer obs-secret"},
-        )
+        # With dependency_overrides bypass → 200
+        original = _install_fake_principal(rest_module.app)
+        configured = TestClient(rest_module.app, raise_server_exceptions=True)
+        resp = configured.get(f"/v1/graph/memory/{memory_id}/observers")
         assert resp.status_code == 200
+        rest_module.app.dependency_overrides.clear()
+        rest_module.app.dependency_overrides.update(original)
 
     def test_dedup_produces_one_memory_n_event_entities(self, tmp_path, monkeypatch):
         """T-497: 10 concurrent publishes of identical content → 1 MemoryEntity, 10 EventEntities."""
@@ -509,7 +553,11 @@ class TestMemoryObservers:
         assert len(event_entities) == N
 
         # Verify the /observers endpoint finds the memory entity
-        from depthfusion.api.rest import app
-        client = TestClient(app, raise_server_exceptions=True)
-        resp = client.get(f"/v1/graph/memory/{memory_id}/observers")
+        from importlib import reload
+        import depthfusion.api.rest as rest_module
+        reload(rest_module)
+        _install_fake_principal(rest_module.app)
+        dedup_client = TestClient(rest_module.app, raise_server_exceptions=True)
+        resp = dedup_client.get(f"/v1/graph/memory/{memory_id}/observers")
         assert resp.status_code == 200
+        rest_module.app.dependency_overrides.clear()

@@ -292,6 +292,7 @@ class EventStore:
             confidence=1.0,
             first_seen=timestamp_iso,
             metadata={
+                "acl_allow": [project_slug],
                 "event_type": event_type,
                 "agent_id": agent_id,
                 "project_slug": project_slug,
@@ -347,6 +348,7 @@ class EventStore:
             confidence=1.0,
             first_seen=existing.first_seen if existing else timestamp_iso,
             metadata={
+                "acl_allow": [project_slug],
                 "content_hash": content_hash,
                 "agent_id": agent_id,
             },
@@ -370,6 +372,7 @@ class EventStore:
             confidence=1.0,
             first_seen=timestamp_iso,
             metadata={
+                "acl_allow": [project_slug],
                 "event_type": event_type,
                 "agent_id": agent_id,
                 "project_slug": project_slug,
@@ -592,6 +595,7 @@ class EventStore:
             signals=["event_fabric"],
             adapter_name="event_store",
             source_type="event",
+            metadata={"acl_allow": [project_slug]},
         )
 
         lock_path = _graph_lock_path(project_slug)

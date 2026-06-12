@@ -48,6 +48,7 @@ from depthfusion.identity.token_validator import TokenValidator
 _PUBLIC_PATHS: frozenset[str] = frozenset(
     {
         "/health",
+        "/metrics",  # Prometheus scraping — intentionally public per admin_console.py
         "/openapi.json",
         "/docs",
         "/docs/oauth2-redirect",
