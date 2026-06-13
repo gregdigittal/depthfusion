@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion V2 — Installation Guide</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3349;
+    --accent: #5b8dee;
+    --accent-dim: #3a5db5;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --code-bg: #161b2e;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  /* Layout */
+  .container { max-width: 900px; margin: 0 auto; padding: 0 20px 80px; }
+  header { background: linear-gradient(135deg, #1a1d27 0%, #12172b 100%); border-bottom: 1px solid var(--border); padding: 36px 0 0; margin-bottom: 32px; }
+  header .inner { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+  .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .logo-mark { width: 42px; height: 42px; background: linear-gradient(135deg, #5b8dee, #a78bfa); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  h1 { font-size: 26px; font-weight: 700; color: var(--text); }
+  .tagline { color: var(--text-dim); font-size: 15px; margin-bottom: 24px; }
+  .role-notice { background: rgba(91,141,238,0.1); border: 1px solid rgba(91,141,238,0.3); border-radius: var(--radius) var(--radius) 0 0; padding: 10px 16px; font-size: 13px; color: #93b4f5; margin-bottom: 0; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 32px; overflow-x: auto; }
+  .tab { padding: 11px 20px; cursor: pointer; color: var(--text-dim); font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { margin-right: 6px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Steps */
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 26px; margin-bottom: 16px; position: relative; }
+  .step-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-num.done { background: var(--green); }
+  .step-title { font-size: 17px; font-weight: 600; color: var(--text); padding-top: 4px; }
+  .step-role { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-left: 10px; vertical-align: middle; }
+  .role-it { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .role-user { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+  .step-body { padding-left: 46px; }
+
+  /* Code blocks */
+  .code-block { position: relative; margin: 12px 0; }
+  .code-block pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 50px 14px 16px; font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 13px; color: #c9d1d9; overflow-x: auto; line-height: 1.55; white-space: pre; }
+  .code-block .comment { color: #6e7f9e; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); font-size: 11px; padding: 3px 10px; border-radius: 5px; cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
+
+  /* Callouts */
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 12px 0; font-size: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .callout-icon { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+  .callout.info { background: rgba(91,141,238,0.1); border: 1px solid rgba(91,141,238,0.25); color: #93b4f5; }
+  .callout.warn { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); color: #fbbf24; }
+  .callout.critical { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .callout.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); color: #86efac; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th { background: var(--surface2); color: var(--text-dim); font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 7px 12px; border: 1px solid var(--border); color: var(--text); vertical-align: top; }
+  td code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", monospace; font-size: 12px; color: #93c5fd; }
+  .req-yes { color: #f87171; font-weight: 600; }
+  .req-no { color: var(--text-dim); }
+
+  /* Checklist */
+  .checklist { list-style: none; }
+  .checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist input[type=checkbox] { width: 17px; height: 17px; margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+  .checklist label { cursor: pointer; line-height: 1.5; }
+  .checklist input:checked + label { text-decoration: line-through; color: var(--text-dim); }
+
+  /* Accordion */
+  .accordion { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .accordion summary { padding: 14px 18px; cursor: pointer; font-size: 15px; font-weight: 500; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; }
+  .accordion summary::-webkit-details-marker { display: none; }
+  .accordion summary::before { content: "▶"; font-size: 10px; color: var(--text-dim); transition: transform 0.2s; }
+  .accordion[open] summary::before { transform: rotate(90deg); }
+  .accordion-body { padding: 0 18px 16px; border-top: 1px solid var(--border); }
+
+  /* Platform selector */
+  .platform-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .ptab { padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); transition: all 0.15s; }
+  .ptab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .plat { display: none; }
+  .plat.active { display: block; }
+
+  /* Misc */
+  p { margin: 8px 0; font-size: 14.5px; color: var(--text); }
+  strong { color: var(--text); }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text-dim); margin: 18px 0 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  h2 { font-size: 22px; font-weight: 700; color: var(--text); margin: 0 0 20px; }
+  ul { padding-left: 20px; }
+  ul li { margin: 4px 0; font-size: 14px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
+  .badge-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .badge-red { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .section-intro { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; font-size: 14px; }
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin: 20px 0 28px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #a78bfa); border-radius: 2px; transition: width 0.4s; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="logo">
+      <div class="logo-mark">🧠</div>
+      <div>
+        <h1>DepthFusion V2</h1>
+        <div class="tagline">Enterprise Knowledge Retrieval — Installation Guide</div>
+      </div>
+    </div>
+    <div class="role-notice">
+      🏷 Roles in this guide:
+      <span class="step-role role-it">IT / DevOps Admin</span> installs the server and SharePoint connector ·
+      <span class="step-role role-user">End User</span> installs the desktop app
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('prereqs')"><span class="tab-icon">📋</span>Before You Start</button>
+    <button class="tab" onclick="showTab('server')"><span class="tab-icon">🖥</span>1 · MCP Server</button>
+    <button class="tab" onclick="showTab('desktop')"><span class="tab-icon">💻</span>2 · Desktop App</button>
+    <button class="tab" onclick="showTab('sharepoint')"><span class="tab-icon">☁️</span>3 · SharePoint</button>
+    <button class="tab" onclick="showTab('env')"><span class="tab-icon">⚙️</span>4 · Env Vars</button>
+    <button class="tab" onclick="showTab('trouble')"><span class="tab-icon">🔧</span>5 · Troubleshooting</button>
+    <button class="tab" onclick="showTab('checklist')"><span class="tab-icon">✅</span>6 · Security Checklist</button>
+  </div>
+
+  <!-- ====================================================
+       TAB: BEFORE YOU START
+  ===================================================== -->
+  <div id="tab-prereqs" class="panel active">
+    <h2>Before You Start</h2>
+    <p>DepthFusion V2 has three deployable parts. You only need to install what your organization uses.</p>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Server requirements <span class="step-role role-it">IT Admin</span></div>
+      </div>
+      <div class="step-body">
+        <p>You need a Linux server (or macOS for dev/single-user) to run the MCP server and SharePoint connector.</p>
+        <table>
+          <tr><th>Requirement</th><th>Minimum</th><th>Recommended</th></tr>
+          <tr><td>OS</td><td>Ubuntu 22.04 LTS</td><td>Ubuntu 24.04 LTS</td></tr>
+          <tr><td>CPU</td><td>2 cores</td><td>4 cores</td></tr>
+          <tr><td>RAM</td><td>4 GB</td><td>8 GB</td></tr>
+          <tr><td>Disk</td><td>20 GB SSD</td><td>100 GB SSD</td></tr>
+          <tr><td>Python</td><td>3.11</td><td>3.12</td></tr>
+          <tr><td>Network</td><td>Reachable by desktops</td><td>Tailscale or HTTPS with TLS cert</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">Desktop app requirements <span class="step-role role-user">End User</span></div>
+      </div>
+      <div class="step-body">
+        <table>
+          <tr><th>Platform</th><th>Requirement</th></tr>
+          <tr><td>macOS</td><td>macOS 13 Ventura or later · 4 GB RAM</td></tr>
+          <tr><td>Windows</td><td>Windows 10 or 11 (64-bit) · 4 GB RAM · WebView2 (auto-installed)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">Azure Entra ID App Registration <span class="step-role role-it">IT Admin</span></div>
+      </div>
+      <div class="step-body">
+        <p>You need an Azure account with permission to create App Registrations. This provides:</p>
+        <ul>
+          <li><strong>OIDC sign-in</strong> — lets users log in with their Microsoft work account</li>
+          <li><strong>SharePoint connector</strong> (optional) — lets the server read files from SharePoint</li>
+        </ul>
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span>You will create <strong>one App Registration</strong> for sign-in, and optionally a second (or extend the first) for SharePoint. See Section 1.3 and Section 3.1 for step-by-step Azure Portal instructions.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">✅</span>
+      <span>Once you have the server and an Azure app registration, start with <strong>Section 1: MCP Server</strong>. Desktop users can jump straight to <strong>Section 2</strong> — your admin will give you the server address.</span>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       TAB: MCP SERVER
+  ===================================================== -->
+  <div id="tab-server" class="panel">
+    <h2>MCP Server <span class="step-role role-it">IT Admin</span></h2>
+    <p class="section-intro">The MCP server is the brain of DepthFusion — it stores indexed knowledge, handles queries, and enforces access control. Install it once on your Linux server.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Install the server</div>
+      </div>
+      <div class="step-body">
+        <p>SSH into your server, then run:</p>
+        <div class="code-block">
+          <pre><span class="comment"># Clone the repository</span>
+git clone https://github.com/gregdigittal/depthfusion.git ~/depthfusion
+cd ~/depthfusion
+git checkout v2.0.0   <span class="comment"># use the latest tag from the releases page</span>
+
+<span class="comment"># Create a Python virtual environment</span>
+python3 -m venv .venv
+source .venv/bin/activate
+
+<span class="comment"># Install with server extras (vector store, embeddings, etc.)</span>
+pip install -e ".[vps-cpu]"
+<span class="comment"># GPU server (CUDA 12+): pip install -e ".[vps-gpu]"</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">Run first-time setup</div>
+      </div>
+      <div class="step-body">
+        <p>This interactive wizard creates your database files, generates the device CA, and writes <code>~/.depthfusion/config.json</code>.</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.install.install --mode vps-cpu --v2</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>The wizard will ask for your OIDC details (tenant ID and client ID from Step 3 below). Have those ready.</p>
+        <div class="callout warn">
+          <span class="callout-icon">⚠️</span>
+          <span>Never set <code>ANTHROPIC_API_KEY</code> for DepthFusion. Always use <code>DEPTHFUSION_API_KEY</code> separately — this prevents Claude Code billing interference.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">Configure OIDC sign-in (Azure Entra ID)</div>
+      </div>
+      <div class="step-body">
+        <p>Go to <strong>Azure Portal → Entra ID → App registrations → New registration</strong> and fill in:</p>
+        <table>
+          <tr><th>Field</th><th>Value</th></tr>
+          <tr><td>Name</td><td>DepthFusion</td></tr>
+          <tr><td>Supported account types</td><td>Accounts in this organizational directory only</td></tr>
+          <tr><td>Redirect URI</td><td><code>depthfusion://auth/callback</code> — select <em>Mobile and desktop applications</em></td></tr>
+        </table>
+        <p style="margin-top:12px">After creating, note the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong>. Then add these delegated API permissions and grant admin consent:</p>
+        <table>
+          <tr><th>Permission</th><th>Type</th><th>Why</th></tr>
+          <tr><td><code>openid</code></td><td>Delegated</td><td>ID token</td></tr>
+          <tr><td><code>email</code></td><td>Delegated</td><td>User email in token</td></tr>
+          <tr><td><code>profile</code></td><td>Delegated</td><td>User name claims</td></tr>
+          <tr><td><code>offline_access</code></td><td>Delegated</td><td>Refresh token</td></tr>
+        </table>
+        <p style="margin-top:12px">Add these to your <code>~/.depthfusion/.env</code>:</p>
+        <div class="code-block">
+          <pre>DEPTHFUSION_OIDC_TENANT_ID="paste-your-tenant-id-here"
+DEPTHFUSION_OIDC_CLIENT_ID="paste-your-app-client-id-here"</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div class="step-title">Start the server</div>
+      </div>
+      <div class="step-body">
+        <div class="platform-tabs">
+          <button class="ptab active" onclick="showPlat(this,'s4','linux')">Linux (systemd)</button>
+          <button class="ptab" onclick="showPlat(this,'s4','manual')">Manual / macOS</button>
+          <button class="ptab" onclick="showPlat(this,'s4','claudecode')">Claude Code MCP</button>
+        </div>
+        <div id="s4-linux" class="plat active">
+          <div class="code-block">
+            <pre>sudo systemctl enable depthfusion-mcp
+sudo systemctl start depthfusion-mcp
+sudo systemctl status depthfusion-mcp  <span class="comment"># should show: active (running)</span></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+        <div id="s4-manual" class="plat">
+          <div class="code-block">
+            <pre>cd ~/depthfusion
+source .venv/bin/activate
+DEPTHFUSION_MODE=vps-cpu python3 -m depthfusion.mcp.server</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+        <div id="s4-claudecode" class="plat">
+          <p>Add to <code>~/.claude/settings.json</code>:</p>
+          <div class="code-block">
+            <pre>{
+  "mcpServers": {
+    "depthfusion": {
+      "command": "/home/YOU/depthfusion/.venv/bin/python",
+      "args": ["-m", "depthfusion.mcp.server"],
+      "env": {
+        "DEPTHFUSION_MODE": "vps-cpu",
+        "DEPTHFUSION_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <p>Restart Claude Code, then run <code>/mcp</code> to confirm <strong>depthfusion</strong> appears.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">5</div>
+        <div class="step-title">Set up TLS / reverse proxy <span class="badge badge-green">Production only</span></div>
+      </div>
+      <div class="step-body">
+        <p>The server listens on <code>127.0.0.1:7300</code> by default. In production, put a TLS-terminating reverse proxy in front of it. <strong>Never expose port 7300 directly to the internet.</strong></p>
+        <div class="platform-tabs">
+          <button class="ptab active" onclick="showPlat(this,'s5','caddy')">Caddy (recommended)</button>
+          <button class="ptab" onclick="showPlat(this,'s5','nginx')">nginx</button>
+        </div>
+        <div id="s5-caddy" class="plat active">
+          <p>Caddy handles Let's Encrypt certificates automatically. Add to your <code>Caddyfile</code>:</p>
+          <div class="code-block">
+            <pre>depthfusion.yourcompany.com {
+    reverse_proxy localhost:7300
+}</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+        <div id="s5-nginx" class="plat">
+          <div class="code-block">
+            <pre>server {
+    listen 443 ssl;
+    server_name depthfusion.yourcompany.com;
+
+    ssl_certificate /etc/letsencrypt/live/depthfusion.yourcompany.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/depthfusion.yourcompany.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:7300;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">6</div>
+        <div class="step-title">Enroll the first admin user</div>
+      </div>
+      <div class="step-body">
+        <div class="code-block">
+          <pre>python3 -m depthfusion.install.enroll --role owner --email admin@yourcompany.com</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>This prints an enrollment token. The first sign-in from that email address is auto-granted the <strong>owner</strong> role.</p>
+        <table>
+          <tr><th>Role</th><th>Can do</th></tr>
+          <tr><td><code>owner</code></td><td>Everything · manage users · rotate keys</td></tr>
+          <tr><td><code>admin</code></td><td>Read all records · manage members · run ingestion</td></tr>
+          <tr><td><code>member</code></td><td>Read records where they are in the ACL</td></tr>
+          <tr><td><code>viewer</code></td><td>Read own records only</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num done">✓</div>
+        <div class="step-title">Verify the server is running</div>
+      </div>
+      <div class="step-body">
+        <div class="code-block">
+          <pre>curl http://localhost:7300/health
+<span class="comment"># Expected: {"status": "ok", "version": "0.4.0", "mode": "vps-cpu"}</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="callout success">
+          <span class="callout-icon">✅</span>
+          <span>Server is running. Desktop users can now install the app and connect to <code>https://depthfusion.yourcompany.com</code>.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       TAB: DESKTOP APP
+  ===================================================== -->
+  <div id="tab-desktop" class="panel">
+    <h2>Desktop App <span class="step-role role-user">End User</span></h2>
+    <p class="section-intro">Install the DepthFusion desktop app on your computer. Your IT admin will provide the server address before you start.</p>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Download and install</div>
+      </div>
+      <div class="step-body">
+        <div class="platform-tabs">
+          <button class="ptab active" onclick="showPlat(this,'d1','mac')">macOS</button>
+          <button class="ptab" onclick="showPlat(this,'d1','win')">Windows</button>
+        </div>
+        <div id="d1-mac" class="plat active">
+          <ol style="padding-left:20px; font-size:14px; line-height:2">
+            <li>Download <strong>DepthFusion-&lt;version&gt;-macos-universal.dmg</strong> from the GitHub releases page.</li>
+            <li>Open the <code>.dmg</code> file.</li>
+            <li>Drag <strong>DepthFusion</strong> into your <strong>Applications</strong> folder.</li>
+            <li>If macOS says <em>"cannot be opened because it is from an unidentified developer"</em>:<br>
+              → Go to <strong>System Settings → Privacy &amp; Security</strong> → click <strong>Open Anyway</strong>
+            </li>
+          </ol>
+        </div>
+        <div id="d1-win" class="plat">
+          <ol style="padding-left:20px; font-size:14px; line-height:2">
+            <li>Download <strong>DepthFusion-&lt;version&gt;-windows-x64-setup.exe</strong>.</li>
+            <li>Run the installer. If Windows SmartScreen appears, click <strong>More info → Run anyway</strong>.</li>
+            <li>The app installs to <code>%LOCALAPPDATA%\DepthFusion\</code>.</li>
+          </ol>
+          <p style="margin-top:8px"><strong>IT deployment (silent install):</strong></p>
+          <div class="code-block">
+            <pre>DepthFusion-&lt;version&gt;-windows-x64-setup.exe /S /ServerUrl=https://depthfusion.yourcompany.com</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">First-time setup</div>
+      </div>
+      <div class="step-body">
+        <ol style="padding-left:20px; font-size:14px; line-height:2.2">
+          <li>Launch <strong>DepthFusion</strong>.</li>
+          <li>Enter the <strong>server address</strong> your admin gave you<br>
+            (e.g. <code>https://depthfusion.yourcompany.com</code> or a Tailscale hostname).</li>
+          <li>Click <strong>Sign in with Microsoft</strong>.</li>
+          <li>A browser tab opens — complete the Microsoft login flow.</li>
+          <li>The browser redirects back to the app automatically.</li>
+          <li>You're in. Your session is saved in the OS keychain and persists across restarts.</li>
+        </ol>
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span>If the sign-in doesn't redirect back to the app, see the <strong>Troubleshooting → Sign-in loop</strong> section.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num done">✓</div>
+        <div class="step-title">You're ready</div>
+      </div>
+      <div class="step-body">
+        <p>The status indicator in the bottom-right corner of the app turns <strong style="color:var(--green)">green</strong> when the server is reachable and your session is active.</p>
+        <div class="callout success">
+          <span class="callout-icon">✅</span>
+          <span>Installation complete. If you see a red status indicator, ask your IT admin to check the server is running and your account has been enrolled.</span>
+        </div>
+      </div>
+    </div>
+
+    <details class="accordion">
+      <summary>🔨 Build from source (developers only)</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p><strong>Prerequisites:</strong> Rust 1.77+ · Node.js 20+ · Tauri CLI v2</p>
+        <div class="code-block">
+          <pre><span class="comment"># Install Tauri CLI</span>
+npm install -g @tauri-apps/cli@^2
+
+<span class="comment"># Build and run</span>
+cd depthfusion/app
+npm install
+npm run dev          <span class="comment"># hot-reload dev mode</span>
+npx tauri build      <span class="comment"># production installer</span>
+
+<span class="comment"># macOS universal binary (Intel + Apple Silicon)</span>
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npx tauri build --target universal-apple-darwin</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="callout critical">
+          <span class="callout-icon">🚨</span>
+          <span><strong>Before any public release:</strong> rotate the Tauri updater signing key. The bootstrap key in the repo must be replaced.
+          <br><code>npx tauri signer generate -w ~/.tauri/depthfusion-signing.key</code><br>
+          Set the output public key in <code>app/src-tauri/tauri.conf.json → plugins.updater.pubkey</code> and store the private key as the <code>TAURI_SIGNING_PRIVATE_KEY</code> GitHub secret.</span>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ====================================================
+       TAB: SHAREPOINT
+  ===================================================== -->
+  <div id="tab-sharepoint" class="panel">
+    <h2>SharePoint Connector <span class="step-role role-it">IT Admin</span></h2>
+    <p class="section-intro">The SharePoint connector reads files from your Microsoft 365 sites and ingests them into DepthFusion's knowledge store. It uses delta queries — only changed files are fetched after the initial crawl.</p>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Create an Azure App Registration for Graph API</div>
+      </div>
+      <div class="step-body">
+        <p>In <strong>Azure Portal → Entra ID → App registrations → New registration</strong> (or open your existing DepthFusion app registration):</p>
+        <p style="margin-top:10px"><strong>Step 1a — Add a certificate:</strong></p>
+        <ol style="padding-left:20px; font-size:14px; line-height:1.9">
+          <li>Go to <strong>Certificates &amp; secrets → Certificates → Upload certificate</strong></li>
+          <li>Generate a cert on your server:</li>
+        </ol>
+        <div class="code-block">
+          <pre>openssl req -x509 -newkey rsa:4096 \
+    -keyout ~/.depthfusion/graph-client.key \
+    -out ~/.depthfusion/graph-client.crt \
+    -days 730 -nodes \
+    -subj "/CN=DepthFusion-Graph"
+
+<span class="comment"># Secure the private key</span>
+chmod 600 ~/.depthfusion/graph-client.key</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p style="margin-top:8px">Upload <code>graph-client.crt</code> to the Azure portal. Note the <strong>SHA-1 thumbprint</strong> shown after upload.</p>
+
+        <p style="margin-top:14px"><strong>Step 1b — Add API permissions and grant admin consent:</strong></p>
+        <table>
+          <tr><th>Permission</th><th>Type</th><th>Why</th></tr>
+          <tr><td><code>Sites.Selected</code></td><td>Application</td><td>Read only sites you explicitly register (preferred)</td></tr>
+          <tr><td><code>Files.Read.All</code></td><td>Application</td><td>Read file content and metadata</td></tr>
+          <tr><td><code>User.Read.All</code></td><td>Application</td><td>Resolve user IDs for access-control mapping</td></tr>
+        </table>
+        <p style="margin-top:8px">Click <strong>Grant admin consent</strong>. Requires Azure Global Admin or SharePoint Admin + Entra Admin.</p>
+
+        <p style="margin-top:14px"><strong>Step 1c — Grant per-site access</strong> (required for <code>Sites.Selected</code>):</p>
+        <p>Run this PowerShell for each site you want to index. Use Azure Cloud Shell if you don't have PnP Online locally:</p>
+        <div class="code-block">
+          <pre><span class="comment"># Replace the URL and AppId with your values</span>
+Connect-PnPOnline -Url https://yourcompany.sharepoint.com/sites/MySite -Interactive
+Grant-PnPAzureADAppSitePermission `
+    -AppId "&lt;your-app-client-id&gt;" `
+    -DisplayName "DepthFusion" `
+    -Permissions Read</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">Configure the connector</div>
+      </div>
+      <div class="step-body">
+        <p>Add these to <code>~/.depthfusion/.env</code> on the server:</p>
+        <div class="code-block">
+          <pre>DEPTHFUSION_SHAREPOINT_TENANT_ID="your-tenant-id"
+DEPTHFUSION_SHAREPOINT_CLIENT_ID="your-graph-app-client-id"
+DEPTHFUSION_SHAREPOINT_CERT_PATH="/home/depthfusion/.depthfusion/graph-client.key"
+DEPTHFUSION_SHAREPOINT_CERT_THUMBPRINT="ABCDEF0123456789..."  <span class="comment"># from Azure portal</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="callout warn">
+          <span class="callout-icon">⚠️</span>
+          <span>Set <code>chmod 600 ~/.depthfusion/.env</code> to protect these credentials.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">Register sites for ingestion</div>
+      </div>
+      <div class="step-body">
+        <div class="code-block">
+          <pre><span class="comment"># Register a site (find your drive-id in the Graph Explorer or SharePoint admin center)</span>
+python3 -m depthfusion.connectors.sharepoint_scope add \
+    --site-url "https://yourcompany.sharepoint.com/sites/MySite" \
+    --drive-id "b!ABC..." \
+    --label "MySite Documents"
+
+<span class="comment"># List registered sites</span>
+python3 -m depthfusion.connectors.sharepoint_scope list
+
+<span class="comment"># Remove a site</span>
+python3 -m depthfusion.connectors.sharepoint_scope remove \
+    --site-url "https://yourcompany.sharepoint.com/sites/MySite"</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div class="step-title">Run the initial crawl</div>
+      </div>
+      <div class="step-body">
+        <div class="code-block">
+          <pre>python3 -m depthfusion.connectors.sharepoint sync --mode initial</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>This walks all registered drives and downloads every file. Estimated time: <strong>5–10 minutes per 1,000 documents</strong>. The connector automatically rate-limits on 429/503 responses.</p>
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span>A lock file at <code>~/.depthfusion/sharepoint_sync.lock</code> prevents concurrent runs. If the crawl is interrupted, re-run the same command — it resumes where it left off.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">5</div>
+        <div class="step-title">Schedule incremental sync</div>
+      </div>
+      <div class="step-body">
+        <p>After the initial crawl, set up a cron job to fetch only changed files:</p>
+        <div class="code-block">
+          <pre><span class="comment"># Edit your crontab: crontab -e</span>
+0 * * * * /home/depthfusion/depthfusion/.venv/bin/python \
+    -m depthfusion.connectors.sharepoint sync --mode incremental \
+    >> /var/log/depthfusion-sharepoint.log 2>&1</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p style="margin-top:8px">Or use the built-in scheduler daemon:</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.connectors.sharepoint_scheduler --interval-minutes 60</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p style="margin-top:8px">Check sync status at any time:</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.connectors.sharepoint status</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       TAB: ENV VARS
+  ===================================================== -->
+  <div id="tab-env" class="panel">
+    <h2>Environment Variables Reference</h2>
+    <p class="section-intro">All variables can be set as shell exports or placed in <code>~/.depthfusion/.env</code>. The <code>.env</code> file is loaded at startup. <strong>Never commit it to git.</strong></p>
+
+    <h3>Core server</h3>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>DEPTHFUSION_MODE</code></td><td class="req-yes">Yes</td><td><code>local</code></td><td><code>local</code>, <code>vps-cpu</code>, or <code>vps-gpu</code></td></tr>
+      <tr><td><code>DEPTHFUSION_API_KEY</code></td><td class="req-yes">Yes</td><td>—</td><td>API key for the Claude model used by DepthFusion tools. <strong>Not the same as ANTHROPIC_API_KEY.</strong></td></tr>
+      <tr><td><code>DEPTHFUSION_API_HOST</code></td><td class="req-no">No</td><td><code>127.0.0.1</code></td><td>Bind address for HTTP API</td></tr>
+      <tr><td><code>DEPTHFUSION_API_PORT</code></td><td class="req-no">No</td><td><code>7300</code></td><td>HTTP API port</td></tr>
+      <tr><td><code>DEPTHFUSION_MEMORY_STORE_PATH</code></td><td class="req-no">No</td><td><code>~/.depthfusion/memory_store.db</code></td><td>ChromaDB persistent store path</td></tr>
+      <tr><td><code>DEPTHFUSION_AUDIT_LOG_PATH</code></td><td class="req-no">No</td><td><code>~/.depthfusion/audit.db</code></td><td>Audit log (SQLite)</td></tr>
+      <tr><td><code>DEPTHFUSION_AUTONOMIC</code></td><td class="req-no">No</td><td><code>0</code></td><td>Set to <code>1</code> to enable background memory consolidation</td></tr>
+    </table>
+
+    <h3>OIDC / Identity</h3>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>DEPTHFUSION_OIDC_TENANT_ID</code></td><td class="req-yes">Yes</td><td>—</td><td>Azure Entra ID tenant ID</td></tr>
+      <tr><td><code>DEPTHFUSION_OIDC_CLIENT_ID</code></td><td class="req-yes">Yes</td><td>—</td><td>App registration client ID</td></tr>
+      <tr><td><code>DEPTHFUSION_OIDC_DISCOVERY_URL</code></td><td class="req-no">No</td><td>Auto-derived</td><td>Full <code>.well-known/openid-configuration</code> URL</td></tr>
+    </table>
+
+    <h3>SharePoint connector</h3>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>DEPTHFUSION_SHAREPOINT_TENANT_ID</code></td><td class="req-yes">Yes</td><td>—</td><td>Azure tenant ID</td></tr>
+      <tr><td><code>DEPTHFUSION_SHAREPOINT_CLIENT_ID</code></td><td class="req-yes">Yes</td><td>—</td><td>Graph API app client ID</td></tr>
+      <tr><td><code>DEPTHFUSION_SHAREPOINT_CERT_PATH</code></td><td class="req-yes">Yes</td><td>—</td><td>Path to PEM private key for Graph auth</td></tr>
+      <tr><td><code>DEPTHFUSION_SHAREPOINT_CERT_THUMBPRINT</code></td><td class="req-yes">Yes</td><td>—</td><td>SHA-1 thumbprint of the certificate</td></tr>
+    </table>
+
+    <div class="callout critical">
+      <span class="callout-icon">🚨</span>
+      <span><strong>Never set <code>ANTHROPIC_API_KEY</code> for DepthFusion.</strong> The Claude model used by DepthFusion tools must be authenticated via <code>DEPTHFUSION_API_KEY</code> only. Setting <code>ANTHROPIC_API_KEY</code> routes charges to your Claude Code session's billing account instead.</span>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       TAB: TROUBLESHOOTING
+  ===================================================== -->
+  <div id="tab-trouble" class="panel">
+    <h2>Troubleshooting</h2>
+
+    <details class="accordion">
+      <summary>Server won't start: "No module named 'depthfusion'"</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p>You're running Python outside the virtualenv. Activate it first:</p>
+        <div class="code-block">
+          <pre>source ~/depthfusion/.venv/bin/activate
+python3 -m depthfusion.mcp.server</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>Or set PYTHONPATH manually:</p>
+        <div class="code-block">
+          <pre>PYTHONPATH=~/depthfusion/src python3 -m depthfusion.mcp.server</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>SharePoint sync fails: "delta token expired" (HTTP 410)</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p>Delta tokens expire after 30 days of no activity. Reset them and run a full re-crawl:</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.connectors.sharepoint sync --mode initial --reset-cursors</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>SharePoint sync fails: "another sync process is running"</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p>The previous run crashed without releasing the lock file. Break it manually:</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.connectors.sharepoint sync --break-lock</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>The lock is PID-aware — if the original process is gone, the next sync attempt clears it automatically.</p>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>Desktop app shows "server unreachable" (red status dot)</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <ol style="padding-left:20px; font-size:14px; line-height:1.9">
+          <li>Is the server running? <code>sudo systemctl status depthfusion-mcp</code></li>
+          <li>Does the server address in app Settings match the actual host?</li>
+          <li>If using Tailscale: <code>tailscale status</code> — is your device connected?</li>
+          <li>Check TLS: <code>curl -v https://depthfusion.yourcompany.com/health</code></li>
+        </ol>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>Desktop app: sign-in loop (browser opens but never comes back)</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p>The <code>depthfusion://</code> URI scheme must be registered at the OS level. This is done by the installer. If it's missing:</p>
+        <div class="platform-tabs">
+          <button class="ptab active" onclick="showPlat(this,'t3','mac')">macOS</button>
+          <button class="ptab" onclick="showPlat(this,'t3','win')">Windows</button>
+        </div>
+        <div id="t3-mac" class="plat active">
+          <p>Test: <code>open depthfusion://auth/test</code> — the app should open. If not, re-run the installer.</p>
+        </div>
+        <div id="t3-win" class="plat">
+          <p>Check <code>HKCU\Software\Classes\depthfusion</code> in the registry editor. If the key is missing, re-run the installer.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>"Authorization denied" when calling tools</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <p>Your account hasn't been enrolled or lacks the required role. Ask your IT admin to run:</p>
+        <div class="code-block">
+          <pre>python3 -m depthfusion.install.enroll \
+    --email your@company.com \
+    --role member</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>Tests fail after install</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <div class="code-block">
+          <pre>cd ~/depthfusion
+PYTHONPATH=./src python3 -m pytest tests/ -x -q \
+    --ignore=tests/test_benchmark \
+    --ignore=tests/test_benchmarks \
+    --ignore=tests/test_integration</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <p>All 3,435 tests should pass. If <code>test_pin.py</code> fails with <code>ImportError: _TOOL_FLAGS</code>, ensure you are on a commit at or after <code>8537142</code> (v2.0.0+).</p>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>Health checks and log locations</summary>
+      <div class="accordion-body" style="padding-top:14px">
+        <div class="code-block">
+          <pre><span class="comment"># HTTP health endpoint</span>
+curl http://localhost:7300/health
+
+<span class="comment"># Follow live server logs (systemd)</span>
+journalctl -u depthfusion-mcp -f
+
+<span class="comment"># SharePoint sync status</span>
+python3 -m depthfusion.connectors.sharepoint status</pre>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <table style="margin-top:10px">
+          <tr><th>Log</th><th>Location</th></tr>
+          <tr><td>MCP server</td><td><code>journalctl -u depthfusion-mcp</code></td></tr>
+          <tr><td>SharePoint sync</td><td><code>/var/log/depthfusion-sharepoint.log</code></td></tr>
+          <tr><td>Audit log</td><td><code>~/.depthfusion/audit.db</code> (SQLite)</td></tr>
+        </table>
+      </div>
+    </details>
+  </div>
+
+  <!-- ====================================================
+       TAB: SECURITY CHECKLIST
+  ===================================================== -->
+  <div id="tab-checklist" class="panel">
+    <h2>Security Hardening Checklist</h2>
+    <p class="section-intro">Complete these before going to production. Click each item to mark it done.</p>
+
+    <div class="progress-bar"><div class="progress-fill" id="checklist-bar" style="width:0%"></div></div>
+    <p id="checklist-count" style="color:var(--text-dim); font-size:13px; margin-bottom:16px">0 / 11 completed</p>
+
+    <div class="step">
+      <ul class="checklist" id="security-checklist">
+        <li><input type="checkbox" id="c1" onchange="updateChecklist()"><label for="c1">TLS certificate is valid and auto-renewing (Caddy or certbot)</label></li>
+        <li><input type="checkbox" id="c2" onchange="updateChecklist()"><label for="c2">Port 7300 is NOT exposed directly to the internet — only the reverse proxy is public</label></li>
+        <li><input type="checkbox" id="c3" onchange="updateChecklist()"><label for="c3"><code>~/.depthfusion/.env</code> permissions are set to 600: <code>chmod 600 ~/.depthfusion/.env</code></label></li>
+        <li><input type="checkbox" id="c4" onchange="updateChecklist()"><label for="c4">Tauri updater signing key rotated from bootstrap: <code>npx tauri signer generate</code></label></li>
+        <li><input type="checkbox" id="c5" onchange="updateChecklist()"><label for="c5"><code>TAURI_SIGNING_PRIVATE_KEY</code> GitHub secret updated with the new private key</label></li>
+        <li><input type="checkbox" id="c6" onchange="updateChecklist()"><label for="c6">Full-disk encryption is enabled on the server host</label></li>
+        <li><input type="checkbox" id="c7" onchange="updateChecklist()"><label for="c7">OIDC redirect URI uses <code>depthfusion://auth/callback</code> (not a wildcard or localhost)</label></li>
+        <li><input type="checkbox" id="c8" onchange="updateChecklist()"><label for="c8"><code>Sites.Selected</code> is used — not <code>Sites.ReadWrite.All</code> — for SharePoint Graph permissions</label></li>
+        <li><input type="checkbox" id="c9" onchange="updateChecklist()"><label for="c9">Graph API certificate thumbprint matches the cert uploaded in the Azure portal</label></li>
+        <li><input type="checkbox" id="c10" onchange="updateChecklist()"><label for="c10">First admin user enrolled and bootstrap credentials changed</label></li>
+        <li><input type="checkbox" id="c11" onchange="updateChecklist()"><label for="c11"><code>DEPTHFUSION_API_KEY</code> is set and is <strong>NOT</strong> the same value as <code>ANTHROPIC_API_KEY</code></label></li>
+      </ul>
+    </div>
+
+    <div id="checklist-done" style="display:none">
+      <div class="callout success">
+        <span class="callout-icon">🎉</span>
+        <span><strong>All checks complete.</strong> DepthFusion V2 is hardened and ready for production.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  function showPlat(btn, group, plat) {
+    const parent = btn.closest('.step-body') || btn.closest('.accordion-body');
+    parent.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    parent.querySelectorAll('.plat').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(group + '-' + plat).classList.add('active');
+  }
+
+  function copyCode(btn) {
+    const pre = btn.previousElementSibling;
+    const text = pre.innerText;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => flash(btn));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      flash(btn);
+    }
+  }
+
+  function flash(btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+  }
+
+  function updateChecklist() {
+    const boxes = document.querySelectorAll('#security-checklist input[type=checkbox]');
+    const done = Array.from(boxes).filter(b => b.checked).length;
+    const total = boxes.length;
+    document.getElementById('checklist-bar').style.width = (done / total * 100) + '%';
+    document.getElementById('checklist-count').textContent = done + ' / ' + total + ' completed';
+    document.getElementById('checklist-done').style.display = done === total ? 'block' : 'none';
+  }
+</script>
+</body>
+</html>
