@@ -287,6 +287,7 @@ class TestDictShapeContract:
         _minimal_corpus(tmp_path)
 
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.retrieval.hybrid import RecallPipeline
 
         PROBE_STUB = 999.0  # deliberately large so the merge is visible
@@ -301,7 +302,8 @@ class TestDictShapeContract:
                     fallback_chain[cap] = ["null"]
             return {c: "null" for c in SIX_CAPS}
 
-        monkeypatch.setattr(srv_mod, "_detect_current_backends", fake_detect)
+        # After T-535a, _tool_recall lives in recall.py — patch there.
+        monkeypatch.setattr(_recall_module, "_detect_current_backends", fake_detect)
 
         # Pipeline mock: non-local so reranker is timed, but apply_reranker
         # is instant (the finally block records a real elapsed ≈ 0ms).

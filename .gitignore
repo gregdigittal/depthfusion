@@ -53,6 +53,7 @@ dmypy.json
 # Local tooling — Claude Code, agent-hub, Codex
 .claude/*
 !.claude/workflows/
+!.claude/v2-routing.yaml
 .pm/
 .rollback/
 .codex
@@ -62,3 +63,7 @@ text.txt
 # Private VPS connect scripts (contain credentials — never commit)
 scripts/connect-vps.sh
 scripts/connect-vps.ps1
+
+# Test tenant environment files (contain secrets — never commit)
+tests/fixtures/entra/test-tenant.env
+!tests/fixtures/entra/test-tenant.env.example

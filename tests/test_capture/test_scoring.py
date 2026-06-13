@@ -346,14 +346,16 @@ class TestPublishContextScalar:
         bypasses.
         """
         from depthfusion.mcp import server as mcp_server
+        from depthfusion.mcp.tools import _state as _mcp_state
+        from depthfusion.mcp.tools import capture as _mcp_capture
         from depthfusion.router.bus import FileBus
 
         # Force a fresh bus pointing at the temp dir.
-        mcp_server._BUS_INSTANCE = None  # type: ignore[attr-defined]
+        # After the server.py split, _BUS_INSTANCE lives in _state, and
+        # _tool_publish_context uses _get_context_bus from capture's namespace.
+        _mcp_state._BUS_INSTANCE = None  # type: ignore[attr-defined]
         bus = FileBus(bus_dir=tmp_path)
-        monkeypatch.setattr(
-            mcp_server, "_get_context_bus", lambda config=None: bus,
-        )
+        monkeypatch.setattr(_mcp_capture, "_get_context_bus", lambda config=None: bus)
 
         result_text = mcp_server._tool_publish_context(
             {
