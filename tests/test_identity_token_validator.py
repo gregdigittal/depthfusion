@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -33,14 +32,15 @@ from depthfusion.identity import (  # noqa: E402
     DeviceCodeResult,
     JwksCache,
     Principal,
+    PrincipalStore,
     TokenValidator,
 )
-from depthfusion.identity.oidc_client import OidcClient  # noqa: E402
 from depthfusion.identity.errors import (  # noqa: E402
     JwksFetchError,
     TokenExpiredError,
     TokenInvalidError,
 )
+from depthfusion.identity.oidc_client import OidcClient  # noqa: E402
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "entra"
 _JWKS_PATH = _FIXTURES / "mock-jwks.json"
@@ -224,6 +224,17 @@ async def test_malformed_token_raises_token_invalid() -> None:
         await _validator().validate("not.a-valid-jwt-at-all")
 
 
+@pytest.mark.asyncio
+async def test_missing_sub_raises_token_invalid() -> None:
+    # A correctly-signed token with all other claims valid but no 'sub'
+    # must be rejected — every authenticated principal needs a subject.
+    claims = _base_claims()
+    del claims["sub"]
+    token = _make_jwt(claims)
+    with pytest.raises(TokenInvalidError, match="sub"):
+        await _validator().validate(token)
+
+
 # --------------------------------------------------------------------------- #
 # JWKS fetch / from_env                                                        #
 # --------------------------------------------------------------------------- #
@@ -313,3 +324,128 @@ def test_build_pkce_url_returns_state_value() -> None:
     url, verifier, nonce, state = client.build_pkce_url()
     assert len(state) >= 16
     assert state != nonce  # distinct values
+
+
+# --------------------------------------------------------------------------- #
+# AC-3 persistence wiring: login -> exchange_code -> upsert -> get_principal   #
+# --------------------------------------------------------------------------- #
+def _oidc_client_for_fixture() -> OidcClient:
+    """OidcClient whose derived validator matches the fixture iss/aud/kid."""
+    return OidcClient(
+        client_id="test-client",
+        tenant_id="test-tenant",
+        authorize_endpoint="https://example/authorize",
+        token_endpoint="https://example/token",
+        device_code_endpoint="https://example/devicecode",
+    )
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_persists_principal_on_login(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """exchange_code(store=...) persists the principal so get_principal works.
+
+    This is the S-156 AC-3 round-trip: a successful login must refresh stored
+    group membership. Token fields must NOT be persisted (AC-4).
+    """
+    monkeypatch.setenv("DEPTHFUSION_OIDC_ISSUER", _ISSUER)
+    monkeypatch.setenv("DEPTHFUSION_OIDC_AUDIENCE", _AUDIENCE)
+
+    cache = _StubJwksCache(_fixture_jwk())
+    store = PrincipalStore(db_path=tmp_path / "identity.db")
+    client = _oidc_client_for_fixture()
+
+    # Mock the token endpoint POST so no network is touched. Return a real,
+    # fixture-signed id_token plus an access_token to prove it is NOT persisted.
+    id_token = _make_jwt(_base_claims(sub="user-ac3", groups=["g-old"]))
+
+    async def _fake_post_token(_data: dict) -> dict:
+        return {"id_token": id_token, "access_token": "secret-access-token"}
+
+    monkeypatch.setattr(client, "_post_token", _fake_post_token)
+
+    # Nothing persisted before login.
+    assert store.get_principal("user-ac3") is None
+
+    principal = await client.exchange_code(
+        code="auth-code",
+        verifier="verifier",
+        jwks_cache=cache,
+        store=store,
+    )
+    assert principal.principal_id == "user-ac3"
+    assert principal.access_token == "secret-access-token"  # in-memory only
+
+    # The login path persisted the principal.
+    stored = store.get_principal("user-ac3")
+    assert stored is not None
+    assert stored.principal_id == "user-ac3"
+    assert stored.groups == ["g-old"]
+    # AC-4: token fields are NOT persisted by the store.
+    assert stored.access_token is None
+    assert stored.id_token is None
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_refreshes_groups_on_relogin(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second login overwrites stored groups (AC-3 group refresh)."""
+    monkeypatch.setenv("DEPTHFUSION_OIDC_ISSUER", _ISSUER)
+    monkeypatch.setenv("DEPTHFUSION_OIDC_AUDIENCE", _AUDIENCE)
+
+    cache = _StubJwksCache(_fixture_jwk())
+    store = PrincipalStore(db_path=tmp_path / "identity.db")
+    client = _oidc_client_for_fixture()
+
+    async def _post_with_groups(groups: list[str]):
+        token = _make_jwt(_base_claims(sub="user-refresh", groups=groups))
+
+        async def _fake(_data: dict) -> dict:
+            return {"id_token": token, "access_token": "tok"}
+
+        return _fake
+
+    # First login: groups = [g1].
+    monkeypatch.setattr(client, "_post_token", await _post_with_groups(["g1"]))
+    await client.exchange_code(
+        code="c", verifier="v", jwks_cache=cache, store=store
+    )
+    assert store.get_principal("user-refresh").groups == ["g1"]
+
+    # Second login: groups changed to [g2, g3] — must be refreshed in store.
+    monkeypatch.setattr(
+        client, "_post_token", await _post_with_groups(["g2", "g3"])
+    )
+    await client.exchange_code(
+        code="c", verifier="v", jwks_cache=cache, store=store
+    )
+    assert store.get_principal("user-refresh").groups == ["g2", "g3"]
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_without_store_does_not_persist(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Omitting store keeps the old behaviour: nothing is persisted."""
+    monkeypatch.setenv("DEPTHFUSION_OIDC_ISSUER", _ISSUER)
+    monkeypatch.setenv("DEPTHFUSION_OIDC_AUDIENCE", _AUDIENCE)
+
+    cache = _StubJwksCache(_fixture_jwk())
+    store = PrincipalStore(db_path=tmp_path / "identity.db")
+    client = _oidc_client_for_fixture()
+
+    id_token = _make_jwt(_base_claims(sub="user-nostore"))
+
+    async def _fake_post_token(_data: dict) -> dict:
+        return {"id_token": id_token, "access_token": "tok"}
+
+    monkeypatch.setattr(client, "_post_token", _fake_post_token)
+
+    principal = await client.exchange_code(
+        code="c", verifier="v", jwks_cache=cache
+    )
+    assert principal.principal_id == "user-nostore"
+    # No store passed -> nothing persisted.
+    assert store.get_principal("user-nostore") is None

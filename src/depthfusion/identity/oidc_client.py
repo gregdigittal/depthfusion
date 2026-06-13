@@ -33,6 +33,7 @@ import httpx
 from .errors import OidcFlowError
 from .jwks_cache import JwksCache
 from .models import DeviceCodeResult, Principal
+from .principal_store import PrincipalStore
 from .token_validator import TokenValidator
 
 _DEFAULT_SCOPE = "openid profile offline_access"
@@ -165,8 +166,15 @@ class OidcClient:
         verifier: str,
         jwks_cache: JwksCache,
         nonce: str | None = None,
+        *,
+        store: PrincipalStore | None = None,
     ) -> Principal:
         """Exchange an authorization ``code`` for tokens and build a Principal.
+
+        When ``store`` is provided, the resulting principal is persisted via
+        :meth:`PrincipalStore.upsert_principal` before being returned, so that
+        current group membership is refreshed on every login (S-156 AC-3).
+        Token fields are intentionally **not** persisted by the store.
 
         Raises
         ------
@@ -184,7 +192,9 @@ class OidcClient:
             "scope": self._scope,
         }
         payload = await self._post_token(data)
-        return await self._principal_from_token_response(payload, jwks_cache, nonce)
+        return await self._principal_from_token_response(
+            payload, jwks_cache, nonce, store=store
+        )
 
     # ------------------------------------------------------------------ #
     # Device-authorization flow (RFC 8628)                               #
@@ -239,12 +249,19 @@ class OidcClient:
         jwks_cache: JwksCache,
         timeout: float = 300.0,
         interval: float = 5.0,
+        *,
+        store: PrincipalStore | None = None,
     ) -> Principal:
         """Poll the token endpoint until the user completes the device flow.
 
         Honours the ``authorization_pending`` and ``slow_down`` responses:
         on ``slow_down`` the poll interval is increased by 5 seconds per
         RFC 8628 §3.5.
+
+        When ``store`` is provided, the resulting principal is persisted via
+        :meth:`PrincipalStore.upsert_principal` before being returned, so that
+        current group membership is refreshed on every login (S-156 AC-3).
+        Token fields are intentionally **not** persisted by the store.
 
         Raises
         ------
@@ -275,7 +292,7 @@ class OidcClient:
 
             if not error and response.status_code < 400:
                 return await self._principal_from_token_response(
-                    body, jwks_cache, nonce=None
+                    body, jwks_cache, nonce=None, store=store
                 )
 
             if error == "authorization_pending":
@@ -317,6 +334,8 @@ class OidcClient:
         body: dict,
         jwks_cache: JwksCache,
         nonce: str | None,
+        *,
+        store: PrincipalStore | None = None,
     ) -> Principal:
         id_token = body.get("id_token")
         access_token = body.get("access_token")
@@ -342,7 +361,7 @@ class OidcClient:
         if not isinstance(groups, list):
             groups = []
 
-        return Principal(
+        principal = Principal(
             principal_id=str(claims.get("sub", "")),
             upn=str(claims.get("preferred_username", "")),
             display_name=str(claims.get("name", "")),
@@ -352,6 +371,15 @@ class OidcClient:
             id_token=id_token,
             expires_at=expires_at,
         )
+
+        # AC-3: persist current group membership on each successful login.
+        # PrincipalStore.upsert_principal stores only the non-secret identity
+        # fields (principal_id, upn, display_name, groups) — tokens are NOT
+        # persisted (AC-4).
+        if store is not None:
+            store.upsert_principal(principal)
+
+        return principal
 
     def _build_validator(self, jwks_cache: JwksCache) -> TokenValidator:
         issuer = os.environ.get("DEPTHFUSION_OIDC_ISSUER", "").strip() or (

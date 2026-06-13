@@ -20,6 +20,7 @@ from .errors import (
 from .jwks_cache import JwksCache
 from .models import DeviceCodeResult, Principal
 from .oidc_client import OidcClient
+from .principal_store import PrincipalStore
 from .token_validator import TokenValidator
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "JwksCache",
     "TokenValidator",
     "OidcClient",
+    "PrincipalStore",
     # errors
     "IdentityError",
     "TokenExpiredError",

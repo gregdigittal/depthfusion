@@ -28,7 +28,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from .errors import JwksFetchError, TokenExpiredError, TokenInvalidError
+from .errors import TokenExpiredError, TokenInvalidError
 from .jwks_cache import JwksCache
 
 _EXPECTED_ALG = "RS256"
@@ -157,6 +157,7 @@ class TokenValidator:
 
         # 3. Decode claims and run claim checks.
         claims = self._decode_json_segment(payload_seg, "JWT payload")
+        self._check_subject(claims)
         self._check_temporal(claims)
         self._check_issuer(claims)
         self._check_audience(claims)
@@ -164,6 +165,11 @@ class TokenValidator:
             self._check_nonce(claims, nonce)
 
         return claims
+
+    @staticmethod
+    def _check_subject(claims: dict[str, Any]) -> None:
+        if not claims.get("sub"):
+            raise TokenInvalidError("JWT is missing the required 'sub' claim")
 
     def _check_temporal(self, claims: dict[str, Any]) -> None:
         now = time.time()
