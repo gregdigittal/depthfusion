@@ -1,11 +1,11 @@
-/// System-browser OIDC flow with PKCE and deep-link callback handling.
-///
-/// Flow:
-///   1. `build_pkce_url()`   — generate verifier + challenge + state, return auth URL
-///   2. Open URL in system browser via tauri-plugin-shell
-///   3. Browser redirects to depthfusion://callback?code=...&state=...
-///   4. `handle_callback()` — validate state, call `exchange_code()`
-///   5. `exchange_code()`   — POST to token endpoint, return TokenSet
+//! System-browser OIDC flow with PKCE and deep-link callback handling.
+//!
+//! Flow:
+//!   1. `build_pkce_url()`   — generate verifier + challenge + state, return auth URL
+//!   2. Open URL in system browser via tauri-plugin-shell
+//!   3. Browser redirects to depthfusion://callback?code=...&state=...
+//!   4. `handle_callback()` — validate state, call `exchange_code()`
+//!   5. `exchange_code()`   — POST to token endpoint, return TokenSet
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use once_cell::sync::Lazy;

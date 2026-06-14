@@ -1,7 +1,7 @@
-/// Settings commands backed by `tauri-plugin-store`.
-///
-/// Provides typed IPC access to persistent key/value configuration.
-/// The store file is `settings.json` inside the app's data directory.
+//! Settings commands backed by `tauri-plugin-store`.
+//!
+//! Provides typed IPC access to persistent key/value configuration.
+//! The store file is `settings.json` inside the app's data directory.
 
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;

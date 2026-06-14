@@ -18,6 +18,14 @@ export interface TokenSet {
   id_token: string | null
   refresh_token: string | null
   expires_in: number | null
+  /**
+   * Unix epoch seconds when the tokens were written to the vault. Stamped by
+   * the Rust layer at store time as internal vault bookkeeping — it is NOT
+   * surfaced by `poll_auth_state`. Mirrors the Rust `Option<u64>` field, which
+   * serialises to `number | null` over Tauri IPC (`null` for legacy blobs
+   * written before this field existed, which the Rust layer treats as expired).
+   */
+  stored_at: number | null
   token_type: string
 }
 

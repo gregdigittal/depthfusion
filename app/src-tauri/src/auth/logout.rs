@@ -1,16 +1,16 @@
-/// Sign-out and local-wipe logic for the DepthFusion Tauri app.
-///
-/// `wipe_local_state()` performs a best-effort purge of every piece of locally
-/// stored session data:
-///
-///   1. OS keychain token vault  (via `vault::clear_tokens`)
-///   2. Tauri `AppData` / `userData` directory  (platform-specific app data)
-///   3. Any temporary files written under the system temp dir that carry the
-///      `depthfusion-` prefix
-///
-/// Each step is attempted independently so a failure in one does not prevent
-/// the others from running. The returned `Vec<WipeError>` lists every step that
-/// failed; an empty vec means a clean wipe.
+//! Sign-out and local-wipe logic for the DepthFusion Tauri app.
+//!
+//! `wipe_local_state()` performs a best-effort purge of every piece of locally
+//! stored session data:
+//!
+//!   1. OS keychain token vault  (via `vault::clear_tokens`)
+//!   2. Tauri `AppData` / `userData` directory  (platform-specific app data)
+//!   3. Any temporary files written under the system temp dir that carry the
+//!      `depthfusion-` prefix
+//!
+//! Each step is attempted independently so a failure in one does not prevent
+//! the others from running. The returned `Vec<WipeError>` lists every step that
+//! failed; an empty vec means a clean wipe.
 
 use std::path::PathBuf;
 
@@ -134,6 +134,10 @@ mod tests {
             refresh_token: Some("test-refresh-token".to_string()),
             expires_in: Some(3600),
             token_type: "Bearer".to_string(),
+            stored_at: Some(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()),
         };
         // Ignore errors — the keychain may not be available in CI.
         let _ = vault::store_tokens(&tokens);
@@ -141,6 +145,9 @@ mod tests {
 
     #[test]
     fn wipe_clears_vault() {
+        // Use the in-memory keyring mock so this test does not depend on a live
+        // OS Secret Service (unavailable in headless CI — no $DISPLAY/DBus).
+        vault::install_mock_keystore();
         seed_vault();
 
         // Run the wipe without an app_data_dir so we only exercise the vault step.
@@ -165,6 +172,9 @@ mod tests {
 
     #[test]
     fn wipe_is_idempotent_when_vault_empty() {
+        // Use the in-memory keyring mock so this test does not depend on a live
+        // OS Secret Service (unavailable in headless CI — no $DISPLAY/DBus).
+        vault::install_mock_keystore();
         // Ensure vault is empty first.
         let _ = vault::clear_tokens();
 

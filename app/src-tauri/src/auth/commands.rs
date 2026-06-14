@@ -1,4 +1,4 @@
-/// Tauri IPC commands for the OIDC auth flow, token vault, and sign-out.
+//! Tauri IPC commands for the OIDC auth flow, token vault, and sign-out.
 
 use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
@@ -57,10 +57,26 @@ pub async fn handle_deep_link(raw_url: String) -> Result<TokenSet, String> {
 /// `None` (frontend should then trigger `startLogin()`).
 #[tauri::command]
 pub async fn poll_auth_state() -> Option<TokenSet> {
+    /// Skew margin (seconds) so a token about to lapse is treated as already
+    /// expired rather than handed out and rejected one network hop later.
+    const SKEW: u64 = 30;
+
     // T-630: check the vault for a cached session.
     match vault::load_tokens() {
         Ok(Some(vt)) => {
+            // Reject expired (or legacy/unanchored) sessions so the frontend
+            // re-triggers `start_login` instead of using a stale access token.
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            if vt.is_expired(now, SKEW) {
+                return None;
+            }
+
             // Re-export vault::TokenSet as the canonical oidc::TokenSet shape.
+            // `stored_at` is internal vault bookkeeping and is deliberately
+            // dropped at the IPC boundary (oidc::TokenSet has no such field).
             Some(TokenSet {
                 access_token: vt.access_token,
                 id_token: vt.id_token,
