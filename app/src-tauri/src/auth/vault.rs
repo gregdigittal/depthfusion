@@ -190,6 +190,37 @@ pub(crate) fn install_mock_keystore() {
     });
 }
 
+/// Test-only: persist `tokens` to a caller-supplied `Entry` (stamping
+/// `stored_at`). Exposes the entry-scoped store path to other modules' tests
+/// (e.g. `commands::persist_token_set`) so they can drive a real store→load
+/// round-trip against one persistent mock-backed `Entry` — the keyring mock's
+/// secret lives inside the credential object, so the same `Entry` must be
+/// reused to observe persistence.
+#[cfg(test)]
+pub(crate) fn store_tokens_in_entry(e: &Entry, tokens: &TokenSet) -> Result<(), VaultError> {
+    store_tokens_in(e, tokens)
+}
+
+/// Test-only: load tokens from a caller-supplied `Entry`. Companion to
+/// `store_tokens_in_entry`; see its docs for why entry reuse is required under
+/// the keyring mock.
+#[cfg(test)]
+pub(crate) fn load_tokens_from_entry(e: &Entry) -> Result<Option<TokenSet>, VaultError> {
+    load_tokens_from(e)
+}
+
+/// Test-only: build a single mock-backed `Entry` whose in-memory credential
+/// persists across calls. Other modules' tests reuse this to observe a
+/// store→load round-trip without the live OS Secret Service (headless-CI safe).
+#[cfg(test)]
+pub(crate) fn mock_entry_for(service: &str, account: &str) -> Entry {
+    install_mock_keystore();
+    let credential = keyring::mock::default_credential_builder()
+        .build(None, service, account)
+        .expect("build mock credential");
+    Entry::new_with_credential(credential)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

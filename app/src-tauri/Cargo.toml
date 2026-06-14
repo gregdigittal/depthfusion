@@ -36,3 +36,12 @@ reqwest = { version = "0.12", features = ["json"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 tauri-plugin-updater = "2"
 tauri-plugin-store = "2"
+
+[dev-dependencies]
+# HTTP mocking for the OIDC token-endpoint tests (oidc.rs exchange_code).
+mockito = "1"
+# Test-only async runtime features so #[tokio::test] can drive the async oidc
+# tests. The main [dependencies] tokio intentionally enables only "sync" to keep
+# the production binary's feature set/size unchanged; the rt/macros/multi-thread
+# features are needed solely for the test target.
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }

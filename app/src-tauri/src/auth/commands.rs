@@ -48,7 +48,53 @@ pub async fn handle_deep_link(raw_url: String) -> Result<TokenSet, String> {
 
     let params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
 
-    oidc::handle_callback(&config, params).await.map_err(|e: OidcError| e.to_string())
+    let oidc_tokens = oidc::handle_callback(&config, params)
+        .await
+        .map_err(|e: OidcError| e.to_string())?;
+
+    // S-181 AC-2: the token must land in the OS keychain vault, not just JS
+    // memory. `poll_auth_state` reads the vault as the canonical source of
+    // truth, so without this write a "successful" login leaves no durable
+    // session. Persist before returning; a vault write failure is fatal.
+    persist_token_set(oidc_tokens).await
+}
+
+/// Convert an `oidc::TokenSet` to a `vault::TokenSet` and persist it in the OS
+/// keychain, returning the original oidc shape for the frontend.
+///
+/// The oidc shape has no `stored_at`; we leave it `None` so `store_tokens_in`
+/// stamps the absolute expiry anchor at write time. A vault write failure is
+/// fatal (returned as `Err`) — AC-2 is not met if the token is not durably
+/// stored, so we must not silently drop it.
+///
+/// Extracted from the `#[tauri::command]` wrapper (which needs an `AppHandle`)
+/// so the persistence path is unit-testable in isolation.
+///
+/// Credential safety: token contents are never logged at any level.
+async fn persist_token_set(oidc_tokens: TokenSet) -> Result<TokenSet, String> {
+    let vault_set = oidc_to_vault(&oidc_tokens);
+
+    vault::store_tokens(&vault_set)
+        .map_err(|e| format!("Failed to persist tokens to keychain vault: {e}"))?;
+
+    // Return the oidc shape (no internal `stored_at`) for backward
+    // compatibility with the existing deep-link listener on the frontend.
+    Ok(oidc_tokens)
+}
+
+/// Map an `oidc::TokenSet` onto a `vault::TokenSet`, mapping all five shared
+/// fields and leaving `stored_at: None` so `vault::store_tokens_in` stamps the
+/// absolute expiry anchor at write time. Pure (no I/O), so unit tests can
+/// assert the field mapping without a keychain.
+fn oidc_to_vault(oidc_tokens: &TokenSet) -> vault::TokenSet {
+    vault::TokenSet {
+        access_token: oidc_tokens.access_token.clone(),
+        id_token: oidc_tokens.id_token.clone(),
+        refresh_token: oidc_tokens.refresh_token.clone(),
+        expires_in: oidc_tokens.expires_in,
+        token_type: oidc_tokens.token_type.clone(),
+        stored_at: None,
+    }
 }
 
 /// Poll the current auth state.
@@ -154,4 +200,122 @@ pub fn logout(app: AppHandle) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_oidc() -> TokenSet {
+        TokenSet {
+            access_token: "deep-link-access-token".to_string(),
+            id_token: Some("deep-link-id-token".to_string()),
+            refresh_token: Some("deep-link-refresh-token".to_string()),
+            expires_in: Some(3600),
+            token_type: "Bearer".to_string(),
+        }
+    }
+
+    /// The oidc→vault converter maps all five shared fields and leaves
+    /// `stored_at` unset so the vault stamps it on write.
+    #[test]
+    fn oidc_to_vault_maps_all_fields_and_leaves_stored_at_none() {
+        let oidc = sample_oidc();
+        let v = oidc_to_vault(&oidc);
+
+        assert_eq!(v.access_token, oidc.access_token);
+        assert_eq!(v.id_token, oidc.id_token);
+        assert_eq!(v.refresh_token, oidc.refresh_token);
+        assert_eq!(v.expires_in, oidc.expires_in);
+        assert_eq!(v.token_type, oidc.token_type);
+        assert_eq!(v.stored_at, None, "converter must leave stored_at for the vault to stamp");
+    }
+
+    /// AC-2 proof: running the deep-link persistence path writes the token to
+    /// the keychain such that a subsequent load returns it with a populated
+    /// `stored_at`.
+    ///
+    /// Under the keyring in-memory mock, each `Entry::new(SERVICE, ACCOUNT)`
+    /// builds a *fresh* empty credential, so a round-trip is only observable on
+    /// a single reused `Entry`. We therefore drive the same conversion +
+    /// entry-scoped store/load the production path uses, against one persistent
+    /// mock-backed entry — proving the conversion + write reach the keychain and
+    /// the absolute expiry anchor is stamped.
+    #[test]
+    fn persist_path_writes_token_to_keychain_with_stored_at() {
+        let oidc = sample_oidc();
+
+        // Mirror persist_token_set's conversion, then exercise the vault's
+        // entry-scoped store/load against one persistent mock entry.
+        let vault_set = oidc_to_vault(&oidc);
+        let e = vault::mock_entry_for("depthfusion-test", "deep_link_persist");
+
+        // Nothing stored yet.
+        assert!(matches!(vault::load_tokens_from_entry(&e), Ok(None)));
+
+        vault::store_tokens_in_entry(&e, &vault_set).expect("store must succeed");
+
+        let loaded = vault::load_tokens_from_entry(&e)
+            .expect("load ok")
+            .expect("deep-link path must leave a token in the keychain");
+
+        assert_eq!(
+            loaded.access_token, oidc.access_token,
+            "stored access_token must match the exchanged token"
+        );
+        assert_eq!(loaded.id_token, oidc.id_token);
+        assert_eq!(loaded.refresh_token, oidc.refresh_token);
+        assert_eq!(loaded.expires_in, oidc.expires_in);
+        assert_eq!(loaded.token_type, oidc.token_type);
+        assert!(
+            loaded.stored_at.is_some(),
+            "store must stamp stored_at so poll_auth_state can evaluate expiry"
+        );
+    }
+
+    /// The public persist path (the production seam used by `handle_deep_link`)
+    /// calls `vault::store_tokens` without error and returns the oidc shape
+    /// unchanged.
+    ///
+    /// `persist_token_set` is `async` but never crosses a real `.await`
+    /// suspension point, so we drive it to completion with a no-op waker rather
+    /// than pulling in a runtime — keeping this task independent of the
+    /// tokio test-feature wiring added in a later task.
+    #[test]
+    fn persist_token_set_succeeds_and_returns_oidc_shape() {
+        vault::install_mock_keystore();
+        let oidc = sample_oidc();
+
+        let returned =
+            block_on(persist_token_set(oidc.clone())).expect("persist must succeed under mock");
+
+        // Backward compatibility: the frontend still receives the oidc shape.
+        assert_eq!(returned.access_token, oidc.access_token);
+        assert_eq!(returned.token_type, oidc.token_type);
+    }
+
+    /// Minimal executor for futures that complete without yielding. Avoids a
+    /// runtime dependency for the synchronous-in-practice persist path.
+    fn block_on<F: std::future::Future>(mut fut: F) -> F::Output {
+        use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+        fn noop(_: *const ()) {}
+        fn clone(_: *const ()) -> RawWaker {
+            RawWaker::new(std::ptr::null(), &VTABLE)
+        }
+        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, noop, noop, noop);
+
+        let raw = RawWaker::new(std::ptr::null(), &VTABLE);
+        let waker = unsafe { Waker::from_raw(raw) };
+        let mut cx = Context::from_waker(&waker);
+
+        // SAFETY: `fut` is owned, stack-pinned here, and never moved again.
+        let mut fut = unsafe { std::pin::Pin::new_unchecked(&mut fut) };
+        loop {
+            match fut.as_mut().poll(&mut cx) {
+                Poll::Ready(v) => return v,
+                Poll::Pending => std::hint::spin_loop(),
+            }
+        }
+    }
 }
