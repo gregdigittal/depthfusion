@@ -15,10 +15,10 @@ from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 logger = logging.getLogger(__name__)
 
 # Tool registry (TOOLS, _TOOL_FLAGS, TOOL_SCHEMAS, get_enabled_tools)
-from depthfusion.mcp.tools._registry import (  # noqa: E402
+from depthfusion.mcp.tools._registry import (  # noqa: E402,F401
+    _TOOL_FLAGS,  # re-exported for tests (e.g. tests/test_capture/test_pin.py)
     TOOL_SCHEMAS,
     TOOLS,
-    _TOOL_FLAGS,
     get_enabled_tools,
 )
 

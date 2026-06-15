@@ -22,15 +22,11 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from io import StringIO
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
-from depthfusion.identity.device_registry import DeviceRecord, DeviceRegistry
 from depthfusion.cli.devices import cmd_list, cmd_revoke, main
-
+from depthfusion.identity.device_registry import DeviceRecord, DeviceRegistry
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -63,6 +59,8 @@ class TestDeviceRegistry:
 
         result = registry.get("dev-001")
         assert result is not None
+        # The record returned by register() matches the one fetched by get().
+        assert result == rec
         assert result.device_id == "dev-001"
         assert result.owner_principal_id == "principal-aaa"
         assert result.platform == "linux"
@@ -125,6 +123,56 @@ class TestDeviceRegistry:
         """revoke returns False when device_id does not exist."""
         registry = make_registry(tmp_path)
         assert registry.revoke("ghost-device") is False
+
+    def test_revoked_device_fails_sync_within_lease_period(
+        self, tmp_path: Path
+    ) -> None:
+        """S-158 AC-2: a revoked device fails sync within one lease period.
+
+        Models the sync-authorization gate with the real ``DeviceRegistry`` +
+        ``DeviceLease`` primitives:
+
+        1. Enroll a device; its credential lease is comfortably valid.
+        2. Confirm the gate (lease VALID *and* not revoked) admits sync.
+        3. Admin revokes the device.
+        4. Even though the lease is still within its valid window, the gate
+           must now reject sync — proving revocation takes effect *within*
+           one lease period rather than only after the lease expires.
+        """
+        from depthfusion.identity.device_lease import DeviceLease
+
+        registry = make_registry(tmp_path)
+        lease = DeviceLease(lease_hours=24)
+
+        record = registry.register("dev-revoke-sync", "owner-rs", "linux")
+        issued_at = record.last_sync
+
+        def sync_allowed(device_id: str, *, now: float) -> bool:
+            """The sync gate: credential lease still valid AND device not revoked."""
+            rec = registry.get(device_id)
+            if rec is None or rec.revoked:
+                return False
+            return lease.is_valid(device_id, issued_at=issued_at, now=now)
+
+        # 1h into a 24h lease — the credential is unambiguously within its window.
+        now = issued_at + 3600
+
+        # Before revocation: sync is allowed.
+        assert sync_allowed("dev-revoke-sync", now=now) is True
+        assert lease.is_valid(
+            "dev-revoke-sync", issued_at=issued_at, now=now
+        ) is True, "Precondition: lease must still be valid at this instant"
+
+        # Admin revokes the device.
+        assert registry.revoke("dev-revoke-sync") is True
+
+        # After revocation, with the lease STILL valid, sync must be rejected.
+        assert sync_allowed("dev-revoke-sync", now=now) is False
+        # And the lease itself is still within its window — proving it was the
+        # revocation (not lease expiry) that blocked sync within the lease period.
+        assert lease.is_valid(
+            "dev-revoke-sync", issued_at=issued_at, now=now
+        ) is True
 
     def test_touch_updates_last_sync(self, tmp_path: Path) -> None:
         """touch increases last_sync for an existing device."""
