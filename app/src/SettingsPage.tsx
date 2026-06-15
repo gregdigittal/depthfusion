@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { LogoMark } from './components/LogoMark'
 import { getServerUrl, setServerUrl, loadTokens, logoutUser } from './lib/ipc'
 import { decodeJwtPayload, extractRole } from './lib/jwt'
 
@@ -93,9 +94,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         >
           ←
         </button>
-        <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-sm">
-          DF
-        </div>
+        <LogoMark size={32} />
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
       </header>
 

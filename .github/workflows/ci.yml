@@ -10,6 +10,7 @@ on:
       - "src/**"
       - "tests/**"
       - "pyproject.toml"
+      - "app/**"
   pull_request:
     branches:
       - main
@@ -18,6 +19,7 @@ on:
       - "src/**"
       - "tests/**"
       - "pyproject.toml"
+      - "app/**"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -53,3 +55,31 @@ jobs:
 
       - name: Type check with mypy
         run: mypy src/depthfusion/core/ src/depthfusion/recursive/ src/depthfusion/mcp/ --ignore-missing-imports
+
+  frontend-test:
+    name: "Frontend (TypeScript + Vitest)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm --dir app install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm --dir app tsc --noEmit
+
+      - name: Run tests
+        run: pnpm --dir app test

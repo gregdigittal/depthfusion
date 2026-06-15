@@ -1,58 +1,57 @@
 import { useEffect, useState } from 'react'
 import { getAppInfo, type AppInfo } from './lib/ipc'
-import { SettingsPage } from './SettingsPage'
 import {
   getAuthState,
   onAuthStateChange,
-  startLogin,
   logout,
+  pollAuthState,
   type AuthState,
 } from './lib/auth'
+import { LogoMark } from './components/LogoMark'
+import { SignInButton } from './components/SignInButton'
+import { DashboardPage } from './DashboardPage'
+import { SearchPage } from './SearchPage'
+import { GraphPage } from './GraphPage'
+import { DocumentViewer } from './DocumentViewer'
+import { SettingsPage } from './SettingsPage'
 
-type Route = 'home' | 'settings'
+type Route = 'dashboard' | 'search' | 'graph' | 'settings'
+
+const NAV_TABS: { id: Route; label: string }[] = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'search', label: 'Search' },
+  { id: 'graph', label: 'Graph' },
+]
 
 function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
-  const [route, setRoute] = useState<Route>('home')
+  const [route, setRoute] = useState<Route>('dashboard')
   const [authState, setAuthState] = useState<AuthState>(getAuthState)
-  const [signingIn, setSigningIn] = useState(false)
+  const [openDocId, setOpenDocId] = useState<string | null>(null)
 
   useEffect(() => {
     getAppInfo().then(setAppInfo).catch(console.error)
   }, [])
 
-  // Subscribe to auth state transitions (deep-link callback drives this)
+  // Recover tokens already in vault (e.g. app restart after successful login)
+  useEffect(() => {
+    void pollAuthState(5_000).catch(() => {})
+  }, [])
+
+  // Subscribe to auth state transitions driven by deep-link callback
   useEffect(() => {
     return onAuthStateChange(setAuthState)
   }, [])
 
-  async function handleSignIn() {
-    setSigningIn(true)
-    try {
-      await startLogin()
-      // State is driven by deep-link → onAuthStateChange; no need to poll here
-    } catch {
-      // error state is set by startLogin() → setState internally
-    } finally {
-      setSigningIn(false)
-    }
-  }
-
   async function handleSignOut() {
-    await logout(() => setRoute('home'))
-  }
-
-  if (route === 'settings') {
-    return <SettingsPage onBack={() => setRoute('home')} />
+    await logout(() => setRoute('dashboard'))
   }
 
   // ── Unauthenticated shell ────────────────────────────────────────────────
   if (authState.status !== 'authenticated') {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-6 px-6">
-        <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center font-bold text-white text-2xl">
-          DF
-        </div>
+        <LogoMark size={64} />
         <h1 className="text-3xl font-bold tracking-tight">DepthFusion</h1>
         <p className="text-gray-400 text-sm text-center max-w-xs">
           AI-powered context retrieval and knowledge management.
@@ -65,15 +64,7 @@ function App() {
           </p>
         )}
 
-        <button
-          onClick={handleSignIn}
-          disabled={signingIn || authState.status === 'pending'}
-          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-        >
-          {signingIn || authState.status === 'pending'
-            ? 'Opening browser…'
-            : 'Sign in'}
-        </button>
+        <SignInButton authPending={authState.status === 'pending'} />
 
         {appInfo && (
           <span className="text-xs text-gray-600 absolute bottom-4">
@@ -86,48 +77,77 @@ function App() {
 
   // ── Authenticated shell ──────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center gap-3">
-        <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-sm">
-          DF
+      <header className="border-b border-gray-800 px-5 py-3 flex items-center gap-3 shrink-0">
+        <LogoMark size={24} />
+        <span className="text-base font-semibold tracking-tight">DepthFusion</span>
+
+        {/* Nav tabs */}
+        <nav className="flex items-center gap-1 ml-4">
+          {NAV_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setRoute(tab.id)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                route === tab.id
+                  ? 'bg-gray-800 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-2 ml-auto">
+          {appInfo && (
+            <span className="text-xs text-gray-600">v{appInfo.version}</span>
+          )}
+          <button
+            onClick={() => setRoute('settings')}
+            className={`text-gray-400 hover:text-gray-200 transition-colors p-1.5 rounded-md ${
+              route === 'settings' ? 'text-white bg-gray-800' : ''
+            }`}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙
+          </button>
+          <button
+            onClick={() => void handleSignOut()}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded-md hover:bg-gray-800/50"
+          >
+            Sign out
+          </button>
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">DepthFusion</h1>
-        {appInfo && (
-          <span className="text-xs text-gray-500 ml-auto">v{appInfo.version}</span>
-        )}
-        <button
-          onClick={() => setRoute('settings')}
-          className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded"
-          aria-label="Settings"
-          title="Settings"
-        >
-          ⚙
-        </button>
-        <button
-          onClick={handleSignOut}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors ml-1"
-        >
-          Sign out
-        </button>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 flex items-center justify-center px-6">
-        <div className="text-center max-w-md">
-          <p className="text-4xl mb-4">🔬</p>
-          <h2 className="text-2xl font-bold mb-2">DepthFusion Desktop</h2>
-          <p className="text-gray-400 text-sm">
-            AI-powered context retrieval and knowledge management.
-            Built with Tauri 2, React, and Tailwind CSS.
-          </p>
-        </div>
-      </main>
+      {/* Page content + optional DocumentViewer panel */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        <main className="flex-1 overflow-hidden">
+          {route === 'dashboard' && <DashboardPage />}
+          {route === 'search' && (
+            <SearchPage onOpenDocument={(id) => setOpenDocId(id)} />
+          )}
+          {route === 'graph' && (
+            <GraphPage onOpenDocument={(id) => setOpenDocId(id)} />
+          )}
+          {route === 'settings' && (
+            <SettingsPage onBack={() => setRoute('dashboard')} />
+          )}
+        </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-3 text-xs text-gray-600 text-center">
-        DepthFusion — Tauri 2 + React + Tailwind CSS
-      </footer>
+        {/* Document viewer drawer */}
+        {openDocId !== null && (
+          <div className="w-[640px] shrink-0 overflow-hidden">
+            <DocumentViewer
+              documentId={openDocId}
+              onClose={() => setOpenDocId(null)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
