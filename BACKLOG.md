@@ -2575,15 +2575,22 @@
 
 **Acceptance criteria:**
 - [x] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
-- [ ] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
+- [x] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
 - [ ] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
 - [ ] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
+- [ ] AC-5: Authenticated shell renders Search, Graph, and Dashboard pages with a navigation bar (v2-enterprise UI integrated)
+- [ ] AC-6: App `<title>` in `index.html` reads "DepthFusion" (not "app"); footer dev copy removed
+- [ ] AC-7: A real SVG logo replaces the "DF" text mark in App.tsx and SettingsPage.tsx
 
 **Tasks:**
 - [x] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
-- [ ] T-534: Implement `SignInButton` component that calls `startLogin()` and shows a loading spinner while `pollAuthState()` is running
-- [ ] T-535: Wire `pollAuthState()` into Tauri's `app:ready` lifecycle hook so token detection happens on startup
+- [ ] T-534: Extract `SignInButton` as a standalone component in `app/src/components/SignInButton.tsx`
+- [ ] T-535: Wire `pollAuthState()` into app startup — on mount call `invoke('poll_auth_state')`; if truthy, set `authenticated` state immediately
 - [ ] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears
+- [ ] T-554: Copy v2-enterprise UI pages into main: `SearchPage.tsx`, `GraphPage.tsx`, `DashboardPage.tsx`, `DocumentViewer.tsx`, `components/FacetPanel.tsx`, `components/GraphCanvas.tsx`, `components/NodeInspector.tsx`, `components/WatermarkOverlay.tsx`, `hooks/useSearch.ts`
+- [ ] T-555: Merge `App.tsx` — combine v2-enterprise routing/navigation (Search/Graph/Dashboard) with main branch auth guard; navigation tabs appear in the authenticated header
+- [ ] T-556: Create `app/src/assets/logo.svg` with DepthFusion geometric SVG mark; use it in App.tsx header (both screens) and SettingsPage.tsx header in place of "DF" text box
+- [ ] T-557: Fix `app/index.html` `<title>` to "DepthFusion"; remove tech-stack footer from authenticated shell in `App.tsx`
 
 ### S-154: As a DepthFusion operator, I want the MCP HTTP server to validate per-user JWTs so that only authenticated users can call MCP tools `P0` `L`
 
