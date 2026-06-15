@@ -18,6 +18,13 @@ from __future__ import annotations
 from depthfusion.parsers.base import ConversationMessage, ConversationParser
 from depthfusion.parsers.chatgpt import ChatGPTParser
 from depthfusion.parsers.deepseek import DeepSeekParser
+from depthfusion.parsers.documents.base import (
+    QuarantineEntry,
+    QuarantineStore,
+    get_quarantine,
+    get_quarantine_store,
+    quarantine,
+)
 from depthfusion.parsers.gemini import GeminiParser
 from depthfusion.parsers.generic import GenericParser
 
@@ -45,7 +52,6 @@ def parse_conversation(provider: str, data: str) -> list[dict]:
     messages = parser.parse(data)
     return [{"role": m.role, "content": m.content, "timestamp": m.timestamp} for m in messages]
 
-
 __all__ = [
     "ChatGPTParser",
     "ConversationMessage",
@@ -54,4 +60,10 @@ __all__ = [
     "GenericParser",
     "GeminiParser",
     "parse_conversation",
+    # Document quarantine (T-590 / T-591)
+    "QuarantineEntry",
+    "QuarantineStore",
+    "get_quarantine",
+    "get_quarantine_store",
+    "quarantine",
 ]

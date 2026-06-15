@@ -30,6 +30,7 @@ def build_decision_memory(
         "rejected_options": rejected_options or [],
         "constraints": constraints or [],
         "impact_radius": impact_radius,
+        "acl_allow": [actor],
     }
     return MemoryObject(
         id=str(uuid.uuid4()),
@@ -62,6 +63,7 @@ def build_incident_memory(
         "lesson": lesson,
         "severity": severity,
         "recurrence_risk": recurrence_risk,
+        "acl_allow": [actor],
     }
     return MemoryObject(
         id=str(uuid.uuid4()),

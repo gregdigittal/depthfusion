@@ -16,8 +16,8 @@ def test_is_chromadb_available_returns_bool():
 @pytest.mark.skipif(not is_chromadb_available(), reason="chromadb not installed")
 def test_chromadb_store_add_and_query(tmp_path):
     store = ChromaDBStore(persist_dir=tmp_path / "vectors")
-    store.add_document("doc1", "VPS server SSH configuration", {"source": "memory"})
-    store.add_document("doc2", "cooking pasta recipe", {"source": "memory"})
+    store.add_document("doc1", "VPS server SSH configuration", {"source": "memory", "acl_allow": ["proj-test"]})
+    store.add_document("doc2", "cooking pasta recipe", {"source": "memory", "acl_allow": ["proj-test"]})
     results = store.query("VPS server", top_k=1)
     assert len(results) == 1
     assert results[0]["chunk_id"] == "doc1"
@@ -26,8 +26,8 @@ def test_chromadb_store_add_and_query(tmp_path):
 @pytest.mark.skipif(not is_chromadb_available(), reason="chromadb not installed")
 def test_chromadb_store_upsert_idempotent(tmp_path):
     store = ChromaDBStore(persist_dir=tmp_path / "vectors")
-    store.add_document("doc1", "original content", {"source": "memory"})
-    store.add_document("doc1", "updated content", {"source": "memory"})
+    store.add_document("doc1", "original content", {"source": "memory", "acl_allow": ["proj-test"]})
+    store.add_document("doc1", "updated content", {"source": "memory", "acl_allow": ["proj-test"]})
     assert store.count() == 1  # upsert, not duplicate
 
 
@@ -139,7 +139,7 @@ class TestAddDocumentEmbeddingBackend:
         mock_backend.embed.return_value = [fake_vec]
 
         with patch("depthfusion.backends.get_backend", return_value=mock_backend):
-            store.add_document("doc1", "some content", {"k": "v"})
+            store.add_document("doc1", "some content", {"k": "v", "acl_allow": ["proj-test"]})
 
         call_kwargs = store._collection.upsert.call_args.kwargs
         assert call_kwargs["embeddings"] == [fake_vec]
@@ -154,7 +154,7 @@ class TestAddDocumentEmbeddingBackend:
         mock_backend.embed.return_value = None
 
         with patch("depthfusion.backends.get_backend", return_value=mock_backend):
-            store.add_document("doc1", "some content", {"k": "v"})
+            store.add_document("doc1", "some content", {"k": "v", "acl_allow": ["proj-test"]})
 
         call_kwargs = store._collection.upsert.call_args.kwargs
         # Must NOT have embeddings= key (or it's absent)
@@ -168,7 +168,7 @@ class TestAddDocumentEmbeddingBackend:
         mock_backend.embed.side_effect = Exception("network error")
 
         with patch("depthfusion.backends.get_backend", return_value=mock_backend):
-            store.add_document("doc1", "some content", {"k": "v"})
+            store.add_document("doc1", "some content", {"k": "v", "acl_allow": ["proj-test"]})
 
         call_kwargs = store._collection.upsert.call_args.kwargs
         assert "embeddings" not in call_kwargs

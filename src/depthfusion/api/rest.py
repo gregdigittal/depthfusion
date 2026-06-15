@@ -1,17 +1,14 @@
 """DepthFusion REST API — FastAPI app, loopback by default.
 
-Security: binds 127.0.0.1:7300 unless DEPTHFUSION_API_PUBLIC=1 AND
-DEPTHFUSION_API_TOKEN is set. Startup raises ValueError if public
-bind is requested without a bearer token.
+Security: binds 127.0.0.1:7300 unless DEPTHFUSION_API_PUBLIC=1.
+All routes require a verified Principal via ``require_principal`` from
+``depthfusion.api.auth`` (backed by Entra ID RS256 JWT validation).
 
 Tailscale multi-bind: set DEPTHFUSION_API_TAILSCALE=1 to spawn a second
 uvicorn listener on the Tailscale interface IP (resolved via ``tailscale ip
--4`` at startup). Requires DEPTHFUSION_API_TOKEN. Fails gracefully (log
-warning, loopback-only) if the tailscale command is unavailable or errors.
-Redis stays loopback-only — never exposed on the Tailscale interface.
-
-Query endpoints (/query/*) additionally support X-DepthFusion-Key header
-auth controlled by DEPTHFUSION_QUERY_API_KEY env var.
+-4`` at startup). Requires DEPTHFUSION_OIDC_* env vars. Fails gracefully
+(log warning, loopback-only) if the tailscale command is unavailable or
+errors. Redis stays loopback-only — never exposed on the Tailscale interface.
 """
 from __future__ import annotations
 
@@ -24,10 +21,15 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
+from depthfusion.api.admin_console import router as admin_console_router
+from depthfusion.api.auth import require_principal
 from depthfusion.api.events import router as events_router
+from depthfusion.api.role_admin import router as role_admin_router
+from depthfusion.identity.models import Principal
 
 log = logging.getLogger(__name__)
 
@@ -37,11 +39,19 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+# HTTP gzip compression — E-61 performance hardening.
+# minimum_size=500: payloads smaller than 500 bytes are not worth compressing
+# (overhead exceeds gain). Starlette GZipMiddleware respects Accept-Encoding.
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Mount the Event Graph Fabric router (S-142 / T-486)
 app.include_router(events_router)
 
-_API_TOKEN = os.getenv("DEPTHFUSION_API_TOKEN", "")
-_API_PUBLIC = os.getenv("DEPTHFUSION_API_PUBLIC", "0") == "1"
+# Mount the role-admin router (T-558)
+app.include_router(role_admin_router)
+
+# Mount the admin console router (E-60 / T-672..T-676)
+app.include_router(admin_console_router)
 
 
 def get_bind_host() -> str:
@@ -149,22 +159,6 @@ def start_tailscale_listener() -> None:
     t.start()
 
 
-def _check_auth(authorization: Optional[str] = Header(default=None)) -> None:
-    token = os.getenv("DEPTHFUSION_API_TOKEN", "")
-    if os.getenv("DEPTHFUSION_API_PUBLIC", "0") == "1" and token:
-        if authorization != f"Bearer {token}":
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-def _check_query_auth(
-    x_depthfusion_key: Optional[str] = Header(default=None, alias="X-DepthFusion-Key"),
-) -> None:
-    """API key auth for /query/* endpoints. Only enforced when key is configured."""
-    key = os.getenv("DEPTHFUSION_QUERY_API_KEY", "")
-    if key and x_depthfusion_key != key:
-        raise HTTPException(status_code=401, detail="Invalid or missing X-DepthFusion-Key")
-
-
 def _parse_dt(value: Optional[str], param_name: str) -> Optional[datetime]:
     """Parse ISO-8601 datetime string; raise 422 on invalid input."""
     if not value:
@@ -189,7 +183,7 @@ async def health():
 @app.get("/v1/cognitive-state")
 async def cognitive_state(
     project_id: str,
-    _auth: None = Depends(_check_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.storage.event_log import EventLog
@@ -221,7 +215,7 @@ async def list_memories(
     memory_type: Optional[str] = None,
     include_archived: bool = False,
     limit: int = 50,
-    _auth: None = Depends(_check_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.storage.memory_store import MemoryStore
@@ -250,7 +244,7 @@ async def get_discoveries(
     tags: Optional[str] = Query(default=None, description="Comma-separated tags"),
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
-    _auth: None = Depends(_check_query_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.api.query import query_discoveries
 
@@ -267,6 +261,7 @@ async def get_discoveries(
             tags=tag_list,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
@@ -281,7 +276,7 @@ async def get_sessions(
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
     include_telemetry_summary: bool = Query(default=False),
-    _auth: None = Depends(_check_query_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.api.query import query_sessions
 
@@ -296,6 +291,7 @@ async def get_sessions(
             to_dt=to_dt,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
@@ -324,14 +320,14 @@ async def get_sessions(
 async def get_aggregate(
     from_: Optional[str] = Query(default=None, alias="from"),
     to: Optional[str] = Query(default=None),
-    _auth: None = Depends(_check_query_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.api.query import query_aggregate
 
     from_dt = _parse_dt(from_, "from")
     to_dt = _parse_dt(to, "to")
 
-    return query_aggregate(from_dt=from_dt, to_dt=to_dt)
+    return query_aggregate(from_dt=from_dt, to_dt=to_dt, principal=principal)
 
 
 def _decode_telemetry_cursor(cursor: Optional[str]) -> int:
@@ -365,7 +361,7 @@ async def get_telemetry(
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
     include_think_time: bool = Query(default=False),
-    _auth: None = Depends(_check_query_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.storage.telemetry_store import TelemetryStore, compute_think_times
@@ -527,7 +523,7 @@ def _parse_tool_result(result):
 # ---------------------------------------------------------------------------
 
 @app.get("/status")
-async def status(_auth: None = Depends(_check_auth)):
+async def status(principal: Principal = Depends(require_principal)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_status
     cfg = DepthFusionConfig.from_env()
@@ -535,25 +531,25 @@ async def status(_auth: None = Depends(_check_auth)):
 
 
 @app.get("/tiers/status")
-async def tiers_status(_auth: None = Depends(_check_auth)):
+async def tiers_status(principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_tier_status
     return _parse_tool_result(_tool_tier_status())
 
 
 @app.get("/capabilities")
-async def capabilities(_auth: None = Depends(_check_auth)):
+async def capabilities(principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_describe_capabilities
     return _parse_tool_result(_tool_describe_capabilities())
 
 
 @app.get("/hnsw/capability")
-async def hnsw_capability(_auth: None = Depends(_check_auth)):
+async def hnsw_capability(principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_hnsw_capability
     return _parse_tool_result(_tool_hnsw_capability())
 
 
 @app.get("/cognitive-state")
-async def cognitive_state_v2(_auth: None = Depends(_check_auth)):
+async def cognitive_state_v2(principal: Principal = Depends(require_principal)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_get_cognitive_state
     cfg = DepthFusionConfig.from_env()
@@ -565,13 +561,13 @@ async def cognitive_state_v2(_auth: None = Depends(_check_auth)):
 # ---------------------------------------------------------------------------
 
 @app.put("/scope")
-async def set_scope(body: ScopeBody, _auth: None = Depends(_check_auth)):
+async def set_scope(body: ScopeBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_set_scope
     return _parse_tool_result(_tool_set_scope({"scope": body.scope}))
 
 
 @app.post("/session/seed")
-async def session_seed(body: SessionSeedBody, _auth: None = Depends(_check_auth)):
+async def session_seed(body: SessionSeedBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_session_seed
     args = {"project": body.project}
     if body.branch is not None:
@@ -582,7 +578,10 @@ async def session_seed(body: SessionSeedBody, _auth: None = Depends(_check_auth)
 
 
 @app.post("/session/compress")
-async def session_compress(body: CompressSessionBody, _auth: None = Depends(_check_auth)):
+async def session_compress(
+    body: CompressSessionBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_compress_session
     args = {}
     if body.max_tokens is not None:
@@ -591,7 +590,7 @@ async def session_compress(body: CompressSessionBody, _auth: None = Depends(_che
 
 
 @app.post("/session/tags")
-async def session_tags(body: TagSessionBody, _auth: None = Depends(_check_auth)):
+async def session_tags(body: TagSessionBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_tag_session
     return _parse_tool_result(_tool_tag_session({"tags": body.tags}))
 
@@ -601,7 +600,7 @@ async def session_tags(body: TagSessionBody, _auth: None = Depends(_check_auth))
 # ---------------------------------------------------------------------------
 
 @app.post("/recall")
-async def recall(body: RecallBody, _auth: None = Depends(_check_auth)):
+async def recall(body: RecallBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_recall
     args: dict = {"query": body.query, "limit": body.limit, "threshold": body.threshold}
     if body.scope is not None:
@@ -610,7 +609,10 @@ async def recall(body: RecallBody, _auth: None = Depends(_check_auth)):
 
 
 @app.post("/recall/feedback")
-async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check_auth)):
+async def recall_feedback(
+    body: RecallFeedbackBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_recall_feedback
     args: dict = {"recall_id": body.recall_id, "rating": body.rating}
     if body.notes is not None:
@@ -623,7 +625,10 @@ async def recall_feedback(body: RecallFeedbackBody, _auth: None = Depends(_check
 # ---------------------------------------------------------------------------
 
 @app.post("/context")
-async def publish_context(body: PublishContextBody, _auth: None = Depends(_check_auth)):
+async def publish_context(
+    body: PublishContextBody,
+    principal: Principal = Depends(require_principal),
+):
     import uuid
 
     from depthfusion.core.config import DepthFusionConfig
@@ -646,7 +651,10 @@ async def publish_context(body: PublishContextBody, _auth: None = Depends(_check
 
 
 @app.post("/context/retrieve")
-async def retrieve_context(body: RetrieveContextBody, _auth: None = Depends(_check_auth)):
+async def retrieve_context(
+    body: RetrieveContextBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_retrieve_context
     cfg = DepthFusionConfig.from_env()
@@ -661,7 +669,7 @@ async def retrieve_context(body: RetrieveContextBody, _auth: None = Depends(_che
 
 
 @app.post("/auto-learn")
-async def auto_learn(body: AutoLearnBody, _auth: None = Depends(_check_auth)):
+async def auto_learn(body: AutoLearnBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_auto_learn
     args: dict = {}
     if body.session_id is not None:
@@ -676,13 +684,16 @@ async def auto_learn(body: AutoLearnBody, _auth: None = Depends(_check_auth)):
 # ---------------------------------------------------------------------------
 
 @app.get("/graph/status")
-async def graph_status(_auth: None = Depends(_check_auth)):
+async def graph_status(principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_graph_status
     return _parse_tool_result(_tool_graph_status())
 
 
 @app.post("/graph/traverse")
-async def graph_traverse(body: GraphTraverseBody, _auth: None = Depends(_check_auth)):
+async def graph_traverse(
+    body: GraphTraverseBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_graph_traverse
     args: dict = {"from": body.from_node, "depth": body.depth, "direction": body.direction}
     if body.filter_tags is not None:
@@ -691,7 +702,7 @@ async def graph_traverse(body: GraphTraverseBody, _auth: None = Depends(_check_a
 
 
 @app.post("/run/recursive")
-async def run_recursive(body: RunRecursiveBody, _auth: None = Depends(_check_auth)):
+async def run_recursive(body: RunRecursiveBody, principal: Principal = Depends(require_principal)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_run_recursive
     cfg = DepthFusionConfig.from_env()
@@ -713,7 +724,7 @@ async def list_discoveries(
     tags: Optional[str] = Query(default=None, description="Comma-separated tags"),
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=20, ge=1, le=200),
-    _auth: None = Depends(_check_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.api.query import query_discoveries
 
@@ -730,19 +741,26 @@ async def list_discoveries(
             tags=tag_list,
             cursor=cursor,
             limit=limit,
+            principal=principal,
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid cursor")
 
 
 @app.post("/discoveries/inspect")
-async def inspect_discovery(body: InspectDiscoveryBody, _auth: None = Depends(_check_auth)):
+async def inspect_discovery(
+    body: InspectDiscoveryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_inspect_discovery
     return _parse_tool_result(_tool_inspect_discovery({"filename": body.filename}))
 
 
 @app.post("/discoveries/confirm")
-async def confirm_discovery(body: ConfirmDiscoveryBody, _auth: None = Depends(_check_auth)):
+async def confirm_discovery(
+    body: ConfirmDiscoveryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_confirm_discovery
     args: dict = {"text": body.text}
     if body.project is not None:
@@ -755,7 +773,7 @@ async def confirm_discovery(body: ConfirmDiscoveryBody, _auth: None = Depends(_c
 
 
 @app.post("/discoveries/pin")
-async def pin_discovery(body: PinDiscoveryBody, _auth: None = Depends(_check_auth)):
+async def pin_discovery(body: PinDiscoveryBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_pin_discovery
     return _parse_tool_result(
         _tool_pin_discovery({"filename": body.filename, "pinned": body.pinned})
@@ -763,7 +781,7 @@ async def pin_discovery(body: PinDiscoveryBody, _auth: None = Depends(_check_aut
 
 
 @app.post("/discoveries/supersede")
-async def mark_superseded(body: SupersedeBody, _auth: None = Depends(_check_auth)):
+async def mark_superseded(body: SupersedeBody, principal: Principal = Depends(require_principal)):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_mark_superseded
     cfg = DepthFusionConfig.from_env()
@@ -780,7 +798,10 @@ async def mark_superseded(body: SupersedeBody, _auth: None = Depends(_check_auth
 
 
 @app.post("/discoveries/prune")
-async def prune_discoveries(body: PruneDiscoveriesBody, _auth: None = Depends(_check_auth)):
+async def prune_discoveries(
+    body: PruneDiscoveriesBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.mcp.server import _tool_prune_discoveries
     args: dict = {"older_than_days": body.older_than_days}
     if body.status is not None:
@@ -796,7 +817,7 @@ async def prune_discoveries(body: PruneDiscoveriesBody, _auth: None = Depends(_c
 async def set_memory_score(
     memory_id: str = Path(...),
     body: SetMemoryScoreBody = ...,  # type: ignore[assignment]
-    _auth: None = Depends(_check_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.mcp.server import _tool_set_memory_score
     return _parse_tool_result(_tool_set_memory_score({"id": memory_id, "score": body.score}))
@@ -807,7 +828,10 @@ async def set_memory_score(
 # ---------------------------------------------------------------------------
 
 @app.post("/telemetry")
-async def record_telemetry(body: RecordTelemetryBody, _auth: None = Depends(_check_auth)):
+async def record_telemetry(
+    body: RecordTelemetryBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_telemetry
     cfg = DepthFusionConfig.from_env()
@@ -822,7 +846,10 @@ async def record_telemetry(body: RecordTelemetryBody, _auth: None = Depends(_che
 # ---------------------------------------------------------------------------
 
 @app.post("/decisions")
-async def record_decision(body: RecordDecisionBody, _auth: None = Depends(_check_auth)):
+async def record_decision(
+    body: RecordDecisionBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_decision
     cfg = DepthFusionConfig.from_env()
@@ -835,7 +862,10 @@ async def record_decision(body: RecordDecisionBody, _auth: None = Depends(_check
 
 
 @app.post("/incidents")
-async def record_incident(body: RecordIncidentBody, _auth: None = Depends(_check_auth)):
+async def record_incident(
+    body: RecordIncidentBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_record_incident
     cfg = DepthFusionConfig.from_env()
@@ -846,7 +876,10 @@ async def record_incident(body: RecordIncidentBody, _auth: None = Depends(_check
 
 
 @app.post("/outcomes")
-async def report_outcome(body: ReportOutcomeBody, _auth: None = Depends(_check_auth)):
+async def report_outcome(
+    body: ReportOutcomeBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_report_outcome
     cfg = DepthFusionConfig.from_env()
@@ -861,7 +894,10 @@ async def report_outcome(body: ReportOutcomeBody, _auth: None = Depends(_check_a
 # ---------------------------------------------------------------------------
 
 @app.post("/skills/candidates")
-async def surface_skill_candidates(body: SkillCandidatesBody, _auth: None = Depends(_check_auth)):
+async def surface_skill_candidates(
+    body: SkillCandidatesBody,
+    principal: Principal = Depends(require_principal),
+):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.mcp.server import _tool_surface_skill_candidates
     cfg = DepthFusionConfig.from_env()
@@ -881,7 +917,7 @@ async def get_telemetry_aggregate(
     period: Optional[str] = Query(default=None),
     from_: Optional[str] = Query(default=None, alias="from"),
     to: Optional[str] = Query(default=None),
-    _auth: None = Depends(_check_query_auth),
+    principal: Principal = Depends(require_principal),
 ):
     from depthfusion.core.config import DepthFusionConfig
     from depthfusion.storage.telemetry_store import TelemetryStore

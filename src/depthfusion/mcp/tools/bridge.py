@@ -3,19 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
-import sys
-import threading
-import time
-from pathlib import Path
-from typing import Any
 
-from depthfusion.capture.event_hook import emit_if_high_importance
-from depthfusion.core.types import ContextItem
-from depthfusion.retrieval.bm25 import BM25 as _BM25
-from depthfusion.retrieval.bm25 import tokenize as _tokenize_bm25
-from depthfusion.router.bus import ContextBus, FileBus, InMemoryBus
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments
@@ -23,14 +11,12 @@ except Exception:  # pragma: no cover — optional module in older environments
 
 logger = logging.getLogger("depthfusion.mcp.server")
 
-from depthfusion.mcp.tools._state import _get_hnsw_store, _get_context_bus, _get_fabric_store  # noqa: E402
-from depthfusion.mcp.tools.recall import _tool_recall  # noqa: E402
 from depthfusion.mcp.tools.capture import _tool_publish_context  # noqa: E402
+from depthfusion.mcp.tools.recall import _tool_recall  # noqa: E402
 
 
 def _tool_bridge(arguments: dict) -> str:
     import hashlib
-    import json
 
     if OpenRouterBackend is None:
         return json.dumps({"error": "OPENROUTER_API_KEY not configured", "model": ""})
@@ -70,6 +56,9 @@ def _tool_bridge(arguments: dict) -> str:
 
     fragments_stored = 0
     try:
+        meta: dict = {"sub_scope": f"provider:{model}"}
+        if context_tags:
+            meta["context_tags"] = context_tags
         item_payload = {
             "item_id": (
                 "bridge:"
@@ -80,10 +69,8 @@ def _tool_bridge(arguments: dict) -> str:
             "content": f"[Bridge response from {model}]\nPrompt: {prompt}\n\nResponse: {response}",
             "source_agent": "depthfusion_bridge",
             "tags": ["bridge", f"provider:{model}"],
-            "metadata": {"sub_scope": f"provider:{model}"},
+            "metadata": meta,
         }
-        if context_tags:
-            item_payload["metadata"]["context_tags"] = context_tags
         publish_args = {"item": item_payload}
         _tool_publish_context(publish_args)
         fragments_stored = 1

@@ -450,7 +450,7 @@ def _link_session_temporally(
             source_files=[rec.session_id],
             confidence=1.0,
             first_seen=rec.timestamp,
-            metadata={"vocabulary_size": len(rec.vocabulary)},
+            metadata={"vocabulary_size": len(rec.vocabulary), "acl_allow": [rec.project]},
         ))
 
     # The linker's edge source_id / target_id are session_ids (stems), but
@@ -462,6 +462,9 @@ def _link_session_temporally(
         edge.source_id = src_entity
         edge.target_id = tgt_entity
         edge.edge_id = make_edge_id(src_entity, tgt_entity, edge.relationship)
+        # T-562: stamp acl_allow on edges that the linker created without it.
+        if not edge.metadata.get("acl_allow"):
+            edge.metadata["acl_allow"] = [project]
         graph_store.upsert_edge(edge)
 
 

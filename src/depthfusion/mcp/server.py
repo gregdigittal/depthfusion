@@ -7,35 +7,35 @@ import os
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
-from depthfusion.router.bus import ContextBus
+from depthfusion.identity.models import Principal
+from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 
 logger = logging.getLogger(__name__)
 
 # Tool registry (TOOLS, _TOOL_FLAGS, TOOL_SCHEMAS, get_enabled_tools)
 from depthfusion.mcp.tools._registry import (  # noqa: E402
-    TOOLS,
     TOOL_SCHEMAS,
+    TOOLS,
     _TOOL_FLAGS,
     get_enabled_tools,
 )
 
-# Server state and infrastructure helpers
-from depthfusion.mcp.tools._state import (  # noqa: E402
-    _get_context_bus,
-    _get_fabric_store,
-    _get_hnsw_store,
-    _hnsw_enabled,
-    _register_hnsw_shutdown,
+# Recall implementation helpers (re-exported for test patching compatibility)
+from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
+    _backend_name_to_chain,
+    _detect_current_backends,
+    _sanitise_project_slug,
+    _split_into_blocks,
+    _tool_recall_impl,
+    _trim_to_sentence,
 )
 
-# Tool implementations — recall domain
-from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
-    _tool_recall,
-    _tool_recall_feedback,
-    _tool_retrieve_context,
+# Server state and infrastructure helpers
+# Tool implementations — bridge domain
+from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
+    _tool_bridge,
 )
 
 # Tool implementations — capture domain
@@ -48,6 +48,16 @@ from depthfusion.mcp.tools.capture import (  # noqa: E402,F401
     _tool_prune_discoveries,
     _tool_publish_context,
     _tool_tag_session,
+)
+
+# Tool implementations — decisions domain
+from depthfusion.mcp.tools.decisions import (  # noqa: E402,F401
+    _tool_get_cognitive_state,
+    _tool_mark_superseded,
+    _tool_record_decision,
+    _tool_record_incident,
+    _tool_report_outcome,
+    _tool_run_recursive,
 )
 
 # Tool implementations — graph domain
@@ -63,14 +73,27 @@ from depthfusion.mcp.tools.graph import (  # noqa: E402,F401
     _tool_set_scope,
 )
 
-# Tool implementations — decisions domain
-from depthfusion.mcp.tools.decisions import (  # noqa: E402,F401
-    _tool_get_cognitive_state,
-    _tool_mark_superseded,
-    _tool_record_decision,
-    _tool_record_incident,
-    _tool_report_outcome,
-    _tool_run_recursive,
+# Tool implementations — project domain
+from depthfusion.mcp.tools.project import (  # noqa: E402,F401
+    _tool_ingest_project,
+    _tool_list_projects,
+    _tool_register_project,
+    _tool_session_seed,
+    _tool_sync_project,
+)
+
+# Tool implementations — recall domain
+from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
+    _tool_recall,
+    _tool_recall_feedback,
+    _tool_retrieve_context,
+)
+
+# Tool implementations — system domain
+from depthfusion.mcp.tools.system import (  # noqa: E402,F401
+    _tool_list_providers,
+    _tool_research_topic,
+    _tool_status,
 )
 
 # Tool implementations — telemetry domain
@@ -83,37 +106,6 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _tool_record_telemetry,
     _tool_surface_skill_candidates,
     _tool_tier_status,
-)
-
-# Tool implementations — project domain
-from depthfusion.mcp.tools.project import (  # noqa: E402,F401
-    _tool_ingest_project,
-    _tool_list_projects,
-    _tool_register_project,
-    _tool_session_seed,
-    _tool_sync_project,
-)
-
-# Tool implementations — system domain
-from depthfusion.mcp.tools.system import (  # noqa: E402,F401
-    _tool_list_providers,
-    _tool_research_topic,
-    _tool_status,
-)
-
-# Tool implementations — bridge domain
-from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
-    _tool_bridge,
-)
-
-# Recall implementation helpers (re-exported for test patching compatibility)
-from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
-    _backend_name_to_chain,
-    _detect_current_backends,
-    _sanitise_project_slug,
-    _split_into_blocks,
-    _tool_recall_impl,
-    _trim_to_sentence,
 )
 
 
@@ -136,8 +128,26 @@ def _handle_tools_list(config: Any) -> dict:
         "tools": [_make_tool_schema(n, TOOLS[n]) for n in enabled]
     }
 
-def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
-    """Dispatch a tool call and return MCP-formatted result."""
+def _handle_tools_call(
+    tool_name: str,
+    arguments: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> dict:
+    """Dispatch a tool call and return MCP-formatted result.
+
+    Parameters
+    ----------
+    tool_name:
+        The MCP tool identifier (e.g. ``"depthfusion_recall_relevant"``).
+    arguments:
+        Caller-supplied arguments.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller bound to this session.  ``None`` for
+        unauthenticated stdio sessions (will be rejected by authz).
+    """
     if tool_name not in TOOLS:
         return {
             "isError": True,
@@ -151,9 +161,18 @@ def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
             "content": [{"type": "text", "text": f"Tool {tool_name} is disabled by config"}],
         }
 
+    # Principal binding + capability check (T-578 / T-579)
+    try:
+        check_tool_access(tool_name, principal)
+    except AuthorizationError as exc:
+        return {
+            "isError": True,
+            "content": [{"type": "text", "text": f"Authorization denied: {exc}"}],
+        }
+
     # Dispatch to tool implementations
     try:
-        result_text = _dispatch_tool(tool_name, arguments, config)
+        result_text = _dispatch_tool(tool_name, arguments, config, principal)
         return {
             "isError": False,
             "content": [{"type": "text", "text": result_text}],
@@ -164,8 +183,28 @@ def _handle_tools_call(tool_name: str, arguments: dict, config: Any) -> dict:
             "content": [{"type": "text", "text": f"Tool error: {exc}"}],
         }
 
-def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
-    """Route tool calls to their implementations."""
+def _dispatch_tool(
+    tool_name: str,
+    arguments: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> str:
+    """Route tool calls to their implementations.
+
+    Parameters
+    ----------
+    tool_name:
+        The MCP tool identifier.
+    arguments:
+        Caller-supplied arguments.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller.  By the time this function is called,
+        ``check_tool_access`` has already validated the principal — callers
+        that skip ``_handle_tools_call`` must call ``check_tool_access``
+        themselves.
+    """
     if tool_name == "depthfusion_status":
         return _tool_status(config)
     elif tool_name == "depthfusion_recall_relevant":
@@ -227,8 +266,25 @@ def _dispatch_tool(tool_name: str, arguments: dict, config: Any) -> str:
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
-def _process_request(request: dict, config: Any) -> dict:
-    """Process a single JSON-RPC request and return the response."""
+def _process_request(
+    request: dict,
+    config: Any,
+    principal: Principal | None = None,
+) -> dict:
+    """Process a single JSON-RPC request and return the response.
+
+    Parameters
+    ----------
+    request:
+        Parsed JSON-RPC 2.0 request object.
+    config:
+        Server configuration.
+    principal:
+        The authenticated caller bound to this MCP session.  ``None`` for
+        unauthenticated stdio sessions — tool calls will be rejected by the
+        capability check unless the tool is accessible without a principal
+        (currently none are).
+    """
     method = request.get("method", "")
     req_id = request.get("id")
     params = request.get("params", {})
@@ -244,7 +300,7 @@ def _process_request(request: dict, config: Any) -> dict:
     elif method == "tools/call":
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
-        result = _handle_tools_call(tool_name, arguments, config)
+        result = _handle_tools_call(tool_name, arguments, config, principal)
     elif method == "notifications/initialized":
         # Notification — no response needed
         return {}

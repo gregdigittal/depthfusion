@@ -7,6 +7,9 @@ on:
       - "feat/e44-*"
   pull_request:
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 

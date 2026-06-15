@@ -36,7 +36,7 @@ def test_upsert_entity_twice_updates(json_store, sample_entity):
         source_files=["memory/new.md"],
         confidence=0.95,
         first_seen=sample_entity.first_seen,
-        metadata={},
+        metadata={"acl_allow": ["depthfusion"]},
     )
     json_store.upsert_entity(updated)
     result = json_store.get_entity(sample_entity.entity_id)
@@ -313,7 +313,7 @@ class TestChromaGraphStore:
             source_files=["memory/new.md"],
             confidence=0.95,
             first_seen=sample_entity.first_seen,
-            metadata={},
+            metadata={"acl_allow": ["depthfusion"]},
         )
         chroma_store.upsert_entity(updated)
         result = chroma_store.get_entity(sample_entity.entity_id)
@@ -387,12 +387,12 @@ class TestChromaGraphStore:
             source_files=["a.md", "b.md"],
             confidence=1.0,
             first_seen=sample_entity.first_seen,
-            metadata={"key": "value", "count": 3},
+            metadata={"acl_allow": ["depthfusion"], "key": "value", "count": 3},
         )
         chroma_store.upsert_entity(entity_with_meta)
         result = chroma_store.get_entity(entity_with_meta.entity_id)
         assert result.source_files == ["a.md", "b.md"]
-        assert result.metadata == {"key": "value", "count": 3}
+        assert result.metadata == {"acl_allow": ["depthfusion"], "key": "value", "count": 3}
 
 
 class TestGetStoreChromaFactory:
@@ -429,6 +429,7 @@ class TestEdgeProvenance:
         defaults = dict(
             edge_id="e001", source_id="s1", target_id="t1",
             relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"],
+            metadata={"acl_allow": ["depthfusion"]},
         )
         defaults.update(kwargs)
         return Edge(**defaults)
@@ -497,6 +498,7 @@ class TestEdgeInvalidation:
         return Edge(
             edge_id=edge_id, source_id="s1", target_id="t1",
             relationship="CO_OCCURS", weight=1.0, signals=[],
+            metadata={"acl_allow": ["depthfusion"]},
         )
 
     def _t(self, hour: int):

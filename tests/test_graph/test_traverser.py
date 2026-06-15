@@ -113,25 +113,25 @@ def test_traverse_depth2_walks_two_hops(tmp_path):
     store = JSONGraphStore(path=tmp_path / "g.json")
     a = Entity(entity_id=make_entity_id("A", "class", "p"), name="A", type="class",
                project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
+               first_seen="2026-03-28T00:00:00", metadata={"acl_allow": ["depthfusion"]})
     b = Entity(entity_id=make_entity_id("B", "class", "p"), name="B", type="class",
                project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
+               first_seen="2026-03-28T00:00:00", metadata={"acl_allow": ["depthfusion"]})
     c = Entity(entity_id=make_entity_id("C", "class", "p"), name="C", type="class",
                project="p", source_files=[], confidence=1.0,
-               first_seen="2026-03-28T00:00:00", metadata={})
+               first_seen="2026-03-28T00:00:00", metadata={"acl_allow": ["depthfusion"]})
     store.upsert_entity(a)
     store.upsert_entity(b)
     store.upsert_entity(c)
     store.upsert_edge(Edge(
         edge_id=make_edge_id(a.entity_id, b.entity_id, "CO_OCCURS"),
         source_id=a.entity_id, target_id=b.entity_id,
-        relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"], metadata={},
+        relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"], metadata={"acl_allow": ["depthfusion"]},
     ))
     store.upsert_edge(Edge(
         edge_id=make_edge_id(b.entity_id, c.entity_id, "CO_OCCURS"),
         source_id=b.entity_id, target_id=c.entity_id,
-        relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"], metadata={},
+        relationship="CO_OCCURS", weight=1.0, signals=["co_occurrence"], metadata={"acl_allow": ["depthfusion"]},
     ))
     result = traverse(a.entity_id, store, depth=2)
     connected_ids = {e.entity_id for e, _ in result.connected}
@@ -146,7 +146,7 @@ def test_expand_query_skips_low_confidence_entity(tmp_path):
         entity_id=make_entity_id("LowConf", "class", "p"),
         name="LowConf", type="class", project="p",
         source_files=[], confidence=0.65,
-        first_seen="2026-03-28T00:00:00", metadata={},
+        first_seen="2026-03-28T00:00:00", metadata={"acl_allow": ["depthfusion"]},
     )
     store.upsert_entity(low_conf)
     expanded = expand_query("LowConf processing", store)

@@ -14,7 +14,7 @@ def sample_entity() -> Entity:
         source_files=["memory/arch.md"],
         confidence=1.0,
         first_seen="2026-03-28T00:00:00",
-        metadata={},
+        metadata={"acl_allow": ["depthfusion"]},
     )
 
 
@@ -28,7 +28,7 @@ def sample_entity_b() -> Entity:
         source_files=["memory/arch.md"],
         confidence=1.0,
         first_seen="2026-03-28T00:00:00",
-        metadata={},
+        metadata={"acl_allow": ["depthfusion"]},
     )
 
 
@@ -41,5 +41,5 @@ def sample_edge(sample_entity, sample_entity_b) -> Edge:
         relationship="CO_OCCURS",
         weight=1.0,
         signals=["co_occurrence"],
-        metadata={},
+        metadata={"acl_allow": ["depthfusion"]},
     )

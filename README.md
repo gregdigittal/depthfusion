@@ -6,9 +6,26 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
+> **V2 enterprise branch:** This branch (`v2-enterprise`) contains the V2 enterprise build with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, and classification-aware memory handling. V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. If you are looking for the V1 MCP-only deployment, use the `main` branch.
+
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.2.2 (2026-06-10). 2151+ tests passing · 0 ruff · 0 mypy. Multi-Provider Context Bridge (E-48) live — delegate to GPT-4o/Gemini/DeepSeek, ingest past conversations, shared memory flows both ways. Project Context Intelligence (E-47) live — register, sync, ingest, and research across projects. Event Graph Fabric (E-46) live — multi-agent shared memory, `fabric_seed` warm-start, agent provenance graph. MCP surface: **29 canonical tools** (17 always-on, 9 feature-flagged, 3 bridge; identical on Mac and VPS). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v1.2.2 (main) / v2.0.0-dev (v2-enterprise). 2151+ tests passing · 0 ruff · 0 mypy. V2 adds: OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), and offline mode. V1: Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46), **29 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+
+## V2 Feature Summary
+
+| V2 Capability | Description | Docs |
+|---|---|---|
+| OIDC + PKCE authentication | Sign in via Azure Entra ID, Okta, or Google Workspace — no DepthFusion passwords | [security-model.md §1](docs/v2/security-model.md) |
+| Device enrollment | Each device is registered and admin-approved; enrollment certificates + revocation | [security-model.md §1.2](docs/v2/security-model.md) |
+| Token vault | refresh_token + device key stored in OS keychain (macOS/Windows/Linux) | [security-model.md §1.3](docs/v2/security-model.md) |
+| RBAC roles | viewer / contributor / operator / admin — capability matrix enforced at API layer | [security-model.md §2.1](docs/v2/security-model.md) |
+| ACL records | Per-memory or per-namespace access control; explicit deny support | [security-model.md §2.2](docs/v2/security-model.md) |
+| Data classification | PUBLIC / INTERNAL / CONFIDENTIAL / RESTRICTED with handling rules and export policy | [security-model.md §3](docs/v2/security-model.md) |
+| Fernet cache encryption | Offline recall cache encrypted at rest using device-derived key | [security-model.md §4.2](docs/v2/security-model.md) |
+| Tauri desktop app | Native app for macOS (Apple Silicon + Intel) and Windows 10/11 | [user-guide.md §1](docs/v2/user-guide.md) |
+| Offline mode | Encrypted local cache; queued write replay on reconnect | [user-guide.md §4](docs/v2/user-guide.md) |
+| Admin runbooks | Device approval/revocation, role assignment, backup/restore, audit queries | [admin-runbooks.md](docs/v2/admin-runbooks.md) |
 
 ---
 

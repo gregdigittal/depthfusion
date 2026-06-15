@@ -1,5 +1,7 @@
 # vps-gpu Quickstart — GPU-accelerated DepthFusion + research tools
 
+> **Note: This doc describes V1 behavior.** V2 server setup is documented in `docs/v2/admin-runbooks.md` (§1 Initial Server Setup + First-User Enrollment). The V2 installer adds OIDC configuration, database initialization, and TLS setup steps not covered here. If you are running the `v2-enterprise` branch, refer to the V2 admin runbooks instead.
+
 > **Target:** Hetzner GEX44 (NVIDIA RTX 4000 SFF Ada) or any CUDA-12+ host
 > **Time:** ~4 hours (mostly GPU-driver + Gemma model download)
 > **Produces:** working DepthFusion in `vps-gpu` mode + weekly regression monitor + initial prompt corpus

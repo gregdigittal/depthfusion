@@ -14,7 +14,7 @@ def _make_event(event_id: str, project_id: str = "proj-test") -> MemoryEvent:
         memory_id=f"mem-{event_id}",
         event_type=MemoryEventType.CREATED,
         project_id=project_id,
-        payload={"content": "test"},
+        payload={"content": "test", "extra": {"acl_allow": [project_id]}},
         actor="test",
         timestamp=datetime.now(timezone.utc),
     )
@@ -72,7 +72,7 @@ def test_replay_since_filter(tmp_path):
         memory_id="mem-old",
         event_type=MemoryEventType.CREATED,
         project_id="proj-test",
-        payload={},
+        payload={"extra": {"acl_allow": ["proj-test"]}},
         actor="test",
         timestamp=old_ts,
     )
@@ -81,7 +81,7 @@ def test_replay_since_filter(tmp_path):
         memory_id="mem-new",
         event_type=MemoryEventType.CREATED,
         project_id="proj-test",
-        payload={},
+        payload={"extra": {"acl_allow": ["proj-test"]}},
         actor="test",
         timestamp=new_ts,
     )

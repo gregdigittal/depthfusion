@@ -4,15 +4,29 @@ from __future__ import annotations
 import pytest
 
 
+def _install_fake_principal(app):
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.identity.models import Principal
+    fake = Principal(principal_id="greg", upn="greg@test.local")
+    original = dict(app.dependency_overrides)
+    app.dependency_overrides[_require_principal_dep] = lambda: fake
+    return original
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_REST_API", "1")
     monkeypatch.setenv("DEPTHFUSION_EVENT_LOG", str(tmp_path / "events.jsonl"))
     monkeypatch.setenv("DEPTHFUSION_MEMORY_STORE", str(tmp_path / "memories.db"))
-    from fastapi.testclient import TestClient
+    from importlib import reload
 
-    from depthfusion.api.rest import app
-    return TestClient(app)
+    import depthfusion.api.rest as rest_module
+    reload(rest_module)
+    original = _install_fake_principal(rest_module.app)
+    from fastapi.testclient import TestClient
+    yield TestClient(rest_module.app)
+    rest_module.app.dependency_overrides.clear()
+    rest_module.app.dependency_overrides.update(original)
 
 
 def test_health_endpoint(client):

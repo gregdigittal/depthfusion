@@ -5,6 +5,7 @@ import json
 from unittest.mock import MagicMock
 
 from depthfusion.core.config import DepthFusionConfig
+from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
@@ -136,9 +137,13 @@ class TestConfirmDiscovery:
     def _cfg(self):
         return DepthFusionConfig(rlm_enabled=False, router_enabled=False, graph_enabled=False)
 
+    def _principal(self) -> Principal:
+        """Return a member principal that satisfies WRITE_OWN_RECORDS."""
+        return Principal(principal_id="test-member", groups=["member"])
+
     def test_missing_text_returns_error(self):
         config = self._cfg()
-        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config)
+        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config, self._principal())
         assert result["isError"] is False  # protocol success
         body = json.loads(result["content"][0]["text"])
         assert body["ok"] is False
@@ -160,6 +165,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Use asyncpg over psycopg2 for async support", "project": "test-proj"},
                 self._cfg(),
+                self._principal(),
             )
 
         assert result["isError"] is False
@@ -179,6 +185,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": long_text, "project": "proj"},
                 self._cfg(),
+                self._principal(),
             )
         assert result["isError"] is False
 
@@ -201,6 +208,7 @@ class TestConfirmDiscovery:
                 {"text": "Always validate at boundaries", "project": "proj",
                  "category": "invalid_category"},
                 self._cfg(),
+                self._principal(),
             )
         assert captured_entries[0].category == "decision"
 
@@ -222,6 +230,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Deploy via kubernetes", "project": "proj", "confidence": 99.9},
                 self._cfg(),
+                self._principal(),
             )
         assert captured_entries[0].confidence <= 1.0
 

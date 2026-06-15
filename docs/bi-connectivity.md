@@ -1,5 +1,9 @@
 # BI Tool Connectivity — DepthFusion Query API
 
+> **Note: This doc describes V1 behavior.** V2 behavior is documented in `docs/v2/admin-runbooks.md` (§5 Log Analysis and Audit Queries). V2 uses authenticated API endpoints with RBAC-gated access rather than raw SSH tunnels. If you are running the `v2-enterprise` branch, refer to the admin runbooks instead.
+
+
+
 The DepthFusion REST API exposes three query endpoints on `127.0.0.1:7300` (loopback only by
 default). To connect BI tools running on other machines, use an SSH tunnel. Public binding is
 supported but requires both `DEPTHFUSION_API_TOKEN` (bearer) and `DEPTHFUSION_QUERY_API_KEY`

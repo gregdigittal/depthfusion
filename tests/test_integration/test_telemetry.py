@@ -313,13 +313,33 @@ def test_mcp_query_telemetry_session_type_filter(mcp_config):
 
 @pytest.fixture
 def telemetry_client(tmp_path, monkeypatch):
-    """Test client with telemetry store routed to a temp DB."""
+    """Test client with telemetry store routed to a temp DB.
+
+    Overrides the auth dependency so that tests don't require OIDC env vars.
+    Without this override, _UnconfiguredPrincipalDep raises 503 for every
+    protected route when DEPTHFUSION_JWKS_URI / OIDC_ISSUER / OIDC_AUDIENCE
+    are absent (which they always are in the test environment).
+    """
     from fastapi.testclient import TestClient
+    from depthfusion.identity.models import Principal
+
     monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
     monkeypatch.delenv("DEPTHFUSION_API_PUBLIC", raising=False)
     monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
+
     from depthfusion.api.rest import app
-    return TestClient(app)
+    from depthfusion.api.auth import _require_principal_dep
+
+    fake_principal = Principal(principal_id="test-user", upn="test@test.local")
+
+    original_overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[_require_principal_dep] = lambda: fake_principal
+
+    client = TestClient(app)
+    yield client
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(original_overrides)
 
 
 def test_rest_get_telemetry_empty(telemetry_client):

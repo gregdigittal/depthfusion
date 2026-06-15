@@ -54,7 +54,10 @@ import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from depthfusion.identity.models import Principal
 
 logger = logging.getLogger(__name__)
 
@@ -320,8 +323,32 @@ class HNSWStore:
         _ = current_count
         return True
 
-    def search(self, query: str, k: int) -> list[dict[str, Any]]:
-        """Embed *query* and return top-*k* hits.
+    def search(
+        self,
+        query: str,
+        k: int,
+        *,
+        principal: "Principal | None" = None,
+        acl_resolver: "Any | None" = None,
+    ) -> list[dict[str, Any]]:
+        """Embed *query* and return top-*k* hits, filtered by principal ACL.
+
+        T-571/T-572: when *principal* is supplied, only results whose
+        discovery_id is in the allowed set (as determined by *acl_resolver*)
+        are returned.  *acl_resolver* is an optional callable::
+
+            acl_resolver(discovery_id: str) -> list[str] | None
+
+        that returns the ``acl_allow`` list for a given discovery_id.  When
+        *acl_resolver* is None but *principal* is set, the filter falls back
+        to checking the ``_acl_cache`` attribute on the store itself (populated
+        via :meth:`register_acl`).
+
+        **Fail-closed policy:** when a principal is supplied but neither an
+        *acl_resolver* nor an ``_acl_cache`` is available, the call raises
+        ``RuntimeError`` rather than silently returning unfiltered results.
+        Returning everything to an authenticated caller whose ACL cannot be
+        resolved is a data-leak; raising is the safe default.
 
         Each hit is ``{"discovery_id": str, "score": float, "label": int}``
         where ``score`` is cosine similarity (1.0 = identical).  Returns
@@ -356,6 +383,31 @@ class HNSWStore:
         except Exception:
             return []
 
+        # Resolve the ACL filter function once, before the per-hit loop.
+        allowed_ids: set[str] | None = None
+        _acl_fn: Any = None
+        if principal is not None:
+            allowed_ids = {principal.principal_id}
+            for g in (principal.groups or []):
+                allowed_ids.add(g)
+            if acl_resolver is not None:
+                _acl_fn = acl_resolver
+            elif hasattr(self, "_acl_cache"):
+                # Fallback: use the in-memory ACL cache populated via register_acl().
+                _cache: dict[str, list[str]] = self._acl_cache  # type: ignore[attr-defined]
+                _acl_fn = _cache.get
+            else:
+                # Fail-closed: a principal was supplied but no ACL source is
+                # available. Returning unfiltered results would silently widen
+                # access; raise instead so the caller can surface the
+                # misconfiguration rather than leaking data.
+                raise RuntimeError(
+                    "ACL filter requested (principal supplied) but no "
+                    "acl_resolver or _acl_cache is available. "
+                    "Call register_acl() on the store or pass acl_resolver "
+                    "to search()."
+                )
+
         results: list[dict[str, Any]] = []
         for label_val, dist in zip(row_labels, row_dists):
             label_int = int(label_val)
@@ -366,10 +418,30 @@ class HNSWStore:
             # similarity score in [-1, 1] (in practice [0, 1] for normalised
             # text embeddings).
             score = max(0.0, min(1.0, 1.0 - float(dist)))
+
+            # T-572: ACL filter for HNSW results.
+            # _acl_fn is guaranteed non-None when allowed_ids is set — the
+            # setup block above raises RuntimeError if no ACL source exists.
+            if allowed_ids is not None:
+                acl_allow = _acl_fn(discovery_id)  # type: ignore[misc]
+                if not acl_allow or not (set(acl_allow) & allowed_ids):
+                    continue  # not authorized
+
             results.append(
                 {"discovery_id": discovery_id, "score": score, "label": label_int}
             )
         return results
+
+    def register_acl(self, discovery_id: str, acl_allow: list[str]) -> None:
+        """Register ACL metadata for a discovery_id.
+
+        T-572: callers that index documents into the HNSW store should also
+        call register_acl() so that search() can apply ACL filtering.
+        Stored in ``_acl_cache`` dict on the store instance.
+        """
+        if not hasattr(self, "_acl_cache"):
+            self._acl_cache: dict[str, list[str]] = {}
+        self._acl_cache[discovery_id] = list(acl_allow)
 
     # ------------------------------------------------------------------
     # Persistence
