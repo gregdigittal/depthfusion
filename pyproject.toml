@@ -125,6 +125,9 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
 pythonpath = ["src"]
+# tests/integration/ is excluded from the default CI collection — run manually:
+#   python -m pytest tests/integration/test_delta_e2e.py -v
+norecursedirs = ["tests/integration"]
 markers = [
     "integration: marks tests that require live Azure/OIDC credentials (deselect with '-m not integration')",
 ]
