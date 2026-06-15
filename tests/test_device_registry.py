@@ -69,6 +69,28 @@ class TestDeviceRegistry:
         assert result.revoked is False
         assert result.last_sync > 0
 
+    def test_device_record_carries_owner_platform_last_sync(
+        self, tmp_path: Path
+    ) -> None:
+        """S-158 AC-3: device records carry owner principal + platform + last-sync.
+
+        A registered device must persist and return all three of:
+        owner_principal_id, platform, and a positive last_sync timestamp.
+        """
+        registry = make_registry(tmp_path)
+        before = time.time()
+        registry.register("dev-ac3", "principal-owner-ac3", "darwin")
+
+        record = registry.get("dev-ac3")
+        assert record is not None
+        # owner principal
+        assert record.owner_principal_id == "principal-owner-ac3"
+        # platform
+        assert record.platform == "darwin"
+        # last-sync timestamp (recorded at registration)
+        assert record.last_sync >= before
+        assert record.last_sync > 0
+
     def test_get_unknown_returns_none(self, tmp_path: Path) -> None:
         """get returns None for a device_id not in the store."""
         registry = make_registry(tmp_path)

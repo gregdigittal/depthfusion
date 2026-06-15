@@ -2576,21 +2576,21 @@
 **Acceptance criteria:**
 - [x] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
 - [x] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
-- [ ] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
+- [x] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
 - [ ] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
-- [ ] AC-5: Authenticated shell renders Search, Graph, and Dashboard pages with a navigation bar (v2-enterprise UI integrated)
-- [ ] AC-6: App `<title>` in `index.html` reads "DepthFusion" (not "app"); footer dev copy removed
-- [ ] AC-7: A real SVG logo replaces the "DF" text mark in App.tsx and SettingsPage.tsx
+- [x] AC-5: Authenticated shell renders Search, Graph, and Dashboard pages with a navigation bar (v2-enterprise UI integrated)
+- [x] AC-6: App `<title>` in `index.html` reads "DepthFusion" (not "app"); footer dev copy removed
+- [x] AC-7: A real SVG logo replaces the "DF" text mark in App.tsx and SettingsPage.tsx
 
 **Tasks:**
 - [x] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
-- [ ] T-534: Extract `SignInButton` as a standalone component in `app/src/components/SignInButton.tsx`
-- [ ] T-535: Wire `pollAuthState()` into app startup — on mount call `invoke('poll_auth_state')`; if truthy, set `authenticated` state immediately
+- [x] T-534: Extract `SignInButton` as a standalone component in `app/src/components/SignInButton.tsx`
+- [x] T-535: Wire `pollAuthState()` into app startup — on mount call `invoke('poll_auth_state')`; if truthy, set `authenticated` state immediately
 - [ ] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears
-- [ ] T-554: Copy v2-enterprise UI pages into main: `SearchPage.tsx`, `GraphPage.tsx`, `DashboardPage.tsx`, `DocumentViewer.tsx`, `components/FacetPanel.tsx`, `components/GraphCanvas.tsx`, `components/NodeInspector.tsx`, `components/WatermarkOverlay.tsx`, `hooks/useSearch.ts`
-- [ ] T-555: Merge `App.tsx` — combine v2-enterprise routing/navigation (Search/Graph/Dashboard) with main branch auth guard; navigation tabs appear in the authenticated header
-- [ ] T-556: Create `app/src/assets/logo.svg` with DepthFusion geometric SVG mark; use it in App.tsx header (both screens) and SettingsPage.tsx header in place of "DF" text box
-- [ ] T-557: Fix `app/index.html` `<title>` to "DepthFusion"; remove tech-stack footer from authenticated shell in `App.tsx`
+- [x] T-554: Copy v2-enterprise UI pages into main: `SearchPage.tsx`, `GraphPage.tsx`, `DashboardPage.tsx`, `DocumentViewer.tsx`, `components/FacetPanel.tsx`, `components/GraphCanvas.tsx`, `components/NodeInspector.tsx`, `components/WatermarkOverlay.tsx`, `hooks/useSearch.ts`
+- [x] T-555: Merge `App.tsx` — combine v2-enterprise routing/navigation (Search/Graph/Dashboard) with main branch auth guard; navigation tabs appear in the authenticated header
+- [x] T-556: Create `app/src/assets/logo.svg` with DepthFusion geometric SVG mark; use it in App.tsx header (both screens) and SettingsPage.tsx header in place of "DF" text box
+- [x] T-557: Fix `app/index.html` `<title>` to "DepthFusion"; remove tech-stack footer from authenticated shell in `App.tsx`
 
 ### S-154: As a DepthFusion operator, I want the MCP HTTP server to validate per-user JWTs so that only authenticated users can call MCP tools `P0` `L`
 
@@ -2634,7 +2634,7 @@
 - [x] T-546: Write `src/auth/auth.test.ts` covering `startLogin()`, `pollAuthState()`, and `exchangeCodeForToken()` with mocked Tauri invoke
 - [x] T-547: Write `src/auth/jwt.test.ts` covering `validateToken()` with valid, expired, and malformed token fixtures
 - [x] T-548: Write `src/auth/vault.test.ts` covering store/load/clear with mocked `@tauri-apps/plugin-store`
-- [ ] T-549: Add `test` step to CI workflow (`.github/workflows/ci.yml`) that runs `vitest run --coverage`
+- [x] T-549: Add `test` step to CI workflow (`.github/workflows/ci.yml`) that runs `vitest run --coverage`
 
 ### S-157: As a DepthFusion maintainer, I want CI to run on pushes and PRs to main so that every change to the primary branch is validated `P1` `XS`
 
@@ -2679,10 +2679,10 @@
 ### S-156: As a team member, I want to authenticate via Entra ID (OIDC + PKCE) so that my DepthFusion identity matches my corporate identity `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Authorization-code + PKCE flow implemented; tokens validated (issuer, audience, signature via JWKS, expiry, nonce)
-- [ ] AC-2: Device-code flow available for headless CLI/VPS sessions
-- [ ] AC-3: Group claims extracted and persisted to the principal record on each login
-- [ ] AC-4: Refresh handled server-side; access tokens never written to disk unencrypted
+- [x] AC-1: Authorization-code + PKCE flow implemented; tokens validated (issuer, audience, signature via JWKS, expiry, nonce)
+- [x] AC-2: Device-code flow available for headless CLI/VPS sessions
+- [x] AC-3: Group claims extracted and persisted to the principal record on each login
+- [x] AC-4: Refresh handled server-side; access tokens never written to disk unencrypted
 
 **Tasks:**
 - [x] T-544: Add `src/depthfusion/identity/` package: OIDC client, JWKS cache, token validator — Opus dev, DS+GM rev
@@ -2694,10 +2694,10 @@
 ### S-157: As the API server, I want auth middleware on every route so that no endpoint serves data without a verified principal `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: FastAPI dependency injects `Principal` into all routes in `rest.py`, `events.py`, `query.py`, MCP HTTP server
-- [ ] AC-2: Legacy `DEPTHFUSION_API_TOKEN` accepted only when `DEPTHFUSION_V2_LEGACY_AUTH=1`, mapped to a flagged legacy principal, logs deprecation warning
-- [ ] AC-3: Loopback-without-auth removed for any route that can return record content
-- [ ] AC-4: 100% route coverage verified by an automated route-walker test
+- [x] AC-1: FastAPI dependency injects `Principal` into all routes in `rest.py`, `events.py`, `query.py`, MCP HTTP server
+- [x] AC-2: Legacy `DEPTHFUSION_API_TOKEN` accepted only when `DEPTHFUSION_V2_LEGACY_AUTH=1`, mapped to a flagged legacy principal, logs deprecation warning
+- [x] AC-3: Loopback-without-auth removed for any route that can return record content
+- [x] AC-4: 100% route coverage verified by an automated route-walker test
 
 **Tasks:**
 - [x] T-549: `require_principal` dependency + error envelope — Opus dev, DS+GM rev
@@ -2708,9 +2708,9 @@
 ### S-158: As an instance (VPS, laptop, Mac/MLX), I want a service identity so that machine-to-machine sync is authenticated and revocable per device `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Each instance enrolls once (device-code flow) and receives a device-bound credential stored in OS keychain
-- [ ] AC-2: Admin can list and revoke device credentials; revoked devices fail sync within one lease period
-- [ ] AC-3: Device records carry owner principal + platform + last-sync timestamp
+- [x] AC-1: Each instance enrolls once (device-code flow) and receives a device-bound credential stored in OS keychain
+- [x] AC-2: Admin can list and revoke device credentials; revoked devices fail sync within one lease period
+- [x] AC-3: Device records carry owner principal + platform + last-sync timestamp
 
 **Tasks:**
 - [x] T-553: Device enrollment + keychain storage (macOS Keychain, Windows DPAPI, Linux secret-service) — Opus dev, DS rev

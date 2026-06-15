@@ -126,6 +126,44 @@ def test_upsert_updates_groups_on_duplicate(tmp_path):
     assert result.groups == ["new-group-x", "new-group-y"]
 
 
+def test_access_tokens_never_written_to_disk(tmp_path):
+    """S-156 AC-4: access/id tokens are never persisted to disk unencrypted.
+
+    Builds a principal carrying secret token material, upserts it, then scans
+    the raw bytes of the SQLite database file to prove no token string ever
+    lands on disk. ``upsert_principal`` stores only the non-secret identity
+    fields (principal_id, upn, display_name, groups, last_seen).
+    """
+    db_path = tmp_path / "identity.db"
+    store = PrincipalStore(db_path=db_path)
+
+    secret_access = "SECRET-ACCESS-TOKEN-do-not-persist-abc123"
+    secret_id = "SECRET-ID-TOKEN-do-not-persist-xyz789"
+    p = Principal(
+        principal_id="sub-secret",
+        upn="user@example.com",
+        display_name="Test User",
+        groups=["group-a"],
+        access_token=secret_access,
+        id_token=secret_id,
+        expires_at=time.time() + 3600,
+    )
+    store.upsert_principal(p)
+
+    # Read the entire database file as bytes and assert neither token appears.
+    raw = db_path.read_bytes()
+    assert secret_access.encode() not in raw
+    assert secret_id.encode() not in raw
+
+    # The non-secret identity fields ARE persisted and round-trip cleanly,
+    # with token fields absent on read.
+    stored = store.get_principal("sub-secret")
+    assert stored is not None
+    assert stored.access_token is None
+    assert stored.id_token is None
+    assert stored.groups == ["group-a"]
+
+
 def test_thread_safety(tmp_path):
     """10 threads calling upsert_principal concurrently must not raise."""
     store = PrincipalStore(db_path=tmp_path / "identity.db")
