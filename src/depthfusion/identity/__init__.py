@@ -17,6 +17,7 @@ from .errors import (
     TokenExpiredError,
     TokenInvalidError,
 )
+from .fastapi_deps import PrincipalDep, make_require_principal, require_principal
 from .jwks_cache import JwksCache
 from .models import DeviceCodeResult, Principal
 from .oidc_client import OidcClient
@@ -32,6 +33,10 @@ __all__ = [
     "TokenValidator",
     "OidcClient",
     "PrincipalStore",
+    # fastapi deps
+    "PrincipalDep",
+    "make_require_principal",
+    "require_principal",
     # errors
     "IdentityError",
     "TokenExpiredError",

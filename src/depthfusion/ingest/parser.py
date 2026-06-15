@@ -6,6 +6,11 @@ Supports:
   - ``.txt``  — plain text UTF-8
   - ``.md``   — Markdown (treated as plain text)
 
+Parse budget (T-599):
+  Set ``DEPTHFUSION_PARSE_MAX_BYTES`` to a byte-count limit.  Documents
+  exceeding the limit are quarantined instead of parsed.  The default is
+  ``10 * 1024 * 1024`` (10 MiB).  Set to ``0`` to disable (no limit).
+
 Usage::
 
     from depthfusion.ingest.parser import DocumentParser
@@ -17,10 +22,32 @@ Usage::
 from __future__ import annotations
 
 import io
+import os
 import pathlib
 import re
 
 from depthfusion.ingest.models import ParsedDocument
+
+# ---------------------------------------------------------------------------
+# Parse-budget helpers (T-599)
+# ---------------------------------------------------------------------------
+
+#: Default parse-budget: 10 MiB.  Callers may override via env or constructor.
+_DEFAULT_PARSE_MAX_BYTES: int = 10 * 1024 * 1024
+
+
+def _get_parse_max_bytes() -> int:
+    """Return the active parse budget from env or the built-in default.
+
+    ``DEPTHFUSION_PARSE_MAX_BYTES=0`` disables the budget (no limit).
+    """
+    raw = os.environ.get("DEPTHFUSION_PARSE_MAX_BYTES", "")
+    if raw.strip():
+        try:
+            return int(raw.strip())
+        except ValueError:
+            pass
+    return _DEFAULT_PARSE_MAX_BYTES
 
 # Sentinel for optional imports — only loaded if the caller actually uses
 # that format so the package stays importable even without python-docx /
@@ -61,15 +88,28 @@ class DocumentParser:
         default_acl_allow:   Default ACL principal list applied when the
                              source connector does not supply one.
         default_classification: Default classification label.
+        max_bytes:           Parse budget in bytes.  Documents larger than
+                             this threshold are quarantined instead of parsed.
+                             ``None`` (default) reads from the environment
+                             variable ``DEPTHFUSION_PARSE_MAX_BYTES``.
+                             ``0`` disables the budget entirely.
+        quarantine_store:    :class:`~depthfusion.parsers.documents.base.QuarantineStore`
+                             instance to receive oversized documents.  ``None``
+                             uses the module-level default store from
+                             :mod:`depthfusion.parsers.documents.base`.
     """
 
     def __init__(
         self,
         default_acl_allow: list[str] | None = None,
         default_classification: str = "internal",
+        max_bytes: int | None = None,
+        quarantine_store=None,  # QuarantineStore | None — imported lazily
     ) -> None:
         self._default_acl = default_acl_allow or []
         self._default_classification = default_classification
+        self._max_bytes: int = max_bytes if max_bytes is not None else _get_parse_max_bytes()
+        self._quarantine_store = quarantine_store  # resolved lazily if None
 
     # ------------------------------------------------------------------
     # Public API
@@ -111,6 +151,29 @@ class DocumentParser:
             )
 
         raw_bytes = p.read_bytes()
+
+        # T-599 — parse-budget enforcement
+        if self._max_bytes > 0 and len(raw_bytes) > self._max_bytes:
+            import datetime
+
+            from depthfusion.parsers.documents.base import (
+                QuarantineEntry,
+                get_quarantine_store,
+            )
+
+            store = self._quarantine_store or get_quarantine_store()
+            reason = (
+                f"Document size {len(raw_bytes):,} bytes exceeds parse budget "
+                f"{self._max_bytes:,} bytes"
+            )
+            entry = QuarantineEntry(
+                source_id=str(p.resolve()),
+                error_message=reason,
+                timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                raw_size_bytes=len(raw_bytes),
+            )
+            store.add(entry)
+            raise ValueError(reason)
 
         if resolved_mime in (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
