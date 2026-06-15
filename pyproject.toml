@@ -111,6 +111,9 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
 pythonpath = ["src"]
+markers = [
+    "integration: marks tests that require live Azure/OIDC credentials (deselect with '-m not integration')",
+]
 
 [tool.mypy]
 python_version = "3.10"
