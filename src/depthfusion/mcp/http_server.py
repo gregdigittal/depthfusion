@@ -90,12 +90,19 @@ def get_mcp_bind_host() -> str:
 
 
 def validate_mcp_public_bind() -> None:
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1" and not os.getenv(
-        "DEPTHFUSION_MCP_TOKEN", ""
-    ) and not os.getenv("DEPTHFUSION_JWKS_URI", ""):
+    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") != "1":
+        return
+    has_static = bool(os.getenv("DEPTHFUSION_MCP_TOKEN", ""))
+    # OIDC requires ALL THREE vars — a partial set leaves validator=None at runtime
+    has_oidc = all(
+        os.getenv(k)
+        for k in ("DEPTHFUSION_JWKS_URI", "DEPTHFUSION_OIDC_ISSUER", "DEPTHFUSION_OIDC_AUDIENCE")
+    )
+    if not (has_static or has_oidc):
         raise ValueError(
-            "Either DEPTHFUSION_MCP_TOKEN or DEPTHFUSION_JWKS_URI must be set "
-            "when DEPTHFUSION_MCP_PUBLIC=1. "
+            "DEPTHFUSION_MCP_PUBLIC=1 requires either DEPTHFUSION_MCP_TOKEN or "
+            "all three OIDC vars (DEPTHFUSION_JWKS_URI, DEPTHFUSION_OIDC_ISSUER, "
+            "DEPTHFUSION_OIDC_AUDIENCE). "
             "Public bind without bearer token authentication is forbidden."
         )
 
@@ -138,7 +145,13 @@ async def _check_mcp_auth(
 
     # Static bearer token fallback
     static_token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
-    if static_token and raw_token != static_token:
+    if static_token:
+        if raw_token != static_token:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return
+
+    # No auth backend configured — fail closed on public bind, pass on loopback
+    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
