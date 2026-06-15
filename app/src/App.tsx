@@ -1,21 +1,90 @@
 import { useEffect, useState } from 'react'
 import { getAppInfo, type AppInfo } from './lib/ipc'
 import { SettingsPage } from './SettingsPage'
+import {
+  getAuthState,
+  onAuthStateChange,
+  startLogin,
+  logout,
+  type AuthState,
+} from './lib/auth'
 
 type Route = 'home' | 'settings'
 
 function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [route, setRoute] = useState<Route>('home')
+  const [authState, setAuthState] = useState<AuthState>(getAuthState)
+  const [signingIn, setSigningIn] = useState(false)
 
   useEffect(() => {
     getAppInfo().then(setAppInfo).catch(console.error)
   }, [])
 
+  // Subscribe to auth state transitions (deep-link callback drives this)
+  useEffect(() => {
+    return onAuthStateChange(setAuthState)
+  }, [])
+
+  async function handleSignIn() {
+    setSigningIn(true)
+    try {
+      await startLogin()
+      // State is driven by deep-link → onAuthStateChange; no need to poll here
+    } catch {
+      // error state is set by startLogin() → setState internally
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  async function handleSignOut() {
+    await logout(() => setRoute('home'))
+  }
+
   if (route === 'settings') {
     return <SettingsPage onBack={() => setRoute('home')} />
   }
 
+  // ── Unauthenticated shell ────────────────────────────────────────────────
+  if (authState.status !== 'authenticated') {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-6 px-6">
+        <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center font-bold text-white text-2xl">
+          DF
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight">DepthFusion</h1>
+        <p className="text-gray-400 text-sm text-center max-w-xs">
+          AI-powered context retrieval and knowledge management.
+          Sign in with your identity provider to continue.
+        </p>
+
+        {authState.status === 'error' && (
+          <p className="text-red-400 text-sm" role="alert">
+            {authState.error ?? 'Authentication failed. Please try again.'}
+          </p>
+        )}
+
+        <button
+          onClick={handleSignIn}
+          disabled={signingIn || authState.status === 'pending'}
+          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+        >
+          {signingIn || authState.status === 'pending'
+            ? 'Opening browser…'
+            : 'Sign in'}
+        </button>
+
+        {appInfo && (
+          <span className="text-xs text-gray-600 absolute bottom-4">
+            v{appInfo.version}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // ── Authenticated shell ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
@@ -35,6 +104,12 @@ function App() {
         >
           ⚙
         </button>
+        <button
+          onClick={handleSignOut}
+          className="text-xs text-gray-500 hover:text-gray-300 transition-colors ml-1"
+        >
+          Sign out
+        </button>
       </header>
 
       {/* Main content */}
@@ -51,7 +126,7 @@ function App() {
 
       {/* Footer */}
       <footer className="border-t border-gray-800 px-6 py-3 text-xs text-gray-600 text-center">
-        DepthFusion — Tauri 2 + React + Tailwind CSS scaffold (S-180)
+        DepthFusion — Tauri 2 + React + Tailwind CSS
       </footer>
     </div>
   )

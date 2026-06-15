@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DepthFusion",
-  "version": "0.1.0",
+  "version": "1.2.2",
   "identifier": "com.depthfusion.app",
   "build": {
     "frontendDist": "../dist",
@@ -46,7 +46,7 @@
       }
     },
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
         "https://releases.depthfusion.app/{{target}}/{{arch}}/{{current_version}}"
       ],

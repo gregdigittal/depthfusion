@@ -237,7 +237,7 @@ def _process_request(request: dict, config: Any) -> dict:
         result = {
             "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "depthfusion", "version": "0.4.0"},
+            "serverInfo": {"name": "depthfusion", "version": "1.2.2"},
         }
     elif method == "tools/list":
         result = _handle_tools_list(config)

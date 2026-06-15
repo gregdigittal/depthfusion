@@ -8,9 +8,11 @@ Transport: two-endpoint SSE pattern (MCP spec 2025-03-26)
 
 Security:
   - Default bind: 127.0.0.1:7301 (loopback)
-  - DEPTHFUSION_MCP_PUBLIC=1 → binds 0.0.0.0 (requires DEPTHFUSION_MCP_TOKEN)
-  - Bearer token validated on every /sse and /messages request
-  - startup raises ValueError if public bind requested without token
+  - DEPTHFUSION_MCP_PUBLIC=1 → binds 0.0.0.0 (requires token auth)
+  - JWT validation: JWKS-backed RS256 when DEPTHFUSION_JWKS_URI is set.
+    Falls back to static bearer token (DEPTHFUSION_MCP_TOKEN) for loopback-only
+    dev deployments without an OIDC provider.
+  - startup raises ValueError if public bind is requested without token auth.
 """
 from __future__ import annotations
 
@@ -29,6 +31,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from depthfusion.core.config import DepthFusionConfig
+from depthfusion.identity.errors import IdentityError, JwksFetchError, TokenExpiredError
+from depthfusion.identity.jwks_cache import JwksCache
+from depthfusion.identity.token_validator import TokenValidator
 from depthfusion.mcp.server import _process_request
 
 logger = logging.getLogger(__name__)
@@ -39,9 +44,43 @@ _MCP_SESSIONS: dict[str, asyncio.Queue] = {}
 
 _PING_INTERVAL = 30.0
 
+# ---------------------------------------------------------------------------
+# JWKS-backed JWT validator — initialised lazily on first auth call.
+# A single instance is shared across all requests; JwksCache is concurrency-safe.
+# ---------------------------------------------------------------------------
+
+_token_validator: Optional[TokenValidator] = None
+
+
+def _get_token_validator() -> Optional[TokenValidator]:
+    """Return a JWT validator if OIDC env vars are fully configured, else None."""
+    global _token_validator
+    if _token_validator is not None:
+        return _token_validator
+
+    jwks_uri = os.getenv("DEPTHFUSION_JWKS_URI", "")
+    issuer = os.getenv("DEPTHFUSION_OIDC_ISSUER", "")
+    audience = os.getenv("DEPTHFUSION_OIDC_AUDIENCE", "")
+
+    if jwks_uri and issuer and audience:
+        cache = JwksCache(jwks_uri=jwks_uri)
+        _token_validator = TokenValidator(
+            jwks_cache=cache,
+            expected_issuer=issuer,
+            expected_audience=audience,
+        )
+        logger.info("MCP auth: JWKS JWT validation active (issuer=%s)", issuer)
+    else:
+        logger.warning(
+            "MCP auth: DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE not set; "
+            "falling back to static bearer token."
+        )
+
+    return _token_validator
+
 
 # ---------------------------------------------------------------------------
-# Auth + binding helpers (mirrors api/rest.py pattern exactly)
+# Binding helpers
 # ---------------------------------------------------------------------------
 
 def get_mcp_bind_host() -> str:
@@ -53,18 +92,61 @@ def get_mcp_bind_host() -> str:
 def validate_mcp_public_bind() -> None:
     if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1" and not os.getenv(
         "DEPTHFUSION_MCP_TOKEN", ""
-    ):
+    ) and not os.getenv("DEPTHFUSION_JWKS_URI", ""):
         raise ValueError(
-            "DEPTHFUSION_MCP_TOKEN must be set when DEPTHFUSION_MCP_PUBLIC=1. "
+            "Either DEPTHFUSION_MCP_TOKEN or DEPTHFUSION_JWKS_URI must be set "
+            "when DEPTHFUSION_MCP_PUBLIC=1. "
             "Public bind without bearer token authentication is forbidden."
         )
 
 
-def _check_mcp_auth(authorization: Optional[str] = Header(default=None)) -> None:
-    token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1" and token:
-        if authorization != f"Bearer {token}":
-            raise HTTPException(status_code=401, detail="Unauthorized")
+# ---------------------------------------------------------------------------
+# Auth dependency — always enforced on /sse and /messages
+# ---------------------------------------------------------------------------
+
+async def _check_mcp_auth(
+    authorization: Optional[str] = Header(default=None),
+) -> None:
+    """Validate Bearer token on every authenticated endpoint.
+
+    Validation order:
+      1. JWKS JWT validation when DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE
+         are all set — full RS256 signature + claim checks via identity module.
+      2. Static bearer token comparison (DEPTHFUSION_MCP_TOKEN) — dev/loopback
+         fallback when no OIDC provider is configured.
+      3. Loopback-only, no token configured → pass (127.0.0.1 bind is the guard).
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        _raise_if_auth_required(authorization)
+        return
+
+    raw_token = authorization[len("Bearer "):]
+
+    validator = _get_token_validator()
+
+    if validator is not None:
+        # Full JWT validation path
+        try:
+            await validator.validate(raw_token)
+        except TokenExpiredError as exc:
+            raise HTTPException(status_code=401, detail=f"Token expired: {exc}") from exc
+        except JwksFetchError as exc:
+            raise HTTPException(status_code=503, detail=f"Auth service unavailable: {exc}") from exc
+        except IdentityError as exc:
+            raise HTTPException(status_code=401, detail=f"Unauthorized: {exc}") from exc
+        return
+
+    # Static bearer token fallback
+    static_token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
+    if static_token and raw_token != static_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _raise_if_auth_required(authorization: Optional[str]) -> None:
+    """Reject unauthenticated requests on public-bind servers."""
+    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    # Loopback-only with no token configured: allow (bind address is the guard)
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +226,12 @@ def main() -> None:
     """Start the MCP HTTP/SSE server.
 
     Reads all configuration from environment variables. Raises ValueError at
-    startup if DEPTHFUSION_MCP_PUBLIC=1 without DEPTHFUSION_MCP_TOKEN.
+    startup if DEPTHFUSION_MCP_PUBLIC=1 without any auth configuration.
     """
     validate_mcp_public_bind()
+
+    # Initialise the validator at startup so config errors surface immediately
+    _get_token_validator()
 
     host = get_mcp_bind_host()
     port = int(os.getenv("DEPTHFUSION_MCP_PORT", "7301"))

@@ -216,7 +216,7 @@ in the HTML plan before BACKLOG.md transcription (§7 below). Executor: Haiku.
 |---|---|---|---|---|
 | A | E-49 identity (OIDC/JWKS/device-code) | **Opus 4.8** for T-544/549/553; Codex 5.5 for the rest | DS+GM dual on Opus tickets; DS on Codex tickets | Adjudicates D-1 (IdP scope) **before** lane start |
 | B | E-53 parsers (docx/xlsx/pptx/PDF/OCR) | Codex 5.5 (perfect fit — well-specified, pattern-following: mirrors existing `parsers/` protocol at `src/depthfusion/parsers/base.py`) | DS | None expected |
-| C | E-56 Tauri shell | Codex 5.5; **Opus 4.8 for T-628/T-630** (IPC hardening, token vault) | GM (frontend), DS+GM (Rust security) | Adjudicates D-3 (already decided: Tauri) · **T-628 ✓ 2026-06-14** (typed IPC + CSP, compiled on VPS) |
+| C | E-56 Tauri shell | Codex 5.5; **Opus 4.8 for T-628/T-630** (IPC hardening, token vault) | GM (frontend), DS+GM (Rust security) | Adjudicates D-3 (already decided: Tauri) · **T-628 ✓ 2026-06-14** (typed IPC + CSP, compiled on VPS) · **T-630 ✓ 2026-06-14** (vault expiry + 19 unit tests, READY_TO_MERGE) |
 | D | E-52 sync design docs (T-581/T-582) | **Opus 4.8** (design doc, not code — one shot, high leverage) | DS+GM | **Moved earlier:** design doc starts in Phase 0, parallel to E-48 (see §7, bottleneck fix) |
 
 Each lane = one `v2-lane-batch` workflow run in the background. Fable-5 monitors
