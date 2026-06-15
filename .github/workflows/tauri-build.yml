@@ -3,13 +3,12 @@ name: Tauri Build Matrix
 on:
   push:
     branches:
-      - v2/lane-c-ui
-      - v2-enterprise
+      - main
     paths:
       - "app/**"
   pull_request:
     branches:
-      - v2-enterprise
+      - main
     paths:
       - "app/**"
 

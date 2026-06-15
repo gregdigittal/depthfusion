@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - v2-enterprise
-      - "v2/lane-*"
     paths:
       - "src/**"
       - "tests/**"
@@ -14,7 +12,6 @@ on:
   pull_request:
     branches:
       - main
-      - v2-enterprise
     paths:
       - "src/**"
       - "tests/**"
