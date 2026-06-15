@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-06-14
+> Last updated: 2026-06-15
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2574,13 +2574,13 @@
 ### S-153: As a DepthFusion user, I want a working "Sign In" UI in the desktop app so that I can authenticate with my Entra identity without touching a terminal `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
+- [x] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
 - [ ] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
 - [ ] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
 - [ ] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
 
 **Tasks:**
-- [ ] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
+- [x] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
 - [ ] T-534: Implement `SignInButton` component that calls `startLogin()` and shows a loading spinner while `pollAuthState()` is running
 - [ ] T-535: Wire `pollAuthState()` into Tauri's `app:ready` lifecycle hook so token detection happens on startup
 - [ ] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears
@@ -2588,80 +2588,80 @@
 ### S-154: As a DepthFusion operator, I want the MCP HTTP server to validate per-user JWTs so that only authenticated users can call MCP tools `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: The `identity/` module (`token_validator.py`, `jwks_cache.py`, `principal_store.py`) is imported and wired into the MCP HTTP server request pipeline
-- [ ] AC-2: Every MCP tool call requires a valid Bearer JWT signed by the configured Entra tenant; calls without a valid token return HTTP 401
-- [ ] AC-3: `DEPTHFUSION_MCP_PUBLIC` bypass guard is removed — there is no unauthenticated access path in production
-- [ ] AC-4: JWKS keys are cached per `jwks_cache.py` with TTL; cache is refreshed on 401 from JWKS endpoint
-- [ ] AC-5: `principal_store.py` records the authenticated principal for each request; principal is available to tool handlers for per-user context
+- [x] AC-1: The `identity/` module (`token_validator.py`, `jwks_cache.py`, `principal_store.py`) is imported and wired into the MCP HTTP server request pipeline
+- [x] AC-2: Every MCP tool call requires a valid Bearer JWT signed by the configured Entra tenant; calls without a valid token return HTTP 401
+- [x] AC-3: `DEPTHFUSION_MCP_PUBLIC` bypass guard is removed — there is no unauthenticated access path in production
+- [x] AC-4: JWKS keys are cached per `jwks_cache.py` with TTL; cache is refreshed on 401 from JWKS endpoint
+- [x] AC-5: `principal_store.py` records the authenticated principal for each request; principal is available to tool handlers for per-user context
 
 **Tasks:**
-- [ ] T-537: Import `token_validator`, `jwks_cache`, `principal_store` from `identity/` into `server.py`
-- [ ] T-538: Add JWT validation middleware to the MCP HTTP server — intercept all requests, validate Bearer token, set principal on request context
-- [ ] T-539: Remove `DEPTHFUSION_MCP_PUBLIC` environment variable guard and all code paths that skip auth
-- [ ] T-540: Write integration test: send request with valid JWT → 200 OK; send without token → 401; send with expired token → 401
-- [ ] T-541: Update `docs/deployment.md` and `docs/auth-setup.md` to remove any reference to `DEPTHFUSION_MCP_PUBLIC`
+- [x] T-537: Import `token_validator`, `jwks_cache`, `principal_store` from `identity/` into `server.py`
+- [x] T-538: Add JWT validation middleware to the MCP HTTP server — intercept all requests, validate Bearer token, set principal on request context
+- [x] T-539: Remove `DEPTHFUSION_MCP_PUBLIC` environment variable guard and all code paths that skip auth
+- [x] T-540: Write integration test: send request with valid JWT → 200 OK; send without token → 401; send with expired token → 401
+- [x] T-541: Update `docs/deployment.md` and `docs/auth-setup.md` to remove any reference to `DEPTHFUSION_MCP_PUBLIC`
 
 ### S-155: As a DepthFusion maintainer, I want version metadata consistent across all config files so that installers, update checks, and release artifacts agree on the version `P2` `XS`
 
 **Acceptance criteria:**
-- [ ] AC-1: `tauri.conf.json` `version` field reads `1.2.2` (was `0.1.0`)
-- [ ] AC-2: `package.json` `version` field reads `1.2.2` (was `0.0.0`)
-- [ ] AC-3: `server.py` MCP `serverInfo.version` reads `1.2.2` (was `0.4.0`)
-- [ ] AC-4: Tauri auto-updater is disabled for v2.0 — `tauri.conf.json` `updater.active` is `false`
+- [x] AC-1: `tauri.conf.json` `version` field reads `1.2.2` (was `0.1.0`)
+- [x] AC-2: `package.json` `version` field reads `1.2.2` (was `0.0.0`)
+- [x] AC-3: `server.py` MCP `serverInfo.version` reads `1.2.2` (was `0.4.0`)
+- [x] AC-4: Tauri auto-updater is disabled for v2.0 — `tauri.conf.json` `updater.active` is `false`
 
 **Tasks:**
-- [ ] T-542: Update `src-tauri/tauri.conf.json`: set `version` to `1.2.2` and `updater.active` to `false`
-- [ ] T-543: Update `package.json`: set `version` to `1.2.2`
-- [ ] T-544: Update `server.py` `serverInfo.version` to `1.2.2`
+- [x] T-542: Update `src-tauri/tauri.conf.json`: set `version` to `1.2.2` and `updater.active` to `false`
+- [x] T-543: Update `package.json`: set `version` to `1.2.2`
+- [x] T-544: Update `server.py` `serverInfo.version` to `1.2.2`
 
 ### S-156: As a DepthFusion contributor, I want Vitest unit tests for the auth/credential modules so that regressions in token handling and vault storage are caught in CI `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `src/auth/auth.ts` is covered by Vitest tests: `startLogin()` builds correct PKCE URL and stores state; `pollAuthState()` detects token presence and returns correct auth state
-- [ ] AC-2: `src/auth/jwt.ts` is covered: `validateToken()` returns valid principal for a well-formed JWT; returns null for expired/invalid; handles missing `kid`
-- [ ] AC-3: `src/auth/vault.ts` is covered: `storeToken()` persists token; `loadToken()` retrieves it; `clearToken()` removes it; all via mocked Tauri store
-- [ ] AC-4: Tests run in CI on every push/PR and must pass before merge
+- [x] AC-1: `src/auth/auth.ts` is covered by Vitest tests: `startLogin()` builds correct PKCE URL and stores state; `pollAuthState()` detects token presence and returns correct auth state
+- [x] AC-2: `src/auth/jwt.ts` is covered: `validateToken()` returns valid principal for a well-formed JWT; returns null for expired/invalid; handles missing `kid`
+- [x] AC-3: `src/auth/vault.ts` is covered: `storeToken()` persists token; `loadToken()` retrieves it; `clearToken()` removes it; all via mocked Tauri store
+- [x] AC-4: Tests run in CI on every push/PR and must pass before merge
 
 **Tasks:**
-- [ ] T-545: Set up Vitest config for the `src/` tree if not already present (`vitest.config.ts`, `@vitest/coverage-v8`)
-- [ ] T-546: Write `src/auth/auth.test.ts` covering `startLogin()`, `pollAuthState()`, and `exchangeCodeForToken()` with mocked Tauri invoke
-- [ ] T-547: Write `src/auth/jwt.test.ts` covering `validateToken()` with valid, expired, and malformed token fixtures
-- [ ] T-548: Write `src/auth/vault.test.ts` covering store/load/clear with mocked `@tauri-apps/plugin-store`
+- [x] T-545: Set up Vitest config for the `src/` tree if not already present (`vitest.config.ts`, `@vitest/coverage-v8`)
+- [x] T-546: Write `src/auth/auth.test.ts` covering `startLogin()`, `pollAuthState()`, and `exchangeCodeForToken()` with mocked Tauri invoke
+- [x] T-547: Write `src/auth/jwt.test.ts` covering `validateToken()` with valid, expired, and malformed token fixtures
+- [x] T-548: Write `src/auth/vault.test.ts` covering store/load/clear with mocked `@tauri-apps/plugin-store`
 - [ ] T-549: Add `test` step to CI workflow (`.github/workflows/ci.yml`) that runs `vitest run --coverage`
 
 ### S-157: As a DepthFusion maintainer, I want CI to run on pushes and PRs to main so that every change to the primary branch is validated `P1` `XS`
 
 **Acceptance criteria:**
-- [ ] AC-1: `.github/workflows/ci.yml` `on:` block includes `push: branches: [main]` and `pull_request: branches: [main]`
+- [x] AC-1: `.github/workflows/ci.yml` `on:` block includes `push: branches: [main]` and `pull_request: branches: [main]`
 - [ ] AC-2: CI passes on a test push to main after this change
 
 **Tasks:**
-- [ ] T-550: Edit `.github/workflows/ci.yml` to add `main` branch to `push` and `pull_request` triggers
+- [x] T-550: Edit `.github/workflows/ci.yml` to add `main` branch to `push` and `pull_request` triggers
 
 ### S-158: As a new contributor, I want T-628 setup artifacts located in `docs/` so that the repo root is clean and onboarding docs are discoverable alongside other documentation `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `T-628-instructions.md`, `T-628-setup-guide.md`, and `T-628-setup-guide.html` are moved from the repo root into `docs/setup/`
-- [ ] AC-2: Any internal cross-references between these files are updated to reflect the new paths
-- [ ] AC-3: `docs/setup/README.md` (or `docs/README.md`) links to the setup guide so it is discoverable
-- [ ] AC-4: Root `.gitignore` or repo root has no leftover stubs from the old paths
+- [x] AC-1: `T-628-instructions.md`, `T-628-setup-guide.md`, and `T-628-setup-guide.html` are moved from the repo root into `docs/setup/`
+- [x] AC-2: Any internal cross-references between these files are updated to reflect the new paths
+- [x] AC-3: `docs/setup/README.md` (or `docs/README.md`) links to the setup guide so it is discoverable
+- [x] AC-4: Root `.gitignore` or repo root has no leftover stubs from the old paths
 
 **Tasks:**
-- [ ] T-551: Create `docs/setup/` directory and move `T-628-instructions.md`, `T-628-setup-guide.md`, `T-628-setup-guide.html` into it
-- [ ] T-552: Update any cross-links within the moved files; add `docs/setup/` entry to `docs/README.md` (create if absent)
-- [ ] T-553: Verify repo root is clean; commit with message `docs: move T-628 setup artifacts into docs/setup/`
+- [x] T-551: Create `docs/setup/` directory and move `T-628-instructions.md`, `T-628-setup-guide.md`, `T-628-setup-guide.html` into it
+- [x] T-552: Update any cross-links within the moved files; add `docs/setup/` entry to `docs/README.md` (create if absent)
+- [x] T-553: Verify repo root is clean; commit with message `docs: move T-628 setup artifacts into docs/setup/`
 
 ### S-159: As a DepthFusion operator, I want an E2E smoke test that verifies authenticated MCP tool calls work after the OIDC/JWT wiring lands so that the auth integration is validated in a real runtime `P1` `M`
 
 > **Backlog-only story — depends on S-153 and S-154 landing first. Do not start until both are marked [x].**
 
 **Acceptance criteria:**
-- [ ] AC-1: Smoke test authenticates with a test Entra principal (service principal or test user), obtains a JWT, and calls at least one MCP tool via the HTTP server
-- [ ] AC-2: Test asserts HTTP 200 with a valid tool response for an authenticated call
-- [ ] AC-3: Test asserts HTTP 401 for a call with no Bearer token
-- [ ] AC-4: Test is runnable locally with `pytest tests/integration/test_oidc_e2e.py` and in CI (behind a `[integration]` marker so it can be opted in)
+- [x] AC-1: Smoke test authenticates with a test Entra principal (service principal or test user), obtains a JWT, and calls at least one MCP tool via the HTTP server
+- [x] AC-2: Test asserts HTTP 200 with a valid tool response for an authenticated call
+- [x] AC-3: Test asserts HTTP 401 for a call with no Bearer token
+- [x] AC-4: Test is runnable locally with `pytest tests/integration/test_oidc_e2e.py` and in CI (behind a `[integration]` marker so it can be opted in)
 
 **Tasks:**
-- [ ] T-554: Write `tests/integration/test_oidc_e2e.py` using a test service principal — obtain JWT via client-credentials flow, call `depthfusion_status` tool, assert 200
-- [ ] T-555: Add unauthenticated negative test case (no Bearer header → assert 401)
-- [ ] T-556: Wire `[integration]` pytest marker and document how to run locally with `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID` env vars
+- [x] T-554: Write `tests/integration/test_oidc_e2e.py` using a test service principal — obtain JWT via client-credentials flow, call `depthfusion_status` tool, assert 200
+- [x] T-555: Add unauthenticated negative test case (no Bearer header → assert 401)
+- [x] T-556: Wire `[integration]` pytest marker and document how to run locally with `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID` env vars
