@@ -25,16 +25,22 @@ export PATH="$HOME/printing-press/library/depthfusion/build/stage/bin:$PATH"
 
 ## Auth
 
-DepthFusion runs loopback-only by default — no auth needed for local use.
+The MCP HTTP server is **fail-closed**: every request to `/sse` and `/messages`
+requires a valid Bearer token.  Set `DEPTHFUSION_MCP_TOKEN` on the server and
+export the same value as `DEPTHFUSION_API_KEY` in your client environment.
 
 ```bash
-# Loopback (default) — no key required:
-depthfusion-pp-cli status
+# Set the token on the server side (in ~/.claude/depthfusion.env):
+#   DEPTHFUSION_MCP_TOKEN=<your-secret-token>
 
-# If the server is running with DEPTHFUSION_MCP_PUBLIC=1:
+# On the client — export the matching token:
 export DEPTHFUSION_API_KEY="<value-of-DEPTHFUSION_MCP_TOKEN-on-server>"
 depthfusion-pp-cli doctor   # confirm auth OK
 ```
+
+The bind host is controlled by `DEPTHFUSION_MCP_HOST` (default `127.0.0.1`).
+Set it to `0.0.0.0` when you need remote access (ensure a firewall rule is in
+place and `DEPTHFUSION_MCP_TOKEN` is configured).
 
 Config file: `~/.config/depthfusion-pp-cli/config.toml`
 

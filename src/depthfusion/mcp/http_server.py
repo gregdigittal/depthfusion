@@ -7,12 +7,17 @@ Transport: two-endpoint SSE pattern (MCP spec 2025-03-26)
   GET  /health          → unauthenticated health probe
 
 Security:
-  - Default bind: 127.0.0.1:7301 (loopback)
-  - DEPTHFUSION_MCP_PUBLIC=1 → binds 0.0.0.0 (requires token auth)
-  - JWT validation: JWKS-backed RS256 when DEPTHFUSION_JWKS_URI is set.
-    Falls back to static bearer token (DEPTHFUSION_MCP_TOKEN) for loopback-only
-    dev deployments without an OIDC provider.
-  - startup raises ValueError if public bind is requested without token auth.
+  - Bind host: controlled by DEPTHFUSION_MCP_HOST (default 127.0.0.1 / loopback).
+    Set to 0.0.0.0 only when exposing the server to remote clients AND auth is
+    fully configured (see below).
+  - Fail-closed auth: every request to /sse and /messages MUST carry a valid
+    Bearer token.  If no token is present, or no auth backend is configured,
+    the server returns HTTP 401.  There is no pass-through mode.
+  - JWT validation: JWKS-backed RS256 when DEPTHFUSION_JWKS_URI is set
+    (together with DEPTHFUSION_OIDC_ISSUER and DEPTHFUSION_OIDC_AUDIENCE).
+    Falls back to static bearer token comparison (DEPTHFUSION_MCP_TOKEN) when
+    the OIDC vars are absent.
+  - /health is the only unauthenticated endpoint.
 """
 from __future__ import annotations
 
@@ -84,27 +89,12 @@ def _get_token_validator() -> Optional[TokenValidator]:
 # ---------------------------------------------------------------------------
 
 def get_mcp_bind_host() -> str:
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1":
-        return "0.0.0.0"  # noqa: S104 — guarded by validate_mcp_public_bind
-    return "127.0.0.1"
+    """Return the host to bind to.
 
-
-def validate_mcp_public_bind() -> None:
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") != "1":
-        return
-    has_static = bool(os.getenv("DEPTHFUSION_MCP_TOKEN", ""))
-    # OIDC requires ALL THREE vars — a partial set leaves validator=None at runtime
-    has_oidc = all(
-        os.getenv(k)
-        for k in ("DEPTHFUSION_JWKS_URI", "DEPTHFUSION_OIDC_ISSUER", "DEPTHFUSION_OIDC_AUDIENCE")
-    )
-    if not (has_static or has_oidc):
-        raise ValueError(
-            "DEPTHFUSION_MCP_PUBLIC=1 requires either DEPTHFUSION_MCP_TOKEN or "
-            "all three OIDC vars (DEPTHFUSION_JWKS_URI, DEPTHFUSION_OIDC_ISSUER, "
-            "DEPTHFUSION_OIDC_AUDIENCE). "
-            "Public bind without bearer token authentication is forbidden."
-        )
+    Reads DEPTHFUSION_MCP_HOST (default ``127.0.0.1``).  Set to ``0.0.0.0``
+    only when remote access is required AND auth is fully configured.
+    """
+    return os.getenv("DEPTHFUSION_MCP_HOST", "127.0.0.1")
 
 
 # ---------------------------------------------------------------------------
@@ -114,17 +104,23 @@ def validate_mcp_public_bind() -> None:
 async def _check_mcp_auth(
     authorization: Optional[str] = Header(default=None),
 ) -> None:
-    """Validate Bearer token on every authenticated endpoint.
+    """Validate Bearer token on every authenticated endpoint — fail closed.
+
+    The server ALWAYS requires a valid Bearer token.  If no token is present,
+    or if no auth backend is configured, the request is rejected with HTTP 401.
 
     Validation order:
-      1. JWKS JWT validation when DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE
+      1. No Authorization header (or header without "Bearer " prefix) → 401.
+      2. JWKS JWT validation when DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE
          are all set — full RS256 signature + claim checks via identity module.
-      2. Static bearer token comparison (DEPTHFUSION_MCP_TOKEN) — dev/loopback
-         fallback when no OIDC provider is configured.
-      3. Loopback-only, no token configured → pass (127.0.0.1 bind is the guard).
+         Exception ordering: TokenExpiredError → 401; JwksFetchError → 503;
+         IdentityError → 401.
+      3. Static bearer token comparison (DEPTHFUSION_MCP_TOKEN) — dev fallback
+         when no OIDC provider is configured.
+      4. No auth backend configured at all → 401 (fail closed).
     """
     if not authorization or not authorization.startswith("Bearer "):
-        _raise_if_auth_required(authorization)
+        _raise_if_auth_required()
         return
 
     raw_token = authorization[len("Bearer "):]
@@ -150,16 +146,17 @@ async def _check_mcp_auth(
             raise HTTPException(status_code=401, detail="Unauthorized")
         return
 
-    # No auth backend configured — fail closed on public bind, pass on loopback
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1":
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    # No auth backend configured — always fail closed
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def _raise_if_auth_required(authorization: Optional[str]) -> None:
-    """Reject unauthenticated requests on public-bind servers."""
-    if os.getenv("DEPTHFUSION_MCP_PUBLIC", "0") == "1":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    # Loopback-only with no token configured: allow (bind address is the guard)
+def _raise_if_auth_required() -> None:
+    """Reject any request that carries no Bearer token — always.
+
+    The server is fail-closed: missing tokens are never permitted regardless
+    of bind address.
+    """
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # ---------------------------------------------------------------------------
@@ -238,11 +235,10 @@ async def messages_endpoint(
 def main() -> None:
     """Start the MCP HTTP/SSE server.
 
-    Reads all configuration from environment variables. Raises ValueError at
-    startup if DEPTHFUSION_MCP_PUBLIC=1 without any auth configuration.
+    Reads all configuration from environment variables.  The server is
+    fail-closed: all requests to /sse and /messages require a valid Bearer
+    token regardless of bind address.
     """
-    validate_mcp_public_bind()
-
     # Initialise the validator at startup so config errors surface immediately
     _get_token_validator()
 

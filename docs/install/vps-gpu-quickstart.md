@@ -488,8 +488,12 @@ depthfusion-pp-cli status
 depthfusion-pp-cli recall relevant --query "test" --json
 ```
 
-For loopback use (REST API on 127.0.0.1:7300) no auth env var is needed.
-If `DEPTHFUSION_MCP_PUBLIC=1` is set, export `DEPTHFUSION_API_KEY` first.
+The MCP HTTP server is fail-closed: every request requires a Bearer token.
+Set `DEPTHFUSION_MCP_TOKEN` on the server and export the same value as
+`DEPTHFUSION_API_KEY` in your client environment before running CLI commands.
+To expose the server on a non-loopback interface, set
+`DEPTHFUSION_MCP_HOST=0.0.0.0` in the env file (and ensure `DEPTHFUSION_MCP_TOKEN`
+is configured and a firewall rule is in place).
 
 The companion MCP server (`depthfusion-pp-mcp`) mirrors all commands as agent
 tools. Register it with Claude Code:
