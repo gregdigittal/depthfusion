@@ -3282,7 +3282,7 @@
 **Tasks:**
 - [x] T-690: Staging stack compose (API + ingestion + two app instances) — scripts/integration_smoke_test.sh + .env.example delivered (E-63 integration, 2026-06-11)
 - [ ] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
-- [ ] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
+- [x] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
 
 ### S-203: As a V1 operator, I want migration tooling so that existing instances upgrade without data loss `P0` `M`
 
@@ -3293,7 +3293,7 @@
 
 **Tasks:**
 - [x] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
-- [ ] T-694: Production-copy migration rehearsal + report — Haiku dev, Opus rev
+- [x] T-694: Production-copy migration rehearsal + report — Haiku dev, Opus rev
 
 ### S-204: As the team, I want a structured pilot so that real usage validates V2 before merge `P0` `M`
 
