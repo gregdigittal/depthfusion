@@ -9,27 +9,15 @@ export function TileGrid({ tiles, children }: TileGridProps) {
   const childArray = Array.isArray(children) ? children : [children]
 
   return (
-    <div
-      className="grid gap-4 p-6"
-      style={{
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      }}
-    >
+    <div className="df-tiles">
       {tiles.map((tile, i) => {
-        const child = childArray[i]
+        const cls = ['df-tile', tile.width > 1 ? 'df-tile--wide' : ''].filter(Boolean).join(' ')
         return (
-          <div
-            key={tile.id}
-            className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
-            style={{
-              gridColumn: tile.width > 1 ? `span ${tile.width}` : undefined,
-              gridRow: tile.height > 1 ? `span ${tile.height}` : undefined,
-            }}
-          >
-            <div className="px-4 py-3 border-b border-gray-800">
-              <h3 className="text-sm font-semibold text-gray-300">{tile.title}</h3>
+          <div key={tile.id} className={cls}>
+            <div className="df-tile__head">
+              <span className="df-tile__label">{tile.title}</span>
             </div>
-            <div className="p-4">{child}</div>
+            <div className="df-tile__body">{childArray[i]}</div>
           </div>
         )
       })}

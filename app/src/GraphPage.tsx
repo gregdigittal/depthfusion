@@ -27,7 +27,10 @@ interface GraphResponse {
 }
 
 export function GraphPage({ onOpenDocument }: GraphPageProps) {
-  const serverUrl = getServerUrl()
+  const [serverUrl, setServerUrlState] = useState<string>('')
+  useEffect(() => {
+    getServerUrl().then(setServerUrlState).catch(console.error)
+  }, [])
   const [nodes, setNodes] = useState<NodeData[]>([])
   const [edges, setEdges] = useState<EdgeData[]>([])
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null)
@@ -86,34 +89,38 @@ export function GraphPage({ onOpenDocument }: GraphPageProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="px-6 py-3 border-b border-gray-800 shrink-0 flex items-center justify-between">
-        <h1 className="text-sm font-semibold text-white">Knowledge Graph</h1>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+      <div className="df-graphbar">
+        <span style={{ color: 'var(--text)', fontSize: 'var(--fs-body)', fontWeight: 500 }}>
+          Knowledge Graph
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>
           <span>{nodes.length} nodes</span>
           <span>{edges.length} edges</span>
-          <span className="text-gray-700">· scroll to zoom, drag to pan</span>
+          <span style={{ color: 'var(--border-strong)' }}>· scroll to zoom, drag to pan</span>
         </div>
       </div>
 
       {/* Main area */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="df-graph-body">
         {/* Canvas area */}
-        <div ref={containerRef} className="flex-1 relative overflow-hidden bg-gray-950">
+        <div ref={containerRef} className="df-canvas">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+            <div className="absolute inset-0 flex items-center justify-center" style={{ color: 'var(--muted)', fontSize: 'var(--fs-body)' }}>
               Loading graph…
             </div>
           )}
           {!isLoading && error && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-red-400 text-sm mb-2">Failed to load graph</p>
-                <p className="text-gray-600 text-xs">{error}</p>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: 'var(--danger)', fontSize: 'var(--fs-body)', marginBottom: 'var(--sp-2)' }}>
+                  Failed to load graph
+                </p>
+                <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>{error}</p>
               </div>
             </div>
           )}
           {!isLoading && !error && nodes.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">
+            <div className="absolute inset-0 flex items-center justify-center" style={{ color: 'var(--muted)', fontSize: 'var(--fs-body)' }}>
               No graph data yet
             </div>
           )}
@@ -128,15 +135,13 @@ export function GraphPage({ onOpenDocument }: GraphPageProps) {
           )}
         </div>
 
-        {/* Node inspector sidebar */}
+        {/* Node inspector — df-inspector provides width, border-left, bg, padding, scroll */}
         {selectedNode && (
-          <div className="shrink-0 w-72 border-l border-gray-800 p-4 overflow-y-auto bg-gray-950">
-            <NodeInspector
-              node={selectedNode}
-              onClose={handleCloseInspector}
-              onOpenDocument={onOpenDocument}
-            />
-          </div>
+          <NodeInspector
+            node={selectedNode}
+            onClose={handleCloseInspector}
+            onOpenDocument={onOpenDocument}
+          />
         )}
       </div>
     </div>

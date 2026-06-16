@@ -9,13 +9,11 @@ function RecentActivity() {
     { label: 'Downloaded "Q1 Report.pdf"', time: '3 hr ago' },
   ]
   return (
-    <ul className="space-y-2.5">
+    <ul className="df-activity">
       {activities.map((a, i) => (
-        <li key={i} className="flex justify-between items-start gap-2">
-          <span className="text-sm text-gray-300 leading-snug">{a.label}</span>
-          <span className="text-xs text-gray-600 whitespace-nowrap shrink-0 pt-px">
-            {a.time}
-          </span>
+        <li key={i} className="df-activity__row">
+          <span>{a.label}</span>
+          <span className="df-activity__time">{a.time}</span>
         </li>
       ))}
     </ul>
@@ -24,14 +22,14 @@ function RecentActivity() {
 
 function SearchStats() {
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
       <div>
-        <div className="text-2xl font-bold text-white">247</div>
-        <div className="text-xs text-gray-500 mt-0.5">Queries this week</div>
+        <div className="df-stat-big">247</div>
+        <div className="df-stat-label">Queries this week</div>
       </div>
       <div>
-        <div className="text-lg font-semibold text-indigo-400">142ms</div>
-        <div className="text-xs text-gray-500 mt-0.5">Avg. latency</div>
+        <div className="df-stat-med">142ms</div>
+        <div className="df-stat-label">Avg. latency</div>
       </div>
     </div>
   )
@@ -42,19 +40,16 @@ function StorageUsage() {
   const totalGb = 20
   const pct = Math.round((usedGb / totalGb) * 100)
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
       <div>
-        <div className="text-2xl font-bold text-white">{usedGb} GB</div>
-        <div className="text-xs text-gray-500 mt-0.5">of {totalGb} GB used</div>
+        <div className="df-stat-big">{usedGb} GB</div>
+        <div className="df-stat-label">of {totalGb} GB used</div>
       </div>
       <div>
-        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-indigo-500 rounded-full"
-            style={{ width: `${pct}%` }}
-          />
+        <div className="df-progress">
+          <div className="df-progress__fill" style={{ width: `${pct}%` }} />
         </div>
-        <div className="text-xs text-gray-600 mt-1">{pct}% used</div>
+        <div className="df-stat-label" style={{ marginTop: 'var(--sp-1)' }}>{pct}% used</div>
       </div>
     </div>
   )
@@ -62,13 +57,13 @@ function StorageUsage() {
 
 function SyncStatus() {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-        <span className="text-sm text-gray-300">Synced</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+        <span className="df-dot df-dot--ok df-dot--pip" />
+        <span style={{ color: 'var(--text)', fontSize: 'var(--fs-body)' }}>Synced</span>
       </div>
-      <div className="text-xs text-gray-500">Last sync: 3 min ago</div>
-      <div className="text-xs text-gray-600">1,204 documents indexed</div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>Last sync: 3 min ago</div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-micro)' }}>1,204 documents indexed</div>
     </div>
   )
 }
@@ -84,10 +79,7 @@ export function DashboardPage() {
   const { tiles } = useDashboard()
 
   return (
-    <div className="overflow-y-auto h-full">
-      <div className="px-6 py-4 border-b border-gray-800">
-        <h1 className="text-base font-semibold text-white">Dashboard</h1>
-      </div>
+    <div className="flex-1 overflow-y-auto">
       <TileGrid tiles={tiles}>
         {tiles.map((t) => TILE_CONTENT[t.id] ?? null)}
       </TileGrid>

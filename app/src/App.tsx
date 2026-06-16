@@ -14,13 +14,14 @@ import { SearchPage } from './SearchPage'
 import { GraphPage } from './GraphPage'
 import { DocumentViewer } from './DocumentViewer'
 import { SettingsPage } from './SettingsPage'
+import { LayoutDashboard, Search, GitFork, Settings } from 'lucide-react'
 
 type Route = 'dashboard' | 'search' | 'graph' | 'settings'
 
-const NAV_TABS: { id: Route; label: string }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'search', label: 'Search' },
-  { id: 'graph', label: 'Graph' },
+const NAV_TABS: { id: Route; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
+  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { id: 'search',    label: 'Search',    Icon: Search },
+  { id: 'graph',     label: 'Graph',     Icon: GitFork },
 ]
 
 function App() {
@@ -50,16 +51,16 @@ function App() {
   // ── Unauthenticated shell ────────────────────────────────────────────────
   if (authState.status !== 'authenticated') {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-6 px-6">
-        <LogoMark size={64} />
-        <h1 className="text-3xl font-bold tracking-tight">DepthFusion</h1>
-        <p className="text-gray-400 text-sm text-center max-w-xs">
+      <div className="df df-auth" style={{ minHeight: '100vh' }}>
+        <LogoMark size={64} animation="breathe pulse" />
+        <h1 className="df-auth__title">DepthFusion</h1>
+        <p className="df-auth__desc">
           AI-powered context retrieval and knowledge management.
           Sign in with your identity provider to continue.
         </p>
 
         {authState.status === 'error' && (
-          <p className="text-red-400 text-sm" role="alert">
+          <p style={{ color: 'var(--danger)', fontSize: 'var(--fs-body)' }} role="alert">
             {authState.error ?? 'Authentication failed. Please try again.'}
           </p>
         )}
@@ -67,9 +68,7 @@ function App() {
         <SignInButton authPending={authState.status === 'pending'} />
 
         {appInfo && (
-          <span className="text-xs text-gray-600 absolute bottom-4">
-            v{appInfo.version}
-          </span>
+          <span className="df-auth__version">v{appInfo.version}</span>
         )}
       </div>
     )
@@ -77,46 +76,53 @@ function App() {
 
   // ── Authenticated shell ──────────────────────────────────────────────────
   return (
-    <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
+    <div className="df df-window">
+      {/* Title bar */}
+      <div className="df-titlebar">
+        <div className="df-titlebar__dots">
+          <span className="df-titlebar__dot df-titlebar__dot--close" />
+          <span className="df-titlebar__dot df-titlebar__dot--min" />
+          <span className="df-titlebar__dot df-titlebar__dot--expand" />
+        </div>
+        <span className="df-titlebar__title">DepthFusion</span>
+      </div>
+
       {/* Header */}
-      <header className="border-b border-gray-800 px-5 py-3 flex items-center gap-3 shrink-0">
-        <LogoMark size={24} />
-        <span className="text-base font-semibold tracking-tight">DepthFusion</span>
+      <header className="df-header">
+        <div className="df-brand">
+          <LogoMark size={23} flat animation="breathe" />
+          <span className="df-brand__name">DepthFusion</span>
+        </div>
 
         {/* Nav tabs */}
-        <nav className="flex items-center gap-1 ml-4">
-          {NAV_TABS.map((tab) => (
+        <nav className="df-tabs">
+          {NAV_TABS.map(({ id, label, Icon }) => (
             <button
-              key={tab.id}
-              onClick={() => setRoute(tab.id)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                route === tab.id
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-              }`}
+              key={id}
+              onClick={() => setRoute(id)}
+              className={`df-tab${route === id ? ' df-tab--active' : ''}`}
             >
-              {tab.label}
+              <Icon size={14} />
+              {label}
             </button>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="df-header__right">
           {appInfo && (
-            <span className="text-xs text-gray-600">v{appInfo.version}</span>
+            <span className="df-header__version">v{appInfo.version}</span>
           )}
           <button
             onClick={() => setRoute('settings')}
-            className={`text-gray-400 hover:text-gray-200 transition-colors p-1.5 rounded-md ${
-              route === 'settings' ? 'text-white bg-gray-800' : ''
-            }`}
+            className={`df-iconbtn${route === 'settings' ? ' df-tab--active' : ''}`}
             aria-label="Settings"
             title="Settings"
           >
-            ⚙
+            <Settings size={16} />
           </button>
           <button
             onClick={() => void handleSignOut()}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded-md hover:bg-gray-800/50"
+            className="df-signout"
           >
             Sign out
           </button>

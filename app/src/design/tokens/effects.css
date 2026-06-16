@@ -1,0 +1,16 @@
+/* DepthFusion · Shadows and motion tokens */
+:root {
+  --shadow-card:       0 1px 0 rgba(255,142,58,.05), 0 4px 30px rgba(0,0,0,.4);
+  --shadow-card-hover: 0 1px 0 rgba(255,142,58,.1), 0 20px 50px rgba(0,0,0,.55), 0 0 50px rgba(255,142,58,.08);
+  --shadow-pop:        0 24px 60px rgba(0,0,0,.6), 0 0 60px rgba(255,142,58,.06);
+  --accent-glow:       0 0 28px rgba(255,142,58,.32), inset 0 1px 0 rgba(255,255,255,.15);
+
+  --ease:         cubic-bezier(.4, 0, .2, 1);
+  --ease-develop: cubic-bezier(.2, .6, .2, 1);
+
+  --dur-quick:   150ms;
+  --dur-medium:  400ms;
+  --dur-develop: 2400ms;
+  --dur-breathe: 6s;
+  --dur-node:    4s;
+}

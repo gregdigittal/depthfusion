@@ -31,15 +31,16 @@ function Section({
 }) {
   const [open, setOpen] = useState(true)
   return (
-    <div className="border-b border-gray-800 last:border-b-0">
+    <div className="df-facets__group">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+        className="df-facets__head"
+        aria-expanded={open}
       >
         {title}
-        <span className="text-gray-500 text-xs">{open ? '▲' : '▼'}</span>
+        <span className="df-facets__chevron">{open ? '▲' : '▼'}</span>
       </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
+      {open && <div className="df-facets__items">{children}</div>}
     </div>
   )
 }
@@ -52,94 +53,59 @@ export function FacetPanel({ facets, onChange, collapsed }: FacetPanelProps) {
   if (collapsed) return null
 
   return (
-    <aside className="w-56 shrink-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden h-fit">
-      <div className="px-4 py-3 border-b border-gray-800">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          Filters
-        </h3>
-      </div>
-
+    <aside className="df-facets">
       {/* Date Range */}
       <Section title="Date">
-        <div className="space-y-1.5">
-          {DATE_OPTIONS.map((opt) => (
-            <label
-              key={opt.value}
-              className="flex items-center gap-2 cursor-pointer group"
-            >
-              <input
-                type="radio"
-                name="dateRange"
-                value={opt.value}
-                checked={facets.dateRange === opt.value}
-                onChange={() =>
-                  onChange({ ...facets, dateRange: opt.value })
-                }
-                className="accent-indigo-500"
-              />
-              <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                {opt.label}
-              </span>
-            </label>
-          ))}
-        </div>
+        {DATE_OPTIONS.map((opt) => (
+          <label key={opt.value} className="df-facet-item">
+            <input
+              type="radio"
+              name="dateRange"
+              value={opt.value}
+              checked={facets.dateRange === opt.value}
+              onChange={() => onChange({ ...facets, dateRange: opt.value })}
+            />
+            {opt.label}
+          </label>
+        ))}
       </Section>
 
       {/* Source Type */}
       <Section title="Source">
-        <div className="space-y-1.5">
-          {SOURCE_TYPES.map((src) => (
-            <label
-              key={src}
-              className="flex items-center gap-2 cursor-pointer group"
-            >
-              <input
-                type="checkbox"
-                checked={facets.sourceType.includes(src)}
-                onChange={() =>
-                  onChange({
-                    ...facets,
-                    sourceType: toggleMulti(facets.sourceType, src),
-                  })
-                }
-                className="accent-indigo-500"
-              />
-              <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                {src}
-              </span>
-            </label>
-          ))}
-        </div>
+        {SOURCE_TYPES.map((src) => (
+          <label key={src} className="df-facet-item">
+            <input
+              type="checkbox"
+              checked={facets.sourceType.includes(src)}
+              onChange={() =>
+                onChange({
+                  ...facets,
+                  sourceType: toggleMulti(facets.sourceType, src),
+                })
+              }
+            />
+            {src}
+          </label>
+        ))}
       </Section>
 
       {/* Classification */}
       <Section title="Classification">
-        <div className="space-y-1.5">
-          {CLASSIFICATIONS.map((cls) => (
-            <label
-              key={cls}
-              className="flex items-center gap-2 cursor-pointer group"
-            >
-              <input
-                type="checkbox"
-                checked={facets.classification.includes(cls)}
-                onChange={() =>
-                  onChange({
-                    ...facets,
-                    classification: toggleMulti(
-                      facets.classification,
-                      cls
-                    ),
-                  })
-                }
-                className="accent-indigo-500"
-              />
-              <span className="text-sm text-gray-300 group-hover:text-white transition-colors capitalize">
-                {cls}
-              </span>
-            </label>
-          ))}
-        </div>
+        {CLASSIFICATIONS.map((cls) => (
+          <label key={cls} className="df-facet-item" style={{ textTransform: 'capitalize' }}>
+            <input
+              type="checkbox"
+              checked={facets.classification.includes(cls)}
+              onChange={() =>
+                onChange({
+                  ...facets,
+                  classification: toggleMulti(facets.classification, cls),
+                })
+              }
+            />
+            {cls}
+          </label>
+        ))}
       </Section>
     </aside>
   )

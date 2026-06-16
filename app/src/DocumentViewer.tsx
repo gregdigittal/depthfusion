@@ -36,7 +36,10 @@ export function DocumentViewer({
   onClose,
   highlightLocator,
 }: DocumentViewerProps) {
-  const serverUrl = getServerUrl()
+  const [serverUrl, setServerUrlState] = useState<string>('')
+  useEffect(() => {
+    getServerUrl().then(setServerUrlState).catch(console.error)
+  }, [])
   const [doc, setDoc] = useState<DocumentContent | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -186,15 +189,15 @@ export function DocumentViewer({
                 const isHighlighted =
                   highlightLocator && block.locator === highlightLocator
 
-                const Tag: keyof JSX.IntrinsicElements =
-                  isHeading
-                    ? (`h${Math.min(block.heading_path.length + 1, 6)}` as keyof JSX.IntrinsicElements)
-                    : 'p'
+                type BlockTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p'
+                const Tag = (isHeading
+                  ? (`h${Math.min(block.heading_path.length + 1, 6)}` as BlockTag)
+                  : 'p') satisfies BlockTag
 
                 return (
                   <Tag
                     key={block.id}
-                    ref={(el) => {
+                    ref={(el: HTMLElement | null) => {
                       if (el) blocksRef.current.set(block.locator, el)
                       else blocksRef.current.delete(block.locator)
                     }}
