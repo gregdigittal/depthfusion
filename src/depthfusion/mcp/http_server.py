@@ -29,8 +29,6 @@ import uuid
 from importlib.metadata import version as _pkg_version
 from typing import AsyncGenerator, Optional
 
-_VERSION = _pkg_version("depthfusion")
-
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -40,6 +38,8 @@ from depthfusion.identity.errors import IdentityError, JwksFetchError, TokenExpi
 from depthfusion.identity.jwks_cache import JwksCache
 from depthfusion.identity.token_validator import TokenValidator
 from depthfusion.mcp.server import _process_request
+
+_VERSION = _pkg_version("depthfusion")
 
 logger = logging.getLogger(__name__)
 

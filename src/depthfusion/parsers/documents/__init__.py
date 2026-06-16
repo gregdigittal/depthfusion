@@ -16,6 +16,13 @@ Document parsers (T-592)::
 
     parser = get_registry().get("text/markdown")
     records = parser.parse("readme.md", raw_bytes)
+
+OCR parser (T-598) — registered only when DEPTHFUSION_OCR_ENABLED=1::
+
+    DEPTHFUSION_OCR_ENABLED=1 python -c "
+    from depthfusion.parsers.documents import get_registry
+    parser = get_registry().get('image/png')
+    "
 """
 from __future__ import annotations
 
@@ -29,6 +36,7 @@ from depthfusion.parsers.documents.base import (
     quarantine,
 )
 from depthfusion.parsers.documents.generic import GenericParser
+from depthfusion.parsers.documents.ocr import OcrParser, _ocr_enabled
 from depthfusion.parsers.documents.pptx import PptxParser
 from depthfusion.parsers.documents.xlsx import XlsxParser
 
@@ -63,6 +71,10 @@ _default_registry.register(GenericParser())
 _default_registry.register(XlsxParser())
 _default_registry.register(PptxParser())
 
+# Register OcrParser only when the feature flag is active (T-598).
+if _ocr_enabled():
+    _default_registry.register(OcrParser())
+
 
 def get_registry() -> DocumentParserRegistry:
     """Return the shared default DocumentParserRegistry."""
@@ -76,6 +88,7 @@ __all__ = [
     "DocumentRecord",
     # Parsers
     "GenericParser",
+    "OcrParser",
     "PptxParser",
     "XlsxParser",
     "get_registry",

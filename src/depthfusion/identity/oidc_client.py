@@ -25,7 +25,9 @@ import base64
 import hashlib
 import os
 import secrets
+import sys
 import time
+from typing import Callable
 from urllib.parse import urlencode
 
 import httpx
@@ -309,6 +311,80 @@ class OidcClient:
                 f"device-code poll error: {error} "
                 f"{body.get('error_description', '')}".strip()
             )
+
+    async def device_login(
+        self,
+        jwks_cache: JwksCache,
+        *,
+        poll_interval: float | None = None,
+        max_wait: float = 900.0,
+        message_callback: "Callable[[DeviceCodeResult], None] | None" = None,
+        store: PrincipalStore | None = None,
+    ) -> Principal:
+        """Run a full headless device-code login (S-156 AC-2).
+
+        High-level helper for CLI / VPS sessions: it starts the device
+        authorization flow, surfaces the verification URI + user code to the
+        operator, then blocks polling the token endpoint until the user
+        completes sign-in.
+
+        Parameters
+        ----------
+        jwks_cache:
+            JWKS source used to validate the returned ID token.
+        poll_interval:
+            Seconds between poll attempts. When ``None`` (default) the
+            interval advertised by the provider in the device-code response is
+            used.
+        max_wait:
+            Maximum total seconds to poll before giving up. Defaults to 900.
+        message_callback:
+            Optional callable invoked with the :class:`DeviceCodeResult` so the
+            caller can present the verification URI / user code however it
+            wishes. When omitted, a human-readable prompt is printed to
+            ``stderr``.
+        store:
+            Optional :class:`PrincipalStore`; when given the authenticated
+            principal is persisted (group refresh, S-156 AC-3).
+
+        Returns
+        -------
+        Principal
+            The authenticated principal returned by :meth:`poll_device_code`.
+
+        Raises
+        ------
+        OidcFlowError
+            On any device-code start/poll failure (timeout, declined, etc.).
+        """
+        result = await self.start_device_code()
+
+        if message_callback is not None:
+            message_callback(result)
+        else:
+            uri = result.verification_uri_complete or result.verification_uri
+            print(
+                "To sign in, open the following URL in a browser and enter "
+                f"the code:\n  URL:  {uri}\n  Code: {result.user_code}\n"
+                f"  (the code expires in {result.expires_in} seconds)",
+                file=sys.stderr,
+            )
+
+        interval = poll_interval if poll_interval is not None else float(result.interval)
+        if store is not None:
+            return await self.poll_device_code(
+                result.device_code,
+                jwks_cache,
+                max_wait,
+                interval,
+                store=store,
+            )
+        return await self.poll_device_code(
+            result.device_code,
+            jwks_cache,
+            max_wait,
+            interval,
+        )
 
     # ------------------------------------------------------------------ #
     # Internals                                                          #
