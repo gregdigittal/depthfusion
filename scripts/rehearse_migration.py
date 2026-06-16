@@ -128,6 +128,7 @@ def _run_migrations(rehearsal_dir: Path) -> tuple[bool, float, list[str]]:
         return True, 0.0, log_lines
 
     start = time.monotonic()
+    any_hard_errors = False
 
     for db_filename in SQLITE_DB_FILES:
         db_path = rehearsal_dir / db_filename
@@ -193,6 +194,7 @@ def _run_migrations(rehearsal_dir: Path) -> tuple[bool, float, list[str]]:
 
                 if hard_errors:
                     log_lines.extend(f"    ERROR: {e}" for e in hard_errors)
+                    any_hard_errors = True
                 else:
                     conn.execute(
                         "INSERT INTO _df_schema_migrations VALUES (?, ?)",
@@ -202,7 +204,7 @@ def _run_migrations(rehearsal_dir: Path) -> tuple[bool, float, list[str]]:
                     log_lines.append(f"    {migration_id}: applied OK")
 
     elapsed = time.monotonic() - start
-    return True, elapsed, log_lines
+    return not any_hard_errors, elapsed, log_lines
 
 
 def _run_backfill(

@@ -299,6 +299,41 @@ class TestRunMigrations:
         ok, _, log = _run_migrations(tmp_path)
         assert ok is True
 
+    def test_returns_false_on_hard_error(
+        self, rehearsal_dir: Path, tmp_path: Path
+    ) -> None:
+        """A non-benign OperationalError must cause _run_migrations to return False."""
+        import shutil as _shutil
+        from unittest.mock import patch
+
+        # Inject a bad SQL file with a syntax error (message contains neither
+        # "no such table", "duplicate column", nor "table already exists", so it
+        # is treated as a *hard* error by the benign-fragment filter).
+        bad_sql = rehearsal_dir / "bad_sql_for_test.sql"
+        bad_sql.write_text("INVALID_SYNTAX_HARD_ERROR_FOR_TESTING;\n", encoding="utf-8")
+
+        # Seed one DB so the runner has something to open.
+        db_path = rehearsal_dir / ".depthfusion_memories.db"
+        with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
+            conn.execute("CREATE TABLE memories (id TEXT PRIMARY KEY)")
+            conn.commit()
+
+        import rehearse_migration as rm
+
+        original_migrations_dir = rm.MIGRATIONS_DIR
+        try:
+            # Point MIGRATIONS_DIR at our rehearsal_dir which has the bad SQL.
+            rm.MIGRATIONS_DIR = rehearsal_dir
+            ok, _elapsed, log = _run_migrations(rehearsal_dir)
+        finally:
+            rm.MIGRATIONS_DIR = original_migrations_dir
+            bad_sql.unlink(missing_ok=True)
+
+        assert ok is False, "Expected False when a non-benign OperationalError occurs"
+        assert any("ERROR:" in line for line in log), (
+            "Expected at least one ERROR line in the log"
+        )
+
 
 # ── Backfill invocation tests ─────────────────────────────────────────────────
 
