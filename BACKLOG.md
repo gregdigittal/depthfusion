@@ -3292,7 +3292,7 @@
 - [ ] AC-3: Verified on a copy of the production VPS dataset
 
 **Tasks:**
-- [ ] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
+- [x] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
 - [ ] T-694: Production-copy migration rehearsal + report — Haiku dev, Opus rev
 
 ### S-204: As the team, I want a structured pilot so that real usage validates V2 before merge `P0` `M`

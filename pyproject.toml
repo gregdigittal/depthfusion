@@ -118,6 +118,9 @@ dev = [
     "hnswlib>=0.7",          # HNSW index tests (T-534 CI 80% floor)
 ]
 
+[project.scripts]
+depthfusion-migrate = "depthfusion.cli.migrate:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
