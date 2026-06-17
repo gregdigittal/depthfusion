@@ -33,9 +33,11 @@ import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from depthfusion.api.auth import require_principal
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.identity.errors import IdentityError, JwksFetchError, TokenExpiredError
 from depthfusion.identity.jwks_cache import JwksCache
+from depthfusion.identity.models import Principal
 from depthfusion.identity.token_validator import TokenValidator
 from depthfusion.mcp.server import _process_request
 
@@ -171,7 +173,7 @@ async def health():
 @app.get("/sse")
 async def sse_endpoint(
     request: Request,
-    _auth: None = Depends(_check_mcp_auth),
+    _principal: Principal = Depends(require_principal),
 ) -> StreamingResponse:
     session_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
@@ -209,7 +211,7 @@ async def sse_endpoint(
 async def messages_endpoint(
     request: Request,
     sessionId: str,
-    _auth: None = Depends(_check_mcp_auth),
+    _principal: Principal = Depends(require_principal),
 ):
     if sessionId not in _MCP_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found or expired")

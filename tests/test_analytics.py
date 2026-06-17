@@ -40,8 +40,13 @@ def aggregation(db_path: Path) -> AggregationService:
 
 
 @pytest.fixture()
-def client(db_path: Path) -> TestClient:
+def client(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """TestClient wired to an app that uses a temp DB path."""
+    # Enable the unauthenticated dev fallback so tests can pass a raw Bearer
+    # token without a full OIDC stack.  The resolver reads this at request
+    # time so setting it here (after module import) is sufficient.
+    monkeypatch.setenv("DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS", "1")
+
     app = FastAPI()
     app.include_router(analytics_router)
 

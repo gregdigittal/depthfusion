@@ -378,10 +378,9 @@ class TestMcpPublishContextToolShape:
         import depthfusion.mcp.tools.capture as _capture_module
 
         bus = FileBus(bus_dir=tmp_path)
-        # After T-535a, _tool_publish_context lives in capture.py and calls
-        # _get_context_bus from that module's namespace — patch there.
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus), \
-             patch.object(_capture_module, "_get_context_bus", return_value=bus):
+        # _tool_publish_context lives in capture.py and calls _get_context_bus
+        # from that module's namespace — patch there.
+        with patch.object(_capture_module, "_get_context_bus", return_value=bus):
             payload = {
                 "item": {
                     "item_id": "mcp1",
@@ -402,9 +401,10 @@ class TestMcpPublishContextToolShape:
 
     def test_tool_dedup_response_returns_original_item_id(self, tmp_path):
         from depthfusion.mcp import server as mcp_server
+        import depthfusion.mcp.tools.capture as _capture_module
 
         bus = FileBus(bus_dir=tmp_path)
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus):
+        with patch.object(_capture_module, "_get_context_bus", return_value=bus):
             first_payload = {
                 "item": {
                     "item_id": "first",

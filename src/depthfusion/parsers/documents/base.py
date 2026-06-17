@@ -2,6 +2,7 @@
 
 T-590: DocumentRecord dataclass, DocumentParser protocol, QuarantineEntry + registry.
 T-591: QuarantineStore class with retry tracking semantics.
+T-599: Persistent quarantine — entries are written to a configurable directory on disk.
 
 Usage::
 
@@ -27,9 +28,20 @@ Usage::
     # Fine-grained store access:
     store = get_quarantine_store()
     retryable = store.list_retryable("2026-06-11T11:00:00Z")
+
+Persistent quarantine::
+
+    # Writes JSON sidecar files to data/quarantine/ by default.
+    store = QuarantineStore(persist_dir=pathlib.Path("data/quarantine"))
+    store.add(entry)
+    # → data/quarantine/<sanitised-source-id>.json written atomically
 """
 from __future__ import annotations
 
+import dataclasses
+import json
+import pathlib
+import re
 import threading
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
@@ -138,20 +150,74 @@ class QuarantineStore:
 
     Entries are keyed by *source_id* — adding an entry with the same
     source_id as an existing entry replaces it (upsert semantics).
+
+    Disk persistence (T-599):
+        When *persist_dir* is provided, each call to :meth:`add` writes a
+        JSON sidecar file to that directory.  The sidecar filename is derived
+        from the *source_id* by replacing non-alphanumeric characters with
+        underscores.  The write is atomic (write-to-tmp then rename).
+
+    Args:
+        persist_dir: Optional directory path for JSON sidecar files.  The
+                     directory is created if it does not already exist.
+                     Pass ``None`` (default) for in-memory-only behaviour.
     """
 
-    def __init__(self) -> None:
+    #: Characters that are safe for use in filenames.
+    _SAFE_RE: re.Pattern[str] = re.compile(r"[^\w.\-]")
+
+    def __init__(self, persist_dir: pathlib.Path | str | None = None) -> None:
         self._entries: dict[str, QuarantineEntry] = {}
         self._lock = threading.RLock()
+        self._persist_dir: pathlib.Path | None = (
+            pathlib.Path(persist_dir) if persist_dir is not None else None
+        )
+        if self._persist_dir is not None:
+            self._persist_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _sidecar_path(self, source_id: str) -> pathlib.Path | None:
+        """Return the sidecar JSON path for *source_id*, or None if no persist_dir."""
+        if self._persist_dir is None:
+            return None
+        safe_name = self._SAFE_RE.sub("_", source_id)
+        # Truncate to stay under OS filename limits.
+        safe_name = safe_name[-200:] if len(safe_name) > 200 else safe_name
+        return self._persist_dir / f"{safe_name}.json"
+
+    def _write_sidecar(self, entry: QuarantineEntry) -> None:
+        """Atomically write a JSON sidecar for *entry* if persist_dir is set."""
+        dest = self._sidecar_path(entry.source_id)
+        if dest is None:
+            return
+        payload = json.dumps(dataclasses.asdict(entry), indent=2, ensure_ascii=False)
+        tmp = dest.with_suffix(".json.tmp")
+        try:
+            tmp.write_text(payload, encoding="utf-8")
+            tmp.replace(dest)
+        except OSError:
+            # Best-effort: do not mask the primary quarantine write.
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     # ------------------------------------------------------------------
     # Mutation API
     # ------------------------------------------------------------------
 
     def add(self, entry: QuarantineEntry) -> None:
-        """Add or update (upsert) a :class:`QuarantineEntry` by source_id."""
+        """Add or update (upsert) a :class:`QuarantineEntry` by source_id.
+
+        If *persist_dir* was set at construction, a JSON sidecar file is
+        written atomically to that directory alongside the in-memory update.
+        """
         with self._lock:
             self._entries[entry.source_id] = entry
+            self._write_sidecar(entry)
 
     def remove(self, source_id: str) -> bool:
         """Remove the entry for *source_id*.
@@ -235,7 +301,13 @@ class QuarantineStore:
 # Module-level singleton and backward-compat helpers (T-590 public surface)
 # ---------------------------------------------------------------------------
 
-_default_quarantine_store: QuarantineStore = QuarantineStore()
+#: Default persist directory for the module-level quarantine store.
+#: Relative to the current working directory at import time.
+_DEFAULT_QUARANTINE_DIR: pathlib.Path = pathlib.Path("data/quarantine")
+
+_default_quarantine_store: QuarantineStore = QuarantineStore(
+    persist_dir=_DEFAULT_QUARANTINE_DIR
+)
 # Backward-compat alias used in some tests
 _quarantine_store = _default_quarantine_store
 

@@ -121,7 +121,7 @@ def schedule_sync(
                 {"site_url": site.site_url, "drive_id": site.drive_id},
             )
             try:
-                docs, _token = connector.sync_incremental(
+                docs, _deleted_ids, _token = connector.sync_incremental(
                     site_url=site.site_url,
                     drive_id=site.drive_id,
                 )
@@ -131,6 +131,7 @@ def schedule_sync(
                         "site_url": site.site_url,
                         "drive_id": site.drive_id,
                         "count": len(docs),
+                        "deleted": len(_deleted_ids),
                     },
                 )
             except Exception as exc:

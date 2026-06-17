@@ -168,7 +168,9 @@ class SharePointConnector:
 
         self._emit_telemetry("sync_start", {"drive_id": drive_id})
 
-        drive_items = self._list_drive_items(session, drive_id, delta_token)
+        drive_items, _deleted_items, _next_delta_link = self._list_drive_items(
+            session, drive_id, delta_token
+        )
         docs: list[ParsedDocument] = []
 
         for item in drive_items:
@@ -239,10 +241,17 @@ class SharePointConnector:
         session: Any,
         drive_id: str,
         delta_token: str | None,
-    ) -> list[dict[str, Any]]:
-        """Walk the drive (or delta) and return a flat list of file items.
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+        """Walk the drive (or delta) and return file items, deleted items, and the new deltaLink.
 
         Handles pagination via ``@odata.nextLink``.
+
+        Returns:
+            A three-tuple of:
+              - list of file items to process (folders and deletes excluded)
+              - list of deleted item dicts (each has a ``"deleted"`` key)
+              - the deltaLink token extracted from ``@odata.deltaLink``, or
+                ``None`` if the response did not include one
         """
         if delta_token:
             if delta_token == "latest":
@@ -254,21 +263,38 @@ class SharePointConnector:
         else:
             url = f"{_GRAPH_BASE}/drives/{drive_id}/root/delta"
 
-        items: list[dict[str, Any]] = []
+        all_items: list[dict[str, Any]] = []
+        next_delta_link: str | None = None
 
         while url:
             response = self._throttled_get(session, url, timeout=30)
             response.raise_for_status()
             data: dict[str, Any] = response.json()
-            items.extend(data.get("value", []))
+            all_items.extend(data.get("value", []))
             url = data.get("@odata.nextLink")
+            # Capture the deltaLink from the last page (overwrite on each page)
+            delta_link = data.get("@odata.deltaLink")
+            if delta_link:
+                # Extract only the token value from the URL for storage
+                import urllib.parse
+                parsed = urllib.parse.urlparse(delta_link)
+                params = urllib.parse.parse_qs(parsed.query)
+                token_vals = params.get("$token", [])
+                next_delta_link = token_vals[0] if token_vals else delta_link
 
-        # Filter to files only (exclude folders and deleted items)
-        return [
+        # Separate file items from deleted items
+        file_items = [
             item
-            for item in items
+            for item in all_items
             if "file" in item and not item.get("deleted")
         ]
+        deleted_items = [
+            item
+            for item in all_items
+            if item.get("deleted")
+        ]
+
+        return file_items, deleted_items, next_delta_link
 
     def _process_item(
         self,
@@ -541,22 +567,27 @@ class SharePointConnector:
         self,
         site_url: str,
         drive_id: str,
-    ) -> tuple[list[ParsedDocument], str]:
+    ) -> tuple[list[ParsedDocument], list[str], str]:
         """Sync a drive incrementally using a stored delta token.
 
         On first call (no stored token) a full crawl is performed.
         On subsequent calls the delta token from the previous run is used.
 
         The delta token is persisted to the cursor store after a successful
-        sync so subsequent calls pick up only new changes.
+        sync so subsequent calls pick up only new changes.  The actual
+        ``@odata.deltaLink`` token from the Graph response is stored so that
+        subsequent syncs request only the changes since the last run.
 
         Args:
             site_url:  SharePoint site URL.
             drive_id:  Microsoft Graph drive identifier.
 
         Returns:
-            A ``(docs, new_delta_token)`` tuple where *new_delta_token* is the
-            token to pass on the next incremental run.
+            A ``(docs, deleted_ids, new_delta_token)`` tuple where:
+            - *docs* is the list of updated/added :class:`ParsedDocument` objects
+            - *deleted_ids* is a list of ``source_id`` strings for items deleted
+              in this delta window
+            - *new_delta_token* is the token stored for the next incremental run
         """
         from depthfusion.connectors.sharepoint_state import DeltaCursorStore
 
@@ -567,14 +598,41 @@ class SharePointConnector:
         cursor_key = f"{tenant_id}:{site_url}:{drive_id}"
 
         delta_token = self._cursor_store.get_delta_token(cursor_key)
-        docs = self.sync(site_url=site_url, drive_id=drive_id, delta_token=delta_token)
 
-        # After a successful sync obtain the new delta token from a fresh delta call.
-        # The "latest" token always points to the head of the change feed.
-        new_token = "latest"
+        self._ensure_token()
+        session = self._get_session()
+
+        self._emit_telemetry("sync_start", {"drive_id": drive_id, "incremental": True})
+
+        file_items, deleted_items, next_delta_link = self._list_drive_items(
+            session, drive_id, delta_token
+        )
+
+        docs: list[ParsedDocument] = []
+        for item in file_items:
+            doc = self._process_item(session, drive_id, item, site_url)
+            if doc is not None:
+                docs.append(doc)
+
+        # Build list of deleted source_ids
+        deleted_ids: list[str] = [
+            f"sharepoint:{drive_id}:{item.get('id', '')}"
+            for item in deleted_items
+            if item.get("id")
+        ]
+
+        self._emit_telemetry(
+            "sync_complete",
+            {"drive_id": drive_id, "count": len(docs), "deleted": len(deleted_ids)},
+        )
+
+        # Persist the actual delta token from the response so the next call
+        # only fetches changes since this run.  Fall back to "latest" when the
+        # response did not include a deltaLink (e.g. during pagination).
+        new_token: str = next_delta_link or "latest"
         self._cursor_store.set_delta_token(cursor_key, new_token)
 
-        return docs, new_token
+        return docs, deleted_ids, new_token
 
     # ------------------------------------------------------------------
     # T-613: Permission-change delta handling

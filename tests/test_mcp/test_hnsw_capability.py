@@ -15,16 +15,17 @@ from unittest.mock import patch
 import pytest
 
 from depthfusion.mcp import server as mcp_server
+import depthfusion.mcp.tools._state as _state
 
 
 @pytest.fixture(autouse=True)
 def _reset_hnsw_singleton():
     """Reset module-level HNSW singleton between tests."""
-    mcp_server._HNSW_STORE = None
-    mcp_server._HNSW_INIT_ATTEMPTED = False
+    _state._HNSW_STORE = None
+    _state._HNSW_INIT_ATTEMPTED = False
     yield
-    mcp_server._HNSW_STORE = None
-    mcp_server._HNSW_INIT_ATTEMPTED = False
+    _state._HNSW_STORE = None
+    _state._HNSW_INIT_ATTEMPTED = False
 
 
 def test_hnsw_capability_returns_disabled_when_env_not_set():
@@ -44,12 +45,13 @@ def test_hnsw_capability_returns_disabled_when_env_not_set():
 
 def test_publish_context_returns_indexed_in_hnsw_false_when_disabled(tmp_path: Path):
     """With HNSW disabled, publish_context still works and reports False."""
+    import depthfusion.mcp.tools.capture as _capture
     from depthfusion.router.bus import FileBus
 
     bus = FileBus(bus_dir=tmp_path)
     env = {k: v for k, v in os.environ.items() if k != "DEPTHFUSION_HNSW_ENABLED"}
     with patch.dict(os.environ, env, clear=True), \
-         patch.object(mcp_server, "_get_context_bus", return_value=bus):
+         patch.object(_capture, "_get_context_bus", return_value=bus):
         payload = {
             "item": {
                 "item_id": "hnsw-test-1",
@@ -67,10 +69,11 @@ def test_publish_context_returns_indexed_in_hnsw_false_when_disabled(tmp_path: P
 
 def test_publish_context_returns_indexed_in_hnsw_bool(tmp_path: Path):
     """`indexed_in_hnsw` is always present and is a bool — never missing/None."""
+    import depthfusion.mcp.tools.capture as _capture
     from depthfusion.router.bus import FileBus
 
     bus = FileBus(bus_dir=tmp_path)
-    with patch.object(mcp_server, "_get_context_bus", return_value=bus):
+    with patch.object(_capture, "_get_context_bus", return_value=bus):
         payload = {
             "item": {
                 "item_id": "hnsw-test-2",

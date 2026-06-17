@@ -44,13 +44,14 @@ def _patch_embedder(store: HNSWStore, vector: list[float] | None) -> None:
 def test_capability_disabled_when_env_false(tmp_path: Path) -> None:
     """When DEPTHFUSION_HNSW_ENABLED is not set, _get_hnsw_store() returns None
     and the capability tool reports enabled=False."""
+    import depthfusion.mcp.tools._state as _state
     from depthfusion.mcp import server as mcp_server
 
     with patch.dict(os.environ, {"DEPTHFUSION_HNSW_ENABLED": "false"}, clear=False):
         # Reset module-level singleton so the env change is honoured.
-        mcp_server._HNSW_STORE = None
-        mcp_server._HNSW_INIT_ATTEMPTED = False
-        store = mcp_server._get_hnsw_store()
+        _state._HNSW_STORE = None
+        _state._HNSW_INIT_ATTEMPTED = False
+        store = _state._get_hnsw_store()
         assert store is None
         cap = json.loads(mcp_server._tool_hnsw_capability())
         assert cap["enabled"] is False

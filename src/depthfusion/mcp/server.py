@@ -32,7 +32,6 @@ from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
     _trim_to_sentence,
 )
 
-# Server state and infrastructure helpers
 # Tool implementations — bridge domain
 from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
     _tool_bridge,

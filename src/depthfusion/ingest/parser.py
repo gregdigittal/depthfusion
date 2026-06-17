@@ -9,7 +9,8 @@ Supports:
 Parse budget (T-599):
   Set ``DEPTHFUSION_PARSE_MAX_BYTES`` to a byte-count limit.  Documents
   exceeding the limit are quarantined instead of parsed.  The default is
-  ``10 * 1024 * 1024`` (10 MiB).  Set to ``0`` to disable (no limit).
+  ``50 * 1024 * 1024`` (50 MiB).  Set to ``0`` to disable (no limit).
+  Quarantined files are written to ``data/quarantine/`` as JSON sidecars.
 
 Usage::
 
@@ -32,8 +33,8 @@ from depthfusion.ingest.models import ParsedDocument
 # Parse-budget helpers (T-599)
 # ---------------------------------------------------------------------------
 
-#: Default parse-budget: 10 MiB.  Callers may override via env or constructor.
-_DEFAULT_PARSE_MAX_BYTES: int = 10 * 1024 * 1024
+#: Default parse-budget: 50 MiB (T-599 spec).  Callers may override via env or constructor.
+_DEFAULT_PARSE_MAX_BYTES: int = 50 * 1024 * 1024
 
 
 def _get_parse_max_bytes() -> int:

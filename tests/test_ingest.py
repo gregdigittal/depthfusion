@@ -401,3 +401,140 @@ class TestChunkingStrategyProtocol:
     def test_sentence_boundary_satisfies_protocol(self) -> None:
         chunker = SentenceBoundaryChunker()
         assert isinstance(chunker, ChunkingStrategy)
+
+
+# ---------------------------------------------------------------------------
+# T-599 — Parse-budget oversized-doc quarantine with disk persistence
+# ---------------------------------------------------------------------------
+
+class TestParseBudgetQuarantinePersistence:
+    """Oversized documents are quarantined to data/quarantine/ with reason logged.
+
+    Acceptance criteria (T-599):
+      AC-1: Files exceeding the budget are written to data/quarantine/ as JSON
+            sidecar files (not in-memory only).
+      AC-2: The JSON sidecar contains the source_id, raw_size_bytes, and a
+            reason string that mentions the doc size and the budget limit.
+      AC-3: The document is NOT parsed — parse() raises ValueError.
+      AC-4: Default threshold (50 MiB) and DEPTHFUSION_PARSE_MAX_BYTES override
+            both work; setting budget=0 disables quarantine.
+    """
+
+    def test_oversized_doc_creates_quarantine_artifact(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """An oversized doc produces a JSON sidecar in data/quarantine/."""
+        from depthfusion.parsers.documents.base import QuarantineStore
+
+        quarantine_dir = tmp_path / "data" / "quarantine"
+        store = QuarantineStore(persist_dir=quarantine_dir)
+        budget = 100
+        parser = DocumentParser(max_bytes=budget, quarantine_store=store)
+
+        content = b"X" * (budget + 1)
+        doc_path = tmp_path / "big.txt"
+        doc_path.write_bytes(content)
+
+        with pytest.raises(ValueError, match="parse budget"):
+            parser.parse(str(doc_path), "text/plain")
+
+        # Quarantine directory must now exist and have exactly one JSON file.
+        artifacts = list(quarantine_dir.glob("*.json"))
+        assert len(artifacts) == 1, f"expected 1 artifact, found {artifacts}"
+
+    def test_quarantine_artifact_contains_reason(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The JSON sidecar records source_id, raw_size_bytes, and reason."""
+        import json as _json
+
+        from depthfusion.parsers.documents.base import QuarantineStore
+
+        quarantine_dir = tmp_path / "data" / "quarantine"
+        store = QuarantineStore(persist_dir=quarantine_dir)
+        budget = 200
+        parser = DocumentParser(max_bytes=budget, quarantine_store=store)
+
+        content = b"Y" * (budget + 50)
+        doc_path = tmp_path / "oversized.txt"
+        doc_path.write_bytes(content)
+
+        with pytest.raises(ValueError):
+            parser.parse(str(doc_path), "text/plain")
+
+        artifacts = list(quarantine_dir.glob("*.json"))
+        assert artifacts, "expected at least one quarantine artifact"
+        record = _json.loads(artifacts[0].read_text(encoding="utf-8"))
+
+        # source_id must reference the document.
+        assert str(doc_path.resolve()) in record["source_id"]
+        # raw_size_bytes must be accurate.
+        assert record["raw_size_bytes"] == len(content)
+        # error_message must mention both sizes so operators can diagnose.
+        msg = record["error_message"]
+        assert str(len(content)) in msg
+        assert str(budget) in msg
+
+    def test_oversized_doc_is_not_parsed(self, tmp_path: pathlib.Path) -> None:
+        """parse() raises ValueError for oversized docs — no ParsedDocument returned."""
+        from depthfusion.parsers.documents.base import QuarantineStore
+
+        quarantine_dir = tmp_path / "data" / "quarantine"
+        store = QuarantineStore(persist_dir=quarantine_dir)
+        budget = 50
+        parser = DocumentParser(max_bytes=budget, quarantine_store=store)
+
+        doc_path = tmp_path / "toobig.txt"
+        doc_path.write_bytes(b"Z" * (budget + 10))
+
+        with pytest.raises(ValueError):
+            parser.parse(str(doc_path), "text/plain")
+
+        # Nothing was parsed — quarantine dir has the artifact, not a parsed doc.
+        artifacts = list(quarantine_dir.glob("*.json"))
+        assert len(artifacts) == 1
+
+    def test_budget_zero_disables_quarantine(self, tmp_path: pathlib.Path) -> None:
+        """budget=0 means no limit — no quarantine artifact is created."""
+        from depthfusion.parsers.documents.base import QuarantineStore
+
+        quarantine_dir = tmp_path / "data" / "quarantine"
+        store = QuarantineStore(persist_dir=quarantine_dir)
+        parser = DocumentParser(max_bytes=0, quarantine_store=store)
+
+        content = b"A" * 500
+        doc_path = tmp_path / "unlimited.txt"
+        doc_path.write_bytes(content)
+
+        doc = parser.parse(str(doc_path), "text/plain")
+        assert doc is not None
+
+        # No quarantine artifact produced.
+        if quarantine_dir.exists():
+            assert list(quarantine_dir.glob("*.json")) == []
+
+    def test_env_var_override_persists_to_disk(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """DEPTHFUSION_PARSE_MAX_BYTES env override triggers disk quarantine."""
+        import json as _json
+
+        from depthfusion.parsers.documents.base import QuarantineStore
+
+        monkeypatch.setenv("DEPTHFUSION_PARSE_MAX_BYTES", "30")
+        quarantine_dir = tmp_path / "data" / "quarantine"
+        store = QuarantineStore(persist_dir=quarantine_dir)
+        parser = DocumentParser(max_bytes=None, quarantine_store=store)
+        assert parser._max_bytes == 30
+
+        content = b"E" * 50
+        doc_path = tmp_path / "envtest.txt"
+        doc_path.write_bytes(content)
+
+        with pytest.raises(ValueError, match="parse budget"):
+            parser.parse(str(doc_path), "text/plain")
+
+        artifacts = list(quarantine_dir.glob("*.json"))
+        assert len(artifacts) == 1
+        record = _json.loads(artifacts[0].read_text(encoding="utf-8"))
+        assert "30" in record["error_message"]

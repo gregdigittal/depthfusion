@@ -231,6 +231,13 @@ class FileMetadataIndex:
         ``pinned``).  The ``content_hash`` and file stat values are computed
         and stored automatically.
 
+        **No TOCTOU window**: the hash comparison and the conditional DB write
+        are performed under the same lock acquisition.  A second thread calling
+        this method concurrently with the same *data* will either: (a) read the
+        already-updated row and short-circuit as a no-op, or (b) write the same
+        hash value (idempotent INSERT OR REPLACE), so the final state is
+        always consistent.
+
         Args:
             file_path: Path key for the index entry.
             data:      Raw bytes whose hash determines whether to update.
@@ -241,10 +248,8 @@ class FileMetadataIndex:
             ``True`` when the record was updated (data changed); ``False``
             when the data was identical and no update was performed.
         """
-        if not self.content_hash_changed(file_path, data):
-            return False  # identical — no-op
-
         new_hash = hashlib.sha256(data).hexdigest()
+
         try:
             stat = file_path.stat()
             mtime = stat.st_mtime
@@ -260,8 +265,22 @@ class FileMetadataIndex:
         salience = kwargs.get("salience")
         pinned = bool(kwargs.get("pinned", False))
 
+        # Hold the lock for the entire check-then-write sequence so that no
+        # other thread can interleave a read between the hash comparison and
+        # the INSERT OR REPLACE (eliminates the TOCTOU window).
         with self._lock:
             assert self._conn is not None
+
+            cur = self._conn.execute(
+                "SELECT content_hash FROM file_metadata WHERE file_path = ?",
+                (str(file_path),),
+            )
+            row = cur.fetchone()
+            stored_hash: str | None = row[0] if row is not None else None
+
+            if stored_hash is not None and stored_hash == new_hash:
+                return False  # identical — no-op
+
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO file_metadata

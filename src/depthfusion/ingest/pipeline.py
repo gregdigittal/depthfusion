@@ -209,6 +209,17 @@ class IngestPipeline:
         finally:
             pathlib.Path(tmp_path).unlink(missing_ok=True)
 
+        # run() can return None if the document is unchanged (file_index) or
+        # if OCR is disabled for image MIME types. Since run_from_bytes() is
+        # used by connectors and always expects a parsed document, we raise
+        # an error in these cases.
+        if doc is None:
+            raise ValueError(
+                f"Failed to parse document from bytes (mime_type={mime_type}): "
+                "either OCR is disabled for image types, or the file is unchanged "
+                "and a file_index was provided. Check your DEPTHFUSION_OCR_ENABLED flag."
+            )
+
         # Override source_id and merge caller-supplied metadata
         doc.source_id = source_id
         if metadata:

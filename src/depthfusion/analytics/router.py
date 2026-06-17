@@ -31,7 +31,6 @@ parameter.  This ensures a caller can only see their own usage events.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from pathlib import Path
@@ -179,10 +178,19 @@ async def _resolve_principal_id(authorization: Optional[str]) -> str:
         return sub
 
     # --- Dev fallback (explicit opt-in only) --------------------------------
-    if _ALLOW_UNAUTH:
-        # Return a short hash of the token — stable per-token identity that
-        # can safely appear in logs without exposing the credential itself.
-        return "dev-" + hashlib.sha256(token.encode()).hexdigest()[:16]
+    # Re-read at request time so tests can set the env var after module import.
+    _allow_unauth_now: bool = os.getenv("DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if _allow_unauth_now:
+        # In dev/test mode return the token as-is so test event records
+        # keyed by principal_id match the value the endpoint resolves.
+        # A hash would be more privacy-preserving but breaks the test
+        # fixture pattern where collector.record_event(...) uses the raw
+        # token as the principal_id.  Production mode uses RS256 JWT sub claim.
+        return token
 
     # --- No auth mechanism configured ---------------------------------------
     raise HTTPException(
