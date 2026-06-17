@@ -172,8 +172,8 @@ class QuarantineStore:
         self._persist_dir: pathlib.Path | None = (
             pathlib.Path(persist_dir) if persist_dir is not None else None
         )
-        # Directory is created lazily on first write — not at construction time.
-        self._dir_created: bool = False
+        if self._persist_dir is not None:
+            self._persist_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -188,18 +188,11 @@ class QuarantineStore:
         safe_name = safe_name[-200:] if len(safe_name) > 200 else safe_name
         return self._persist_dir / f"{safe_name}.json"
 
-    def _ensure_dir(self) -> None:
-        """Create persist_dir on first write (lazy creation)."""
-        if self._persist_dir is not None and not self._dir_created:
-            self._persist_dir.mkdir(parents=True, exist_ok=True)
-            self._dir_created = True
-
     def _write_sidecar(self, entry: QuarantineEntry) -> None:
         """Atomically write a JSON sidecar for *entry* if persist_dir is set."""
         dest = self._sidecar_path(entry.source_id)
         if dest is None:
             return
-        self._ensure_dir()
         payload = json.dumps(dataclasses.asdict(entry), indent=2, ensure_ascii=False)
         tmp = dest.with_suffix(".json.tmp")
         try:
