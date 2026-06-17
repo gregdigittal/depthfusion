@@ -11,6 +11,12 @@ from depthfusion.authz.export_controls import (
 from .capability_check import AuthorizationError, require_capability
 from .frontmatter import ACLFrontmatter, parse_acl, write_acl
 from .policy_engine import PolicyDecision, PolicyEngine, get_policy_engine
+from .policy_snapshot import (
+    SignedPolicySnapshot,
+    SnapshotVerification,
+    sign_policy_snapshot,
+    verify_policy_snapshot,
+)
 from .roles import (
     ROLE_CAPABILITIES,
     Capability,
@@ -39,4 +45,8 @@ __all__ = [
     "PolicyDecision",
     "PolicyEngine",
     "get_policy_engine",
+    "SignedPolicySnapshot",
+    "SnapshotVerification",
+    "sign_policy_snapshot",
+    "verify_policy_snapshot",
 ]

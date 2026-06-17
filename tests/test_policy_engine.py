@@ -532,3 +532,261 @@ class TestClassificationExclusion:
             {"acl_allow": [p.principal_id], "classification": "restricted"},
         )
         assert not dec.allow
+
+
+# ---------------------------------------------------------------------------
+# S-191 T-662 — Signed offline policy snapshot
+# ---------------------------------------------------------------------------
+
+from depthfusion.authz.policy_snapshot import (  # noqa: E402
+    SNAPSHOT_KEY_ENV,
+    PolicySnapshotError,
+    SignedPolicySnapshot,
+    SnapshotVerification,
+    current_classification_policy_payload,
+    sign_policy_snapshot,
+    verify_policy_snapshot,
+)
+
+# A fixed, test-only signing key. Installed via the env var the production code
+# reads, BEFORE any snapshot is signed/verified (per project keyring-test rule).
+_TEST_SNAPSHOT_KEY = "00112233445566778899aabbccddeeff"
+
+
+@pytest.fixture()
+def snapshot_key_env(monkeypatch: pytest.MonkeyPatch) -> str:
+    """Install a test-only signing key in the environment the code reads."""
+    monkeypatch.setenv(SNAPSHOT_KEY_ENV, _TEST_SNAPSHOT_KEY)
+    return _TEST_SNAPSHOT_KEY
+
+
+class TestPolicySnapshotSigning:
+    """Snapshot signing + verification primitives (positive AND negative)."""
+
+    def test_sign_then_verify_ok(self, snapshot_key_env: str) -> None:
+        snap = sign_policy_snapshot(version=1)
+        assert snap.signature  # non-empty signature was produced
+        # Positive case: a freshly-signed, unexpired snapshot verifies OK.
+        assert verify_policy_snapshot(snap) is SnapshotVerification.OK
+
+    def test_sign_with_explicit_key(self) -> None:
+        snap = sign_policy_snapshot(version=2, key=_TEST_SNAPSHOT_KEY)
+        assert (
+            verify_policy_snapshot(snap, key=_TEST_SNAPSHOT_KEY)
+            is SnapshotVerification.OK
+        )
+
+    def test_missing_key_raises_on_sign(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv(SNAPSHOT_KEY_ENV, raising=False)
+        with pytest.raises(PolicySnapshotError):
+            sign_policy_snapshot(version=1)
+
+    def test_unsigned_snapshot_refused(self, snapshot_key_env: str) -> None:
+        # Negative case: a snapshot with no signature is UNSIGNED (deny).
+        snap = sign_policy_snapshot(version=1)
+        unsigned = SignedPolicySnapshot(
+            version=snap.version,
+            issued_at=snap.issued_at,
+            expires_at=snap.expires_at,
+            policy=snap.policy,
+            signature="",
+        )
+        assert verify_policy_snapshot(unsigned) is SnapshotVerification.UNSIGNED
+
+    def test_tampered_policy_refused(self, snapshot_key_env: str) -> None:
+        # Negative case: widening allowed_roles after signing breaks the HMAC.
+        snap = sign_policy_snapshot(version=1)
+        tampered_policy = {k: list(v) for k, v in snap.policy.items()}
+        tampered_policy["restricted"] = sorted(
+            set(tampered_policy.get("restricted", [])) | {"viewer", "member"}
+        )
+        tampered = SignedPolicySnapshot(
+            version=snap.version,
+            issued_at=snap.issued_at,
+            expires_at=snap.expires_at,
+            policy=tampered_policy,
+            signature=snap.signature,  # stale signature over old body
+        )
+        assert verify_policy_snapshot(tampered) is SnapshotVerification.TAMPERED
+
+    def test_tampered_signature_refused(self, snapshot_key_env: str) -> None:
+        snap = sign_policy_snapshot(version=1)
+        forged = SignedPolicySnapshot(
+            version=snap.version,
+            issued_at=snap.issued_at,
+            expires_at=snap.expires_at,
+            policy=snap.policy,
+            signature="deadbeef" * 8,  # 64 hex chars, but wrong
+        )
+        assert verify_policy_snapshot(forged) is SnapshotVerification.TAMPERED
+
+    def test_wrong_key_refused(self, snapshot_key_env: str) -> None:
+        snap = sign_policy_snapshot(version=1)
+        assert (
+            verify_policy_snapshot(snap, key="ffffffffffffffffffffffffffffffff")
+            is SnapshotVerification.TAMPERED
+        )
+
+    def test_expired_snapshot_refused(self, snapshot_key_env: str) -> None:
+        # issued in the past with a short TTL → expired by `now`.
+        snap = sign_policy_snapshot(version=1, now=1000.0, ttl_seconds=10)
+        # valid just before expiry
+        assert (
+            verify_policy_snapshot(snap, now=1005.0) is SnapshotVerification.OK
+        )
+        # refused at/after expiry
+        assert (
+            verify_policy_snapshot(snap, now=2000.0)
+            is SnapshotVerification.EXPIRED
+        )
+
+    def test_roundtrip_dict_preserves_verification(self, snapshot_key_env: str) -> None:
+        snap = sign_policy_snapshot(version=3)
+        restored = SignedPolicySnapshot.from_dict(snap.to_dict())
+        assert verify_policy_snapshot(restored) is SnapshotVerification.OK
+
+    def test_payload_matches_live_policy(self) -> None:
+        payload = current_classification_policy_payload()
+        # restricted must NOT grant viewer/member (sanity vs the live policy).
+        assert "restricted" in payload
+        assert "viewer" not in payload["restricted"]
+        assert "member" not in payload["restricted"]
+
+
+class TestPolicyEngineOfflineSnapshot:
+    """Wire-up of the signed snapshot into ``PolicyEngine.decide`` (S-191 AC-3)."""
+
+    def setup_method(self) -> None:
+        self.engine = PolicyEngine(cache_ttl=60.0)
+
+    def test_offline_matches_online_for_allowed(self, snapshot_key_env: str) -> None:
+        # admin reading restricted: online allows; offline (signed snapshot)
+        # must yield the SAME decision.
+        p = _admin()
+        resource = {
+            "acl_allow": [p.principal_id],
+            "classification": "restricted",
+        }
+        online = self.engine.decide(p, Capability.READ_ALL_RECORDS, resource)
+        assert online.allow
+
+        snap = sign_policy_snapshot(version=1)
+        offline = self.engine.decide(
+            p, Capability.READ_ALL_RECORDS, resource, offline_snapshot=snap
+        )
+        assert offline.allow == online.allow == True  # noqa: E712
+
+    def test_offline_matches_online_for_denied(self, snapshot_key_env: str) -> None:
+        # viewer reading restricted: online denies; offline must also deny.
+        p = _principal(pid="viewer-x", groups=["viewer"])
+        resource = {
+            "acl_allow": [p.principal_id],
+            "classification": "restricted",
+        }
+        online = self.engine.decide(p, Capability.READ_OWN_RECORDS, resource)
+        assert not online.allow
+
+        snap = sign_policy_snapshot(version=1)
+        offline = self.engine.decide(
+            p, Capability.READ_OWN_RECORDS, resource, offline_snapshot=snap
+        )
+        assert offline.allow == online.allow == False  # noqa: E712
+
+    def test_tampered_snapshot_denies_not_allows(self, snapshot_key_env: str) -> None:
+        # Attacker widens restricted to include viewer in the offline snapshot.
+        # The engine MUST deny (refuse the snapshot), not honour the forgery.
+        p = _principal(pid="viewer-x", groups=["viewer"])
+        snap = sign_policy_snapshot(version=1)
+        tampered_policy = {k: list(v) for k, v in snap.policy.items()}
+        tampered_policy["restricted"] = sorted(
+            set(tampered_policy.get("restricted", [])) | {"viewer"}
+        )
+        tampered = SignedPolicySnapshot(
+            version=snap.version,
+            issued_at=snap.issued_at,
+            expires_at=snap.expires_at,
+            policy=tampered_policy,
+            signature=snap.signature,
+        )
+        dec = self.engine.decide(
+            p,
+            Capability.READ_OWN_RECORDS,
+            {"acl_allow": [p.principal_id], "classification": "restricted"},
+            offline_snapshot=tampered,
+        )
+        assert not dec.allow
+        assert "snapshot" in dec.reason.lower()
+
+    def test_unsigned_snapshot_denies(self, snapshot_key_env: str) -> None:
+        p = _admin()
+        snap = sign_policy_snapshot(version=1)
+        unsigned = SignedPolicySnapshot(
+            version=snap.version,
+            issued_at=snap.issued_at,
+            expires_at=snap.expires_at,
+            policy=snap.policy,
+            signature="",
+        )
+        dec = self.engine.decide(
+            p,
+            Capability.READ_ALL_RECORDS,
+            {"acl_allow": [p.principal_id], "classification": "restricted"},
+            offline_snapshot=unsigned,
+        )
+        # Even though admin would normally be allowed, an unsigned snapshot
+        # forces deny (fail-closed).
+        assert not dec.allow
+
+    def test_expired_snapshot_denies(self, snapshot_key_env: str) -> None:
+        p = _admin()
+        snap = sign_policy_snapshot(version=1, now=1000.0, ttl_seconds=10)
+        dec = self.engine.decide(
+            p,
+            Capability.READ_ALL_RECORDS,
+            {"acl_allow": [p.principal_id], "classification": "restricted"},
+            offline_snapshot=snap,
+            # decide() uses time.time() for expiry; snapshot is long expired.
+        )
+        assert not dec.allow
+
+    def test_offline_no_classification_still_allows(self, snapshot_key_env: str) -> None:
+        # No classification on the resource → snapshot is irrelevant; the
+        # RBAC + ACL checks alone decide. A signed (but unconsulted) snapshot
+        # must not break a normal allow.
+        p = _member()
+        snap = sign_policy_snapshot(version=1)
+        dec = self.engine.decide(
+            p,
+            Capability.READ_OWN_RECORDS,
+            {"acl_allow": [p.principal_id]},
+            offline_snapshot=snap,
+        )
+        assert dec.allow
+
+    def test_offline_rbac_failure_denies_before_snapshot(
+        self, snapshot_key_env: str
+    ) -> None:
+        # A principal lacking the capability is denied at the RBAC stage even
+        # with a perfectly valid snapshot — order is preserved.
+        p = _no_role()
+        snap = sign_policy_snapshot(version=1)
+        dec = self.engine.decide(
+            p,
+            Capability.READ_OWN_RECORDS,
+            {"acl_allow": [p.principal_id], "classification": "public"},
+            offline_snapshot=snap,
+        )
+        assert not dec.allow
+
+    def test_offline_decisions_not_cached(self, snapshot_key_env: str) -> None:
+        # Offline decisions must not poison the online cache.
+        before = self.engine.cache_size
+        p = _admin()
+        snap = sign_policy_snapshot(version=1)
+        self.engine.decide(
+            p,
+            Capability.READ_ALL_RECORDS,
+            {"acl_allow": [p.principal_id], "classification": "restricted"},
+            offline_snapshot=snap,
+        )
+        assert self.engine.cache_size == before

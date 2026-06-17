@@ -3132,7 +3132,7 @@
 
 **Tasks:**
 - [x] T-661: Export policy schema + admin CRUD + versioning — Sonnet dev, DS rev
-- [ ] T-662: Signed policy snapshot for offline enforcement — Opus dev, DS rev
+- [x] T-662: Signed policy snapshot for offline enforcement — Opus dev, DS rev
 
 ### S-192: As the app, I want enforcement in the Rust core so that export limits can't be bypassed from the webview `P0` `L`
 
