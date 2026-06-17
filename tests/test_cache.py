@@ -19,7 +19,21 @@ import time
 import pytest
 from cryptography.fernet import Fernet
 
-from depthfusion.cache import CacheEntry, CacheManager, EvictionPolicy
+from depthfusion.authz.classification import ClassificationLevel
+from depthfusion.cache import (
+    CACHE_SCHEMA,
+    CACHE_SCHEMA_VERSION,
+    CacheableRecord,
+    CacheEntry,
+    CacheManager,
+    EvictionPolicy,
+    LeaseRow,
+    TamperResult,
+    compute_integrity_hmac,
+    filter_admissible,
+    is_admissible,
+    verify_on_open,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -318,3 +332,153 @@ class TestDeleteAndCount:
         manager.put("s1.txt", "u", b"x" * 100)
         manager.put("s2.txt", "u", b"y" * 200)
         assert manager.total_size_bytes() == 300
+
+
+# ---------------------------------------------------------------------------
+# Admission filter — ACL membership + classification ceiling (T-650, S-188 AC-4)
+# ---------------------------------------------------------------------------
+
+class TestAdmissionFilter:
+    def _record(
+        self,
+        level: ClassificationLevel,
+        acl: list[str],
+        rid: str = "rec-1",
+    ) -> CacheableRecord:
+        return CacheableRecord.of(rid, level, acl)
+
+    def test_admits_when_in_acl_and_within_ceiling(self) -> None:
+        rec = self._record(ClassificationLevel.INTERNAL, ["alice", "bob"])
+        decision = is_admissible(rec, "alice", ClassificationLevel.CONFIDENTIAL)
+        assert decision.admitted is True
+        assert decision.reason == "admitted"
+
+    def test_rejects_when_principal_not_in_acl(self) -> None:
+        rec = self._record(ClassificationLevel.PUBLIC, ["alice"])
+        decision = is_admissible(rec, "mallory", ClassificationLevel.RESTRICTED)
+        assert decision.admitted is False
+        assert decision.acl_denied is True
+
+    def test_rejects_when_classification_exceeds_ceiling(self) -> None:
+        # In ACL, but record is RESTRICTED and ceiling is only INTERNAL.
+        rec = self._record(ClassificationLevel.RESTRICTED, ["alice"])
+        decision = is_admissible(rec, "alice", ClassificationLevel.INTERNAL)
+        assert decision.admitted is False
+        assert decision.ceiling_exceeded is True
+
+    def test_ceiling_is_inclusive(self) -> None:
+        # classification == ceiling is admitted (inclusive boundary).
+        rec = self._record(ClassificationLevel.CONFIDENTIAL, ["alice"])
+        decision = is_admissible(rec, "alice", ClassificationLevel.CONFIDENTIAL)
+        assert decision.admitted is True
+
+    def test_acl_checked_before_ceiling(self) -> None:
+        # Out-of-ACL principal on an over-ceiling record → ACL_DENIED, never
+        # leaks that the ceiling would also have failed.
+        rec = self._record(ClassificationLevel.RESTRICTED, ["alice"])
+        decision = is_admissible(rec, "mallory", ClassificationLevel.PUBLIC)
+        assert decision.acl_denied is True
+        assert decision.ceiling_exceeded is False
+
+    def test_filter_admissible_is_order_preserving_subset(self) -> None:
+        recs = [
+            CacheableRecord.of("r1", ClassificationLevel.PUBLIC, ["alice"]),
+            CacheableRecord.of("r2", ClassificationLevel.RESTRICTED, ["alice"]),
+            CacheableRecord.of("r3", ClassificationLevel.INTERNAL, ["bob"]),
+            CacheableRecord.of("r4", ClassificationLevel.INTERNAL, ["alice"]),
+        ]
+        admitted = filter_admissible(
+            recs, "alice", ClassificationLevel.CONFIDENTIAL
+        )
+        # r1 (public, in acl) and r4 (internal, in acl) pass.
+        # r2 over ceiling; r3 not in acl.
+        assert [r.record_id for r in admitted] == ["r1", "r4"]
+
+    def test_filter_empty_input(self) -> None:
+        assert filter_admissible([], "alice", ClassificationLevel.PUBLIC) == []
+
+
+# ---------------------------------------------------------------------------
+# Tamper detection — HMAC over schema + lease table (T-651, S-188 AC-3)
+# ---------------------------------------------------------------------------
+
+class TestTamperDetection:
+    def _leases(self) -> list[LeaseRow]:
+        return [
+            LeaseRow("rec-a", 1000, 1000 + 7 * 86400, ClassificationLevel.INTERNAL),
+            LeaseRow("rec-b", 2000, 2000 + 48 * 3600, ClassificationLevel.CONFIDENTIAL),
+        ]
+
+    def test_matching_digest_returns_ok(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        digest = compute_integrity_hmac(key, leases)
+        assert verify_on_open(key, digest, leases) is TamperResult.OK
+
+    def test_missing_digest_triggers_wipe_resync(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        assert verify_on_open(key, None, leases) is TamperResult.WIPE_AND_RESYNC
+        assert verify_on_open(key, "", leases) is TamperResult.WIPE_AND_RESYNC
+
+    def test_tampered_lease_expiry_triggers_wipe_resync(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        digest = compute_integrity_hmac(key, leases)
+        # Attacker extends rec-a's lease expiry on disk.
+        tampered = [
+            LeaseRow("rec-a", 1000, 1000 + 365 * 86400, ClassificationLevel.INTERNAL),
+            leases[1],
+        ]
+        assert (
+            verify_on_open(key, digest, tampered)
+            is TamperResult.WIPE_AND_RESYNC
+        )
+
+    def test_tampered_schema_triggers_wipe_resync(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        digest = compute_integrity_hmac(key, leases)
+        evil_schema = CACHE_SCHEMA + "\nDROP TABLE cache_lease;"
+        assert (
+            verify_on_open(key, digest, leases, schema=evil_schema)
+            is TamperResult.WIPE_AND_RESYNC
+        )
+
+    def test_wrong_key_triggers_wipe_resync(self) -> None:
+        leases = self._leases()
+        digest = compute_integrity_hmac(b"k" * 32, leases)
+        assert (
+            verify_on_open(b"x" * 32, digest, leases)
+            is TamperResult.WIPE_AND_RESYNC
+        )
+
+    def test_digest_independent_of_lease_row_order(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        reordered = list(reversed(leases))
+        assert compute_integrity_hmac(key, leases) == compute_integrity_hmac(
+            key, reordered
+        )
+
+    def test_schema_version_bump_changes_digest(self) -> None:
+        key = b"k" * 32
+        leases = self._leases()
+        d1 = compute_integrity_hmac(key, leases, schema_version=CACHE_SCHEMA_VERSION)
+        d2 = compute_integrity_hmac(
+            key, leases, schema_version=CACHE_SCHEMA_VERSION + 1
+        )
+        assert d1 != d2
+
+    def test_schema_mirrors_record_chunk_embedding_with_acl_lease_columns(
+        self,
+    ) -> None:
+        # S-188 AC-2: schema must mirror record + chunk + embedding subset with
+        # ACL + classification + lease columns.
+        assert "cached_record" in CACHE_SCHEMA
+        assert "cached_chunk" in CACHE_SCHEMA
+        assert "cached_embedding" in CACHE_SCHEMA
+        assert "cache_lease" in CACHE_SCHEMA
+        assert "acl_allow" in CACHE_SCHEMA
+        assert "classification" in CACHE_SCHEMA
+        assert "lease_expires_at" in CACHE_SCHEMA

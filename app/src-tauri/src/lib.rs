@@ -1,4 +1,5 @@
 mod auth;
+mod cache;
 mod commands;
 mod settings;
 mod updater;

@@ -3083,9 +3083,9 @@
 - [ ] AC-4: Only records where the principal is in `acl_allow` AND classification ≤ user's offline ceiling are ever cached
 
 **Tasks:**
-- [ ] T-649: SQLCipher integration in Rust core + key wrap via keychain — Opus dev, DS+GM rev
-- [ ] T-650: Cache schema + ACL/ceiling admission filter — Opus dev, DS rev
-- [ ] T-651: Tamper detection + wipe/re-sync path — Sonnet dev, DS rev
+- [x] T-649: SQLCipher integration in Rust core + key wrap via keychain — Opus dev, DS+GM rev
+- [x] T-650: Cache schema + ACL/ceiling admission filter — Opus dev, DS rev
+- [x] T-651: Tamper detection + wipe/re-sync path — Sonnet dev, DS rev
 
 ### S-189: As a user, I want the cache to learn what I work on so that offline mode has what I need without holding everything `P0` `L`
 
