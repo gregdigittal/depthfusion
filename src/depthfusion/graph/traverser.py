@@ -37,29 +37,6 @@ def _graph_entity_allowed(entity: "Entity", allowed_ids: "set[str]") -> bool:
     return bool(set(acl_allow) & allowed_ids)
 
 
-def _graph_edge_allowed(edge: "Edge", allowed_ids: "set[str]") -> bool:
-    """Return True if the principal is allowed to traverse this edge.
-
-    T-619: edges produced for document-derived entities carry
-    ``metadata["acl_allow"]`` inherited from the source document. Traversal
-    must hide an edge whose inherited ACL the principal cannot satisfy, even
-    when the neighbour entity itself is reachable by another path/ACL —
-    otherwise the document relationship leaks across an access boundary.
-
-    Mirrors ``_graph_entity_allowed``:
-      * acl_allow absent → True (legacy structural edge, no ACL stamp →
-        unrestricted, visible to all principals)
-      * acl_allow present but empty / malformed → False (fail-closed)
-      * acl_allow present → True iff any allowed_id intersects it
-    """
-    acl_allow = edge.metadata.get("acl_allow")
-    if acl_allow is None:
-        return True  # legacy — no ACL stamp means unrestricted
-    if not isinstance(acl_allow, list) or not acl_allow:
-        return False
-    return bool(set(acl_allow) & allowed_ids)
-
-
 def traverse(
     entity_id: str,
     store: "JSONGraphStore | SQLiteGraphStore | ChromaGraphStore",
@@ -119,15 +96,6 @@ def traverse(
                     delta = edge.metadata.get("delta_hours")
                     if delta is not None and float(delta) > time_window_hours:
                         continue
-                # T-619: edge-level ACL trim. A document-derived edge carries
-                # the source document's acl_allow; hide the edge (and the
-                # relationship it represents) when the principal's allowed_ids
-                # don't intersect it. Fail-closed: a restricted edge is never
-                # traversed even if the neighbour entity is otherwise visible.
-                if allowed_ids is not None and not _graph_edge_allowed(
-                    edge, allowed_ids
-                ):
-                    continue
                 neighbor_id = (
                     edge.target_id if edge.source_id == fid else edge.source_id
                 )

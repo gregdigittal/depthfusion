@@ -48,41 +48,13 @@ def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def _resolve_acl(acl_allow: list[str] | None, project: str) -> list[str]:
-    """T-619: pick the ACL to stamp onto an extracted entity/edge.
-
-    When the caller supplies a source-document ACL (`acl_allow`), the entity
-    *inherits* it — this is the ACL-inheritance contract. When no ACL is
-    supplied the extractor falls back to `[project]`, preserving the v0.4.x
-    behaviour where memory entities are scoped to their own project.
-
-    The returned list is always a fresh copy so two entities never share a
-    mutable ACL reference.
-    """
-    if acl_allow:
-        return list(acl_allow)
-    return [project]
-
-
 class RegexExtractor:
     """Fast, no-API entity extraction. Returns confidence=1.0 entities."""
 
     def __init__(self, project: str):
         self._project = project
 
-    def extract(
-        self,
-        content: str,
-        source_file: str,
-        acl_allow: list[str] | None = None,
-    ) -> list[Entity]:
-        """Extract entities from `content`.
-
-        `acl_allow` (T-619): the source document's ACL. When provided every
-        extracted entity inherits it via `metadata["acl_allow"]`; otherwise
-        the extractor falls back to `[project]`.
-        """
-        acl = _resolve_acl(acl_allow, self._project)
+    def extract(self, content: str, source_file: str) -> list[Entity]:
         entities: list[Entity] = []
         seen: set[str] = set()
 
@@ -94,7 +66,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "class", self._project),
                     name=name, type="class", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={"acl_allow": list(acl)},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         for match in _SNAKE_FUNC_RE.finditer(content):
@@ -105,7 +77,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "function", self._project),
                     name=name, type="function", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={"acl_allow": list(acl)},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         for match in _FILE_RE.finditer(content):
@@ -116,7 +88,7 @@ class RegexExtractor:
                     entity_id=make_entity_id(name, "file", self._project),
                     name=name, type="file", project=self._project,
                     source_files=[source_file], confidence=1.0,
-                    first_seen=_now_iso(), metadata={"acl_allow": list(acl)},
+                    first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
                 ))
 
         return entities
@@ -162,22 +134,9 @@ class HaikuExtractor:
     def is_available(self) -> bool:
         return self._backend is not None and self._backend.healthy()
 
-    def extract(
-        self,
-        content: str,
-        source_file: str,
-        acl_allow: list[str] | None = None,
-    ) -> list[Entity]:
-        """Extract named entities via the LLM backend.
-
-        `acl_allow` (T-619): the source document's ACL, inherited by every
-        extracted entity. Falls back to `[project]` when not provided.
-        Returns [] when the backend is unavailable (regex fallback applies
-        at the pipeline level — see DocumentEntityPipeline).
-        """
+    def extract(self, content: str, source_file: str) -> list[Entity]:
         if not self.is_available():
             return []
-        acl = _resolve_acl(acl_allow, self._project)
         try:
             raw = self._backend.complete(
                 _HAIKU_PROMPT.format(content=content[:2000]),
@@ -200,7 +159,7 @@ class HaikuExtractor:
                 entity_id=make_entity_id(name, etype, self._project),
                 name=name, type=etype, project=self._project,
                 source_files=[source_file], confidence=0.85,
-                first_seen=_now_iso(), metadata={"acl_allow": list(acl)},
+                first_seen=_now_iso(), metadata={"acl_allow": [self._project]},
             ))
         return entities
 
@@ -220,48 +179,3 @@ def confidence_merge(
         # Regex overwrites haiku on same ID (regex confidence = 1.0 > haiku)
         result[e.entity_id] = e
     return list(result.values())
-
-
-class DocumentEntityPipeline:
-    """T-618: extract named entities from document content.
-
-    Runs the regex extractor (always) and the LLM-backed HaikuExtractor
-    (only when its backend is available), then merges the two. When the LLM
-    backend is unavailable — no API key, no SDK, or DEPTHFUSION_HAIKU_ENABLED
-    unset — the pipeline degrades gracefully to the regex-only fallback path,
-    so document ingestion never depends on a live LLM call.
-
-    T-619: every entity inherits the *source document's* ``acl_allow`` (passed
-    per ``extract()`` call), satisfying the graph store's required-ACL rule
-    enforced by ``_validate_graph_acl``.
-
-    Inject a backend via ``haiku_backend=`` in tests to exercise the LLM path
-    deterministically; pass ``haiku_backend=None`` (default) in production to
-    let the env-gated factory resolve the real backend.
-    """
-
-    def __init__(self, project: str, haiku_backend: Any = None) -> None:
-        self._project = project
-        self._regex = RegexExtractor(project=project)
-        self._haiku = HaikuExtractor(project=project, backend=haiku_backend)
-
-    def llm_available(self) -> bool:
-        """True when the LLM backend will be consulted; else regex-only."""
-        return self._haiku.is_available()
-
-    def extract(
-        self,
-        content: str,
-        source_file: str,
-        acl_allow: list[str] | None = None,
-    ) -> list[Entity]:
-        """Extract named entities from ``content``.
-
-        ``acl_allow`` is the source document's ACL; every returned entity
-        inherits it (T-619). Returns a merged, deduplicated entity list
-        (regex precedence on collision via ``confidence_merge``).
-        """
-        regex_entities = self._regex.extract(content, source_file, acl_allow=acl_allow)
-        # Regex fallback: when the LLM backend is down, haiku_entities is [].
-        haiku_entities = self._haiku.extract(content, source_file, acl_allow=acl_allow)
-        return confidence_merge(regex_entities, haiku_entities)

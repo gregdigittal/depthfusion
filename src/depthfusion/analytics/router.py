@@ -31,6 +31,7 @@ parameter.  This ensures a caller can only see their own usage events.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -124,7 +125,7 @@ def _default_db_path() -> Path:
 # Principal resolution
 # ---------------------------------------------------------------------------
 
-async def _resolve_principal_id(authorization: Optional[str] = Header(default=None)) -> str:
+async def _resolve_principal_id(authorization: Optional[str]) -> str:
     """Validate the Authorization header and return the principal's sub claim.
 
     Returns the validated JWT ``sub`` claim — an opaque stable identifier,
@@ -178,16 +179,10 @@ async def _resolve_principal_id(authorization: Optional[str] = Header(default=No
         return sub
 
     # --- Dev fallback (explicit opt-in only) --------------------------------
-    # Re-read the env var at call time so tests that set it after module
-    # import (e.g. via monkeypatch or fixture) are respected.
-    allow_unauth = os.getenv("DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS", "").lower() in (
-        "1", "true", "yes",
-    )
-    if _ALLOW_UNAUTH or allow_unauth:
-        # Use the bearer token directly as the principal_id in dev/test mode.
-        # This keeps fixture data (principal_id == bearer token) consistent
-        # and avoids hash-aliasing in tests.  Never enable in production.
-        return token
+    if _ALLOW_UNAUTH:
+        # Return a short hash of the token — stable per-token identity that
+        # can safely appear in logs without exposing the credential itself.
+        return "dev-" + hashlib.sha256(token.encode()).hexdigest()[:16]
 
     # --- No auth mechanism configured ---------------------------------------
     raise HTTPException(
@@ -242,10 +237,11 @@ async def get_analytics_summary(
         description="Look-back window, e.g. ``7d``, ``30d``, ``1d``. Max 365d.",
         pattern=r"^[1-9]\d{0,3}d$",  # 1d–9999d; prefix keeps int parse bounded
     ),
-    principal_id: str = Depends(_resolve_principal_id),
+    authorization: Optional[str] = Header(default=None),
     db_path: Path = Depends(_default_db_path),
 ) -> AnalyticsSummaryResponse:
     """Return usage summary for the authenticated principal."""
+    principal_id = await _resolve_principal_id(authorization)
 
     # Parse period string ("7d" → 7)
     try:

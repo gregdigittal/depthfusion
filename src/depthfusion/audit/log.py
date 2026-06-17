@@ -309,34 +309,6 @@ class AuditStore:
                 row = conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()
                 return int(row[0])
 
-    def purge_before(self, cutoff: float) -> int:
-        """Delete audit events older than *cutoff* (Unix timestamp, seconds).
-
-        This is the enforcement primitive for a compliance retention policy:
-        events with ``timestamp < cutoff`` are permanently removed.  The store
-        is otherwise append-only — purging is an explicit, audited admin action
-        invoked only by retention enforcement.
-
-        Parameters
-        ----------
-        cutoff:
-            Unix timestamp (float).  Events strictly older than this are
-            deleted.
-
-        Returns
-        -------
-        int
-            The number of events deleted.
-        """
-        with self._lock:
-            with closing(self._connect()) as conn:
-                cur = conn.execute(
-                    "DELETE FROM audit_events WHERE timestamp < ?",
-                    (cutoff,),
-                )
-                conn.commit()
-                return int(cur.rowcount)
-
 
 __all__ = [
     "AuditEvent",

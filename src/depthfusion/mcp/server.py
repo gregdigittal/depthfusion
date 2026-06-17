@@ -32,15 +32,7 @@ from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
     _trim_to_sentence,
 )
 
-# State helpers re-exported for test patching compatibility (S-78 Task 4)
-from depthfusion.mcp.tools._state import (  # noqa: E402,F401
-    _get_context_bus,
-    _get_hnsw_store,
-)
-
-_HNSW_STORE: Any = None
-_HNSW_INIT_ATTEMPTED: bool = False
-
+# Server state and infrastructure helpers
 # Tool implementations — bridge domain
 from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
     _tool_bridge,
