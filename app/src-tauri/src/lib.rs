@@ -1,6 +1,7 @@
 mod auth;
 mod cache;
 mod commands;
+mod export;
 mod settings;
 mod updater;
 
@@ -35,6 +36,10 @@ pub fn run() {
             updater::check_update,
             settings::get_server_url,
             settings::set_server_url,
+            export::commands::export_copy_text,
+            export::commands::export_save_extract,
+            export::commands::export_print,
+            export::commands::export_download_original,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

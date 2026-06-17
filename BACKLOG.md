@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-06-15
+> Last updated: 2026-06-17
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -3143,8 +3143,8 @@
 - [ ] AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)
 
 **Tasks:**
-- [ ] T-663: Policy-gated clipboard/save/print IPC commands — Opus dev, DS+GM rev
-- [ ] T-664: Original-file streaming gate in Rust core — Opus dev, DS rev
+- [x] T-663: Policy-gated clipboard/save/print IPC commands — Opus dev, DS+GM rev
+- [x] T-664: Original-file streaming gate in Rust core — Opus dev, DS rev
 - [ ] T-665: Provenance footer + watermark policy hooks — Sonnet dev, Gemini rev
 - [ ] T-666: Red-team bypass checklist execution + residual-risk doc — Opus dev, DS rev
 
@@ -3327,4 +3327,169 @@
 **Tasks:**
 - [ ] T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — Opus dev, DS rev
 - [ ] T-700: Bulk grant/revoke drill + rehearsal report — Sonnet dev, Opus rev
+
+---
+
+## E-64: HTTP MCP Server GA + Model Performance Intelligence [backlog]
+
+> Two tightly coupled capabilities that together turn DepthFusion into the intelligent routing layer for the entire agent-hub. First: make the HTTP MCP server the canonical integration point for all Claude Code sessions (replacing the current Python subprocess hooks). Second: build model performance telemetry and a budget-aware recommendation API so that agent-ops auto mode can propose the best model for each task given learned experience and a spend budget.
+>
+> **Dependency:** S-207 (HTTP server GA) must complete before S-208–S-211 (telemetry and recommendation) because the telemetry ingest endpoint and recommendation MCP tools are served over HTTP.
+>
+> **Context (auth fix):** The S-191 auth overhaul changed the env var names. The `/sse` endpoint in `http_server.py` uses `require_principal` from `api/auth.py`, which requires `DEPTHFUSION_V2_LEGACY_AUTH=1` + `DEPTHFUSION_API_TOKEN` — not the old `DEPTHFUSION_MCP_TOKEN`. The env fix was applied 2026-06-17 and is pending a `sudo systemctl restart depthfusion-mcp` to take effect. T-701 finalises and tests this.
+
+---
+
+### S-207: As a Claude Code session, I want to call DepthFusion tools over HTTP MCP so that all sessions share one server and tool calls work mid-conversation without subprocess overhead `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `curl --max-time 5 -H "Authorization: Bearer $DEPTHFUSION_API_TOKEN" http://127.0.0.1:7301/sse` returns HTTP 200 with `event: endpoint` within 3s after service restart
+- [ ] AC-2: All existing DepthFusion MCP tools (`depthfusion_publish_context`, `depthfusion_recall`, `depthfusion_list_sessions`, `depthfusion_delete_context`) are callable via HTTP MCP with identical semantics to the current Python-import path
+- [ ] AC-3: The systemd unit `depthfusion-mcp.service` includes `StartLimitBurst=5` and `StartLimitIntervalSec=30` to prevent infinite crash-loops; if the service fails 5 times in 30s it stays down and emits a journal entry
+- [ ] AC-4: `~/.claude/mcp.json` (or the equivalent settings file used by Claude Code) registers the DepthFusion HTTP MCP server so tool calls work natively in any session without manual configuration
+- [ ] AC-5: The `/health` endpoint returns `{"status":"ok","auth":"legacy_token","version":"<version>"}` — callers can verify auth mode without attempting a full SSE connection
+- [ ] AC-6: Session-start hooks (`session-start.sh`) updated to verify HTTP MCP health rather than attempting a Python subprocess import; if the HTTP server is unreachable they log a warning and fall back to subprocess gracefully
+- [ ] AC-7: Documentation in `docs/mcp-http-server.md` covers: startup, auth env vars, curl verification, Claude Code MCP registration, and the benefit summary (shared server, mid-conversation tool calls, multi-client support)
+
+**Tasks:**
+- [ ] T-701: Verify auth fix in production — restart depthfusion-mcp, confirm `curl --max-time 5` returns 200 SSE, commit auth fix as a documented change in `docs/decisions/` — Sonnet dev, Haiku rev
+- [ ] T-702: Add `StartLimitBurst=5` + `StartLimitIntervalSec=30` to `/etc/systemd/system/depthfusion-mcp.service`; `systemctl daemon-reload` — Sonnet dev, Haiku rev
+- [ ] T-703: Register HTTP MCP server in Claude Code settings (`~/.claude/mcp.json` or `settings.json`); verify DepthFusion tools appear in tool list without manual invocation — Sonnet dev, Sonnet rev
+- [ ] T-704: Update `session-start.sh` hook to probe `/health` over HTTP first; fall back to Python subprocess if unreachable; add health-check result to session context output — Sonnet dev, Haiku rev
+- [ ] T-705: Integration test suite — `tests/test_http_mcp/`: health check, SSE connect, tool call round-trip for each registered tool; run in CI against a locally spawned server — Sonnet dev, Codex rev
+- [ ] T-706: Write `docs/mcp-http-server.md` covering auth, curl verification, MCP registration, multi-client sharing, and the fallback path — Sonnet dev, Haiku rev
+
+---
+
+### S-208: As any agent or orchestrator, I want to record model telemetry so that observed performance data accumulates over time as learned experience `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: A `record_model_telemetry` MCP tool accepts a structured event and persists it; callable from any Claude Code session via the HTTP MCP server (S-207)
+- [ ] AC-2: The telemetry event schema captures every signal needed for quality-per-dollar analysis:
+  ```
+  model_id: str          # e.g. "claude-sonnet-4-6", "claude-opus-4-8", "deepseek-v4-pro"
+  provider: str          # anthropic | openai | deepseek | google | cursor | openrouter
+  task_category: str     # see taxonomy below
+  quality_verdict: str   # PASS | FAIL | RETRY | REPLAN | BLOCK
+  tokens_in: int
+  tokens_out: int
+  cost_usd: float
+  duration_ms: int
+  agent_slug: str        # e.g. "va-security", "fable5-pm"
+  project_slug: str
+  session_id: str
+  gate_tier: str | null  # which gate caught a failure: dod|regression|security|grade|none
+  notes: str | null      # free-text context
+  ```
+- [ ] AC-3: Task category taxonomy enforced as an enum (invalid categories rejected with 422):
+  `architecture`, `implementation`, `code-review`, `test-writing`, `security-audit`,
+  `debugging`, `refactor`, `data-migration`, `documentation`, `analysis`, `planning`,
+  `mechanical` (boilerplate/scaffolding)
+- [ ] AC-4: Events stored in `telemetry/model_telemetry.db` (SQLite, separate from the main DepthFusion store to avoid schema lock contention); schema versioned with Alembic or a hand-rolled migration file
+- [ ] AC-5: Duplicate prevention: events with identical `(session_id, model_id, task_category, tokens_in, tokens_out)` within 60s are silently deduplicated (idempotent ingest)
+- [ ] AC-6: `GET /api/telemetry/recent?limit=50` returns the last N events — useful for debugging and confirming ingest is working
+
+**Tasks:**
+- [ ] T-707: Design `model_telemetry` SQLite schema + Alembic migration; schema includes `id`, `recorded_at`, and all fields from AC-2 — Sonnet dev, Codex rev
+- [ ] T-708: Implement `telemetry/recorder.py` — `record_event(event: TelemetryEvent) -> None` with dedup logic (AC-5) — Sonnet dev, Codex rev
+- [ ] T-709: Register `record_model_telemetry` MCP tool in `tools/`; validate enum fields; return `{id, deduplicated: bool}` — Sonnet dev, Haiku rev
+- [ ] T-710: FastAPI endpoint `GET /api/telemetry/recent` with optional `project_slug` and `model_id` filters — Sonnet dev, Haiku rev
+- [ ] T-711: Unit tests: ingest happy path, dedup, invalid category rejection, schema round-trip — Sonnet dev, Codex rev
+
+---
+
+### S-209: As an agent-ops orchestrator, I want to query learned model performance statistics so that routing decisions are based on empirical data rather than hard-coded assumptions `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `query_model_performance` MCP tool accepts `{task_category, model_id?, window_days?}` and returns per-(model, task_category) statistics
+- [ ] AC-2: Statistics returned per model include:
+  ```
+  model_id: str
+  task_category: str
+  sample_count: int
+  quality_rate: float          # fraction of PASS verdicts
+  avg_cost_usd: float
+  avg_tokens_out: int
+  avg_duration_ms: int
+  cost_per_pass: float         # avg_cost_usd / quality_rate — key quality-per-dollar signal
+  p50_duration_ms: int
+  p95_duration_ms: int
+  last_seen: str               # ISO timestamp of most recent event
+  confidence: str              # low (n<10) | medium (10≤n<50) | high (n≥50)
+  ```
+- [ ] AC-3: Window defaults to last 30 days; `window_days=0` means all-time
+- [ ] AC-4: Results cached in-process for 60 minutes (cache invalidated on new telemetry write)
+- [ ] AC-5: REST endpoint `GET /api/model-stats?task_category=<cat>&model_id=<model>&window_days=<n>` returns the same payload as the MCP tool — usable by dashboards and scripts without MCP overhead
+- [ ] AC-6: When `sample_count < 10`, `confidence = "low"` and the statistics are supplemented with hard-coded prior values (see T-713) clearly labelled as `source: "prior"` vs `source: "observed"`
+
+**Tasks:**
+- [ ] T-712: Implement `analytics/model_stats.py` — SQL aggregation query + in-memory LRU cache (60min TTL); compute all AC-2 fields — Sonnet dev, Codex rev
+- [ ] T-713: Define hard-coded prior table (baseline values drawn from Anthropic + OpenAI published benchmarks, updated quarterly): opus > sonnet > haiku quality order; cost ladder; task-category quality expectations — Opus dev, Codex rev
+- [ ] T-714: FastAPI endpoint `GET /api/model-stats`; register `query_model_performance` MCP tool — Sonnet dev, Haiku rev
+- [ ] T-715: Unit tests: stat computation correctness, cache invalidation, prior blending at low sample count — Sonnet dev, Codex rev
+
+---
+
+### S-210: As agent-ops auto mode, I want DepthFusion to recommend the best model for a task given vendor isolation constraints so that orchestration decisions are grounded in evidence `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `recommend_model` MCP tool accepts:
+  ```
+  task_category: str
+  context: str                     # brief description of the specific task
+  exclude_vendors: list[str]       # Fable-5 vendor isolation — e.g. ["anthropic"] if the dev just used Anthropic
+  available_models: list[str]?     # restrict candidates; default = all known models
+  min_confidence: str?             # "low"|"medium"|"high" — filter out models below threshold
+  ```
+- [ ] AC-2: Returns a ranked list of up to 5 recommendations:
+  ```
+  [
+    {
+      model_id: str,
+      provider: str,
+      rank: int,
+      quality_rate: float,
+      avg_cost_usd: float,
+      cost_per_pass: float,
+      confidence: str,
+      rationale: str              # one sentence: "highest observed quality_rate for code-review with n=47 samples"
+    },
+    ...
+  ]
+  ```
+- [ ] AC-3: `exclude_vendors` enforces Fable-5 vendor isolation — if `"anthropic"` is excluded, no Anthropic models appear in results regardless of quality score
+- [ ] AC-4: Ranking uses `quality_rate / cost_per_pass` as the primary signal (maximise quality per dollar spent); ties broken by `avg_cost_usd` ascending (prefer cheaper when quality is equal)
+- [ ] AC-5: Hard-coded priors are used for any model with `confidence = "low"` — the recommendation does not reject low-confidence models but surfaces confidence clearly
+- [ ] AC-6: Recommendations are NOT cached (they depend on current `exclude_vendors` which changes per call)
+- [ ] AC-7: REST endpoint `POST /api/recommend-model` accepts the same payload — usable by scripts and dashboards
+
+**Tasks:**
+- [ ] T-716: Implement `analytics/recommender.py` — ranking engine using quality_rate / cost_per_pass; Fable-5 vendor filter; prior blending; rationale generation — Opus dev, Codex rev
+- [ ] T-717: Register `recommend_model` MCP tool; validate exclude_vendors against known provider enum — Sonnet dev, Haiku rev
+- [ ] T-718: FastAPI endpoint `POST /api/recommend-model` — Sonnet dev, Haiku rev
+- [ ] T-719: Integration test: verify vendor exclusion filters work; verify prior blending at n<10; verify ranking order — Sonnet dev, Codex rev
+
+---
+
+### S-211: As the agent-ops PM in auto mode, I want budget-aware model selection backed by DepthFusion learned priors so that I maximise task quality within a spend cap `P2` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `recommend_model` (S-210) extended with a `budget_usd` parameter: only models whose `avg_cost_usd` is ≤ `budget_usd` are considered; if no models qualify, the cheapest available model is returned with a `budget_warning` flag
+- [ ] AC-2: The fable5-pm-orchestration rule (`~/.claude-acc1/rules/fable5-pm-orchestration.md`) is updated to call `recommend_model` (with `exclude_vendors` reflecting the prior agent's vendor, and `budget_usd = budget.remaining / remaining_tasks`) before spawning each dev or review agent in a `/digittal-method` run
+- [ ] AC-3: The recommendation result is included in the dispatch log entry in `.agent-hub/history.jsonl`:
+  ```json
+  {"timestamp":"...", "agent":"fable5-pm", "action":"model_selected",
+   "details": "model=claude-opus-4-8; task=architecture; quality_rate=0.91; cost_per_pass=$0.42; confidence=high; budget_remaining=$8.20; budget_warning=false"}
+  ```
+- [ ] AC-4: After the dispatched agent completes, the PM records the actual outcome to DepthFusion via `record_model_telemetry` (S-208) — closing the feedback loop
+- [ ] AC-5: In `/digittal-method` budget mode, if `budget.remaining()` drops below the minimum `avg_cost_usd` of any available model for the next task, the PM surfaces a budget alert to the user before attempting another dispatch (rather than dispatching and hitting OOM on budget)
+- [ ] AC-6: A human-readable budget summary is available via `GET /api/budget-summary?project_slug=<slug>&session_id=<id>` — returns actual spend vs recommendations, showing which model choices saved or cost vs the default (sonnet baseline)
+
+**Tasks:**
+- [ ] T-720: Extend `recommend_model` with `budget_usd` parameter and `budget_warning` flag — Sonnet dev, Haiku rev
+- [ ] T-721: Update `fable5-pm-orchestration.md` rule to add the DepthFusion recommendation call + fallback (when DepthFusion is unreachable, fall back to hard-coded tier table) — Opus dev, Codex rev
+- [ ] T-722: Implement outcome logging in PM dispatch cycle — after agent completion, call `record_model_telemetry` with actual verdict and cost — Sonnet dev, Haiku rev
+- [ ] T-723: Implement budget alert in digittal-method PM: before each dispatch check `budget.remaining() >= min(avg_cost_usd for eligible models)` — Sonnet dev, Haiku rev
+- [ ] T-724: FastAPI endpoint `GET /api/budget-summary` — Sonnet dev, Haiku rev
+- [ ] T-725: End-to-end test: simulate a 5-task `/digittal-method` run with a $5 budget cap; verify model selections degrade toward cheaper models as budget shrinks; verify telemetry accumulates; verify feedback loop closes — Opus dev, Codex rev
 
