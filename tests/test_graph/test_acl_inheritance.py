@@ -15,8 +15,7 @@ from depthfusion.backends.null import NullBackend
 from depthfusion.graph.builder import DocumentEntityBuilder
 from depthfusion.graph.store import JSONGraphStore
 from depthfusion.graph.traverser import traverse
-from depthfusion.graph.types import Entity, Edge
-
+from depthfusion.graph.types import Edge, Entity
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -204,8 +203,8 @@ def test_legacy_entity_no_acl_visible_to_all():
     store's write-side ACL validation (which correctly requires acl_allow on
     all new writes — T-562). The legacy-visibility rule is a read-time concern.
     """
-    from depthfusion.graph.traverser import _graph_entity_allowed
     from depthfusion.graph.extractor import make_entity_id
+    from depthfusion.graph.traverser import _graph_entity_allowed
     legacy = Entity(
         entity_id=make_entity_id("LegacyNode", "class", "p"),
         name="LegacyNode",
@@ -223,8 +222,8 @@ def test_legacy_entity_no_acl_visible_to_all():
 
 def test_entity_with_empty_acl_not_visible():
     """Entity with explicit empty acl_allow is visible to no-one (fail-closed)."""
-    from depthfusion.graph.traverser import _graph_entity_allowed
     from depthfusion.graph.extractor import make_entity_id
+    from depthfusion.graph.traverser import _graph_entity_allowed
     entity = Entity(
         entity_id=make_entity_id("RestrictedNode", "class", "p"),
         name="RestrictedNode",
