@@ -1,6 +1,175 @@
 # BI Tool Connectivity — DepthFusion Query API
 
-> **Note: This doc describes V1 behavior.** V2 behavior is documented in `docs/v2/admin-runbooks.md` (§5 Log Analysis and Audit Queries). V2 uses authenticated API endpoints with RBAC-gated access rather than raw SSH tunnels. If you are running the `v2-enterprise` branch, refer to the admin runbooks instead.
+> **This doc covers both V1 and V2.** Section **0** (V2) is the current,
+> recommended path: JWT-authenticated analytics endpoints with RBAC- and
+> classification-ceiling-gated service accounts. Sections **1–7** describe the
+> legacy V1 SSH-tunnel + API-key model and remain for deployments still on the
+> V1 query API. If you are on the `v2-enterprise` branch, use Section 0.
+
+---
+
+## 0. V2 — Authenticated Analytics Endpoints (current)
+
+V2 replaces the V1 `X-DepthFusion-Key` header model with **OIDC/JWT bearer
+auth** and adds purpose-built aggregate + facet endpoints under
+`/v2/analytics`. Access is scoped per-principal and trimmed by classification
+ceiling — a BI tool never sees data above the ceiling assigned to its service
+account.
+
+### 0.1 Authentication — JWT bearer (RS256)
+
+Every `/v2/analytics/*` request must carry an `Authorization: Bearer <jwt>`
+header. The server validates the token against the configured JWKS endpoint
+(RS256) and derives the principal from the `sub` claim — callers can only see
+their own metrics; the principal is **never** taken from a query parameter.
+
+Server configuration (env vars):
+
+| Variable | Purpose |
+|---|---|
+| `DEPTHFUSION_JWKS_URI` | JWKS endpoint URL for RS256 public keys |
+| `DEPTHFUSION_OIDC_ISSUER` | Expected `iss` claim |
+| `DEPTHFUSION_OIDC_AUDIENCE` | Expected `aud` claim |
+
+If issuer/audience are unset the endpoints return **503** (auth not
+configured). A development-only fallback exists — set
+`DEPTHFUSION_ALLOW_UNAUTH_ANALYTICS=1` to accept the raw bearer string as a
+dev principal — but it logs a prominent WARNING at startup and **must never be
+enabled in production**.
+
+The raw bearer token is never stored, logged, or returned.
+
+### 0.2 V2 endpoints
+
+| Endpoint | Description | Key parameters |
+|---|---|---|
+| `GET /v2/analytics/summary` | Aggregated usage counts (searches/ingests/syncs) for the authenticated principal | `period` (e.g. `7d`, `30d`, max `365d`) |
+| `GET /v2/analytics/facets` | Faceted usage counts grouped by a facet dimension | `facet` (allowlisted; currently `event_type`), `period` |
+
+**Summary response shape:**
+
+```json
+{
+  "principal_id": "user-sub-claim",
+  "period_days": 7,
+  "period_start": "2026-06-10",
+  "period_end": "2026-06-17",
+  "total_events": 42,
+  "by_event_type": {"search": 30, "ingest": 8, "sync": 4}
+}
+```
+
+**Facet response shape:**
+
+```json
+{
+  "principal_id": "user-sub-claim",
+  "facet": "event_type",
+  "period_days": 7,
+  "period_start": "2026-06-10",
+  "period_end": "2026-06-17",
+  "total": 42,
+  "buckets": {"search": 30, "ingest": 8, "sync": 4}
+}
+```
+
+> **Performance (T-622).** The facet/aggregate group-bys are backed by a
+> composite index `analytics_events(principal_id, recorded_at, event_type)`,
+> which is *covering* for the hot `WHERE principal_id = ? AND recorded_at
+> BETWEEN ? AND ? GROUP BY event_type` query. The facet path meets the
+> p95 < 500 ms SLO (see `tests/test_analytics.py::TestFacetPerformance`).
+
+> **Facet allowlist.** The `facet` parameter is validated against a server-side
+> allowlist (`event_type`); `principal_id` is intentionally **not** facetable,
+> so a caller can never group across principals. An unsupported facet returns
+> **422**.
+
+```bash
+# Summary, last 30 days
+curl -s "https://<host>/v2/analytics/summary?period=30d" \
+  -H "Authorization: Bearer $DEPTHFUSION_JWT" | jq .
+
+# Facet breakdown by event type, last 7 days
+curl -s "https://<host>/v2/analytics/facets?facet=event_type&period=7d" \
+  -H "Authorization: Bearer $DEPTHFUSION_JWT" | jq .
+```
+
+### 0.3 BI-tool service accounts + classification ceiling (T-624)
+
+BI tools connect through a **service account** rather than an interactive
+user. A service account is a scoped, read-only principal carrying a
+**classification ceiling** — the highest sensitivity level its bearer may see.
+
+Two hard rules:
+
+1. **The ceiling is server-assigned at issuance, never hardcoded** by the BI
+   tool or client config. The default issuance ceiling is the least-privilege
+   level (`public`); it may only be raised by an explicit, audited issuance
+   request.
+2. **Records above the ceiling are excluded** server-side before any rows are
+   returned. A record with a missing/unknown classification is treated as
+   `restricted` (default-deny).
+
+Classification ceiling is inclusive and ordered
+`public < internal < confidential < restricted`. A `confidential` ceiling
+admits public/internal/confidential records and excludes restricted.
+
+Issue a service account (admin, server-side):
+
+```python
+from depthfusion.identity import issue_service_account
+from depthfusion.authz.classification import ClassificationLevel
+
+acct = issue_service_account(
+    name="metabase-prod",
+    ceiling=ClassificationLevel.INTERNAL,   # server-assigned, audited
+    scopes=("query:read",),                  # read-only; write scopes rejected
+)
+print(acct.account_id, acct.token)           # persist alongside BI tool config
+```
+
+The BI tool then presents `acct.token` as the bearer; the query path calls
+`filter_records_by_ceiling(records, acct)` so only at-or-below-ceiling records
+are returned. Service accounts are strictly read-only — any write/create/
+update/delete/admin/manage scope is refused at issuance.
+
+### 0.4 V2 connection flows for Metabase / Grafana / Power BI
+
+The V2 endpoints are plain JSON over HTTPS with a bearer token, so every BI
+tool's generic REST/JSON connector works. The only change vs V1 is the auth
+header: replace `X-DepthFusion-Key: <key>` with `Authorization: Bearer <jwt>`.
+
+**Metabase** (HTTP / REST API connector or Infinity-style proxy):
+1. Admin → Databases → Add Database → REST/HTTP connector.
+2. Base URL: `https://<host>/v2/analytics`.
+3. Header: `Authorization` → `Bearer <service-account-token>`.
+4. Build cards against `summary` / `facets` (e.g. bar chart of `buckets`).
+
+**Grafana** (Infinity data source — recommended):
+1. Add data source → Infinity.
+2. Base URL: `https://<host>/v2/analytics`.
+3. Headers → add `Authorization` = `Bearer <service-account-token>`.
+4. Panel query → Type JSON, GET `/facets?facet=event_type&period=7d`,
+   root selector `buckets` (or `/summary`, selector `by_event_type`).
+5. Save & Test → expect 200.
+
+**Power BI** (Get Data → Web):
+1. Home → Get Data → Web → Advanced.
+2. URL: `https://<host>/v2/analytics/summary?period=30d`.
+3. HTTP request header parameters: `Authorization` = `Bearer <token>`.
+4. OK → Power Query expands the JSON. Convert `by_event_type` /`buckets`
+   record to a table via *Transform → Record → To Table*.
+
+Validation: each flow above was exercised against the live endpoints with a
+service account; a 200 with the documented JSON shape confirms connectivity,
+and supplying a stale/invalid bearer returns 401, confirming auth enforcement.
+
+---
+
+## V1 — Legacy SSH-tunnel + API-key model
+
+> The sections below describe the V1 query API (`/query/*` on `127.0.0.1:7300`)
+> using the `X-DepthFusion-Key` header. Retained for deployments still on V1.
 
 
 

@@ -22,6 +22,13 @@ from .jwks_cache import JwksCache
 from .models import DeviceCodeResult, Principal
 from .oidc_client import OidcClient
 from .principal_store import PrincipalStore
+from .service_account import (
+    DEFAULT_CEILING,
+    ServiceAccount,
+    filter_records_by_ceiling,
+    is_record_visible,
+    issue_service_account,
+)
 from .token_validator import TokenValidator
 
 __all__ = [
@@ -33,6 +40,12 @@ __all__ = [
     "TokenValidator",
     "OidcClient",
     "PrincipalStore",
+    # service accounts (T-624)
+    "ServiceAccount",
+    "issue_service_account",
+    "is_record_visible",
+    "filter_records_by_ceiling",
+    "DEFAULT_CEILING",
     # fastapi deps
     "PrincipalDep",
     "make_require_principal",

@@ -39,6 +39,9 @@ dmypy.json
 *.tmp
 *.log
 *.jsonl
+
+# Ingestion quarantine — runtime artifacts, not source
+data/quarantine/
 # Allow checked-in fixture files (top-level and subdirectories)
 !tests/fixtures/*.jsonl
 !tests/fixtures/ciqs_cat_d/*.jsonl

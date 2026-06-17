@@ -26,6 +26,17 @@ CREATE INDEX IF NOT EXISTS idx_ae_principal ON analytics_events(principal_id);
 CREATE INDEX IF NOT EXISTS idx_ae_event_type ON analytics_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_ae_recorded ON analytics_events(recorded_at);
 
+-- T-622 facet performance pass.
+-- The hot path for the summary / facet endpoints is:
+--   WHERE principal_id = ? AND recorded_at >= ? AND recorded_at <= ?
+--   GROUP BY event_type
+-- A composite index on (principal_id, recorded_at, event_type) is *covering*
+-- for that query: SQLite can seek the principal + range on the leading columns
+-- and read the trailing event_type for the GROUP BY without touching the table.
+-- This removes the full-table scan the three single-column indexes left behind.
+CREATE INDEX IF NOT EXISTS idx_ae_facet_principal_recorded_type
+    ON analytics_events(principal_id, recorded_at, event_type);
+
 CREATE TABLE IF NOT EXISTS analytics_rollups (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     principal_id TEXT    NOT NULL,

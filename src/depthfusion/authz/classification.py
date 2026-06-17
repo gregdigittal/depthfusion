@@ -122,6 +122,44 @@ CLASSIFICATION_POLICY: dict[ClassificationLevel, HandlingRules] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Classification ordering (least → most sensitive)
+# ---------------------------------------------------------------------------
+# Used for ceiling enforcement: a principal/service-account with ceiling C may
+# see records whose level L satisfies ``level_rank(L) <= level_rank(C)``.
+# ---------------------------------------------------------------------------
+
+_LEVEL_ORDER: tuple[ClassificationLevel, ...] = (
+    ClassificationLevel.PUBLIC,
+    ClassificationLevel.INTERNAL,
+    ClassificationLevel.CONFIDENTIAL,
+    ClassificationLevel.RESTRICTED,
+)
+
+_LEVEL_RANK: dict[ClassificationLevel, int] = {
+    level: idx for idx, level in enumerate(_LEVEL_ORDER)
+}
+
+
+def level_rank(level: ClassificationLevel) -> int:
+    """Return the ordinal rank of *level* (0=public … 3=restricted).
+
+    Raises ``KeyError`` for any level not in the taxonomy (default-deny).
+    """
+    return _LEVEL_RANK[level]
+
+
+def is_within_ceiling(
+    level: ClassificationLevel, ceiling: ClassificationLevel
+) -> bool:
+    """Return ``True`` iff a record at *level* is visible under *ceiling*.
+
+    A ceiling is inclusive: ``ceiling=confidential`` admits public, internal,
+    and confidential records, but excludes restricted.
+    """
+    return level_rank(level) <= level_rank(ceiling)
+
+
 def get_handling_rules(level: ClassificationLevel) -> HandlingRules:
     """Return the ``HandlingRules`` for *level*.
 
@@ -151,4 +189,6 @@ __all__ = [
     "Role",
     "CLASSIFICATION_POLICY",
     "get_handling_rules",
+    "level_rank",
+    "is_within_ceiling",
 ]

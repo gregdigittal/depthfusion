@@ -316,3 +316,137 @@ class TestAnalyticsSummaryEndpoint:
             "period_end", "total_events", "by_event_type",
         }
         assert required_keys.issubset(body.keys())
+
+
+# ---------------------------------------------------------------------------
+# Facet endpoint tests (T-622)
+# ---------------------------------------------------------------------------
+
+class TestAnalyticsFacets:
+    def test_facets_groups_by_event_type(
+        self, collector: AnalyticsCollector, aggregation: AggregationService
+    ) -> None:
+        """facets() returns per-event_type buckets scoped to the principal."""
+        now = datetime.now(tz=timezone.utc)
+        collector.record_event(principal_id="f-1", event_type="search", recorded_at=now)
+        collector.record_event(principal_id="f-1", event_type="search", recorded_at=now)
+        collector.record_event(principal_id="f-1", event_type="ingest", recorded_at=now)
+
+        result = aggregation.facets(principal_id="f-1", facet="event_type", period_days=7)
+        assert result["facet"] == "event_type"
+        assert result["total"] == 3
+        assert result["buckets"]["search"] == 2
+        assert result["buckets"]["ingest"] == 1
+
+    def test_facets_rejects_unsupported_facet(
+        self, aggregation: AggregationService
+    ) -> None:
+        """A facet not on the allowlist (e.g. principal_id) raises ValueError."""
+        with pytest.raises(ValueError):
+            aggregation.facets(principal_id="f-1", facet="principal_id")
+
+    def test_facets_acl_isolation(
+        self, collector: AnalyticsCollector, aggregation: AggregationService
+    ) -> None:
+        """facets() never crosses principals."""
+        now = datetime.now(tz=timezone.utc)
+        collector.record_event(principal_id="f-A", event_type="search", recorded_at=now)
+        collector.record_event(principal_id="f-B", event_type="search", recorded_at=now)
+        result_a = aggregation.facets(principal_id="f-A")
+        assert result_a["total"] == 1
+
+    def test_get_facets_endpoint(
+        self, client: TestClient, collector: AnalyticsCollector
+    ) -> None:
+        """GET /v2/analytics/facets returns 200 with grouped buckets."""
+        now = datetime.now(tz=timezone.utc)
+        collector.record_event(principal_id="fe-1", event_type="sync", recorded_at=now)
+        resp = client.get(
+            "/v2/analytics/facets?facet=event_type&period=7d",
+            headers={"Authorization": "Bearer fe-1"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["facet"] == "event_type"
+        assert body["buckets"]["sync"] == 1
+
+    def test_get_facets_unsupported_facet_returns_422(
+        self, client: TestClient
+    ) -> None:
+        """Requesting an unsupported facet yields 422, not a 500."""
+        resp = client.get(
+            "/v2/analytics/facets?facet=secret&period=7d",
+            headers={"Authorization": "Bearer fe-x"},
+        )
+        assert resp.status_code == 422
+
+    def test_get_facets_no_auth_returns_401(self, client: TestClient) -> None:
+        """Facet endpoint requires auth."""
+        resp = client.get("/v2/analytics/facets?facet=event_type")
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Facet performance pass (T-622) — index existence + SLO
+# ---------------------------------------------------------------------------
+
+class TestFacetPerformance:
+    def test_composite_facet_index_exists(self, db_path: Path) -> None:
+        """The T-622 composite group-by index is created by init_db."""
+        import sqlite3
+
+        from depthfusion.analytics.store import init_db
+
+        init_db(db_path)
+        with sqlite3.connect(str(db_path)) as conn:
+            names = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index'"
+                ).fetchall()
+            }
+        assert "idx_ae_facet_principal_recorded_type" in names
+
+    def test_facet_query_uses_index_not_scan(
+        self, collector: AnalyticsCollector, aggregation: AggregationService
+    ) -> None:
+        """EXPLAIN QUERY PLAN selects the composite index, not a full scan."""
+        now = datetime.now(tz=timezone.utc)
+        collector.record_event(principal_id="probe", event_type="search", recorded_at=now)
+        plan = " ".join(aggregation.explain_facet_query(principal_id="probe"))
+        # The planner must use the facet index — never a full table scan.
+        assert "idx_ae_facet_principal_recorded_type" in plan
+        assert "SCAN analytics_events" not in plan or "USING INDEX" in plan
+
+    def test_facet_query_meets_slo(
+        self, collector: AnalyticsCollector, aggregation: AggregationService
+    ) -> None:
+        """A facet query over a populated table meets the p95 < 500ms SLO.
+
+        Mirrors the SLO pattern in tests/test_performance.py: run the facet
+        query repeatedly and assert the 95th-percentile wall-clock time is
+        comfortably under the generous 500ms budget.
+        """
+        import time
+
+        now = datetime.now(tz=timezone.utc)
+        # Populate a few principals with a spread of event types.
+        for i in range(2000):
+            collector.record_event(
+                principal_id=f"p-{i % 20}",
+                event_type=("search", "ingest", "sync")[i % 3],
+                recorded_at=now - timedelta(days=i % 7),
+            )
+
+        timings: list[float] = []
+        for _ in range(50):
+            t0 = time.perf_counter()
+            aggregation.facets(principal_id="p-3", facet="event_type", period_days=7)
+            t1 = time.perf_counter()
+            timings.append((t1 - t0) * 1000)
+
+        timings.sort()
+        p95_ms = timings[int(len(timings) * 0.95) - 1]
+        assert p95_ms < 500.0, (
+            f"Facet query p95 latency {p95_ms:.1f}ms exceeds 500ms SLO."
+        )

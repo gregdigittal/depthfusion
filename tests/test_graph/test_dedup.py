@@ -2,11 +2,8 @@
 """T-620: Entity deduplicator — near-duplicate merging with fail-closed ACL semantics."""
 from __future__ import annotations
 
-import pytest
-
 from depthfusion.graph.dedup import EntityDeduplicator, _acl_intersect, _normalise
 from depthfusion.graph.types import Entity
-
 
 # ---------------------------------------------------------------------------
 # Helpers

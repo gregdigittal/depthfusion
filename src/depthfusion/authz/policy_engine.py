@@ -39,6 +39,11 @@ from depthfusion.authz.classification import (
     CLASSIFICATION_POLICY,
     ClassificationLevel,
 )
+from depthfusion.authz.policy_snapshot import (
+    SignedPolicySnapshot,
+    SnapshotVerification,
+    verify_policy_snapshot,
+)
 from depthfusion.authz.roles import Capability
 from depthfusion.identity.models import Principal
 
@@ -221,6 +226,9 @@ class PolicyEngine:
         principal: Principal,
         action: Union[str, Capability],
         resource: dict,
+        *,
+        offline_snapshot: SignedPolicySnapshot | None = None,
+        snapshot_key: bytes | str | None = None,
     ) -> PolicyDecision:
         """Evaluate whether *principal* may perform *action* on *resource*.
 
@@ -241,6 +249,21 @@ class PolicyEngine:
                 Optional classification label.  If present it is matched
                 against ``ClassificationLevel`` values; unknown labels deny.
 
+        offline_snapshot:
+            When supplied, the engine is in **offline** mode (S-191 AC-3): the
+            classification check is evaluated against this server-signed policy
+            snapshot rather than the live ``CLASSIFICATION_POLICY``. The
+            snapshot is signature- and freshness-verified first; a tampered,
+            unsigned, or expired snapshot forces a **deny** (fail-closed) — the
+            engine never falls back to the in-process policy when an explicit
+            offline snapshot was provided, because that copy may itself be the
+            stale/forgeable one S-191 guards against. Offline decisions are not
+            cached (the cache key does not bind the snapshot version).
+        snapshot_key:
+            Optional verification key for *offline_snapshot*. Defaults to the
+            ``DF_POLICY_SNAPSHOT_KEY`` environment variable inside the
+            verifier. Never logged.
+
         Returns
         -------
         PolicyDecision
@@ -258,6 +281,24 @@ class PolicyEngine:
                 "policy.unknown_action",
                 principal_id=principal.principal_id,
                 action=str(action),
+            )
+            return decision
+
+        # Offline path (S-191 AC-3): never cache — bind the decision to the
+        # verified snapshot, not the in-process policy. Evaluate directly.
+        if offline_snapshot is not None:
+            decision = self._evaluate(
+                principal,
+                capability,
+                resource,
+                offline_snapshot=offline_snapshot,
+                snapshot_key=snapshot_key,
+            )
+            log.info(
+                "policy.offline_decision",
+                principal_id=principal.principal_id,
+                capability=capability.value,
+                allow=decision.allow,
             )
             return decision
 
@@ -325,10 +366,14 @@ class PolicyEngine:
         principal: Principal,
         capability: Capability,
         resource: dict,
+        *,
+        offline_snapshot: SignedPolicySnapshot | None = None,
+        snapshot_key: bytes | str | None = None,
     ) -> PolicyDecision:
         """Run all policy checks for the given (principal, capability, resource).
 
-        Does not touch the cache.
+        Does not touch the cache. When *offline_snapshot* is supplied the
+        classification check is sourced from the verified snapshot.
         """
         # RBAC check
         caps = _capabilities_for_principal(principal)
@@ -366,7 +411,18 @@ class PolicyEngine:
         # Classification check
         raw_cls = resource.get("classification")
         if raw_cls is not None:
-            cls_decision = _check_classification(principal, capability, raw_cls)
+            if offline_snapshot is not None:
+                cls_decision = _check_classification_offline(
+                    principal,
+                    capability,
+                    raw_cls,
+                    offline_snapshot,
+                    snapshot_key,
+                )
+            else:
+                cls_decision = _check_classification(
+                    principal, capability, raw_cls
+                )
             if cls_decision is not None:
                 return cls_decision
 
@@ -462,6 +518,79 @@ def _check_classification(
             reason=(
                 f"Principal has no role permitted for '{level.value}' "
                 f"classified data."
+            ),
+            capability=capability,
+        )
+
+    return None
+
+
+def _check_classification_offline(
+    principal: Principal,
+    capability: Capability,
+    raw_cls: str,
+    snapshot: SignedPolicySnapshot,
+    snapshot_key: bytes | str | None,
+) -> PolicyDecision | None:
+    """Classification check sourced from a server-signed offline snapshot.
+
+    S-191 AC-3 fail-closed contract:
+
+    * The snapshot is signature- and freshness-verified first. A tampered,
+      unsigned, or expired snapshot → **deny** (never allow, never fall back to
+      the in-process policy).
+    * The classification label must be a known ``ClassificationLevel`` and must
+      be present in the snapshot — otherwise deny.
+    * The principal must hold a role in the snapshot's ``allowed_roles`` for the
+      level, exactly mirroring the online check.
+
+    Returns ``None`` when the check *passes* (caller continues to allow).
+    """
+    verdict = verify_policy_snapshot(snapshot, key=snapshot_key)
+    if verdict is not SnapshotVerification.OK:
+        log.warning(
+            "policy.offline_snapshot_refused",
+            principal_id=principal.principal_id,
+            verdict=verdict.value,
+        )
+        return PolicyDecision(
+            allow=False,
+            reason=(
+                f"Offline policy snapshot refused ({verdict.value}) — "
+                f"deny by default."
+            ),
+            capability=capability,
+        )
+
+    # Label must still be a recognised classification level.
+    try:
+        level = ClassificationLevel(str(raw_cls))
+    except ValueError:
+        return PolicyDecision(
+            allow=False,
+            reason=(
+                f"Unknown classification label '{raw_cls}' — deny by default."
+            ),
+            capability=capability,
+        )
+
+    allowed_role_values = snapshot.allowed_roles_for(level.value)
+    if allowed_role_values is None:
+        return PolicyDecision(
+            allow=False,
+            reason=(
+                f"No snapshot policy for classification '{level.value}' — deny."
+            ),
+            capability=capability,
+        )
+
+    principal_roles = set(principal.groups)
+    if not principal_roles & set(allowed_role_values):
+        return PolicyDecision(
+            allow=False,
+            reason=(
+                f"Principal has no role permitted for '{level.value}' "
+                f"classified data (offline snapshot)."
             ),
             capability=capability,
         )

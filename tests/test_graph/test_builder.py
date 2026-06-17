@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
-from depthfusion.graph.builder import DocumentEntityBuilder
 from depthfusion.backends.null import NullBackend
-
+from depthfusion.graph.builder import DocumentEntityBuilder
 
 # ---------------------------------------------------------------------------
 # Helpers
