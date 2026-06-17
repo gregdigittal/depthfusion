@@ -308,14 +308,19 @@ def test_route_events_seed_authed(rest_client_authed):
 
 @pytest.fixture()
 def mcp_client_authed():
-    """TestClient for the MCP HTTP/SSE app with Principal injected."""
-    from depthfusion.api.auth import require_principal
-    from depthfusion.mcp.http_server import app as mcp_app
+    """TestClient for the MCP HTTP/SSE app with auth bypassed.
 
-    async def _override():
-        return _fake_principal()
+    The MCP app uses ``_check_mcp_auth`` (not ``require_principal``) for its
+    Bearer-token gate.  We override ``_check_mcp_auth`` so the route body
+    actually runs and we can test the downstream behaviour (e.g. 404 for a
+    missing session) rather than always hitting the auth gate.
+    """
+    from depthfusion.mcp.http_server import _check_mcp_auth, app as mcp_app
 
-    mcp_app.dependency_overrides[require_principal] = _override
+    async def _bypass() -> None:
+        return None
+
+    mcp_app.dependency_overrides[_check_mcp_auth] = _bypass
     client = TestClient(mcp_app, raise_server_exceptions=False)
     yield client
     mcp_app.dependency_overrides.clear()
@@ -359,20 +364,24 @@ def test_route_mcp_messages_requires_auth(mcp_client_no_auth):
 
 
 def test_route_mcp_sse_authed():
-    """GET /sse has ``require_principal`` in its dependency graph.
+    """GET /sse has ``_check_mcp_auth`` in its dependency graph.
 
     The SSE endpoint streams indefinitely and cannot be consumed by TestClient
     without hanging (the async generator loops until the client disconnects,
     but TestClient's ASGI runner doesn't propagate disconnection during
     ``stream()``).  We therefore verify auth presence structurally: inspect
-    FastAPI's route dependency list and confirm ``require_principal`` appears.
+    FastAPI's route dependency list and confirm ``_check_mcp_auth`` appears.
+
+    The MCP HTTP server uses ``_check_mcp_auth`` (not ``require_principal``)
+    because it needs dual-mode auth: JWT via joserfc OR a static Bearer token
+    from ``DEPTHFUSION_MCP_TOKEN``, with fail-closed behaviour when neither
+    is configured.  This is distinct from the main API's ``require_principal``.
 
     The behavioural proof (that the gate fires without auth) is already covered
     by ``test_route_mcp_sse_requires_auth``, which confirms 401/503 without
     a credential.
     """
-    from depthfusion.api.auth import require_principal
-    from depthfusion.mcp.http_server import app as mcp_app
+    from depthfusion.mcp.http_server import _check_mcp_auth, app as mcp_app
 
     sse_route = next(
         (r for r in mcp_app.routes if getattr(r, "path", None) == "/sse"),
@@ -391,9 +400,9 @@ def test_route_mcp_sse_authed():
         for dep_model in dependant.dependencies:
             dep_callables.append(dep_model.call)
 
-    assert require_principal in dep_callables, (
-        "require_principal not found in GET /sse route dependencies — "
-        "auth sweep incomplete"
+    assert _check_mcp_auth in dep_callables, (
+        "_check_mcp_auth not found in GET /sse route dependencies — "
+        "MCP SSE auth gate missing or wired incorrectly"
     )
 
 

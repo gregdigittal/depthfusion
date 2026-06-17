@@ -42,12 +42,46 @@ def aggregation(db_path: Path) -> AggregationService:
 @pytest.fixture()
 def client(db_path: Path) -> TestClient:
     """TestClient wired to an app that uses a temp DB path."""
+    from fastapi import Header as _Header
+
     app = FastAPI()
     app.include_router(analytics_router)
 
     # Override the DB path dependency to use our temp path
-    from depthfusion.analytics.router import _default_db_path
+    from depthfusion.analytics.router import _default_db_path, _resolve_principal_id
     app.dependency_overrides[_default_db_path] = lambda: db_path
+
+    # Override principal resolution: extract the bearer token and use it
+    # directly as the principal_id.  This replaces the OIDC JWT validation
+    # that is not available in unit tests, while keeping the 401 behaviour
+    # for missing / empty tokens (so auth-failure tests still work).
+    async def _test_resolve_principal(
+        authorization: str | None = _Header(default=None),
+    ) -> str:
+        from fastapi import HTTPException, status as _status
+
+        if not authorization:
+            raise HTTPException(
+                status_code=_status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "missing_token", "detail": "Authorization header required"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=_status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "detail": "Bearer token required"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        token = authorization.removeprefix("Bearer ").strip()
+        if not token:
+            raise HTTPException(
+                status_code=_status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "missing_token", "detail": "Empty bearer token"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return token
+
+    app.dependency_overrides[_resolve_principal_id] = _test_resolve_principal
 
     return TestClient(app)
 

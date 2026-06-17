@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest  # noqa: F401 — used indirectly via fixtures
 
 from depthfusion.graph.extractor import (
+    DocumentEntityPipeline,
     HaikuExtractor,
     RegexExtractor,
     confidence_merge,
@@ -205,3 +206,110 @@ def test_below_threshold_entities_included_in_output():
     merged = confidence_merge([], [haiku_e])
     assert len(merged) == 1
     assert merged[0].confidence < 0.70
+
+
+# ---------------------------------------------------------------------------
+# T-618: document entity-extraction pipeline (LLM-backed + regex fallback)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_extracts_named_entities_with_llm():
+    """LLM path: backend available → named (concept) entities surface."""
+    backend = _mock_backend_with_response('[{"name": "BM25 scoring", "type": "concept"}]')
+    pipeline = DocumentEntityPipeline(project="depthfusion", haiku_backend=backend)
+    assert pipeline.llm_available() is True
+
+    entities = pipeline.extract(SAMPLE_TEXT, source_file="docs/contract.md")
+    names = [e.name for e in entities]
+    # LLM-extracted concept AND regex-extracted class both present.
+    assert "BM25 scoring" in names
+    assert "TierManager" in names
+
+
+def test_pipeline_regex_fallback_when_llm_unavailable(monkeypatch):
+    """Regex fallback: no backend + HAIKU off → regex-only entities, no crash."""
+    monkeypatch.setenv("DEPTHFUSION_HAIKU_ENABLED", "false")
+    pipeline = DocumentEntityPipeline(project="depthfusion")
+    assert pipeline.llm_available() is False
+
+    entities = pipeline.extract(SAMPLE_TEXT, source_file="docs/contract.md")
+    names = [e.name for e in entities]
+    # Regex still produces entities even with the LLM down.
+    assert "TierManager" in names
+    # No concept-type (LLM-only) entity should appear.
+    assert all(e.type != "concept" for e in entities)
+
+
+def test_pipeline_regex_fallback_when_backend_unhealthy():
+    """A present-but-unhealthy backend still falls back to regex cleanly."""
+    backend = MagicMock()
+    backend.healthy.return_value = False
+    pipeline = DocumentEntityPipeline(project="depthfusion", haiku_backend=backend)
+    assert pipeline.llm_available() is False
+    entities = pipeline.extract(SAMPLE_TEXT, source_file="docs/contract.md")
+    assert any(e.name == "TierManager" for e in entities)
+
+
+# ---------------------------------------------------------------------------
+# T-619: ACL inheritance — entities inherit their source document's ACL
+# ---------------------------------------------------------------------------
+
+
+def test_regex_entities_inherit_document_acl():
+    extractor = RegexExtractor(project="depthfusion")
+    doc_acl = ["acme-corp", "legal-team"]
+    entities = extractor.extract(SAMPLE_TEXT, "docs/contract.md", acl_allow=doc_acl)
+    assert entities
+    for e in entities:
+        assert e.metadata["acl_allow"] == doc_acl
+
+
+def test_haiku_entities_inherit_document_acl():
+    backend = _mock_backend_with_response('[{"name": "NDA clause", "type": "concept"}]')
+    extractor = HaikuExtractor(project="depthfusion", backend=backend)
+    doc_acl = ["acme-corp"]
+    entities = extractor.extract(SAMPLE_TEXT, "docs/contract.md", acl_allow=doc_acl)
+    assert entities
+    for e in entities:
+        assert e.metadata["acl_allow"] == doc_acl
+
+
+def test_pipeline_entities_inherit_document_acl():
+    backend = _mock_backend_with_response('[{"name": "NDA clause", "type": "concept"}]')
+    pipeline = DocumentEntityPipeline(project="depthfusion", haiku_backend=backend)
+    doc_acl = ["acme-corp", "legal-team"]
+    entities = pipeline.extract(SAMPLE_TEXT, "docs/contract.md", acl_allow=doc_acl)
+    assert entities
+    for e in entities:
+        assert e.metadata["acl_allow"] == doc_acl
+
+
+def test_acl_falls_back_to_project_when_not_supplied():
+    """No source-document ACL → entities scoped to their own project."""
+    extractor = RegexExtractor(project="depthfusion")
+    entities = extractor.extract(SAMPLE_TEXT, "memory/arch.md")
+    assert entities
+    for e in entities:
+        assert e.metadata["acl_allow"] == ["depthfusion"]
+
+
+def test_inherited_acl_is_a_copy_not_shared_reference():
+    """Two entities must not share a mutable ACL list."""
+    extractor = RegexExtractor(project="depthfusion")
+    doc_acl = ["acme-corp"]
+    entities = extractor.extract(SAMPLE_TEXT, "docs/contract.md", acl_allow=doc_acl)
+    assert len(entities) >= 2
+    entities[0].metadata["acl_allow"].append("mutated")
+    assert "mutated" not in entities[1].metadata["acl_allow"]
+    # Caller's original list is also untouched.
+    assert doc_acl == ["acme-corp"]
+
+
+def test_inherited_acl_satisfies_store_validation():
+    """Entities from a document write cleanly through _validate_graph_acl."""
+    from depthfusion.graph.store import _validate_graph_acl
+    extractor = RegexExtractor(project="depthfusion")
+    entities = extractor.extract(SAMPLE_TEXT, "docs/contract.md", acl_allow=["acme"])
+    for e in entities:
+        # Must not raise.
+        _validate_graph_acl(e.metadata.get("acl_allow"))

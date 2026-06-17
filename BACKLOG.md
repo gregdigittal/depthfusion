@@ -2891,8 +2891,8 @@
 
 **Tasks:**
 - [x] T-597: PDF text-layer parser with layout-aware block ordering — Sonnet dev, DS rev
-- [ ] T-598: Local OCR integration (tesseract or rapidocr) behind a feature flag — Sonnet dev, Gemini rev
-- [ ] T-599: Parse budgets + oversized-doc quarantine path — Haiku dev, DS rev
+- [x] T-598: Local OCR integration (tesseract or rapidocr) behind a feature flag — Sonnet dev, Gemini rev
+- [x] T-599: Parse budgets + oversized-doc quarantine path — Haiku dev, DS rev
 
 ### S-172: As the retrieval substrate, I want a document chunking + embedding pipeline so that documents rank alongside memories with citations `P0` `L`
 
@@ -2904,8 +2904,8 @@
 **Tasks:**
 - [x] T-600: Structure-aware chunker + config — Sonnet dev, DS rev
 - [x] T-601: Embedding + dual-index writer with ACL inheritance — Sonnet dev, DS rev
-- [ ] T-602: Atomic replace-on-change using file_index hashes — Sonnet dev, Gemini rev
-- [ ] T-603: Ingestion throughput benchmark + report — Haiku dev, Sonnet rev
+- [x] T-602: Atomic replace-on-change using file_index hashes — Sonnet dev, Gemini rev
+- [x] T-603: Ingestion throughput benchmark + report — Haiku dev, Sonnet rev
 
 ---
 
@@ -2926,7 +2926,7 @@
 - [x] T-607: Drive walker + initial crawl with download pipeline into E-53 — Sonnet dev, DS rev
 - [x] T-608: Delta cursor store + incremental apply (add/update/delete) — Sonnet dev, DS rev
 - [x] T-609: Transactional batch commit + resume logic — Opus dev, DS rev
-- [ ] T-610: Pilot-site E2E test + delta verification — Haiku dev, Sonnet rev
+- [x] T-610: Pilot-site E2E test + delta verification — Haiku dev, Sonnet rev
 
 ### S-175: As the security model, I want SharePoint permissions mapped to record ACLs so that DepthFusion never widens access beyond SharePoint `P0` `L`
 
@@ -2952,9 +2952,9 @@
 ### S-177: As an analyst, I want document entities in the knowledge graph so that I can map relationships across contracts, projects, and people `P1` `L`
 
 **Tasks:**
-- [ ] T-618: Document entity-extraction prompts + pipeline — Sonnet dev, Gemini rev
-- [ ] T-619: ACL inheritance on graph store + trimmed traversal — Sonnet dev, DS rev
-- [ ] T-620: Cross-source entity linker with confidence — Sonnet dev, DS rev
+- [x] T-618: Document entity-extraction prompts + pipeline — Sonnet dev, Gemini rev
+- [x] T-619: ACL inheritance on graph store + trimmed traversal — Sonnet dev, DS rev
+- [x] T-620: Cross-source entity linker with confidence — Sonnet dev, DS rev
 
 ### S-178: As a BI consumer, I want aggregate + faceted endpoints over documents so that dashboards can chart the corpus `P1` `M`
 
@@ -3175,7 +3175,7 @@
 **Tasks:**
 - [x] T-669: Hash-chained audit store + verification CLI — Opus dev, DS rev
 - [x] T-670: Wire all V2 subsystems to audit taxonomy — Sonnet dev, DS rev
-- [ ] T-671: Retention + compliance export — Haiku dev, Sonnet rev
+- [x] T-671: Retention + compliance export — Haiku dev, Sonnet rev
 
 ### S-195: As an operator, I want service health metrics + alerts so that ingestion lag or auth failures surface before users complain `P1` `M`
 
@@ -3196,7 +3196,7 @@
 
 **Tasks:**
 - [x] T-674: Admin screens: users/roles/devices — Sonnet dev, Gemini rev
-- [ ] T-675: Policy + classification editors — Sonnet dev, Gemini rev
+- [x] T-675: Policy + classification editors — Sonnet dev, Gemini rev
 - [x] T-676: Ingestion management + audit viewer — Sonnet dev, DS rev
 
 ---

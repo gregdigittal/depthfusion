@@ -16,6 +16,26 @@ GET /v2/admin/devices
     Lists all registered devices from the device registry.
     Requires: ``Capability.MANAGE_DEVICES``
 
+POST /v2/admin/retention/enforce
+    Apply the configured retention policy: purge audit events older than the
+    retention window. The enforcement action is itself audited.
+    Requires: ``Capability.MANAGE_SETTINGS``
+
+GET /v2/admin/export
+    Return the audit/compliance dataset for offline compliance review.
+    The export action is itself audited.
+    Requires: ``Capability.MANAGE_SETTINGS``
+
+GET /v2/admin/policy
+PUT /v2/admin/policy
+    Read / replace the export-policy matrix (per-classification export rules).
+    Requires: ``Capability.MANAGE_SETTINGS``
+
+GET /v2/admin/classification
+PUT /v2/admin/classification
+    Read / replace the classification handling-rules table.
+    Requires: ``Capability.MANAGE_SETTINGS``
+
 GET /metrics
     Prometheus-format metrics (request_count, error_rate, search_latency).
     No auth required (metrics are typically scraped by infra tooling).
@@ -31,11 +51,27 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from depthfusion.api.auth import require_principal
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
 from depthfusion.authz import get_policy_engine
+from depthfusion.authz.classification import (
+    CLASSIFICATION_POLICY,
+    ClassificationLevel,
+    HandlingRules,
+)
+from depthfusion.authz.classification import Role as ClassificationRole
+from depthfusion.authz.export_controls import (
+    DEFAULT_POLICY_MATRIX,
+    ExportFormat,
+    ExportPolicy,
+    ExportPolicyMatrix,
+    check_export_allowed,
+)
+from depthfusion.authz.export_controls import (
+    ClassificationLevel as ExportClassificationLevel,
+)
 from depthfusion.authz.roles import Capability
 from depthfusion.identity.device_registry import DeviceRecord, DeviceRegistry
 from depthfusion.identity.models import Principal
@@ -92,6 +128,55 @@ class _MetricsState:
 
 # Module-level singleton — accessible from middleware / other modules.
 metrics_state = _MetricsState()
+
+
+# ---------------------------------------------------------------------------
+# Editable policy stores (in-process; seeded from canonical defaults)
+# ---------------------------------------------------------------------------
+
+# Default retention window (days) for compliance audit retention. Configurable
+# via the ``DEPTHFUSION_AUDIT_RETENTION_DAYS`` env var; defaults to 365.
+_DEFAULT_RETENTION_DAYS = 365
+
+
+def _retention_days() -> int:
+    """Return the configured audit retention window in days."""
+    raw = os.environ.get("DEPTHFUSION_AUDIT_RETENTION_DAYS")
+    if not raw:
+        return _DEFAULT_RETENTION_DAYS
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_RETENTION_DAYS
+    return value if value > 0 else _DEFAULT_RETENTION_DAYS
+
+
+class _PolicyState:
+    """Mutable, admin-editable copy of the export + classification policies.
+
+    Seeded from the canonical module defaults at import time. The PUT routes
+    replace entries here; the GET routes read them. This is in-process state
+    (reset on restart) — the canonical frozen defaults remain authoritative
+    fallbacks.
+    """
+
+    def __init__(self) -> None:
+        # ``DEFAULT_POLICY_MATRIX`` is keyed by the export_controls
+        # ClassificationLevel enum; re-key by the canonical classification
+        # ClassificationLevel (identical string values) so the stored map is
+        # type-consistent with the editor models.
+        self.export_policy: dict[ClassificationLevel, ExportPolicy] = {
+            ClassificationLevel(level.value): policy
+            for level, policy in DEFAULT_POLICY_MATRIX.items()
+        }
+        self.classification_rules: dict[ClassificationLevel, HandlingRules] = {
+            level: dict(rules)  # type: ignore[misc]
+            for level, rules in CLASSIFICATION_POLICY.items()
+        }
+
+
+# Module-level singleton — admin edits land here.
+policy_state = _PolicyState()
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +267,78 @@ class HealthResponse(BaseModel):
     record_counts: dict[str, int]
     last_sync: Optional[float]
     active_devices: int
+
+
+# ── Retention / compliance export (T-671) ──────────────────────────────────
+
+class RetentionEnforceBody(BaseModel):
+    """Request body for POST /v2/admin/retention/enforce.
+
+    ``retention_days`` overrides the configured default for this run; when
+    omitted the ``DEPTHFUSION_AUDIT_RETENTION_DAYS`` env value (or the
+    built-in default) is used.
+    """
+
+    retention_days: Optional[int] = Field(default=None, gt=0)
+
+
+class RetentionEnforceResponse(BaseModel):
+    retention_days: int
+    cutoff_timestamp: float
+    events_purged: int
+    events_remaining: int
+
+
+class ComplianceExportResponse(BaseModel):
+    exported_at: float
+    record_count: int
+    retention_days: int
+    classification: ExportClassificationLevel
+    export_format: ExportFormat
+    watermark_required: bool
+    events: list[dict]
+
+
+# ── Policy + classification editors (T-675) ─────────────────────────────────
+
+class ExportPolicyEntry(BaseModel):
+    """A single per-classification export policy (editor payload)."""
+
+    allowed_export_formats: list[ExportFormat] = Field(default_factory=list)
+    watermark_required: bool = False
+    approval_required: bool = False
+
+
+class ExportPolicyEditBody(BaseModel):
+    """Request body for PUT /v2/admin/policy.
+
+    Maps each ``ClassificationLevel`` (by string value) to its export policy.
+    """
+
+    policies: dict[ClassificationLevel, ExportPolicyEntry]
+
+
+class ExportPolicyResponse(BaseModel):
+    policies: dict[ClassificationLevel, ExportPolicyEntry]
+
+
+class ClassificationRuleEntry(BaseModel):
+    """A single per-level classification handling rule (editor payload)."""
+
+    export_allowed: bool = False
+    cache_allowed: bool = False
+    redact_in_search: bool = True
+    allowed_roles: list[ClassificationRole] = Field(default_factory=list)
+
+
+class ClassificationEditBody(BaseModel):
+    """Request body for PUT /v2/admin/classification."""
+
+    rules: dict[ClassificationLevel, ClassificationRuleEntry]
+
+
+class ClassificationResponse(BaseModel):
+    rules: dict[ClassificationLevel, ClassificationRuleEntry]
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +458,309 @@ async def list_devices(
     ]
 
 
+# ── T-671: Retention enforcement + compliance export ───────────────────────
+
+@router.post("/v2/admin/retention/enforce", response_model=RetentionEnforceResponse)
+async def enforce_retention(
+    body: RetentionEnforceBody,
+    principal: Principal = Depends(require_principal),
+) -> RetentionEnforceResponse:
+    """Apply the configured audit retention policy.
+
+    Purges audit events older than the retention window (default 365 days,
+    or ``retention_days`` from the request body). The enforcement action is
+    itself written to the audit log.
+
+    Requires ``MANAGE_SETTINGS`` capability.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    days = body.retention_days if body.retention_days is not None else _retention_days()
+    cutoff = datetime.now().timestamp() - (days * 86400)
+
+    store = _get_audit_store()
+    purged = store.purge_before(cutoff)
+
+    # The enforcement action is itself an audited admin action.
+    store.log(
+        AuditEvent(
+            event_type=AuditEventType.ADMIN_ACTION,
+            actor_principal_id=principal.principal_id,
+            resource_id="audit_retention",
+            success=True,
+        )
+    )
+
+    remaining = store.count()
+    log.info(
+        "admin.retention_enforce",
+        actor=principal.principal_id,
+        retention_days=days,
+        events_purged=purged,
+        events_remaining=remaining,
+    )
+    return RetentionEnforceResponse(
+        retention_days=days,
+        cutoff_timestamp=cutoff,
+        events_purged=purged,
+        events_remaining=remaining,
+    )
+
+
+def _live_export_matrix() -> ExportPolicyMatrix:
+    """Build an ``ExportPolicyMatrix`` from the admin-editable ``policy_state``.
+
+    The export-controls enforcement function keys on its own
+    ``ClassificationLevel`` enum; ``policy_state.export_policy`` is keyed by the
+    canonical classification ``ClassificationLevel`` (identical string values),
+    so re-key into the export_controls enum here.
+    """
+    return ExportPolicyMatrix(
+        policies={
+            ExportClassificationLevel(level.value): policy
+            for level, policy in policy_state.export_policy.items()
+        }
+    )
+
+
+@router.get("/v2/admin/export", response_model=ComplianceExportResponse)
+async def compliance_export(
+    since: Optional[str] = Query(default=None, description="ISO-8601 datetime"),
+    classification: ExportClassificationLevel = Query(
+        default=ExportClassificationLevel.INTERNAL,
+        description="Classification ceiling of the data being exported.",
+    ),
+    export_format: ExportFormat = Query(
+        default=ExportFormat.JSON,
+        description="Requested export format.",
+    ),
+    approval_token: Optional[str] = Query(
+        default=None,
+        description="Approval token for classified exports (E-59 T-662).",
+    ),
+    principal: Principal = Depends(require_principal),
+) -> ComplianceExportResponse:
+    """Return the audit/compliance dataset for offline review.
+
+    The export action is itself audited.  Before returning any data the
+    classification ceiling is checked against the export-controls policy
+    (``check_export_allowed``); classified data is not exported without
+    approval. A denied decision yields a 403 and is recorded as a failed
+    ``EXPORT_STARTED`` audit event.
+
+    Requires ``MANAGE_SETTINGS`` capability.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    since_ts: Optional[float] = None
+    if since is not None:
+        try:
+            since_ts = datetime.fromisoformat(since).timestamp()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "invalid_param", "detail": f"'since' must be ISO-8601: {exc}"},
+            ) from exc
+
+    store = _get_audit_store()
+
+    # Respect the export-controls classification ceiling BEFORE returning data.
+    decision = check_export_allowed(
+        classification,
+        export_format,
+        matrix=_live_export_matrix(),
+        approval_token=approval_token,
+    )
+    if not decision.allowed:
+        # Record the denied export attempt (failed admin export).
+        store.log(
+            AuditEvent(
+                event_type=AuditEventType.EXPORT_STARTED,
+                actor_principal_id=principal.principal_id,
+                resource_id="compliance_export",
+                classification=classification.value,
+                success=False,
+            )
+        )
+        log.warning(
+            "admin.compliance_export.denied",
+            actor=principal.principal_id,
+            classification=classification.value,
+            export_format=export_format.value,
+            reason=decision.reason,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "export_forbidden",
+                "detail": decision.reason,
+                "approval_required": decision.approval_required,
+            },
+        )
+
+    events = store.query(since=since_ts, limit=10_000)
+
+    # The export action is itself an audited admin action.
+    store.log(
+        AuditEvent(
+            event_type=AuditEventType.EXPORT_STARTED,
+            actor_principal_id=principal.principal_id,
+            resource_id="compliance_export",
+            classification=classification.value,
+            success=True,
+        )
+    )
+
+    log.info(
+        "admin.compliance_export",
+        actor=principal.principal_id,
+        record_count=len(events),
+        classification=classification.value,
+        export_format=export_format.value,
+    )
+    return ComplianceExportResponse(
+        exported_at=datetime.now().timestamp(),
+        record_count=len(events),
+        retention_days=_retention_days(),
+        classification=classification,
+        export_format=export_format,
+        watermark_required=decision.watermark_required,
+        events=events,
+    )
+
+
+# ── T-675: Policy + classification editors ──────────────────────────────────
+
+def _export_policy_to_entry(policy: ExportPolicy) -> ExportPolicyEntry:
+    return ExportPolicyEntry(
+        allowed_export_formats=list(policy.allowed_export_formats),
+        watermark_required=policy.watermark_required,
+        approval_required=policy.approval_required,
+    )
+
+
+@router.get("/v2/admin/policy", response_model=ExportPolicyResponse)
+async def get_export_policy(
+    principal: Principal = Depends(require_principal),
+) -> ExportPolicyResponse:
+    """Return the current export-policy matrix.
+
+    Requires ``MANAGE_SETTINGS`` capability.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    log.info("admin.get_export_policy", actor=principal.principal_id)
+    return ExportPolicyResponse(
+        policies={
+            level: _export_policy_to_entry(policy)
+            for level, policy in policy_state.export_policy.items()
+        }
+    )
+
+
+@router.put("/v2/admin/policy", response_model=ExportPolicyResponse)
+async def put_export_policy(
+    body: ExportPolicyEditBody,
+    principal: Principal = Depends(require_principal),
+) -> ExportPolicyResponse:
+    """Replace the export-policy matrix.
+
+    Requires ``MANAGE_SETTINGS`` capability. The change is audited.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    policy_state.export_policy = {
+        level: ExportPolicy(
+            allowed_export_formats=list(entry.allowed_export_formats),
+            watermark_required=entry.watermark_required,
+            approval_required=entry.approval_required,
+        )
+        for level, entry in body.policies.items()
+    }
+
+    _get_audit_store().log(
+        AuditEvent(
+            event_type=AuditEventType.ADMIN_ACTION,
+            actor_principal_id=principal.principal_id,
+            resource_id="export_policy",
+            success=True,
+        )
+    )
+    log.info("admin.put_export_policy", actor=principal.principal_id)
+    return ExportPolicyResponse(
+        policies={
+            level: _export_policy_to_entry(policy)
+            for level, policy in policy_state.export_policy.items()
+        }
+    )
+
+
+def _rules_to_entry(rules: HandlingRules) -> ClassificationRuleEntry:
+    return ClassificationRuleEntry(
+        export_allowed=rules["export_allowed"],
+        cache_allowed=rules["cache_allowed"],
+        redact_in_search=rules["redact_in_search"],
+        allowed_roles=list(rules["allowed_roles"]),
+    )
+
+
+@router.get("/v2/admin/classification", response_model=ClassificationResponse)
+async def get_classification(
+    principal: Principal = Depends(require_principal),
+) -> ClassificationResponse:
+    """Return the classification handling-rules table.
+
+    Requires ``MANAGE_SETTINGS`` capability.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    log.info("admin.get_classification", actor=principal.principal_id)
+    return ClassificationResponse(
+        rules={
+            level: _rules_to_entry(rules)
+            for level, rules in policy_state.classification_rules.items()
+        }
+    )
+
+
+@router.put("/v2/admin/classification", response_model=ClassificationResponse)
+async def put_classification(
+    body: ClassificationEditBody,
+    principal: Principal = Depends(require_principal),
+) -> ClassificationResponse:
+    """Replace the classification handling-rules table.
+
+    Requires ``MANAGE_SETTINGS`` capability. The change is audited.
+    """
+    _enforce(principal, Capability.MANAGE_SETTINGS)
+
+    policy_state.classification_rules = {
+        level: HandlingRules(
+            export_allowed=entry.export_allowed,
+            cache_allowed=entry.cache_allowed,
+            redact_in_search=entry.redact_in_search,
+            allowed_roles=list(entry.allowed_roles),
+        )
+        for level, entry in body.rules.items()
+    }
+
+    _get_audit_store().log(
+        AuditEvent(
+            event_type=AuditEventType.ADMIN_ACTION,
+            actor_principal_id=principal.principal_id,
+            resource_id="classification_policy",
+            success=True,
+        )
+    )
+    log.info("admin.put_classification", actor=principal.principal_id)
+    return ClassificationResponse(
+        rules={
+            level: _rules_to_entry(rules)
+            for level, rules in policy_state.classification_rules.items()
+        }
+    )
+
+
 @router.get("/metrics")
 async def prometheus_metrics():  # type: ignore[return]
     """Prometheus-format metrics endpoint.
@@ -332,4 +792,4 @@ async def prometheus_metrics():  # type: ignore[return]
     return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
-__all__ = ["router", "metrics_state"]
+__all__ = ["router", "metrics_state", "policy_state"]
