@@ -2960,14 +2960,14 @@
 
 **Tasks:**
 - [x] T-621: Document query/aggregate endpoints — Sonnet dev, DS rev
-- [ ] T-622: Facet performance pass (indexes for common group-bys) — Sonnet dev, DS rev
-- [ ] T-623: Update `docs/bi-connectivity.md` for v2 auth + new endpoints — Ollama dev, Gemini rev
+- [x] T-622: Facet performance pass (indexes for common group-bys) — Sonnet dev, DS rev
+- [x] T-623: Update `docs/bi-connectivity.md` for v2 auth + new endpoints — Ollama dev, Gemini rev
 
 ### S-179: As an admin, I want BI-tool service accounts with scoped read roles so that Metabase/Grafana/Power BI connect safely `P1` `S`
 
 **Tasks:**
-- [ ] T-624: Service-account issuance + classification ceiling enforcement — Sonnet dev, DS rev
-- [ ] T-625: Validate + document Metabase/Grafana/Power BI flows — Haiku dev, Sonnet rev
+- [x] T-624: Service-account issuance + classification ceiling enforcement — Sonnet dev, DS rev
+- [x] T-625: Validate + document Metabase/Grafana/Power BI flows — Haiku dev, Sonnet rev
 
 ---
 

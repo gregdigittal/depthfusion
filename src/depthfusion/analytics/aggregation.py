@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 #: Rollup granularities supported by the service.
 SUPPORTED_PERIODS = frozenset({"daily", "weekly"})
 
+#: Columns of ``analytics_events`` that may be used as a facet group-by
+#: dimension.  ``principal_id`` is intentionally excluded — it is the ACL
+#: scope, never a facet, so a caller can never group across principals.
+SUPPORTED_FACETS = frozenset({"event_type"})
+
 
 def _period_bounds(period: str, reference: date) -> tuple[date, date]:
     """Return (start, end_inclusive) for a period ending on *reference*.
@@ -200,3 +205,132 @@ class AggregationService:
             "total_events": total,
             "by_event_type": by_type,
         }
+
+    def facets(
+        self,
+        *,
+        principal_id: str,
+        facet: str = "event_type",
+        period_days: int = 7,
+        reference_date: date | None = None,
+    ) -> dict:
+        """Return faceted counts for *principal_id* grouped by *facet*.
+
+        Unlike :meth:`summary` (which always groups by ``event_type``), this
+        method exercises the composite ``(principal_id, recorded_at,
+        event_type)`` index added in T-622, returning a generic facet
+        breakdown that BI dashboards can chart.
+
+        ACL invariant: the result is always scoped to *principal_id*; the
+        facet dimension can never be ``principal_id`` (see
+        :data:`SUPPORTED_FACETS`), so a caller can never group across
+        principals.
+
+        Parameters
+        ----------
+        principal_id:
+            The principal whose events are being faceted (ACL scope).
+        facet:
+            The column to group by.  Must be in :data:`SUPPORTED_FACETS`.
+        period_days:
+            Look-back window in days.
+        reference_date:
+            Anchor date; defaults to today in UTC.
+
+        Returns
+        -------
+        dict with keys ``principal_id``, ``facet``, ``period_days``,
+        ``period_start``, ``period_end``, ``total``, ``buckets``.
+
+        Raises
+        ------
+        ValueError
+            If *facet* is not a supported facet dimension.  This is the
+            allowlist that prevents SQL injection via the column name (the
+            value is interpolated into the SQL, so it must never come from
+            untrusted input directly).
+        """
+        if facet not in SUPPORTED_FACETS:
+            raise ValueError(
+                f"Unsupported facet {facet!r}; allowed: {sorted(SUPPORTED_FACETS)}"
+            )
+
+        if reference_date is None:
+            reference_date = datetime.now(tz=timezone.utc).date()
+
+        start_date = reference_date - timedelta(days=period_days - 1)
+        start_ts = datetime(
+            start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc
+        ).isoformat()
+        end_ts = datetime(
+            reference_date.year, reference_date.month, reference_date.day,
+            23, 59, 59, tzinfo=timezone.utc,
+        ).isoformat()
+
+        buckets: dict[str, int] = {}
+        total = 0
+
+        try:
+            with closing(_connect(self._db_path)) as conn:
+                # ``facet`` is validated against SUPPORTED_FACETS above, so the
+                # interpolation here is safe (allowlist, not user input).
+                rows = conn.execute(
+                    f"SELECT {facet} AS bucket, COUNT(*) AS cnt"  # noqa: S608
+                    "  FROM analytics_events"
+                    " WHERE principal_id = ?"
+                    "   AND recorded_at >= ? AND recorded_at <= ?"
+                    f" GROUP BY {facet}",  # noqa: S608
+                    (principal_id, start_ts, end_ts),
+                ).fetchall()
+
+            for row in rows:
+                buckets[row[0]] = int(row[1])
+                total += int(row[1])
+
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "analytics: facet query failed for principal=%r facet=%r",
+                principal_id,
+                facet,
+            )
+
+        return {
+            "principal_id": principal_id,
+            "facet": facet,
+            "period_days": period_days,
+            "period_start": start_date.isoformat(),
+            "period_end": reference_date.isoformat(),
+            "total": total,
+            "buckets": buckets,
+        }
+
+    def explain_facet_query(
+        self,
+        *,
+        principal_id: str = "_probe",
+        period_days: int = 7,
+    ) -> list[str]:
+        """Return the SQLite ``EXPLAIN QUERY PLAN`` rows for the facet query.
+
+        Used by the performance test to assert the composite facet index
+        (T-622) is actually selected by the planner rather than a full scan.
+        """
+        reference_date = datetime.now(tz=timezone.utc).date()
+        start_date = reference_date - timedelta(days=period_days - 1)
+        start_ts = datetime(
+            start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc
+        ).isoformat()
+        end_ts = datetime(
+            reference_date.year, reference_date.month, reference_date.day,
+            23, 59, 59, tzinfo=timezone.utc,
+        ).isoformat()
+
+        with closing(_connect(self._db_path)) as conn:
+            rows = conn.execute(
+                "EXPLAIN QUERY PLAN "
+                "SELECT event_type, COUNT(*) FROM analytics_events"
+                " WHERE principal_id = ? AND recorded_at >= ? AND recorded_at <= ?"
+                " GROUP BY event_type",
+                (principal_id, start_ts, end_ts),
+            ).fetchall()
+        return [" ".join(str(c) for c in row) for row in rows]

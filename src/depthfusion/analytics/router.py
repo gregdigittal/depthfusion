@@ -222,6 +222,18 @@ class AnalyticsSummaryResponse(BaseModel):
     by_event_type: dict[str, int]
 
 
+class AnalyticsFacetResponse(BaseModel):
+    """Response body for GET /v2/analytics/facets."""
+
+    principal_id: str
+    facet: str
+    period_days: int
+    period_start: str
+    period_end: str
+    total: int
+    buckets: dict[str, int]
+
+
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
@@ -271,3 +283,60 @@ async def get_analytics_summary(
     result = svc.summary(principal_id=principal_id, period_days=period_days)
 
     return AnalyticsSummaryResponse(**result)
+
+
+@analytics_router.get(
+    "/facets",
+    response_model=AnalyticsFacetResponse,
+    summary="Faceted usage counts for the authenticated principal",
+    description=(
+        "Returns usage event counts grouped by a facet dimension (e.g. "
+        "``event_type``) for the requesting principal over the specified "
+        "period.  The principal is derived from the validated Bearer token — "
+        "callers can only facet their own metrics."
+    ),
+)
+async def get_analytics_facets(
+    facet: str = Query(
+        default="event_type",
+        description="Facet dimension to group by. Currently: ``event_type``.",
+        pattern=r"^[a-z_]+$",  # column-name shape; validated against allowlist below
+    ),
+    period: str = Query(
+        default="7d",
+        description="Look-back window, e.g. ``7d``, ``30d``, ``1d``. Max 365d.",
+        pattern=r"^[1-9]\d{0,3}d$",
+    ),
+    authorization: Optional[str] = Header(default=None),
+    db_path: Path = Depends(_default_db_path),
+) -> AnalyticsFacetResponse:
+    """Return faceted usage counts for the authenticated principal."""
+    principal_id = await _resolve_principal_id(authorization)
+
+    try:
+        period_days = int(period.removesuffix("d"))
+        if not (1 <= period_days <= _MAX_PERIOD_DAYS):
+            raise ValueError(f"period_days must be 1–{_MAX_PERIOD_DAYS}")
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Invalid period {period!r}. Use e.g. '7d', '30d'. "
+                f"Max {_MAX_PERIOD_DAYS}d."
+            ),
+        )
+
+    from .aggregation import AggregationService
+
+    svc = AggregationService(db_path=db_path)
+    try:
+        result = svc.facets(
+            principal_id=principal_id, facet=facet, period_days=period_days
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
+
+    return AnalyticsFacetResponse(**result)
