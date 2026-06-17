@@ -3097,11 +3097,11 @@
 - [ ] AC-5: Cold-start: first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure
 
 **Tasks:**
-- [ ] T-652: Local activity signal store + privacy guard (on-device only) — Sonnet dev, DS rev
+- [x] T-652: Local activity signal store + privacy guard (on-device only) — Sonnet dev, DS rev
 - [x] T-653: Relevance scorer (centroid + recency/frequency blend) — Opus dev, DS rev
 - [x] T-654: Budgeted fill/eviction engine + pinning — Sonnet dev, DS rev
-- [ ] T-655: Idle-time prefetch scheduler — Sonnet dev, Gemini rev
-- [ ] T-656: Offline hit-rate telemetry + dogfood report — Haiku dev, Sonnet rev
+- [x] T-655: Idle-time prefetch scheduler — Sonnet dev, Gemini rev
+- [x] T-656: Offline hit-rate telemetry + dogfood report — Haiku dev, Sonnet rev
 
 ### S-190: As a security owner, I want cache leases + remote revocation so that a departed employee's offline data expires `P0` `M`
 
@@ -3112,10 +3112,10 @@
 - [ ] AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator
 
 **Tasks:**
-- [ ] T-657: Lease issuance/renewal protocol + classification scaling — Opus dev, DS rev
-- [ ] T-658: Purge engine (startup + timer + revoke signal) — Sonnet dev, DS rev
-- [ ] T-659: Offline query engine over cache + UI indicator — Sonnet dev, Gemini rev
-- [ ] T-660: Revocation E2E test matrix (online revoke, offline expiry, clock tamper) — Opus dev, DS rev
+- [x] T-657: Lease issuance/renewal protocol + classification scaling — Opus dev, DS rev
+- [x] T-658: Purge engine (startup + timer + revoke signal) — Sonnet dev, DS rev
+- [x] T-659: Offline query engine over cache + UI indicator — Sonnet dev, Gemini rev
+- [x] T-660: Revocation E2E test matrix (online revoke, offline expiry, clock tamper) — Opus dev, DS rev
 
 ---
 

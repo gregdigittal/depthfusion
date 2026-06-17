@@ -482,3 +482,364 @@ class TestTamperDetection:
         assert "acl_allow" in CACHE_SCHEMA
         assert "classification" in CACHE_SCHEMA
         assert "lease_expires_at" in CACHE_SCHEMA
+
+
+# ---------------------------------------------------------------------------
+# Lease lifecycle: issuance/renewal, purge, offline query, revocation matrix
+# (E-58 S-190, T-657/T-658/T-659/T-660)
+# ---------------------------------------------------------------------------
+
+from depthfusion.cache import (  # noqa: E402
+    DEFAULT_LEASE_SECONDS,
+    InMemoryLeaseStore,
+    Lease,
+    LeaseManager,
+    LeaseStatus,
+    OfflineDocument,
+    OfflineQueryEngine,
+    PurgeEngine,
+    PurgeTrigger,
+    RenewalDeniedError,
+    ttl_for_classification,
+)
+
+
+class _FakeCacheWiper:
+    """Records which cache records were wiped."""
+
+    def __init__(self) -> None:
+        self.wiped_records: list[str] = []
+        self.wiped_all: int = 0
+
+    def wipe_record(self, record_id: str) -> None:
+        self.wiped_records.append(record_id)
+
+    def wipe_all(self) -> None:
+        self.wiped_all += 1
+        self.wiped_records.append("*ALL*")
+
+
+class _FakeTokenWiper:
+    """Records token wipes."""
+
+    def __init__(self) -> None:
+        self.wipes: int = 0
+
+    def wipe_token(self) -> None:
+        self.wipes += 1
+
+
+@pytest.fixture()
+def lease_store() -> InMemoryLeaseStore:
+    return InMemoryLeaseStore()
+
+
+@pytest.fixture()
+def cache_wiper() -> "_FakeCacheWiper":
+    return _FakeCacheWiper()
+
+
+@pytest.fixture()
+def token_wiper() -> "_FakeTokenWiper":
+    return _FakeTokenWiper()
+
+
+class TestClassificationTtl:
+    def test_default_is_seven_days(self) -> None:
+        assert DEFAULT_LEASE_SECONDS == 7 * 24 * 3600
+        assert ttl_for_classification(ClassificationLevel.PUBLIC) == DEFAULT_LEASE_SECONDS
+        assert ttl_for_classification(ClassificationLevel.INTERNAL) == DEFAULT_LEASE_SECONDS
+
+    def test_confidential_is_48h(self) -> None:
+        assert ttl_for_classification(ClassificationLevel.CONFIDENTIAL) == 48 * 3600
+
+    def test_restricted_is_24h_and_shorter_than_confidential(self) -> None:
+        assert ttl_for_classification(ClassificationLevel.RESTRICTED) == 24 * 3600
+        assert ttl_for_classification(
+            ClassificationLevel.RESTRICTED
+        ) < ttl_for_classification(ClassificationLevel.CONFIDENTIAL)
+
+
+class TestLeaseIssuance:
+    def test_issue_scales_ttl_by_classification(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        mgr = LeaseManager(lease_store, cache_wiper, token_wiper)
+        now = 1_000_000.0
+        pub = mgr.issue("rec-pub", ClassificationLevel.PUBLIC, now=now)
+        conf = mgr.issue("rec-conf", ClassificationLevel.CONFIDENTIAL, now=now)
+
+        assert pub.expires_at == now + DEFAULT_LEASE_SECONDS
+        assert conf.expires_at == now + 48 * 3600
+        # Positive: a freshly-issued lease is valid now.
+        assert pub.is_valid(now) is True
+        assert conf.status(now) is LeaseStatus.VALID
+
+    def test_issued_lease_is_persisted(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        mgr = LeaseManager(lease_store, cache_wiper, token_wiper)
+        mgr.issue("rec-1", ClassificationLevel.INTERNAL, now=500.0)
+        stored = lease_store.get("rec-1")
+        assert stored is not None
+        assert stored.record_id == "rec-1"
+
+    def test_expired_lease_negative_case(self) -> None:
+        lease = Lease(
+            record_id="r",
+            classification=ClassificationLevel.CONFIDENTIAL,
+            issued_at=0.0,
+            expires_at=48 * 3600,
+        )
+        # Just before expiry → valid; after → expired.
+        assert lease.is_valid(48 * 3600 - 1) is True
+        assert lease.status(48 * 3600 + 1) is LeaseStatus.EXPIRED
+
+
+class TestLeaseRenewal:
+    def test_renew_granted_extends_from_now(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        mgr = LeaseManager(lease_store, cache_wiper, token_wiper)
+        mgr.issue("rec-1", ClassificationLevel.CONFIDENTIAL, now=1000.0)
+        outcome = mgr.renew("rec-1", server_grants=True, now=2000.0)
+        assert outcome.renewed is True
+        assert outcome.lease is not None
+        # Extended from the renewal instant, not the original issue time.
+        assert outcome.lease.expires_at == 2000.0 + 48 * 3600
+        assert lease_store.get("rec-1").expires_at == 2000.0 + 48 * 3600
+
+    def test_renew_denied_wipes_cache_and_token(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        mgr = LeaseManager(lease_store, cache_wiper, token_wiper)
+        mgr.issue("rec-1", ClassificationLevel.PUBLIC, now=1000.0)
+        with pytest.raises(RenewalDeniedError):
+            mgr.renew("rec-1", server_grants=False, now=1500.0)
+        # Full wipe: the lease is gone, the cache record was wiped, token wiped.
+        assert lease_store.get("rec-1") is None
+        assert "rec-1" in cache_wiper.wiped_records
+        assert token_wiper.wipes == 1
+
+    def test_renew_unknown_record_denies_and_wipes_token(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        mgr = LeaseManager(lease_store, cache_wiper, token_wiper)
+        with pytest.raises(RenewalDeniedError):
+            mgr.renew("ghost", server_grants=True, now=100.0)
+        assert token_wiper.wipes == 1
+
+
+class TestPurgeEngine:
+    def _seed(self, store: InMemoryLeaseStore) -> None:
+        # Two leases: one already expired, one valid far in the future.
+        store.upsert(
+            Lease("expired", ClassificationLevel.PUBLIC, issued_at=0.0, expires_at=100.0)
+        )
+        store.upsert(
+            Lease(
+                "valid",
+                ClassificationLevel.PUBLIC,
+                issued_at=0.0,
+                expires_at=10_000_000.0,
+            )
+        )
+
+    def test_purge_on_start(self, lease_store, cache_wiper, token_wiper) -> None:
+        self._seed(lease_store)
+        engine = PurgeEngine(lease_store, cache_wiper, token_wiper)
+        result = engine.run_on_start(now=200.0)
+        assert result.trigger is PurgeTrigger.STARTUP
+        # Positive: expired purged; Negative: valid retained.
+        assert "expired" in result.purged_record_ids
+        assert lease_store.get("expired") is None
+        assert lease_store.get("valid") is not None
+        assert "expired" in cache_wiper.wiped_records
+
+    def test_purge_on_timer(self, lease_store, cache_wiper, token_wiper) -> None:
+        self._seed(lease_store)
+        engine = PurgeEngine(lease_store, cache_wiper, token_wiper)
+        result = engine.run_on_timer(now=200.0)
+        assert result.trigger is PurgeTrigger.TIMER
+        assert result.purged_count == 1
+        assert lease_store.get("valid") is not None
+
+    def test_purge_on_revoke_full_wipe(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        self._seed(lease_store)
+        engine = PurgeEngine(lease_store, cache_wiper, token_wiper)
+        result = engine.run_on_revoke(now=200.0)
+        assert result.trigger is PurgeTrigger.REVOKE
+        assert result.full_wipe is True
+        # Everything is wiped — even the still-valid lease.
+        assert lease_store.all_leases() == []
+        assert cache_wiper.wiped_all == 1
+        assert token_wiper.wipes == 1
+
+    def test_clock_rollback_cannot_revive_expired_lease(
+        self, lease_store, cache_wiper, token_wiper
+    ) -> None:
+        # Issue a lease that expires at t=100. Advance the engine to t=500
+        # (sets the high-water mark), purging it. Then roll the clock back to
+        # t=50 — the lease must NOT come back to life.
+        lease_store.upsert(
+            Lease("r", ClassificationLevel.PUBLIC, issued_at=0.0, expires_at=100.0)
+        )
+        engine = PurgeEngine(lease_store, cache_wiper, token_wiper)
+        engine.run_on_timer(now=500.0)
+        assert lease_store.get("r") is None  # purged at t=500
+
+        # Re-add a lease that, by wall clock, would still be valid at the
+        # rolled-back time but expired relative to the high-water mark.
+        lease_store.upsert(
+            Lease("r2", ClassificationLevel.PUBLIC, issued_at=0.0, expires_at=200.0)
+        )
+        result = engine.run_on_timer(now=50.0)  # clock rolled back
+        assert result.clock_tamper_detected is True
+        # effective_now is max(50, 500) = 500 → r2 (expires_at=200) is expired.
+        assert lease_store.get("r2") is None
+
+
+class TestOfflineQueryEngine:
+    def _docs(self) -> list[OfflineDocument]:
+        return [
+            OfflineDocument(
+                "doc-quarterly",
+                "quarterly revenue report finance numbers",
+                embedding=(1.0, 0.0, 0.0),
+            ),
+            OfflineDocument(
+                "doc-hr",
+                "employee handbook vacation policy hr",
+                embedding=(0.0, 1.0, 0.0),
+            ),
+            OfflineDocument(
+                "doc-expired",
+                "quarterly revenue secret leaked finance",
+                embedding=(1.0, 0.0, 0.0),
+            ),
+        ]
+
+    def _store_with_leases(self) -> InMemoryLeaseStore:
+        store = InMemoryLeaseStore()
+        store.upsert(
+            Lease(
+                "doc-quarterly",
+                ClassificationLevel.INTERNAL,
+                issued_at=0.0,
+                expires_at=10_000.0,
+            )
+        )
+        store.upsert(
+            Lease(
+                "doc-hr",
+                ClassificationLevel.INTERNAL,
+                issued_at=0.0,
+                expires_at=10_000.0,
+            )
+        )
+        # Expired lease — must NOT be searchable even though it matches.
+        store.upsert(
+            Lease(
+                "doc-expired",
+                ClassificationLevel.CONFIDENTIAL,
+                issued_at=0.0,
+                expires_at=10.0,
+            )
+        )
+        return store
+
+    def test_offline_search_returns_cached_results_with_subset_indicator(self) -> None:
+        store = self._store_with_leases()
+        engine = OfflineQueryEngine(store, self._docs())
+        rs = engine.search(
+            "quarterly revenue", query_embedding=(1.0, 0.0, 0.0), now=100.0
+        )
+        # Positive: the matching valid doc is returned.
+        ids = [r.record_id for r in rs.results]
+        assert "doc-quarterly" in ids
+        # The "offline subset" indicator is always present + truthy.
+        assert rs.offline_subset is True
+        assert rs.indicator_label
+        # Only the two valid-lease docs are in the searchable subset.
+        assert rs.total_cached == 2
+
+    def test_expired_lease_record_excluded_negative_case(self) -> None:
+        store = self._store_with_leases()
+        engine = OfflineQueryEngine(store, self._docs())
+        rs = engine.search("quarterly revenue", now=100.0)  # doc-expired lease dead
+        ids = [r.record_id for r in rs.results]
+        assert "doc-expired" not in ids
+
+    def test_empty_subset_after_revoke_returns_no_results(self) -> None:
+        store = InMemoryLeaseStore()  # no leases at all
+        engine = OfflineQueryEngine(store, self._docs())
+        rs = engine.search("quarterly revenue", now=100.0)
+        assert rs.results == []
+        assert rs.total_cached == 0
+        # Indicator still set so the UI shows the offline state.
+        assert rs.offline_subset is True
+
+    def test_vector_score_ranks_semantic_match(self) -> None:
+        store = self._store_with_leases()
+        engine = OfflineQueryEngine(store, self._docs(), alpha=1.0)  # pure vector
+        rs = engine.search(
+            "anything", query_embedding=(1.0, 0.0, 0.0), top_k=1, now=100.0
+        )
+        assert rs.results[0].record_id == "doc-quarterly"
+
+
+class TestRevocationMatrix:
+    """T-660: the three required revocation scenarios, end to end."""
+
+    def test_online_revoke_full_wipe(self) -> None:
+        store = InMemoryLeaseStore()
+        cache = _FakeCacheWiper()
+        token = _FakeTokenWiper()
+        mgr = LeaseManager(store, cache, token)
+        mgr.issue("a", ClassificationLevel.PUBLIC, now=0.0)
+        mgr.issue("b", ClassificationLevel.CONFIDENTIAL, now=0.0)
+        # Online: server returns a revoke signal.
+        engine = PurgeEngine(store, cache, token)
+        result = engine.run_on_revoke(now=100.0)
+        assert result.full_wipe is True
+        assert store.all_leases() == []  # negative: nothing serves after revoke
+        assert token.wipes == 1
+
+    def test_offline_lease_expiry_dies_without_server(self) -> None:
+        store = InMemoryLeaseStore()
+        cache = _FakeCacheWiper()
+        token = _FakeTokenWiper()
+        mgr = LeaseManager(store, cache, token)
+        # Confidential → 48h lease.
+        mgr.issue("c", ClassificationLevel.CONFIDENTIAL, now=0.0)
+        engine = PurgeEngine(store, cache, token)
+        # Positive: still valid within the window (no server contact needed).
+        before = engine.run_on_timer(now=47 * 3600)
+        assert "c" not in before.purged_record_ids
+        assert store.get("c") is not None
+        # Negative: after 48h offline, it dies at the timer with no server.
+        after = engine.run_on_timer(now=49 * 3600)
+        assert "c" in after.purged_record_ids
+        assert store.get("c") is None
+
+    def test_clock_rollback_tamper_does_not_extend_lease(self) -> None:
+        store = InMemoryLeaseStore()
+        cache = _FakeCacheWiper()
+        token = _FakeTokenWiper()
+        mgr = LeaseManager(store, cache, token)
+        mgr.issue("d", ClassificationLevel.RESTRICTED, now=0.0)  # 24h lease
+        engine = PurgeEngine(store, cache, token)
+        # Advance past expiry — high-water mark moves to 25h, lease purged.
+        engine.run_on_timer(now=25 * 3600)
+        assert store.get("d") is None
+        # Attacker rolls the clock back to t=1h and re-seeds a lease that, by
+        # wall clock, looks valid; the engine evaluates against the high-water
+        # mark and still purges it.
+        store.upsert(
+            Lease("d2", ClassificationLevel.RESTRICTED, issued_at=0.0, expires_at=24 * 3600)
+        )
+        result = engine.run_on_timer(now=1 * 3600)
+        assert result.clock_tamper_detected is True
+        assert store.get("d2") is None
