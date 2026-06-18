@@ -120,6 +120,7 @@ dev = [
     "pypdf>=3.0",            # optional PDF parser — imported by test_ingest_throughput.py
     "cryptography>=48.0.1",  # token_validator.py direct import; not installed transitively by pip
     "python-docx>=0.8",     # ingest/parser.py + test_ingest.py direct import; not installed transitively by pip
+    "msal>=1.0",            # sharepoint.py lazy import; test_sharepoint.py expects ConfigurationError not ImportError
 ]
 
 [project.scripts]
