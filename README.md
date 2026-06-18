@@ -1,14 +1,39 @@
 # DepthFusion
 
-Cross-session memory for Claude Code — tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture mechanisms, a memory-policy layer, and a full Cognitive Infrastructure Layer that brings typed memory objects, contradiction detection, and decision-aware recall.
+**DepthFusion gives AI agents the institutional memory your team already has.**
 
-> **Status:** v1.1.0 (2026-05-20). 1986 tests passing · 0 ruff · 0 mypy. Windows installer (`scripts/install.ps1`), Mac/Linux installer (`scripts/install.sh`), fcntl cross-platform compat, and GitHub Actions CI matrix shipped (E-44). MCP surface (24 tools) stable; E-31 cognitive features active by default; SkillForge SF-2 + Mamba B/C/Δ fusion stack live.
+Every agent session starts from zero — it doesn't know what previous sessions discovered or what your teammates' agents figured out. DepthFusion fixes this: a shared memory layer where agents publish discoveries, new sessions inherit them instantly via `fabric_seed`, and every memory is queryable by provenance ("who knew what, when").
+
+Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
+
+> **V2 enterprise branch:** This branch (`v2-enterprise`) contains the V2 enterprise build with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, and classification-aware memory handling. V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. If you are looking for the V1 MCP-only deployment, use the `main` branch.
+
+**[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
+
+> **Status:** v1.2.2 (main) / v2.0.0-dev (v2-enterprise). 2151+ tests passing · 0 ruff · 0 mypy. V2 adds: OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), and offline mode. V1: Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46), **29 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+
+## V2 Feature Summary
+
+| V2 Capability | Description | Docs |
+|---|---|---|
+| OIDC + PKCE authentication | Sign in via Azure Entra ID, Okta, or Google Workspace — no DepthFusion passwords | [security-model.md §1](docs/v2/security-model.md) |
+| Device enrollment | Each device is registered and admin-approved; enrollment certificates + revocation | [security-model.md §1.2](docs/v2/security-model.md) |
+| Token vault | refresh_token + device key stored in OS keychain (macOS/Windows/Linux) | [security-model.md §1.3](docs/v2/security-model.md) |
+| RBAC roles | viewer / contributor / operator / admin — capability matrix enforced at API layer | [security-model.md §2.1](docs/v2/security-model.md) |
+| ACL records | Per-memory or per-namespace access control; explicit deny support | [security-model.md §2.2](docs/v2/security-model.md) |
+| Data classification | PUBLIC / INTERNAL / CONFIDENTIAL / RESTRICTED with handling rules and export policy | [security-model.md §3](docs/v2/security-model.md) |
+| Fernet cache encryption | Offline recall cache encrypted at rest using device-derived key | [security-model.md §4.2](docs/v2/security-model.md) |
+| Tauri desktop app | Native app for macOS (Apple Silicon + Intel) and Windows 10/11 | [user-guide.md §1](docs/v2/user-guide.md) |
+| Offline mode | Encrypted local cache; queued write replay on reconnect | [user-guide.md §4](docs/v2/user-guide.md) |
+| Admin runbooks | Device approval/revocation, role assignment, backup/restore, audit queries | [admin-runbooks.md](docs/v2/admin-runbooks.md) |
 
 ---
 
 ## Performance Impact
 
-DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude Code Information-retrieval Quality Score) suite. Categories: **A** = retrieval precision, **D** = continuity (cross-session memory). Higher is better; vanilla Claude Code baseline is ~76.5.
+DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude Code Information-retrieval Quality Score) suite. Categories: **A** = retrieval precision, **B** = lexical scoring monotonicity, **C** = output identity / T-121 gate, **D** = continuity (cross-session memory). Higher is better; vanilla Claude Code baseline is ~76.5.
+
+> **How to read this section.** The numbers below come from three *different* measurements that are easy to conflate, so we keep them apart deliberately: (1) the **CIQS quality suite** (retrieval quality vs. baseline), (2) **real-session recall latency** (what users actually feel, end-to-end through the MCP path), and (3) the **BM25 core micro-benchmark** (the isolated lexical ranking kernel). The headline credibility claim is the **regression-suite health** — not any single precision figure.
 
 ### Measured (live data)
 
@@ -18,6 +43,22 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 | v0.2.0 local | ~83–85 | BM25 + block chunking | 42% | <50 ms | Manual `/learn` required |
 | v0.3.0 local | ~85 | BM25 (unchanged) | 42% | <50 ms | Zero new deps |
 | v0.6.0a1+ recall (real sessions, 2026-05-07) | not benchmarked | not benchmarked | not benchmarked | **37–372 ms** (n=4 events) | Production-path validated post-S-79 |
+
+The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall latency** — the full MCP path: corpus load from disk, HNSW vector search, RRF fusion, the ~15 ms CognitiveScorer pass, and MCP transport. This is the latency users actually experience. The sub-millisecond figure in the micro-benchmark below is the BM25 ranking kernel **only** and is not comparable.
+
+#### BM25 core micro-benchmark (`scripts/benchmark.py`, n=8 goldset, local — v1.2.2)
+
+| Metric | Value | Scope |
+|---|---|---|
+| precision@1 | 1.000 | per-query micro-corpus |
+| precision@5 | 1.000 | per-query micro-corpus |
+| hit_rate@5 | 1.000 | per-query micro-corpus |
+| p50 latency | 0.043 ms | ranking kernel only |
+| p95 latency | 0.135 ms | ranking kernel only |
+| fallback_rate | 0.0 | local BM25, no API |
+| cost_estimate | $0.00 | local BM25, no API |
+
+<sub>Run 2026-06-10 (`git 95832cd`, mode=local, top_k=5, 8 queries). Isolated lexical ranking over per-query micro-corpora (3–N docs each); for every query, a fresh in-memory BM25 index is built over only that query's tiny corpus and the top-k is ranked. p99 (≈0.12 ms) is interpolated from 8 points and is **estimated**. This is a **regression sentinel** — it proves the lexical core still perfectly separates relevant from distractor chunks on a hand-curated set. It is **not** a production-quality measure (the goldset is too small and too easy — at n=8 with perfect scores there is no discriminating power left) and **not** an end-to-end-latency measure (it excludes corpus loading, vector search, fusion, cognitive scoring, and MCP transport, which is why it reads ~1000× faster than the real-session range above).</sub>
 
 ### Estimated (projection)
 
@@ -32,6 +73,147 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 - **Contradiction prevention** — ContradictionEngine catches conflicting advice across sessions; estimated 40% reduction in contradictory guidance delivered to Claude
 - **Token efficiency** — cognitive pre-filtering reduces irrelevant context surfaced per session; estimated 15–25% reduction in context tokens consumed at scale
 - **8-component scoring overhead** — CognitiveScorer adds ~15 ms vs RRF-only; well within the 1500 ms p95 budget
+
+### Benchmark suite health (v1.2.2, current)
+
+The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v1.2.2 (`git 95832cd`):
+
+- **2151 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
+  - **Cat A** — retrieval precision, no-regression sentinel
+  - **Cat B** — BM25 score monotonicity + source-weight tier ordering
+  - **Cat C** — output identity passes the T-121 gate
+  - **Cat D** — fallback returns all available blocks + block-schema integrity
+- **Weighted fusion vs. RRF** — over 50 queries, weighted fusion wins 45, RRF wins 2, 3 ties → **90.0% win rate** (threshold 70%), confirming the fusion strategy substantially outperforms plain RRF.
+
+These are measured on the harness and goldset; the CIQS *quality* projections above remain estimated until re-measured against a live multi-thousand-session corpus and eval set (tracked as E-26 Cat D AC-3, benchmark-blocked).
+
+## Why DepthFusion?
+
+<table align="center" style="border-collapse:separate;border-spacing:0;width:100%;max-width:980px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(27,31,36,0.12);">
+  <thead>
+    <tr>
+      <th align="left" style="padding:13px 16px;background-color:#4f46e5;color:#ffffff;font-weight:700;border:none;letter-spacing:0.2px;">Feature</th>
+      <th align="center" style="padding:13px 10px;background-color:#4338ca;color:#ffffff;font-weight:800;border:none;border-left:2px solid rgba(255,255,255,0.25);">DepthFusion</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Vanilla&nbsp;CC</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Continue.dev</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Cursor</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Copilot</th>
+      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">RAG&nbsp;Plugin</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cross-session memory</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Fully local / offline mode</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Self-hosted (own your data)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Recall latency (warm, end-to-end)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">37–372&nbsp;ms</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">n/a</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~200&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~300&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~250&nbsp;ms+</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">100–500&nbsp;ms</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Per-query cost</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0&nbsp;✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;API</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Host</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Multi-provider bridge (import GPT/Gemini/DeepSeek)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">MCP-native (29 tools)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Hybrid retrieval (BM25 + vector + RRF)</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cognitive scoring &amp; contradiction detection</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Decision / outcome-aware recall</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#ffffff;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Conversation ingestion from other AI tools</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+    <tr style="background:#f6f8fa;">
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;border-bottom:none;font-weight:600;color:#1f2328;">Open source</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
+      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
+    </tr>
+  </tbody>
+</table>
+<p align="center"><sub>✅ full support&nbsp;&nbsp;•&nbsp;&nbsp;⚠️ partial / varies by config&nbsp;&nbsp;•&nbsp;&nbsp;❌ not supported&nbsp;&nbsp;|&nbsp;&nbsp;Compares the <strong>local / free tier</strong> of each product. Latency = warm recall, end-to-end. DepthFusion's 37–372 ms is measured (n=4 real sessions); competitor values are approximate, drawn from public docs and may vary by configuration.</sub></p>
 
 ---
 
@@ -58,7 +240,7 @@ mac-mlx mode (Apple Silicon, unified memory):
   query → BM25 (top-10) + local embeddings → RRF fusion → Gemma/Qwen reranker → top-k
   Uses mlx_lm.server (OpenAI-compatible) on port 8000.
   Same quality chain as vps-gpu; haiku fallback when mlx_lm.server is not running.
-  Model options: gemma-3-12b (~7 GB), Qwen2.5-14B (~9 GB), Qwen2.5-32B (~20 GB).
+  Model options: gemma-4-26b-a4b-it-4bit (~14 GB, recommended ≥16 GB), Qwen2.5-14B (~9 GB), Qwen2.5-32B (~20 GB), gemma-3-12b (~7 GB).
 
 Auto-capture (vps-cpu / vps-gpu):
   PreCompact hook  → snapshot active state
@@ -102,13 +284,14 @@ E-31 Cognitive Infrastructure Layer (v1.0.0, all enabled by default):
 
 ```
 src/depthfusion/
-├── core/        — types, config, scoring, feedback (RecallStore, FeedbackResult)
+├── core/        — types, config, scoring, feedback (RecallStore, FeedbackResult),
+│                  project_registry, project_context, project_ingest, research
 ├── fusion/      — rrf (k=60), weighted, block_retrieval, reranker, gates (Mamba B/C/Δ)
 ├── session/     — tagger (.meta.yaml), scorer, loader, compactor
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (24 tools gated by feature flags)
+├── mcp/         — server (29 canonical tools: 17 always-on, 9 feature-flagged, 3 bridge)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -131,23 +314,64 @@ DepthFusion has three install modes. Pick the one matching your target:
 
 | Mode | Use when | LLM backend | Extras | Step-by-step |
 |---|---|---|---|---|
-| `local` | Laptop / Windows, zero API deps | Heuristics + BM25 only | `[local]` | **Mac/Linux:** inline below · **Windows:** [docs/install/windows-quickstart.md](docs/install/windows-quickstart.md) |
+| `local` | Laptop / Windows (GPU auto-detected) | BM25 · GPU embeddings if CUDA present | `[local]` | **Mac/Linux:** inline below · **Windows:** [one-line installer](#windows-standalone-installer) |
 | `vps-cpu` | Cloud VPS, no GPU | Haiku via API | `[vps-cpu]` | **[docs/install/vps-cpu-quickstart.md](docs/install/vps-cpu-quickstart.md)** |
 | `vps-gpu` | CUDA host (≥ 20 GB VRAM) | Local Gemma via vLLM | `[vps-gpu]` | **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md)** |
-| `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [docs/mcp-local-setup.html](docs/mcp-local-setup.html) Part E |
+| `mac-mlx` | Apple Silicon Mac (M1/M2/M3/M4) | Local Gemma/Qwen via mlx_lm | `[mac-mlx]` | [one-line installer](#mac-apple-silicon-standalone-installer) |
+
+**Idiot-proof HTML runbooks (open in any browser):**
+- **[docs/install/local-install.html](docs/install/local-install.html)** — single machine setup for Mac Apple Silicon and Windows/Intel Mac. Auto-detects your platform, copy buttons throughout.
+- **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)** — full VPS + Tailscale setup. Role-selector: admin (Ubuntu provisioning, systemd, firewall) or team member (Claude Desktop + Tailscale + connect command).
+- **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** — 4-step guide for non-technical team members connecting to an existing shared server.
 
 The two quickstart guides are the canonical, fully-tested install procedures for non-local hosts. Follow them; the inline `local` snippet is a 2-minute laptop install only.
 
-**Upgrading from v1.0.0?** → **[docs/install/upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md)** — 5-minute upgrade guide covering VPS and local installs (E-38–E-43, backward-compatible).
+### Standalone installers (recommended for new users)
 
-**Upgrading from post-v1.0.0 to v1.1.0?** Pull latest + reinstall — no schema changes, no migration steps. See [CHANGELOG](CHANGELOG.md) for E-44 details.
+Self-contained scripts that bootstrap all prerequisites — Homebrew, Python, Git, PyTorch — from a single command. Nothing needs to be installed first.
+
+#### Mac (Apple Silicon) standalone installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-mac-mlx.sh | bash
+```
+
+Installs `mac-mlx` mode: bootstraps Homebrew + Python 3.12, clones the repo, installs all dependencies, selects an MLX model based on your RAM (Gemma 4 26B recommended for ≥16 GB; Qwen2.5-14B or gemma-3-12b for tighter RAM), downloads it, creates two launchd services that auto-start at login (MLX inference on port 8000, REST/MCP on port 7300), and registers with Claude Desktop and Claude Code CLI.
+
+Requirements: Apple Silicon (M1/M2/M3/M4) · macOS 13+ · 8 GB unified memory minimum.
+
+#### Windows standalone installer
+
+```powershell
+iwr https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-windows.ps1 | iex
+```
+
+Installs `local` mode with GPU detection: uses winget to install Git and Python 3.12 if missing, clones the repo, auto-detects NVIDIA GPU (installs PyTorch CUDA if found), installs DepthFusion, registers a Windows startup task (Task Scheduler), and registers with Claude Desktop and Claude Code CLI.
+
+Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https://apps.microsoft.com/detail/9NBLGGH4NNS1) if missing).
+
+#### Team member / non-technical VPS connect runbook
+
+For team members who need to connect to the shared VPS memory hub without a local install, open **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** in any browser. 4 steps: install Claude Desktop, install Tailscale, run one `claude mcp add` command, verify with `depthfusion_status`. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
+
+For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
+
+**Upgrading to v1.2.2?** Pull + re-run the installer (or just `git pull` on your dev checkout). Patch release only: Gemma 4 26B (`mlx-community/gemma-4-26b-a4b-it-4bit`) is now the recommended MLX model for ≥16 GB unified memory; the installer menu reflects this. MLX server now sets `SO_REUSEADDR` explicitly so launchd restarts no longer hit `EADDRINUSE` on macOS. Fixed `claude mcp add` argument parsing (`--` flag prevents `-m` from being consumed by the Claude CLI). MLX server now handles the mlx_lm 0.21+ API change where `temperature` was replaced by a `sampler` callable — detected at runtime so the server works across mlx_lm versions. Gemma 4 chain-of-thought (`<|channel>thought`) blocks are stripped server-side so callers receive only the final answer. No dep or schema changes.
+
+**Upgrading to v1.2.1?** Pull + re-run the installer (or just `git pull` on your dev checkout). Patch release only: the macOS standalone installer now correctly writes launchd plists (`tac` is Linux-only; fixed with portable awk). Also ensures `uv sync --extra mac-mlx` is documented throughout the local update guide so mac-mlx dependencies are never accidentally stripped. No dep or schema changes.
+
+**Upgrading to v1.2.0?** Pull + `pip install -e .[local]` (or your mode's extras). No schema changes. To enable HNSW: set `DEPTHFUSION_HNSW_ENABLED=true` in `~/.claude/depthfusion.env` and `pip install hnswlib>=0.7` into your venv. HNSW is fully optional — BM25-only recall remains the default.
+
+**Upgrading to v1.1.0?** → **[docs/install/upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md)** — covers E-44 (Windows installer, fcntl compat, CI matrix). Pull + reinstall, no schema changes.
+
+**Upgrading from v1.0.0 (skipping post-v1.0.0)?** Follow [upgrade-to-post-v1.0.0.md](docs/install/upgrade-to-post-v1.0.0.md) (E-38–E-43) first, then [upgrade-to-v1.1.0.md](docs/install/upgrade-to-v1.1.0.md) (E-44), then v1.2.0 above.
 
 > ⚠️ **Billing safety — always use `DEPTHFUSION_API_KEY`, never `ANTHROPIC_API_KEY`.**
 > Claude Code reads `ANTHROPIC_API_KEY` as its own auth credential and will switch your **entire** Claude Code billing from your Pro/Max subscription to pay-per-token API for everything — not just DepthFusion. The separate `DEPTHFUSION_API_KEY` exists specifically to prevent this. The installer refuses to use `ANTHROPIC_API_KEY`.
 
 ### Prerequisites
 
-- Python ≥ 3.10 (3.10–3.13 supported; Ubuntu 24.04 ships 3.12 by default)
+- Python ≥ 3.11 (3.11–3.13 supported; Ubuntu 24.04 ships 3.12 by default)
 - `pip` ≥ 23.0
 - `git` (to clone)
 - A working `~/.claude/` directory (Claude Code installed and run at least once)
@@ -188,6 +412,10 @@ ls ~/.claude/depthfusion-metrics/          # should exist after first MCP call
 
 ### Quick install — `local` mode (Windows)
 
+**Recommended:** use the [standalone one-line installer](#windows-standalone-installer) above — it handles all prerequisites automatically.
+
+Manual install (if you already have Git and Python 3.11+):
+
 ```powershell
 git clone https://github.com/gregdigittal/depthfusion.git $HOME\projects\depthfusion
 cd $HOME\projects\depthfusion
@@ -196,7 +424,7 @@ cd $HOME\projects\depthfusion
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 ```
 
-The installer will prompt for your DepthFusion API key (get it from `claude.ai/settings → API Keys`). It will **refuse** a key starting with `sk-ant-api03-` — those are Claude Code's own billing credentials.
+The installer will prompt for your DepthFusion API key (get it from `console.anthropic.com/settings/keys`). It will **refuse** a key starting with `sk-ant-api03-` — those are Claude Code's own billing credentials.
 
 Full step-by-step: **[docs/install/windows-quickstart.md](docs/install/windows-quickstart.md)**
 
@@ -223,7 +451,7 @@ Follow **[docs/install/vps-gpu-quickstart.md](docs/install/vps-gpu-quickstart.md
 4. `python3 -m depthfusion.install.install --mode=vps-gpu`
 5. Local embedding model download (sentence-transformers cache)
 6. Hook installation and cognitive layer env vars as in vps-cpu
-7. Verification: `nvidia-smi` shows VRAM use during recall; `depthfusion_describe_capabilities` shows `gemma` as the active reranker
+7. Verification: `nvidia-smi` shows VRAM use during recall; check `~/.depthfusion/state.json` or the `depthfusion_status` MCP tool to confirm `gemma` is the active reranker
 
 ### Tier promotion (vps-cpu / vps-gpu only)
 
@@ -323,7 +551,7 @@ Runbook: **[docs/runbooks/dogfood-telemetry.md](docs/runbooks/dogfood-telemetry.
 
 ### Recursive LLM (rlm, E-04)
 
-- `run_recursive` MCP tool — multi-step reasoning with sandbox isolation
+- Recursive reasoning subsystem — multi-step decomposition with sandbox isolation, exposed via the `depthfusion.recursive` Python API (the `depthfusion_run_recursive` MCP tool was removed in the 2026-05-25 parity audit; the underlying `recursive_llm_call` function is unchanged)
 - Trajectory tracking, retry strategies, cost ceiling enforcement
 - Optional dependency: `rlm` package
 
@@ -388,45 +616,139 @@ Runs periodically in DRY-RUN mode — observes what it would merge or archive bu
 
 When `DEPTHFUSION_REST_API=true`, a FastAPI server starts on `127.0.0.1:7300`. Loopback-only by default. Set `DEPTHFUSION_API_PUBLIC=1` **only** with `DEPTHFUSION_API_TOKEN` configured — the server will refuse to start public without a token.
 
+For persistent operation, use the bundled systemd user service:
+
+```bash
+cp ~/projects/depthfusion/infra/systemd/depthfusion-rest.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now depthfusion-rest
+```
+
+A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) expose all 29 REST endpoints as subcommands and agent tools. See **[docs/cli.md](docs/cli.md)** for install and usage.
+
 ---
 
-## MCP Tools (24 total)
+## MCP Tools (29 canonical)
 
-### Core tools (pre-E-31, 18 tools)
+After E-48 (Multi-Provider Context Bridge), the MCP surface is 29 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; their underlying Python functions remain in the codebase. The canonical set:
+
+### Core retrieval & capture (17 always-on)
 
 | Tool | Description | Required flag |
 |---|---|---|
 | `depthfusion_status` | Feature-flag states + module health | always |
 | `depthfusion_recall_relevant` | Tier-aware session block retrieval | always |
 | `depthfusion_tag_session` | Tag a session file → `.meta.yaml` sidecar | always |
-| `depthfusion_publish_context` | Publish to context bus, idempotent by content_hash | `router_enabled` |
-| `depthfusion_run_recursive` | Recursive reasoning via rlm | `rlm_enabled` |
-| `depthfusion_tier_status` | Corpus size, active tier, sessions until promotion | always |
 | `depthfusion_auto_learn` | Trigger extraction from recent `.tmp` session files | always |
 | `depthfusion_compress_session` | Compress a `.tmp` file into a discovery | always |
-| `depthfusion_graph_traverse` | Walk entity graph from a named entity | `graph_enabled` |
-| `depthfusion_graph_status` | Graph health: nodes, edges, coverage | `graph_enabled` |
-| `depthfusion_set_scope` | Traversal scope: project / cross_project / global | `graph_enabled` |
 | `depthfusion_confirm_discovery` | Active capture (CM-5) | always |
-| `depthfusion_prune_discoveries` | Archive stale discoveries (90+ days, unpinned) | always |
 | `depthfusion_set_memory_score` | Override importance / salience | always |
 | `depthfusion_recall_feedback` | Apply bounded salience deltas from used/ignored chunks | always |
 | `depthfusion_pin_discovery` | Exempt a discovery from age-based pruning | always |
-| `depthfusion_describe_capabilities` | Which retrieval layers + CMs engage in this instance | always |
-| `depthfusion_inspect_discovery` | Parsed frontmatter of a discovery file | always |
+| `depthfusion_record_telemetry` | Log a per-tool-call telemetry event (cost, latency, usage) | always |
+| `depthfusion_query_telemetry` | Aggregate telemetry by project, agent, story, sprint, or period | always |
+| `depthfusion_session_seed` | Run a seed recall at session start; publish results as high-priority context. Optional `project_slug` param prepends BACKLOG + CLAUDE.md to seed output. | always |
+| `depthfusion_register_project` | Register a project in the DepthFusion project registry (~/.depthfusion/projects.json) | always |
+| `depthfusion_list_projects` | List all registered projects with slug, name, path, and last-synced timestamp | always |
+| `depthfusion_sync_project` | Sync a registered project's BACKLOG, CLAUDE.md, and git log to the DepthFusion KB | always |
+| `depthfusion_ingest_project` | Deep-ingest a project's source files (local or GitHub) into the KB. Modes: structural (key files only) or full | always |
+| `depthfusion_research_topic` | Research a topic via DuckDuckGo, arXiv, and GitHub; results saved to ~/.claude/shared/research/ and published to the KB | always |
 
-### E-31 Cognitive tools (6 new tools)
+### Multi-provider context bridge (3 always-on, E-48)
 
 | Tool | Description | Required flag |
 |---|---|---|
-| `df_retrieve_context` | Cognitive-scored recall with 8-component ranking | `cognitive_retrieval` |
-| `df_record_decision` | Write a typed decision MemoryObject | `decision_memory` |
-| `df_record_incident` | Write an incident/error MemoryObject | `operational_memory` |
-| `df_mark_superseded` | Mark a prior decision superseded by a new one | `decision_memory` |
-| `df_report_outcome` | Record outcome of a past decision (feedback loop) | `decision_memory` |
-| `df_get_cognitive_state` | Current cognitive layer health + active memory count | always |
+| `depthfusion_bridge` | Delegate a prompt to an external LLM (GPT-4o, Gemini, DeepSeek, etc.) via OpenRouter. Injects relevant recalled memories as context; stores the response back into shared memory. | always |
+| `depthfusion_ingest_conversation` | Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek export format. Stores assistant-turn fragments with provenance tagging so they become searchable via `recall_relevant`. | always |
+| `depthfusion_list_providers` | List configured bridge providers, their health status, and how many memories each has contributed. Returns immediately without a network call. | always |
+
+Requires `OPENROUTER_API_KEY` in `depthfusion.env` for bridge and ingest tools to be healthy. `list_providers` always works and reports which providers are configured.
+
+### Feature-flagged (9 tools)
+
+| Tool | Description | Required flag |
+|---|---|---|
+| `depthfusion_publish_context` | Publish to context bus, idempotent by content_hash | `router_enabled` |
+| `depthfusion_graph_traverse` | Walk entity graph from a named entity | `graph_enabled` |
+| `depthfusion_graph_status` | Graph health: nodes, edges, coverage | `graph_enabled` |
+| `depthfusion_set_scope` | Traversal scope: project / cross_project / global | `graph_enabled` |
+| `depthfusion_retrieve_context` | Cognitive-scored recall with 8-component ranking | `cognitive_retrieval` |
+| `depthfusion_record_decision` | Write a typed decision MemoryObject | `decision_memory` |
+| `depthfusion_record_incident` | Write an incident/error MemoryObject | `operational_memory` |
+| `depthfusion_mark_superseded` | Mark a prior decision superseded by a new one | `operational_memory` |
+| `depthfusion_report_outcome` | Record outcome of a past decision (feedback loop) | `operational_memory` |
+
+### Removed in 2026-05-25 parity audit
+
+The following 11 tools were dropped from the MCP surface because they were either unshipped, dogfood-only, or had no user-callable value. Their underlying functions remain importable from `depthfusion.mcp.server` for internal use:
+
+`depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_describe_capabilities`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`.
 
 Full tool documentation with response shapes: see `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.
+
+For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
+
+The generated CLI (`depthfusion-pp-cli`) exposes all 29 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+
+---
+
+## Shared Memory Fabric (E-46, v0.6.0-alpha)
+
+Every memory publication, subscription, and recall becomes a first-class node in the knowledge graph. Any session can ask "who knew what, when" — and new sessions inherit the room's working memory automatically.
+
+**Three pain points it solves:**
+1. Agents in the same project duplicate work because they can't see each other's in-progress discoveries.
+2. A new session starts cold even though five other agents have been building context all morning.
+3. There's no audit trail for "which agent introduced this assumption into the shared context?"
+
+### Quickstart (5 commands)
+
+```bash
+# 1. Start the REST server (requires DEPTHFUSION_API_TOKEN for any non-loopback bind)
+DEPTHFUSION_API_TOKEN=mytoken uvicorn depthfusion.api.rest:app --port 7300
+
+# 2. Subscribe to the live event stream (terminal 1)
+curl -N -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/events/stream?projects=myproject&consumer_id=agent-b"
+
+# 3. Publish a memory event (terminal 2)
+curl -X POST -H "Authorization: Bearer mytoken" -H "Content-Type: application/json" \
+  -d '{"agent_id":"agent-a","project_slug":"myproject","memory_refs":["abc123"]}' \
+  http://localhost:7300/v1/events/publish
+
+# 4. Seed a new session with the room's working memory
+curl -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/events/seed?projects=myproject&goal=implement+auth"
+
+# 5. Query provenance: who has seen memory abc123?
+curl -H "Authorization: Bearer mytoken" \
+  "http://localhost:7300/v1/graph/memory/abc123/observers"
+```
+
+Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.md)** · [Tailscale setup](docs/fabric/tailscale-setup.md) · [Kafka/Flink migration](docs/fabric/kafka-flink-migration.md)
+
+---
+
+## Project Context Intelligence (E-47, v1.2.0)
+
+Five new tools give agents the ability to register, sync, ingest, and research across multiple projects. Sessions can be seeded with a project's full BACKLOG and CLAUDE.md context automatically.
+
+### The five tools
+
+| Tool | What it does |
+|---|---|
+| `depthfusion_register_project` | Register a project by slug, local path, and optional GitHub URL. Persists to `~/.depthfusion/projects.json`. |
+| `depthfusion_list_projects` | List all registered projects with slug, name, path, and `last_synced` timestamp. |
+| `depthfusion_sync_project` | Parse a project's BACKLOG.md (epics/stories/tasks), read its CLAUDE.md, and publish the last 20 git commits to the DepthFusion KB. |
+| `depthfusion_ingest_project` | Deep-ingest source files from a local path or GitHub URL. Structural mode (key files only) or full mode (all source). Publishes each file as a searchable KB entry. |
+| `depthfusion_research_topic` | Search DuckDuckGo, arXiv, and GitHub for a topic. Saves results to `~/.claude/shared/research/` and publishes to the KB. |
+
+### Session seed extension
+
+`depthfusion_session_seed` accepts an optional `project_slug` parameter. When provided, it prepends the project's BACKLOG and CLAUDE.md to the seed output — giving new sessions immediate project context without a manual recall.
+
+### Session-end auto-sync
+
+A Stop hook (`scripts/push-project-context.sh`) auto-detects the active project from CWD and syncs it to the KB at session end. See **[docs/project-sync.md](docs/project-sync.md)** for setup instructions.
 
 ---
 
@@ -459,6 +781,14 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 | `DEPTHFUSION_SKILLFORGE_API_URL` | SkillForge base URL for recursive calls (E-39) | — |
 | `DEPTHFUSION_SKILLFORGE_API_TOKEN` | Bearer token for SkillForge API (E-39) | — |
 | `DEPTHFUSION_SKILLFORGE_RECURSIVE_SKILL_ID` | UUID of pre-registered SkillForge skill (E-39) | — |
+
+### E-45 HNSW flags
+
+| Env Var | Controls | Default |
+|---|---|---|
+| `DEPTHFUSION_HNSW_ENABLED` | Enable HNSW index + fused BM25+vector recall | `false` |
+| `DEPTHFUSION_HNSW_INDEX_PATH` | Directory for HNSW index files + sidecars | `~/.depthfusion/hnsw/` |
+| `DEPTHFUSION_EMBEDDING_MODEL` | sentence-transformers model for HNSW embeddings | `all-MiniLM-L6-v2` |
 
 ### E-31 Cognitive flags (all ON in the canonical depthfusion.env)
 
@@ -493,7 +823,7 @@ Expected: **10 GREEN · 1 YELLOW** (C4 — CLaRa indicator string in PostCSS `no
 ```bash
 source .venv/bin/activate
 
-pytest                              # 1993 tests, GREEN (a few skipped if chromadb/cuda absent)
+pytest                              # 2151 tests, GREEN (a few skipped if chromadb/cuda absent)
 pytest tests/test_metrics/ -q       # 116 tests — observability (includes E-41 reliability tests)
 pytest tests/test_backends/ -q      # 225 tests — backend chain + factory
 pytest tests/test_cognitive/ -q     # 175 tests — E-31 cognitive layer
@@ -508,12 +838,12 @@ The `tests/conftest.py` autouse fixture redirects bare `MetricsCollector()` call
 
 ## Dependencies
 
-- **Python** ≥ 3.10 (3.10–3.13 supported)
+- **Python** ≥ 3.11 (3.11–3.13 supported)
 - `numpy` ≥ 1.24
 - `pyyaml` ≥ 6.0
 - `structlog` ≥ 24.0
 - `anthropic` ≥ 0.40 — `[vps-cpu]` extra; required for Haiku reranker. Also pulled in by `[vps-gpu]` for the Haiku fallback.
-- `chromadb` ≥ 0.4 — `[vps-cpu]` and `[vps-gpu]` extras; required for Tier 2 vector retrieval
+- `chromadb` ≥ 1.0 — `[vps-cpu]`, `[vps-gpu]`, and `[mac-mlx]` extras; required for Tier 2 vector retrieval. **Known critical (Dependabot #41, no upstream patch):** pre-authentication code injection in all versions ≤1.5.9; patched version not yet released. Mitigated by loopback-only binding and Tailscale network isolation. A daily cron on the VPS monitors for chromadb ≥1.6.0.
 - `sentence-transformers` ≥ 2.2 — `[vps-gpu]` extra; local embeddings
 - `fastapi` + `uvicorn` — `[vps-cpu]` and `[vps-gpu]` extras; required for `DEPTHFUSION_REST_API`
 - `mlx-lm` ≥ 0.18 — `[mac-mlx]` extra; Apple Silicon LLM inference via mlx_lm.server
@@ -534,7 +864,13 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 ## Project status & roadmap
 
 - **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port).
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide. v1.2.2 patch: Gemma 4 26B added as recommended MLX model for ≥16 GB; `SO_REUSEADDR` fix in `mlx-serve-direct.py` prevents `EADDRINUSE` on launchd restarts; `claude mcp add` `--` flag fix.
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.
+
+---
+
+## License
+
+DepthFusion is released under the [MIT License](LICENSE). Copyright (c) 2026 Greg Morris.

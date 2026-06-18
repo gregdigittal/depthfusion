@@ -15,10 +15,10 @@ Write-Host "DepthFusion Installer"
 Write-Host "====================="
 
 # 1. Python version check
-try { $PyOut = & python --version 2>&1 } catch { Write-Error "python not found. Install Python 3.10+ from python.org."; exit 1 }
+try { $PyOut = & python --version 2>&1 } catch { Write-Error "python not found. Install Python 3.11+ from python.org."; exit 1 }
 if ($PyOut -match "Python (\d+)\.(\d+)") {
     $Major = [int]$Matches[1]; $Minor = [int]$Matches[2]
-    if ($Major -lt 3 -or ($Major -eq 3 -and $Minor -lt 10)) { Write-Error "Python 3.10+ required (found $PyOut)"; exit 1 }
+    if ($Major -lt 3 -or ($Major -eq 3 -and $Minor -lt 11)) { Write-Error "Python 3.11+ required (found $PyOut)"; exit 1 }
 }
 Write-Host "✓ $PyOut"
 
@@ -27,10 +27,41 @@ Write-Host "Creating virtual environment at $VenvPath ..."
 python -m venv $VenvPath
 Write-Host "✓ Virtual environment created"
 
-# 3. Install DepthFusion
-Write-Host "Installing DepthFusion (this may take a minute) ..."
-& "$VenvPath\Scripts\pip.exe" install --quiet -e "$RepoRoot[local]"
-Write-Host "✓ DepthFusion installed"
+# 3. Detect GPU and select install extras
+$HasGpu = $false
+try {
+    $NvOut = & nvidia-smi --query-gpu=name --format=csv,noheader 2>&1
+    if ($LASTEXITCODE -eq 0 -and $NvOut -notmatch "error") {
+        $HasGpu = $true
+        Write-Host "  GPU detected: $($NvOut.Trim())"
+    }
+} catch { }
+
+if ($HasGpu) {
+    Write-Host "Installing DepthFusion with GPU support (this may take a few minutes) ..."
+    & "$VenvPath\Scripts\pip.exe" install --quiet -e "$RepoRoot[local]"
+    # Install PyTorch with CUDA 12 and sentence-transformers for GPU-accelerated embeddings
+    & "$VenvPath\Scripts\pip.exe" install --quiet "torch>=2.3" --index-url https://download.pytorch.org/whl/cu121
+    & "$VenvPath\Scripts\pip.exe" install --quiet "sentence-transformers>=2.7"
+    Add-Content -Path $EnvFile -Value "`nDEPTHFUSION_EMBEDDING_DEVICE=cuda"
+    Add-Content -Path $EnvFile -Value "DEPTHFUSION_MODE=vps-cpu"
+    Write-Host "✓ DepthFusion installed with GPU-accelerated embeddings (CUDA)"
+    Write-Host "  Mode: vps-cpu (API reranking) + CUDA sentence-transformers for local embeddings"
+    $SkipHnswPrompt = $true
+    # Auto-enable HNSW when GPU is available
+    Add-Content -Path $EnvFile -Value "DEPTHFUSION_HNSW_ENABLED=true"
+    try {
+        & "$VenvPath\Scripts\pip.exe" install --quiet "hnswlib>=0.7"
+        Write-Host "✓ hnswlib installed — HNSW fused recall active (GPU-accelerated)"
+    } catch {
+        Write-Host "  ⚠ hnswlib install failed — install manually: pip install 'hnswlib>=0.7'"
+    }
+} else {
+    Write-Host "Installing DepthFusion (this may take a minute) ..."
+    & "$VenvPath\Scripts\pip.exe" install --quiet -e "$RepoRoot[local]"
+    Write-Host "✓ DepthFusion installed"
+    $SkipHnswPrompt = $false
+}
 
 # 4. Get API key
 Write-Host ""
@@ -57,6 +88,30 @@ $Rule = New-Object System.Security.AccessControl.FileSystemAccessRule($CurrentUs
 $Acl.AddAccessRule($Rule)
 Set-Acl $EnvFile $Acl
 Write-Host "✓ API key saved to $EnvFile"
+
+# 5b. Optional: HNSW embedding index
+if ($SkipHnswPrompt) {
+    # HNSW already configured by GPU path — add index path
+    Add-Content -Path $EnvFile -Value "DEPTHFUSION_HNSW_INDEX_PATH=$HOME\.depthfusion\hnsw"
+} else {
+    Write-Host ""
+    Write-Host "Enable HNSW embedding index for fused BM25+vector recall? [y/N]"
+    Write-Host "  (Adds ~50 MB sentence-transformers model; skip if you prefer BM25-only)"
+    $HnswChoice = Read-Host
+    if ($HnswChoice -match '^[Yy]') {
+        Add-Content -Path $EnvFile -Value "`nDEPTHFUSION_HNSW_ENABLED=true"
+        Add-Content -Path $EnvFile -Value "DEPTHFUSION_HNSW_INDEX_PATH=$HOME\.depthfusion\hnsw"
+        try {
+            & "$VenvPath\Scripts\pip.exe" install --quiet "hnswlib>=0.7"
+            Write-Host "✓ hnswlib installed — HNSW fused recall active"
+        } catch {
+            Write-Host "  ⚠ hnswlib install failed — HNSW flag written but index will be disabled until hnswlib is installed"
+            Write-Host "    Run: $VenvPath\Scripts\pip.exe install 'hnswlib>=0.7'"
+        }
+    } else {
+        Write-Host "  Skipping HNSW — BM25-only recall active (enable later via DEPTHFUSION_HNSW_ENABLED=true)"
+    }
+}
 
 # 6. Register MCP server
 $PythonBin = Join-Path $VenvPath "Scripts\python.exe"

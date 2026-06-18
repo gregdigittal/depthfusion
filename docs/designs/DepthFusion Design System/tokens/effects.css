@@ -1,0 +1,25 @@
+/* ════════════════════════════════════════════════════════════════
+   DepthFusion · Effects — shadows, glow, and motion tokens
+   Motion is intentionally slow and patient (the darkroom metaphor):
+   memory "develops" into view rather than snapping.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Shadows (warm, with faint amber rim light) ── */
+  --shadow-card: 0 1px 0 rgba(255,142,58,.05), 0 4px 30px rgba(0,0,0,.4);
+  --shadow-pop:  0 24px 60px rgba(0,0,0,.6), 0 0 60px rgba(255,142,58,.06);
+  --shadow-card-hover: 0 1px 0 rgba(255,142,58,.1), 0 20px 50px rgba(0,0,0,.55), 0 0 50px rgba(255,142,58,.08);
+
+  /* ── Amber glow (for accent surfaces: buttons, logo, selected) ── */
+  --accent-glow:  0 0 28px rgba(255,142,58,.32), inset 0 1px 0 rgba(255,255,255,.15);   /* @kind shadow */
+  --accent-glow-lg: 0 0 70px rgba(255,142,58,.22);   /* @kind shadow */
+  --ember-glow: rgba(255,142,58,.22);   /* @kind shadow */
+
+  /* ── Motion ── */
+  --ease:         cubic-bezier(.4, 0, .2, 1);   /* @kind other */
+  --ease-develop: cubic-bezier(.2, .6, .2, 1);  /* @kind other */
+  --dur-quick:    150ms;   /* @kind other */
+  --dur-medium:   400ms;   /* @kind other */
+  --dur-develop:  2400ms;  /* @kind other */
+  --dur-breathe:  6s;      /* @kind other */
+  --dur-node:     4s;      /* @kind other */
+}

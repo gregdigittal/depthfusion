@@ -1,5 +1,7 @@
 # vps-cpu Quickstart — CPU-only DepthFusion + research tools
 
+> **Note: This doc describes V1 behavior.** V2 server setup is documented in `docs/v2/admin-runbooks.md` (§1 Initial Server Setup + First-User Enrollment). The V2 installer adds OIDC configuration, database initialization, and TLS setup steps not covered here. If you are running the `v2-enterprise` branch, refer to the V2 admin runbooks instead.
+
 > **Target:** current Hetzner VPS or any CPU-only Linux host
 > **Time:** ~10 minutes hands-on
 > **Produces:** working DepthFusion in `vps-cpu` mode + weekly regression monitor + initial prompt corpus
@@ -18,9 +20,9 @@ with the research tooling active. At the end you'll have:
 ## 0. Prerequisites
 
 ```bash
-# Python 3.10 or newer — note "or newer", any 3.10/3.11/3.12/3.13 works.
-# Ubuntu 24.04 ships 3.12 as default. You do NOT need to install 3.10
-# specifically; the `>=3.10` constraint means "3.10 is the minimum".
+# Python 3.11 or newer — note "or newer", any 3.11/3.12/3.13 works.
+# Ubuntu 24.04 ships 3.12 as default. You do NOT need to install 3.11
+# specifically; the `>=3.11` constraint means "3.11 is the minimum".
 python3 --version
 
 # Build tools + venv module. On fresh Ubuntu 24.04 the venv module is
@@ -72,7 +74,7 @@ cd ~/projects/depthfusion
 ### 1b. Create and activate a virtualenv
 
 ```bash
-# Use whichever Python 3.10+ you have. On Ubuntu 24.04 this is 3.12.
+# Use whichever Python 3.11+ you have. On Ubuntu 24.04 this is 3.12.
 python3 -m venv ~/venvs/depthfusion
 source ~/venvs/depthfusion/bin/activate
 ```

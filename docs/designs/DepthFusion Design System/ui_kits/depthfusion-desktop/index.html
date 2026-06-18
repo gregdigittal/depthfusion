@@ -1,0 +1,601 @@
+<!-- @dsCard group="DepthFusion Desktop" viewport="1280x820" name="DepthFusion Desktop — app" subtitle="Interactive recreation · Darkroom Amber" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion Desktop — UI Kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  #root { height: 100vh; }
+  /* ── Time Machine graph ── */
+  .tm-canvas { cursor: grab; }
+  .tm-canvas.dragging { cursor: grabbing; }
+  .tm-node { cursor: pointer; }
+  .tm-node circle.tm-ring { transition: filter .15s, stroke-width .15s; }
+  .tm-node:hover circle.tm-ring { filter: brightness(1.4) drop-shadow(0 0 7px rgba(255,142,58,.6)); }
+  @keyframes tm-twinkle { 0%,100% { opacity: .25; } 50% { opacity: .7; } }
+  .tm-crumb { background: none; border: none; color: var(--muted); font-family: var(--font-mono); font-size: 11px; cursor: pointer; padding: 0; }
+  .tm-crumb:hover { color: var(--accent); }
+  .tm-crumb.is-current { color: var(--accent-bright); }
+  .tm-rail-tick { display: flex; align-items: center; justify-content: flex-end; gap: 8px; cursor: pointer; }
+  .tm-rail-tick .lab { font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; transition: color .15s; }
+  .tm-rail-tick:hover .lab { color: var(--text); }
+  .tm-rail-tick .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); background: var(--surface); flex-shrink: 0; transition: all .15s; }
+  .tm-rail-tick.is-current .lab { color: var(--accent-bright); }
+  .tm-rail-tick.is-current .dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(255,142,58,.6); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script>
+/* DepthFusion — mock data, lifted verbatim from the design handoff */
+
+const DF_DATA = {
+  version: 'v0.4.2',
+  user: { name: 'Greg Morris', email: 'morrgreg@gmail.com', role: 'admin' },
+  serverUrl: 'http://127.0.0.1:7474',
+
+  activity: [
+    { label: 'Searched "microservices patterns"', time: '2 min ago' },
+    { label: 'Opened "Architecture ADR-003"', time: '14 min ago' },
+    { label: 'Viewed graph: auth concepts', time: '1 hr ago' },
+    { label: 'Downloaded "Q1 Report.pdf"', time: '3 hr ago' },
+  ],
+  stats: { queries: 247, latency: '142ms' },
+  storage: { used: '4.2 GB', total: '20 GB', pct: 21 },
+  sync: { status: 'Synced', last: '3 min ago', docs: '1,204' },
+
+  results: [
+    {
+      title: 'Microservices Architecture Patterns — ADR-003',
+      cls: 'internal', source: 'Document',
+      snippet: 'The {microservices} {patterns} documented in this ADR cover service decomposition, inter-service communication, and data ownership boundaries for the platform…',
+      score: 92, date: '2026-05-14', loc: 'docs/adr/ADR-003.md',
+    },
+    {
+      title: 'Microservices Deployment Runbook',
+      cls: 'confidential', source: 'Document',
+      snippet: 'Step-by-step runbook for deploying {microservices} to production. Covers blue-green deployments, canary rollouts, and rollback procedures…',
+      score: 74, date: '2026-03-02', loc: 'ops/runbooks/deploy.md',
+    },
+    {
+      title: 'Public knowledge base article on system design',
+      cls: 'public', source: 'Web',
+      snippet: 'An introduction to {microservices} {patterns} covering service decomposition and data ownership.',
+      score: 65, date: '2026-01-12', loc: 'web/article-1234',
+    },
+    {
+      title: 'Internal Engineering Wiki — Platform Teams',
+      cls: 'internal', source: 'Document',
+      snippet: 'Internal wiki page describing platform team responsibilities and on-call rotations.',
+      score: 48, date: '2026-04-03', loc: 'docs/wiki/platform',
+    },
+    {
+      title: 'RESTRICTED — Signing Keys Infrastructure',
+      cls: 'restricted', source: 'Code',
+      snippet: 'RESTRICTED access. Infrastructure credentials and key rotation procedures for production signing.',
+      score: 95, date: '2026-06-01', loc: 'infra/secrets/keys',
+    },
+  ],
+
+  facets: [
+    { id: 'date', title: 'Date range', type: 'radio', name: 'dr',
+      opts: ['All time', 'Last 7 days', 'Last 30 days', 'Last 90 days'], checked: [0] },
+    { id: 'source', title: 'Source type', type: 'check',
+      opts: ['Document', 'Web', 'Email', 'Slack', 'Code', 'Database'], checked: [0] },
+    { id: 'cls', title: 'Classification', type: 'check',
+      opts: ['Public', 'Internal', 'Confidential', 'Restricted'], checked: [] },
+  ],
+
+  // graph: nodes (x,y in 500x300 space), edges by node id
+  graph: {
+    nodes: [
+      { id: 'n-auth-adr', x: 175, y: 150, type: 'doc', label: 'Auth ADR' },
+      { id: 'n-oidc',     x: 280, y: 78,  type: 'con', label: 'OIDC' },
+      { id: 'n-jwt',      x: 280, y: 222, type: 'con', label: 'JWT' },
+      { id: 'n-migrate',  x: 385, y: 104, type: 'dec', label: 'Migrate?' },
+      { id: 'n-deploy',   x: 385, y: 196, type: 'dec', label: 'Deploy?' },
+      { id: 'n-authdoc',  x: 88,  y: 104, type: 'doc', label: 'Auth Doc' },
+    ],
+    edges: [
+      ['n-auth-adr', 'n-oidc'],
+      ['n-auth-adr', 'n-jwt'],
+      ['n-oidc', 'n-migrate'],
+      ['n-jwt', 'n-deploy'],
+      ['n-migrate', 'n-deploy'],
+      ['n-auth-adr', 'n-authdoc', 'selected'],
+    ],
+    counts: { nodes: 12, edges: 18 },
+  },
+  inspector: {
+    type: 'Document', typeKey: 'doc', label: 'Auth Doc',
+    id: 'node-0042', pos: 'x: 88 · y: 104', provenance: '—',
+  },
+
+  // Dependency tree for the Time Machine graph (drill-down)
+  tree: {
+    root: 'auth-adr',
+    counts: { nodes: 14, edges: 18 },
+    nodes: {
+      'auth-adr':    { label: 'Auth ADR-003',    type: 'doc', deps: ['oidc', 'jwt', 'authdoc', 'migrate'] },
+      'oidc':        { label: 'OIDC',             type: 'con', deps: ['discovery', 'token-ep', 'jwks'] },
+      'jwt':         { label: 'JWT',              type: 'con', deps: ['signing-keys', 'claims', 'expiry'] },
+      'authdoc':     { label: 'Auth Doc',         type: 'doc', deps: ['oidc', 'jwt'] },
+      'migrate':     { label: 'Migrate?',         type: 'dec', deps: ['rollback', 'data-owner', 'deploy'] },
+      'deploy':      { label: 'Deploy?',          type: 'dec', deps: ['rollback'] },
+      'discovery':   { label: '.well-known',      type: 'doc', deps: [] },
+      'token-ep':    { label: 'Token Endpoint',   type: 'con', deps: ['jwks'] },
+      'jwks':        { label: 'JWKS',             type: 'con', deps: ['signing-keys'] },
+      'signing-keys':{ label: 'Signing Keys',     type: 'dec', deps: [] },
+      'claims':      { label: 'Claims',           type: 'con', deps: [] },
+      'expiry':      { label: 'Expiry',           type: 'con', deps: [] },
+      'rollback':    { label: 'Rollback Runbook', type: 'doc', deps: [] },
+      'data-owner':  { label: 'Data Owner?',      type: 'dec', deps: [] },
+    },
+  },
+};
+
+window.DF_DATA = DF_DATA;
+
+</script>
+<script type="text/babel">
+/* DepthFusion UI kit — chrome icons (inline stroke SVG, currentColor).
+   The brand LogoMark comes from the DS bundle; these are utility glyphs only.
+   No `export` — loaded via Babel <script> and shared on window (not bundled). */
+
+function _ic(paths, { size = 16, sw = 1.7 } = {}) {
+  return React.createElement('svg', {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: sw, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+  }, paths.map((d, i) => React.createElement('path', { key: i, d })));
+}
+
+const Icon = {
+  search: (p) => _ic(['M11 11m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0', 'M21 21l-4.3-4.3'], p),
+  settings: (p) => React.createElement('svg', { width: p?.size || 16, height: p?.size || 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+    React.createElement('circle', { cx: 12, cy: 12, r: 3 }),
+    React.createElement('path', { d: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z' })),
+  graph: (p) => React.createElement('svg', { width: p?.size || 16, height: p?.size || 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+    React.createElement('circle', { cx: 5, cy: 6, r: 2.4 }), React.createElement('circle', { cx: 19, cy: 8, r: 2.4 }), React.createElement('circle', { cx: 12, cy: 18, r: 2.4 }),
+    React.createElement('path', { d: 'M7 7l3.2 9M16.6 9.3L13.4 16.4M7.3 6.6l9.4 1.2' })),
+  dashboard: (p) => React.createElement('svg', { width: p?.size || 16, height: p?.size || 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+    React.createElement('rect', { x: 3, y: 3, width: 7, height: 9, rx: 1.5 }), React.createElement('rect', { x: 14, y: 3, width: 7, height: 5, rx: 1.5 }),
+    React.createElement('rect', { x: 14, y: 11, width: 7, height: 10, rx: 1.5 }), React.createElement('rect', { x: 3, y: 15, width: 7, height: 6, rx: 1.5 })),
+  doc: (p) => _ic(['M14 3v4a1 1 0 0 0 1 1h4', 'M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z'], p),
+  concept: (p) => _ic(['M9 18h6', 'M10 21h4', 'M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .9 1.6l.1.6h5.2l.1-.6c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3z'], p),
+  decision: (p) => _ic(['M12 3l9 9-9 9-9-9z'], p),
+  brain: (p) => _ic(['M9.5 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.5A3 3 0 0 0 7 18.5a2.5 2.5 0 0 0 5 .5V5a2.5 2.5 0 0 0-2.5-.5z', 'M14.5 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.5A3 3 0 0 1 17 18.5a2.5 2.5 0 0 1-5 .5'], p),
+  close: (p) => _ic(['M18 6L6 18', 'M6 6l12 12'], p),
+};
+
+window.Icon = Icon;
+
+</script>
+<script type="text/babel">
+/* DepthFusion desktop UI kit — interactive recreation in "Darkroom Amber".
+   Composes DS primitives from the bundle; no `export` (not part of the DS bundle). */
+const { useState } = React;
+const NS = window.DepthFusionDesignSystem_ab16e1;
+const { LogoMark, Button, Badge, Tabs, ResultCard, NodeChip, Avatar, Input, Checkbox, Radio, Card } = NS;
+const Icon = window.Icon;
+const d = window.DF_DATA;
+
+/* ── Dashboard ─────────────────────────────────────────────────── */
+function Dashboard() {
+  return (
+    <div className="df-page">
+      <div className="df-page__head"><div className="df-page__title">Dashboard</div></div>
+      <div className="df-tiles">
+        <div className="df-tile df-tile--wide">
+          <div className="df-tile__head">Recent Activity</div>
+          <div className="df-tile__body">
+            <ul className="df-activity">
+              {d.activity.map((a, i) => (
+                <li key={i}><span className="df-activity__label">{a.label}</span><span className="df-activity__time">{a.time}</span></li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="df-tile">
+          <div className="df-tile__head">Search Stats</div>
+          <div className="df-tile__body">
+            <div className="df-stat-big">{d.stats.queries}</div><div className="df-stat-lbl">Queries this week</div>
+            <div style={{ height: 14 }} />
+            <div className="df-stat-med">{d.stats.latency}</div><div className="df-stat-lbl">Avg. latency</div>
+          </div>
+        </div>
+        <div className="df-tile">
+          <div className="df-tile__head">Storage Usage</div>
+          <div className="df-tile__body">
+            <div className="df-stat-big">{d.storage.used}</div><div className="df-stat-lbl">of {d.storage.total} used</div>
+            <div className="df-progress"><div className="df-progress__fill" style={{ width: d.storage.pct + '%' }} /></div>
+            <div style={{ fontSize: 11, color: 'var(--faintest)', marginTop: 4 }}>{d.storage.pct}% used</div>
+          </div>
+        </div>
+        <div className="df-tile">
+          <div className="df-tile__head">Sync Status</div>
+          <div className="df-tile__body">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}><span className="df-dot" /><span style={{ fontSize: 13, color: 'var(--text-2)' }}>{d.sync.status}</span></div>
+            <div style={{ fontSize: 12, color: 'var(--faint)' }}>Last sync: {d.sync.last}</div>
+            <div style={{ fontSize: 12, color: 'var(--faintest)', marginTop: 4 }}>{d.sync.docs} documents indexed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Search ────────────────────────────────────────────────────── */
+function FacetGroup({ f }) {
+  const [open, setOpen] = useState(true);
+  const [checked, setChecked] = useState(new Set(f.checked));
+  const toggle = (i) => {
+    const next = new Set(f.type === 'radio' ? [] : checked);
+    next.has(i) && f.type !== 'radio' ? next.delete(i) : next.add(i);
+    setChecked(next);
+  };
+  return (
+    <div className="df-facet">
+      <button className="df-facet__head" onClick={() => setOpen((o) => !o)}>
+        <span>{f.title}</span>
+        <span className={'df-facet__chev' + (open ? '' : ' df-facet__chev--collapsed')}>▾</span>
+      </button>
+      {open && (
+        <div className="df-facet__body">
+          {f.opts.map((o, i) => (
+            f.type === 'radio'
+              ? <Radio key={i} name={f.name} label={o} checked={checked.has(i)} onChange={() => toggle(i)} />
+              : <Checkbox key={i} label={o} checked={checked.has(i)} onChange={() => toggle(i)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Search() {
+  const [query, setQuery] = useState('microservices patterns');
+  const [showFacets, setShowFacets] = useState(true);
+  const q = query.trim().toLowerCase();
+  const results = q ? d.results.filter((r) => (r.title + ' ' + r.snippet).toLowerCase().includes(q.split(' ')[0])) : [];
+  return (
+    <div className="df-page">
+      <div className="df-searchbar">
+        <div className="df-searchrow">
+          <Input icon={<Icon.search size={15} />} value={query} placeholder="Search knowledge graph… (⌘K)" onChange={(e) => setQuery(e.target.value)} />
+          <Button variant="ghost" onClick={() => setShowFacets((s) => !s)}>{showFacets ? 'Hide filters' : 'Show filters'}</Button>
+        </div>
+        <div className="df-search-meta">{query.trim() ? `${results.length} result${results.length === 1 ? '' : 's'} · ${d.stats.latency}` : 'Type to search'}</div>
+      </div>
+      <div className="df-search-body">
+        {showFacets && (
+          <div className="df-facets">
+            <div className="df-facets__head">Filters</div>
+            {d.facets.map((f) => <FacetGroup key={f.id} f={f} />)}
+          </div>
+        )}
+        <div className="df-results">
+          {results.length
+            ? results.map((r, i) => <ResultCard key={i} result={r} />)
+            : (
+              <div className="df-empty">
+                <div className="df-empty__ic"><Icon.brain size={30} /></div>
+                <p>{query.trim() ? `No results for "${query}"` : 'Start typing to search your knowledge graph'}</p>
+                <small>{query.trim() ? 'Try adjusting your filters' : 'Use ⌘K to focus the search box'}</small>
+              </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Graph ─────────────────────────────────────────────────────── */
+const NODE_COLOR = { doc: 'var(--node-doc)', con: 'var(--node-concept)', dec: 'var(--node-decision)' };
+const NODE_TYPE = { doc: 'doc', con: 'concept', dec: 'decision' };
+const NODE_ICON = { doc: Icon.doc, con: Icon.concept, dec: Icon.decision };
+
+// Geometry for the Time Machine graph
+const VB_W = 600, VB_H = 384, CX = 300, CY = 188, RING = 130, RC = 44, RCH = 30;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+// edge endpoints attached to each circle's perimeter (never cutting into the circle)
+function edgeSeg(x1, y1, r1, x2, y2, r2) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+  return { x1: x1 + ux * r1, y1: y1 + uy * r1, x2: x2 - ux * r2, y2: y2 - uy * r2 };
+}
+function ringLayout(deps, radius, rotation) {
+  const step = deps.length ? (Math.PI * 2 / deps.length) : 0;
+  return deps.map((id, i) => {
+    const a = rotation - Math.PI / 2 + i * step;
+    return { id, x: CX + Math.cos(a) * radius, y: CY + Math.sin(a) * radius };
+  });
+}
+
+function Graph() {
+  const tree = d.tree;
+  const [path, setPath] = useState([tree.root]);
+  const [rot, setRot] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [tick, setTick] = useState(0);
+  const drag = React.useRef({ active: false, x: 0, moved: false });
+  const canvasRef = React.useRef(null);
+
+  const focus = path[path.length - 1];
+  const node = tree.nodes[focus];
+  const depth = path.length - 1;
+  const kids = ringLayout(node.deps, RING, rot);
+
+  const drill = (id) => {
+    if (drag.current.moved || !tree.nodes[id]) return;
+    setPath((p) => [...p, id]); setRot(0); setScale(1); setTick((t) => t + 1);
+  };
+  const popTo = (i) => { setPath((p) => p.slice(0, i + 1)); setRot(0); setScale(1); setTick((t) => t + 1); };
+  const out = () => { if (path.length > 1) popTo(path.length - 2); };
+
+  // drag to rotate · wheel to zoom · esc to recede
+  const onDown = (e) => { drag.current = { active: true, x: e.clientX, moved: false }; };
+  const onMove = (e) => {
+    const dr = drag.current; if (!dr.active) return;
+    const dx = e.clientX - dr.x; if (Math.abs(dx) > 3) dr.moved = true;
+    setRot((r) => r + dx * 0.008); dr.x = e.clientX;
+  };
+  const onUp = () => { drag.current.active = false; setTimeout(() => { drag.current.moved = false; }, 0); };
+  React.useEffect(() => {
+    const el = canvasRef.current; if (!el) return;
+    const h = (e) => { e.preventDefault(); setScale((s) => Math.min(2.2, Math.max(0.6, +(s - e.deltaY * 0.0012).toFixed(3)))); };
+    el.addEventListener('wheel', h, { passive: false });
+    return () => el.removeEventListener('wheel', h);
+  }, []);
+  React.useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') setPath((p) => (p.length > 1 ? p.slice(0, -1) : p)); };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  const stars = React.useMemo(() => Array.from({ length: 90 }, () => ({
+    x: Math.random() * VB_W, y: Math.random() * VB_H, r: Math.random() * 1.1 + 0.25,
+    o: Math.random() * 0.5 + 0.12, d: (Math.random() * 4 + 2).toFixed(1),
+  })), []);
+
+  // receding ancestor layers (the "frames you flew through")
+  const ancestors = path.slice(0, -1);
+  const ghosts = ancestors.slice(-2).map((id, idx, arr) => {
+    const back = arr.length - idx;            // 1 = nearest parent
+    return { id, radius: RING * (1.55 + (back - 1) * 0.7), op: 0.2 / back, dot: 0.13 / back };
+  });
+
+  return (
+    <div className="df-page" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="df-graphbar">
+        <span className="df-graphbar__stat"><span style={{ width: 9, height: 9, borderRadius: '50%', background: NODE_COLOR[node.type], display: 'inline-block', boxShadow: '0 0 8px ' + NODE_COLOR[node.type] }} />{node.label}</span>
+        <span className="df-graphbar__stat">{node.deps.length} {node.deps.length === 1 ? 'dependency' : 'dependencies'}</span>
+        <span className="df-graphbar__stat" style={{ color: 'var(--faintest)' }}>depth {depth} · {tree.counts.nodes} nodes</span>
+        <div className="df-zoomctl">
+          <button className="df-zoombtn" aria-label="Zoom out" onClick={() => setScale((z) => Math.max(0.6, +(z - 0.15).toFixed(2)))}>−</button>
+          <button className="df-zoombtn" aria-label="Reset zoom" onClick={() => setScale(1)} style={{ fontSize: 10, width: 'auto', padding: '0 7px' }}>{Math.round(scale * 100)}%</button>
+          <button className="df-zoombtn" aria-label="Zoom in" onClick={() => setScale((z) => Math.min(2.2, +(z + 0.15).toFixed(2)))}>+</button>
+          <button className="df-zoombtn" aria-label="Recede one level" onClick={out} disabled={path.length === 1} style={{ width: 'auto', padding: '0 9px', fontSize: 11, marginLeft: 6, opacity: path.length === 1 ? 0.4 : 1 }}>↑ out</button>
+        </div>
+        <span className="df-graphbar__hint">drag to rotate · scroll to zoom · click a node to drill in</span>
+      </div>
+      <div className="df-graph-area">
+        <div className={'df-canvas tm-canvas' + (drag.current.active ? ' dragging' : '')} ref={canvasRef}
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
+          <svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ display: 'block' }}>
+            <defs>
+              <radialGradient id="tm-core" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="rgba(255,142,58,.30)" />
+                <stop offset="100%" stopColor="rgba(255,142,58,0)" />
+              </radialGradient>
+              <filter id="tm-glow" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="4" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            {/* starfield */}
+            {stars.map((s, i) => (
+              <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={i % 7 === 0 ? 'var(--accent)' : 'var(--text)'} opacity={s.o}
+                style={{ animation: `tm-twinkle ${s.d}s ease-in-out ${(i % 5) * 0.4}s infinite` }} />
+            ))}
+            {/* depth tunnel rings */}
+            {[1.5, 2.05, 2.65, 3.3].map((m, i) => (
+              <circle key={'t' + i} cx={CX} cy={CY} r={RING * m} fill="none" stroke="var(--accent)" strokeOpacity={0.05} strokeWidth={1} />
+            ))}
+            <circle cx={CX} cy={CY} r={210} fill="url(#tm-core)" />
+            {/* receding ancestor frames */}
+            {ghosts.map((gh) => (
+              <g key={'gh' + gh.id} opacity={gh.op}>
+                {ringLayout(tree.nodes[gh.id].deps, gh.radius, rot * 0.5).map((p) => (
+                  <line key={'gl' + p.id} x1={CX} y1={CY} x2={p.x} y2={p.y} stroke="var(--accent-soft)" strokeWidth={1} />
+                ))}
+                {ringLayout(tree.nodes[gh.id].deps, gh.radius, rot * 0.5).map((p) => (
+                  <circle key={'gc' + p.id} cx={p.x} cy={p.y} r={14} fill="none" stroke="var(--accent-soft)" strokeWidth={1.5} opacity={gh.dot * 6} />
+                ))}
+              </g>
+            ))}
+            {/* active layer */}
+            <g transform={`translate(${CX} ${CY}) scale(${scale}) translate(${-CX} ${-CY})`}>
+              <g key={focus + '|' + tick}>
+                {/* edges — attach to perimeters */}
+                {kids.map((p) => {
+                  const s = edgeSeg(CX, CY, RC, p.x, p.y, RCH);
+                  return <g key={'e' + p.id}>
+                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--accent)" strokeOpacity={0.18} strokeWidth={5} />
+                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--accent)" strokeOpacity={0.85} strokeWidth={1.6} />
+                  </g>;
+                })}
+                {/* center (focus) node */}
+                <g className="tm-node" onClick={() => { if (!drag.current.moved) out(); }} style={{ cursor: path.length > 1 ? 'zoom-out' : 'default' }}>
+                  <circle cx={CX} cy={CY} r={RC + 8} fill={NODE_COLOR[node.type]} fillOpacity={0.1} />
+                  <circle className="tm-ring" cx={CX} cy={CY} r={RC} fill={NODE_COLOR[node.type]} fillOpacity={0.32}
+                    stroke="var(--accent-bright)" strokeWidth={3} filter="url(#tm-glow)" />
+                  <text x={CX} y={CY + 4} textAnchor="middle" fontFamily="var(--font-display)" fontSize={15} fontWeight={400}
+                    fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke' }} stroke="rgba(9,7,10,.85)" strokeWidth={0.6}>{node.label}</text>
+                </g>
+                {/* child nodes */}
+                {kids.map((p) => {
+                  const cn = tree.nodes[p.id];
+                  return (
+                    <g key={p.id} className="tm-node" onClick={() => drill(p.id)}>
+                      <circle className="tm-ring" cx={p.x} cy={p.y} r={RCH} fill={NODE_COLOR[cn.type]} fillOpacity={0.24}
+                        stroke={NODE_COLOR[cn.type]} strokeWidth={2.4} />
+                      {cn.deps.length > 0 && <circle cx={p.x + RCH * 0.7} cy={p.y - RCH * 0.7} r={6.5} fill="var(--accent)" stroke="var(--bg)" strokeWidth={1.5} />}
+                      {cn.deps.length > 0 && <text x={p.x + RCH * 0.7} y={p.y - RCH * 0.7 + 3} textAnchor="middle" fontSize={8} fontWeight={700} fill="var(--on-accent)" style={{ pointerEvents: 'none' }}>{cn.deps.length}</text>}
+                      <text x={p.x} y={p.y + RCH + 14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize={11} fontWeight={600}
+                        fill="var(--text)" style={{ pointerEvents: 'none', paintOrder: 'stroke' }} stroke="rgba(9,7,10,.85)" strokeWidth={2.5}>{cn.label}</text>
+                    </g>
+                  );
+                })}
+                {node.deps.length === 0 && (
+                  <text x={CX} y={CY + RING * 0.7} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={11} fill="var(--faint)">no further dependencies — ↑ out to recede</text>
+                )}
+              </g>
+            </g>
+          </svg>
+
+          {/* breadcrumb */}
+          <div style={{ position: 'absolute', top: 12, left: 16, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', maxWidth: 'calc(100% - 90px)' }}>
+            {path.map((id, i) => (
+              <React.Fragment key={id}>
+                {i > 0 && <span style={{ color: 'var(--faintest)', fontSize: 11 }}>›</span>}
+                <button className={'tm-crumb' + (i === path.length - 1 ? ' is-current' : '')} onClick={() => popTo(i)}>{tree.nodes[id].label}</button>
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Time Machine depth rail */}
+          <div style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14, paddingRight: 16, pointerEvents: 'none' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--faintest)', textAlign: 'right', marginBottom: 2 }}>depth</div>
+            {path.map((id, i) => (
+              <div key={id} className={'tm-rail-tick' + (i === path.length - 1 ? ' is-current' : '')} style={{ pointerEvents: 'auto', transform: `translateX(${(path.length - 1 - i) * -6}px)` }} onClick={() => popTo(i)}>
+                <span className="lab">{tree.nodes[id].label}</span>
+                <span className="dot" />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ position: 'absolute', bottom: 12, left: 16, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--faintest)' }}>
+            drag ⟲ rotate · scroll ⤢ zoom · click ↧ drill · esc ↑ recede
+          </div>
+        </div>
+
+        <div className="df-inspector">
+          <div className="df-inspector__head">Node Inspector<span style={{ color: 'var(--faintest)', cursor: 'pointer', display: 'inline-flex' }} aria-label="Close"><Icon.close size={13} /></span></div>
+          <div style={{ marginBottom: 14 }}>
+            <NodeChip type={NODE_TYPE[node.type]}>{React.createElement(NODE_ICON[node.type], { size: 13 })}{' '}{cap(NODE_TYPE[node.type])}</NodeChip>
+          </div>
+          {[['Label', node.label, false], ['ID', 'node-' + focus, true], ['Depth', String(depth), false], ['Provenance', d.inspector.provenance, false]].map(([k, v, mono], i) => (
+            <div className="df-insp-row" key={i}><span className="df-insp-row__k">{k}</span><span className={'df-insp-row__v' + (mono ? ' mono' : '')}>{v}</span></div>
+          ))}
+          <div style={{ marginTop: 14, marginBottom: 8, fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dependencies</div>
+          {node.deps.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {node.deps.map((id) => {
+                const cn = tree.nodes[id];
+                return (
+                  <button key={id} onClick={() => drill(id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 9px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-2)' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: NODE_COLOR[cn.type] }} />{cn.label}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--faint)' }}>{cn.deps.length ? cn.deps.length + ' →' : 'leaf'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : <div style={{ fontSize: 12, color: 'var(--faint)' }}>No further dependencies.</div>}
+          <Button style={{ width: '100%', marginTop: 14, justifyContent: 'center', fontSize: 12, padding: '8px 12px' }}>Open Document</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Settings ──────────────────────────────────────────────────── */
+function Settings({ onSignOut }) {
+  const [url, setUrl] = useState(d.serverUrl);
+  const [saved, setSaved] = useState(false);
+  return (
+    <div className="df-page">
+      <div className="df-settings">
+        <Card title="Profile">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Avatar name={d.user.name} />
+            <div>
+              <div className="df-profile__name">{d.user.name}</div>
+              <div className="df-profile__email">{d.user.email}</div>
+              <div className="df-profile__role">{d.user.role}</div>
+            </div>
+          </div>
+        </Card>
+        <Card title="Server">
+          <label className="df-field-label">Server URL</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="df-settings-input" style={{ flex: 1 }} value={url} onChange={(e) => { setUrl(e.target.value); setSaved(false); }} />
+            <Button onClick={() => setSaved(true)} style={{ padding: '8px 16px', fontSize: 13 }}>Save</Button>
+          </div>
+          {saved && <div className="df-saved">✓ Saved</div>}
+        </Card>
+        <Card title="Account">
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.55 }}>This will clear your local session and require re-authentication.</div>
+          <Button variant="danger" onClick={onSignOut} style={{ fontSize: 13, padding: '8px 20px' }}>Sign out</Button>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ── App shell ─────────────────────────────────────────────────── */
+function App() {
+  const [authed, setAuthed] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [tab, setTab] = useState('dashboard');
+  const signIn = () => { setPending(true); setTimeout(() => { setPending(false); setAuthed(true); }, 850); };
+  const signOut = () => { setAuthed(false); setTab('dashboard'); };
+
+  return (
+    <div className="df" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="df-titlebar">
+        {['#ff5f57', '#febc2e', '#28c840'].map((c, i) => <span key={i} className="df-titlebar__dot" style={{ background: c }} />)}
+        <span className="df-titlebar__title">DepthFusion</span>
+      </div>
+      <div className="df-window">
+        {authed ? (
+          <>
+            <div className="df-header">
+              <div className="df-brand"><LogoMark size={23} flat animation="breathe" /><span className="df-brand__name">DepthFusion</span></div>
+              <Tabs value={tab} onChange={setTab} tabs={[{ id: 'dashboard', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon.dashboard size={14} />Dashboard</span> }, { id: 'search', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon.search size={14} />Search</span> }, { id: 'graph', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon.graph size={14} />Graph</span> }]} />
+              <div className="df-header__right">
+                <span className="df-ver">{d.version}</span>
+                <button className={'df-iconbtn' + (tab === 'settings' ? ' df-iconbtn--active' : '')} aria-label="Settings" onClick={() => setTab('settings')}><Icon.settings size={16} /></button>
+                <button className="df-signout" onClick={signOut}>Sign out</button>
+              </div>
+            </div>
+            {tab === 'dashboard' && <Dashboard />}
+            {tab === 'search' && <Search />}
+            {tab === 'graph' && <Graph />}
+            {tab === 'settings' && <Settings onSignOut={signOut} />}
+          </>
+        ) : (
+          <div className="df-auth">
+            <div className="df-auth__glow" />
+            <LogoMark size={64} animation="breathe pulse" />
+            <div className="df-auth__title">DepthFusion</div>
+            <p className="df-auth__desc">AI-powered context retrieval and knowledge management. Sign in with your identity provider to continue.</p>
+            <Button disabled={pending} onClick={signIn}>{pending ? 'Opening browser…' : 'Sign in'}</Button>
+            <span className="df-auth__ver">{d.version}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+</body>
+</html>

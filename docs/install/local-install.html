@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Install on Your Own Computer</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2e3e;
+    --accent: #6c63ff; --teal: #4ecdc4; --green: #22c55e;
+    --amber: #f59e0b; --red: #ef4444;
+    --text: #e8eaf0; --muted: #7c849a;
+    --code-bg: #0d1117; --code-text: #c9d1d9;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f9; --card: #ffffff; --border: #dde0ea;
+      --text: #1a1d27; --muted: #5c6070;
+      --code-bg: #1a1d27; --code-text: #c9d1d9;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 3rem 2rem 2.5rem; text-align: center; }
+  .hero-badge { display: inline-block; background: rgba(108,99,255,.15); color: #a89fff; border: 1px solid rgba(108,99,255,.3); border-radius: 2rem; padding: .25rem .9rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1rem; }
+  .hero h1 { font-size: 2.1rem; font-weight: 700; color: #fff; margin-bottom: .5rem; letter-spacing: -.02em; }
+  .hero p { font-size: 1rem; color: var(--muted); max-width: 500px; margin: 0 auto .5rem; }
+  .hero-sub { font-size: .82rem; color: #484f58; margin-top: .75rem; }
+
+  .container { max-width: 700px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  /* Platform selector */
+  .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 2rem 0; }
+  .mode-card { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 1.4rem; cursor: pointer; transition: all .2s; text-align: center; }
+  .mode-card:hover { border-color: var(--accent); }
+  .mode-card.selected { border-color: var(--accent); background: rgba(108,99,255,.08); }
+  .mode-icon { font-size: 2.4rem; margin-bottom: .5rem; }
+  .mode-name { font-size: 1.05rem; font-weight: 700; margin-bottom: .3rem; }
+  .mode-desc { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+  .mode-badge { display: inline-block; font-size: .68rem; font-weight: 700; padding: .15rem .55rem; border-radius: 99px; margin-top: .5rem; text-transform: uppercase; letter-spacing: .07em; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-amber { background: rgba(245,158,11,.12); color: var(--amber); border: 1px solid rgba(245,158,11,.3); }
+
+  .platform-content { display: none; }
+  .platform-content.visible { display: block; }
+
+  /* Section header */
+  .section-header { display: flex; align-items: center; gap: 1rem; margin: 2.5rem 0 1.25rem; }
+  .section-badge { width: 2.4rem; height: 2.4rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; background: var(--accent); color: #fff; }
+  .section-badge.teal { background: var(--teal); color: #0f1117; }
+  .section-badge.green { background: var(--green); color: #0f1117; }
+  .section-title-text h2 { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+  .section-title-text p { font-size: .85rem; color: var(--muted); margin-top: .1rem; }
+
+  /* Step card */
+  .step-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.3rem 1.4rem; margin-bottom: 1rem; }
+  .step-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .4rem; }
+  .step-card p { font-size: .9rem; color: var(--muted); margin-bottom: .75rem; }
+  .step-card p:last-child { margin-bottom: 0; }
+
+  /* Code block */
+  .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin: .6rem 0; }
+  .code-header { display: flex; justify-content: space-between; align-items: center; padding: .45rem .9rem; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.03); }
+  .code-lang { font-size: .68rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .copy-btn { font-size: .75rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 5px; padding: .2rem .55rem; cursor: pointer; transition: all .15s; }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .code-body { padding: .8rem 1rem; font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: .88rem; color: var(--code-text); line-height: 1.55; overflow-x: auto; white-space: pre; }
+
+  /* Callouts */
+  .callout { border-radius: 9px; padding: .85rem 1rem; font-size: .88rem; display: flex; gap: .65rem; align-items: flex-start; margin: .75rem 0; }
+  .callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info  { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: #bdb5ff; }
+  .callout.warn  { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: #fcd34d; }
+  .callout.tip   { background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.25); color: #99f6f0; }
+  .callout.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+
+  .dl-btn { display: inline-flex; align-items: center; gap: .6rem; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; font-size: .95rem; border-radius: 9px; padding: .75rem 1.4rem; margin: .5rem 0; transition: opacity .15s; }
+  .dl-btn:hover { opacity: .88; }
+  .dl-btn.teal { background: var(--teal); color: #0f1117; }
+  .dl-btn.green { background: var(--green); color: #0f1117; }
+
+  /* Requirement checklist */
+  .req-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; margin: .75rem 0; }
+  .req-list li { display: flex; align-items: center; gap: .6rem; font-size: .9rem; }
+  .req-list .req-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .req-list .req-text strong { display: block; }
+  .req-list .req-text span { font-size: .82rem; color: var(--muted); }
+
+  /* Verify box */
+  .verify-box { background: var(--card); border: 2px solid var(--green); border-radius: 14px; padding: 1.5rem 1.6rem; margin-top: 2.5rem; }
+  .verify-title { font-size: 1.1rem; font-weight: 700; color: var(--green); margin-bottom: .75rem; }
+
+  /* Progress */
+  .progress-bar { display: flex; gap: 0; margin: 2rem 0 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .progress-step { flex: 1; padding: .6rem .5rem; text-align: center; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--card); border-right: 1px solid var(--border); cursor: default; }
+  .progress-step:last-child { border-right: none; }
+  .progress-step.active { background: var(--accent); color: #fff; }
+  .progress-step.done { background: rgba(34,197,94,.15); color: var(--green); }
+
+  /* Troubleshoot */
+  details { background: var(--card); border: 1px solid var(--border); border-radius: 9px; margin-bottom: .6rem; overflow: hidden; }
+  details summary { padding: .9rem 1rem; font-size: .9rem; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; color: var(--text); }
+  details summary::after { content: "＋"; color: var(--muted); }
+  details[open] summary::after { content: "－"; }
+  details .detail-body { padding: 0 1rem 1rem; font-size: .88rem; color: var(--muted); line-height: 1.65; }
+  details .detail-body ol, details .detail-body ul { margin: .5rem 0 0 1.2rem; display: flex; flex-direction: column; gap: .4rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem 0 1rem; }
+
+  /* Time estimate chips */
+  .time-chip { display: inline-flex; align-items: center; gap: .35rem; background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.2); color: var(--teal); border-radius: 99px; font-size: .75rem; font-weight: 600; padding: .2rem .65rem; margin-left: .4rem; }
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO -->
+<div class="hero">
+  <div class="hero-badge">Local Install · No Server Required</div>
+  <h1>Install DepthFusion on your computer</h1>
+  <p>Permanent AI memory that runs entirely on your own machine. Nothing leaves your device.</p>
+  <p class="hero-sub">Choose your computer type below to get started.</p>
+</div>
+
+<div class="container">
+
+  <!-- Mode selector -->
+  <div style="margin-top:2rem;">
+    <p style="font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;">What kind of computer are you on?</p>
+    <div class="mode-selector">
+      <div class="mode-card" id="card-mac" onclick="selectPlatform('mac')">
+        <div class="mode-icon">🍎</div>
+        <div class="mode-name">Mac (Apple Silicon)</div>
+        <div class="mode-desc">M1, M2, M3, or M4 chip. Full offline AI — no internet needed after setup.</div>
+        <div class="mode-badge badge-green">Recommended</div>
+      </div>
+      <div class="mode-card" id="card-win" onclick="selectPlatform('win')">
+        <div class="mode-icon">🪟</div>
+        <div class="mode-name">Windows or Intel Mac</div>
+        <div class="mode-desc">No local AI inference. BM25 keyword memory + optional cloud bridge via OpenRouter.</div>
+        <div class="mode-badge badge-amber">BM25 Mode</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════ MAC CONTENT -->
+  <div class="platform-content" id="content-mac">
+
+    <div class="callout info">
+      <div class="callout-icon">💡</div>
+      <div><strong>What you're installing:</strong> DepthFusion runs a small local server on your Mac. It hooks into Claude Desktop so every conversation is remembered — even across sessions, days, and topics. The AI inference runs on your M-chip GPU (called MLX). No cloud processing of your conversations.</div>
+    </div>
+
+    <!-- Requirements -->
+    <div class="section-header">
+      <div class="section-badge">✓</div>
+      <div class="section-title-text">
+        <h2>Before you begin — check your Mac</h2>
+        <p>Your Mac needs to meet these requirements. All modern Macs on macOS 14+ qualify.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Requirements checklist</h3>
+      <ul class="req-list">
+        <li>
+          <div class="req-icon">🍎</div>
+          <div class="req-text"><strong>Apple Silicon chip</strong><span>M1, M2, M3, or M4 (any variant). Intel Macs are not supported for this mode.</span></div>
+        </li>
+        <li>
+          <div class="req-icon">🖥</div>
+          <div class="req-text"><strong>macOS 13 Ventura or later</strong><span>Click the Apple menu → About This Mac to check.</span></div>
+        </li>
+        <li>
+          <div class="req-icon">🧠</div>
+          <div class="req-text"><strong>8 GB unified memory minimum</strong><span>16 GB or more gives you a better model. 32 GB = best quality.</span></div>
+        </li>
+        <li>
+          <div class="req-icon">💾</div>
+          <div class="req-text"><strong>25 GB free disk space</strong><span>For the AI model weights (~7–20 GB depending on your memory) plus the app itself.</span></div>
+        </li>
+        <li>
+          <div class="req-icon">🌐</div>
+          <div class="req-text"><strong>Internet connection</strong><span>Only needed during setup to download the model. After that, everything runs offline.</span></div>
+        </li>
+      </ul>
+      <div class="callout tip" style="margin-top:.75rem;">
+        <div class="callout-icon">ℹ️</div>
+        <div>Not sure if your Mac has Apple Silicon? Click the <strong>Apple menu</strong> (top-left corner) → <strong>About This Mac</strong>. If it says "Apple M1" / "M2" / "M3" / "M4" (any variant), you're good. If it says "Intel Core", use the Windows/Intel Mac mode instead.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Progress bar -->
+    <div class="progress-bar">
+      <div class="progress-step active">1 · Claude Desktop</div>
+      <div class="progress-step">2 · Run Installer</div>
+      <div class="progress-step">3 · API Key</div>
+      <div class="progress-step">4 · Restart &amp; Verify</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="section-header">
+      <div class="section-badge">1</div>
+      <div class="section-title-text">
+        <h2>Install Claude Desktop <span class="time-chip">⏱ 3 min</span></h2>
+        <p>The app you'll chat with. Skip if you already have it.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Download and install Claude Desktop</h3>
+      <p>Click the button below to download the installer for Mac.</p>
+      <a class="dl-btn" href="https://claude.ai/download" target="_blank">⬇ Download Claude Desktop for Mac</a>
+      <p style="margin-top:.75rem;">Open the downloaded <code>.dmg</code> file. A window appears — drag the Claude icon into the Applications folder. Then open Claude from Launchpad or your Applications folder and sign in.</p>
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>Sign in with your Anthropic account (or create a free one). The free Claude plan works perfectly for this — you don't need a paid subscription just to connect DepthFusion.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 2 -->
+    <div class="section-header">
+      <div class="section-badge teal">2</div>
+      <div class="section-title-text">
+        <h2>Run the installer <span class="time-chip">⏱ 10–40 min</span></h2>
+        <p>One command does everything: Python, the app, the AI model, and the background service.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Open Terminal</h3>
+      <p>Press <strong>⌘ Command + Space</strong>, type <strong>Terminal</strong>, and press <strong>Enter</strong>. A black or white window with a blinking cursor appears.</p>
+      <div class="callout tip">
+        <div class="callout-icon">ℹ️</div>
+        <div>Terminal is a built-in Mac app. You just type commands into it and press Enter to run them. Nothing you do here will harm your Mac.</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Paste and run this command</h3>
+      <p>Copy the command below by clicking <strong>Copy</strong>. Then click inside your Terminal window, paste with <strong>⌘ Command + V</strong>, and press <strong>Enter</strong>.</p>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-lang">Terminal</div>
+          <button class="copy-btn" onclick="copyCode(this,'mac-install-cmd')">Copy</button>
+        </div>
+        <div class="code-body" id="mac-install-cmd">curl -fsSL https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-mac-mlx.sh | bash</div>
+      </div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div>
+          <strong>The installer will ask you to do a few things:</strong>
+          <ul style="margin:.4rem 0 0 1rem;gap:.3rem;display:flex;flex-direction:column;">
+            <li>A dialog may appear asking you to install Xcode Command Line Tools — click <strong>Install</strong> and wait for it to finish, then press <strong>Enter</strong> in Terminal when asked.</li>
+            <li>Homebrew (a Mac package manager) may install — this is safe and expected.</li>
+            <li>It will ask for your <strong>DepthFusion API key</strong> (see Step 3 below).</li>
+            <li>It will ask you to choose an AI model — press <strong>Enter</strong> to accept the recommended option for your RAM.</li>
+            <li>The model download takes <strong>10–40 minutes</strong> depending on your internet speed. Leave the Terminal window open.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 3 — API key (shown inline because the installer prompts for it) -->
+    <div class="section-header">
+      <div class="section-badge">3</div>
+      <div class="section-title-text">
+        <h2>Get your API key <span class="time-chip">⏱ 2 min</span></h2>
+        <p>The installer will pause and ask for this. Get it ready before you run the installer, or while it's downloading.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Where to find your API key</h3>
+      <p>Your DepthFusion API key is an Anthropic API key. It is <strong>not</strong> the same as your Claude Pro or Claude Max subscription.</p>
+      <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.5rem;font-size:.9rem;color:var(--muted);">
+        <li>Go to <strong><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--teal);">console.anthropic.com/settings/keys</a></strong></li>
+        <li>Click <strong>Create Key</strong></li>
+        <li>Give it any name (e.g. "DepthFusion local")</li>
+        <li>Copy the key — it starts with <code style="color:var(--teal);">sk-ant-</code></li>
+        <li>Paste it into the Terminal when the installer asks</li>
+      </ol>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div>The installer will refuse a key starting with <code>sk-ant-api03-</code> — that's the Claude Code billing key, not an API key. Make sure you're on the <strong>API Keys</strong> page, not the billing page.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 4 — Restart and verify -->
+    <div class="section-header">
+      <div class="section-badge green">4</div>
+      <div class="section-title-text">
+        <h2>Restart Claude Desktop and verify <span class="time-chip">⏱ 2 min</span></h2>
+        <p>The installer registers DepthFusion with Claude Desktop automatically. You just need to restart it.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Restart Claude Desktop</h3>
+      <p>Find the Claude icon in your <strong>menu bar</strong> (the row of small icons at the top-right of your screen). Click it → <strong>Quit Claude</strong>. Then reopen Claude from your Applications folder or Dock.</p>
+    </div>
+
+    <div class="verify-box">
+      <div class="verify-title">✅ Test that it's working</div>
+      <p style="font-size:.9rem;color:var(--muted);margin-bottom:.9rem;">Open a <strong>new chat</strong> in Claude Desktop and type exactly this:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Claude Desktop — new chat</div><button class="copy-btn" onclick="copyCode(this,'mac-verify')">Copy</button></div>
+        <div class="code-body" id="mac-verify">depthfusion_status</div>
+      </div>
+      <div class="callout success" style="margin-top:1rem;">
+        <div class="callout-icon">🎉</div>
+        <div><strong>Success looks like:</strong> Claude responds with version info and a list of available tools. That means DepthFusion is running on your machine and connected to Claude.</div>
+      </div>
+      <div class="callout warn" style="margin-top:.5rem;">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>If it doesn't respond:</strong> The MLX model might still be loading. Wait 60 seconds and try again. The model load can take up to 2 minutes after your Mac starts. If it still fails after waiting, check the troubleshooting section below.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Updating -->
+    <div class="section-header">
+      <div class="section-badge teal">↑</div>
+      <div class="section-title-text">
+        <h2>Updating DepthFusion</h2>
+        <p>When a new version is available, run two commands in Terminal.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Run these commands in order</h3>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'mac-update')">Copy</button></div>
+        <div class="code-body" id="mac-update">cd ~/depthfusion && git pull
+~/.depthfusion-venv/bin/pip install -e ".[mac-mlx]" -q</div>
+      </div>
+      <p>Then restart the background service:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'mac-restart')">Copy</button></div>
+        <div class="code-body" id="mac-restart">launchctl unload ~/Library/LaunchAgents/com.depthfusion.rest.plist
+launchctl load ~/Library/LaunchAgents/com.depthfusion.rest.plist</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Mac Troubleshooting -->
+    <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Mac troubleshooting</p>
+
+    <details>
+      <summary>"command not found: brew" or Homebrew errors</summary>
+      <div class="detail-body">
+        <p>Homebrew is a package manager that the installer uses. If you see this error:</p>
+        <ol>
+          <li>Close Terminal completely and open a new one.</li>
+          <li>Run this command to check if Homebrew is installed: <code>which brew</code></li>
+          <li>If nothing prints, visit <strong>brew.sh</strong> and follow their install instructions, then re-run the DepthFusion installer.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>The model download is extremely slow or stopped</summary>
+      <div class="detail-body">
+        <p>Model files are large (7–20 GB). On a slow connection, this can take over an hour.</p>
+        <ul>
+          <li>Don't close the Terminal window — it will resume if briefly interrupted.</li>
+          <li>If it's been stuck for 30+ minutes with no progress, press <strong>Ctrl + C</strong> to stop, then re-run the installer — the download will resume from where it stopped.</li>
+          <li>Use a wired ethernet connection if available for faster downloads.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>depthfusion_status says "no tools found" or gives an error</summary>
+      <div class="detail-body">
+        <ol>
+          <li>Check if the background service is running: open Terminal and run <code>curl http://127.0.0.1:7300/health</code>. If you see <code>{"status":"ok"}</code>, the service is running.</li>
+          <li>If nothing responds: run <code>launchctl list | grep depthfusion</code> to see if the service loaded. If it's not listed, re-run the installer.</li>
+          <li>Check logs for errors: <code>tail -30 ~/Library/Logs/depthfusion-rest.log</code></li>
+          <li>Try fully quitting Claude Desktop (menu bar → Quit) and reopening it, then start a brand new chat.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>The MLX service keeps crashing (memory errors)</summary>
+      <div class="detail-body">
+        <p>This usually means the AI model is too large for your Mac's memory.</p>
+        <ol>
+          <li>Open Terminal and run the installer again: <code>bash ~/depthfusion/scripts/install-mac-mlx.sh</code></li>
+          <li>When it asks about the model, choose a <strong>smaller</strong> option than before.</li>
+          <li>The installer will swap the model and restart the service.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>How do I uninstall DepthFusion?</summary>
+      <div class="detail-body">
+        <p>Run these commands in Terminal:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'mac-uninstall')">Copy</button></div>
+          <div class="code-body" id="mac-uninstall">launchctl unload ~/Library/LaunchAgents/com.depthfusion.mlx-server.plist 2>/dev/null
+launchctl unload ~/Library/LaunchAgents/com.depthfusion.rest.plist 2>/dev/null
+rm ~/Library/LaunchAgents/com.depthfusion.*.plist
+rm -rf ~/.depthfusion-venv ~/depthfusion</div>
+        </div>
+        <p style="margin-top:.5rem;">Then remove it from Claude Desktop by editing <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> and deleting the <code>"depthfusion"</code> entry.</p>
+      </div>
+    </details>
+
+  </div><!-- /content-mac -->
+
+
+  <!-- ════════════════════════════════ WINDOWS / INTEL CONTENT -->
+  <div class="platform-content" id="content-win">
+
+    <div class="callout info">
+      <div class="callout-icon">💡</div>
+      <div><strong>What you're installing:</strong> DepthFusion on Windows uses <strong>BM25 keyword memory</strong> — everything you tell Claude is saved and recalled intelligently. Unlike the Mac MLX mode, there is no local AI inference; DepthFusion handles the memory layer and Claude handles the thinking. You can optionally enable the multi-provider bridge (OpenRouter) to delegate to GPT-4o, Gemini, or other models.</div>
+    </div>
+
+    <!-- Requirements -->
+    <div class="section-header">
+      <div class="section-badge">✓</div>
+      <div class="section-title-text">
+        <h2>Before you begin</h2>
+        <p>Windows setup is simpler — no AI model download required.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Requirements</h3>
+      <ul class="req-list">
+        <li><div class="req-icon">🪟</div><div class="req-text"><strong>Windows 10 or 11 (64-bit)</strong><span>Any reasonably modern Windows PC.</span></div></li>
+        <li><div class="req-icon">🐍</div><div class="req-text"><strong>Python 3.11 or later</strong><span>We'll install this in Step 2 if you don't already have it.</span></div></li>
+        <li><div class="req-icon">💾</div><div class="req-text"><strong>500 MB free disk space</strong><span>Just for the app itself. No model weights needed.</span></div></li>
+        <li><div class="req-icon">🌐</div><div class="req-text"><strong>Internet connection</strong><span>Needed during setup only.</span></div></li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <div class="progress-bar">
+      <div class="progress-step active">1 · Claude Desktop</div>
+      <div class="progress-step">2 · Python</div>
+      <div class="progress-step">3 · Install DepthFusion</div>
+      <div class="progress-step">4 · API Key</div>
+      <div class="progress-step">5 · Verify</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="section-header">
+      <div class="section-badge">1</div>
+      <div class="section-title-text">
+        <h2>Install Claude Desktop <span class="time-chip">⏱ 3 min</span></h2>
+        <p>Skip if you already have it installed.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Download and install Claude Desktop</h3>
+      <a class="dl-btn" href="https://claude.ai/download" target="_blank">⬇ Download Claude Desktop for Windows</a>
+      <p style="margin-top:.75rem;">Run the downloaded installer and follow the prompts (Next → Next → Finish). Then open Claude Desktop from the Start menu and sign in with your Anthropic account.</p>
+    </div>
+
+    <hr>
+
+    <!-- STEP 2 -->
+    <div class="section-header">
+      <div class="section-badge teal">2</div>
+      <div class="section-title-text">
+        <h2>Install Python <span class="time-chip">⏱ 5 min</span></h2>
+        <p>DepthFusion needs Python 3.11 or later. Check if you have it first.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Check if Python is already installed</h3>
+      <p>Press the <strong>Windows key</strong>, type <strong>PowerShell</strong>, and press <strong>Enter</strong>. In the window that opens, type:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">PowerShell</div><button class="copy-btn" onclick="copyCode(this,'win-check-py')">Copy</button></div>
+        <div class="code-body" id="win-check-py">python --version</div>
+      </div>
+      <p>If you see <code>Python 3.11.x</code> or later — you're good, skip to Step 3.</p>
+      <p>If you see an error or a version below 3.11, install Python first:</p>
+      <a class="dl-btn teal" href="https://www.python.org/downloads/" target="_blank">⬇ Download Python for Windows</a>
+      <div class="callout warn" style="margin-top:.75rem;">
+        <div class="callout-icon">⚠️</div>
+        <div>On the Python installer, tick <strong>"Add Python to PATH"</strong> before clicking Install. This is unchecked by default and DepthFusion won't work without it.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 3 -->
+    <div class="section-header">
+      <div class="section-badge">3</div>
+      <div class="section-title-text">
+        <h2>Install DepthFusion <span class="time-chip">⏱ 5 min</span></h2>
+        <p>One command clones the repo and installs everything.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Open PowerShell</h3>
+      <p>Press the <strong>Windows key</strong>, type <strong>PowerShell</strong>, press <strong>Enter</strong>.</p>
+    </div>
+
+    <div class="step-card">
+      <h3>Run the Windows installer</h3>
+      <p>Copy the block below, paste it into PowerShell with <strong>right-click → Paste</strong>, and press <strong>Enter</strong>.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">PowerShell</div><button class="copy-btn" onclick="copyCode(this,'win-install')">Copy</button></div>
+        <div class="code-body" id="win-install">powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/gregdigittal/depthfusion/main/scripts/install-windows.ps1' -OutFile $env:TEMP\df-install.ps1; & $env:TEMP\df-install.ps1"</div>
+      </div>
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>The installer will ask for your DepthFusion API key. Have it ready — see Step 4.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 4 -->
+    <div class="section-header">
+      <div class="section-badge">4</div>
+      <div class="section-title-text">
+        <h2>Get your API key <span class="time-chip">⏱ 2 min</span></h2>
+        <p>The installer pauses and asks for this. Get it ready before you run it.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Where to find your API key</h3>
+      <p>Your DepthFusion API key is an Anthropic API key — <strong>separate</strong> from your Claude subscription.</p>
+      <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.5rem;font-size:.9rem;color:var(--muted);">
+        <li>Go to <strong><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--teal);">console.anthropic.com/settings/keys</a></strong></li>
+        <li>Click <strong>Create Key</strong>, give it a name like "DepthFusion"</li>
+        <li>Copy the key — it starts with <code style="color:var(--teal);">sk-ant-</code></li>
+        <li>Paste it when the installer asks</li>
+      </ol>
+    </div>
+
+    <hr>
+
+    <!-- STEP 5 -->
+    <div class="section-header">
+      <div class="section-badge green">5</div>
+      <div class="section-title-text">
+        <h2>Restart Claude Desktop and verify <span class="time-chip">⏱ 2 min</span></h2>
+        <p>The installer registers DepthFusion automatically. Just restart Claude to pick up the change.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Restart Claude Desktop</h3>
+      <p>Find the Claude icon in your <strong>system tray</strong> (bottom-right corner, near the clock — click the ∧ arrow to see hidden icons). Right-click the Claude icon → <strong>Quit</strong>. Then reopen Claude from the Start menu.</p>
+    </div>
+
+    <div class="verify-box">
+      <div class="verify-title">✅ Test that it's working</div>
+      <p style="font-size:.9rem;color:var(--muted);margin-bottom:.9rem;">Open a <strong>new chat</strong> in Claude Desktop and type:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Claude Desktop — new chat</div><button class="copy-btn" onclick="copyCode(this,'win-verify')">Copy</button></div>
+        <div class="code-body" id="win-verify">depthfusion_status</div>
+      </div>
+      <div class="callout success" style="margin-top:1rem;">
+        <div class="callout-icon">🎉</div>
+        <div>Claude responds with version info and available tools. DepthFusion is running!</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Updating Windows -->
+    <div class="section-header">
+      <div class="section-badge teal">↑</div>
+      <div class="section-title-text">
+        <h2>Updating DepthFusion</h2>
+        <p>Run these commands in PowerShell to update.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">PowerShell</div><button class="copy-btn" onclick="copyCode(this,'win-update')">Copy</button></div>
+        <div class="code-body" id="win-update">cd $env:USERPROFILE\depthfusion
+git pull
+.venv\Scripts\pip install -e . -q</div>
+      </div>
+      <p style="margin-top:.5rem;">Then restart Claude Desktop.</p>
+    </div>
+
+    <hr>
+
+    <!-- Windows Troubleshooting -->
+    <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Windows troubleshooting</p>
+
+    <details>
+      <summary>"python is not recognized" after installing Python</summary>
+      <div class="detail-body">
+        <p>Python was installed without adding it to the PATH. Fix it:</p>
+        <ol>
+          <li>Open the Python installer again (from your Downloads folder)</li>
+          <li>Click <strong>Modify</strong></li>
+          <li>On the next screen, tick <strong>Add Python to environment variables</strong></li>
+          <li>Click Install, then close and reopen PowerShell</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>Execution policy error in PowerShell</summary>
+      <div class="detail-body">
+        <p>Windows may block script execution by default. Run PowerShell as Administrator (right-click the Start menu → Windows PowerShell (Admin)) and run:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">PowerShell (Admin)</div><button class="copy-btn" onclick="copyCode(this,'win-policy')">Copy</button></div>
+          <div class="code-body" id="win-policy">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</div>
+        </div>
+        <p>Answer <strong>Y</strong> and press Enter. Then re-run the install command.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>depthfusion_status gives no response or an error</summary>
+      <div class="detail-body">
+        <ol>
+          <li>Check the DepthFusion service is running. Open PowerShell and run: <code>curl http://localhost:7300/health</code>. If you see <code>{"status":"ok"}</code>, it's running.</li>
+          <li>If not running, start it: <code>python -m depthfusion.mcp.server</code> (in the depthfusion folder)</li>
+          <li>Fully quit Claude Desktop (system tray → Quit) and reopen it, then start a new chat.</li>
+        </ol>
+      </div>
+    </details>
+
+  </div><!-- /content-win -->
+
+  <div class="footer">
+    DepthFusion v1.2.1 · <a href="https://github.com/gregdigittal/depthfusion" style="color:var(--muted);">GitHub</a>
+  </div>
+</div><!-- /container -->
+
+<script>
+  var currentPlatform = null;
+
+  function selectPlatform(p) {
+    currentPlatform = p;
+    document.getElementById('card-mac').classList.toggle('selected', p === 'mac');
+    document.getElementById('card-win').classList.toggle('selected', p === 'win');
+    document.getElementById('content-mac').classList.toggle('visible', p === 'mac');
+    document.getElementById('content-win').classList.toggle('visible', p === 'win');
+    document.getElementById('content-mac').scrollIntoView({behavior:'smooth', block:'start', inline:'nearest'});
+  }
+
+  // Auto-detect
+  var isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+  selectPlatform(isMac ? 'mac' : 'win');
+
+  function copyCode(btn, id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText((el.innerText || el.textContent).trim()).then(function() {
+      btn.textContent = 'Copied!'; btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }).catch(function() { btn.textContent = 'Failed'; });
+  }
+</script>
+</body>
+</html>

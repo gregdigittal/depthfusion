@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Update Your Local Install</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2e3e;
+    --accent: #6c63ff; --teal: #4ecdc4; --green: #22c55e;
+    --amber: #f59e0b; --red: #ef4444;
+    --text: #e8eaf0; --muted: #7c849a;
+    --code-bg: #0d1117; --code-text: #c9d1d9;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f5f9; --card: #ffffff; --border: #dde0ea; --text: #1a1d27; --muted: #5c6070; --code-bg: #1a1d27; --code-text: #c9d1d9; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 3rem 2rem 2.5rem; text-align: center; }
+  .hero-badge { display: inline-block; background: rgba(78,205,196,.15); color: var(--teal); border: 1px solid rgba(78,205,196,.3); border-radius: 2rem; padding: .25rem .9rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1rem; }
+  .hero h1 { font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: .5rem; letter-spacing: -.02em; }
+  .hero p { font-size: 1rem; color: var(--muted); max-width: 480px; margin: 0 auto; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  .step-header { display: flex; align-items: center; gap: 1rem; margin: 2.5rem 0 1rem; }
+  .step-num { width: 2.4rem; height: 2.4rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+  .step-num.purple { background: var(--accent); color: #fff; }
+  .step-num.teal   { background: var(--teal); color: #0f1117; }
+  .step-num.green  { background: var(--green); color: #0f1117; }
+  .step-num.amber  { background: var(--amber); color: #0f1117; }
+  .step-title h2 { font-size: 1.15rem; font-weight: 700; }
+  .step-title p  { font-size: .85rem; color: var(--muted); margin-top: .1rem; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.3rem 1.4rem; margin-bottom: 1rem; }
+  .card h3 { font-size: .95rem; font-weight: 600; margin-bottom: .4rem; }
+  .card p  { font-size: .9rem; color: var(--muted); margin-bottom: .7rem; }
+  .card p:last-child { margin-bottom: 0; }
+
+  .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin: .6rem 0; }
+  .code-header { display: flex; justify-content: space-between; align-items: center; padding: .45rem .9rem; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.03); }
+  .code-lang { font-size: .68rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .copy-btn { font-size: .75rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 5px; padding: .2rem .55rem; cursor: pointer; transition: all .15s; }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .code-body { padding: .8rem 1rem; font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: .88rem; color: var(--code-text); line-height: 1.6; overflow-x: auto; white-space: pre; }
+
+  .callout { border-radius: 9px; padding: .85rem 1rem; font-size: .88rem; display: flex; gap: .65rem; align-items: flex-start; margin: .75rem 0; }
+  .callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info    { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: #bdb5ff; }
+  .callout.warn    { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: #fcd34d; }
+  .callout.tip     { background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.25); color: #99f6f0; }
+  .callout.success { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.25);  color: #86efac; }
+
+  .verify-box { background: var(--card); border: 2px solid var(--green); border-radius: 14px; padding: 1.5rem 1.6rem; margin-top: 2.5rem; }
+  .verify-title { font-size: 1.1rem; font-weight: 700; color: var(--green); margin-bottom: .75rem; }
+
+  .time-chip { display: inline-flex; align-items: center; gap: .35rem; background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.2); color: var(--teal); border-radius: 99px; font-size: .75rem; font-weight: 600; padding: .2rem .65rem; margin-left: .4rem; }
+
+  details { background: var(--card); border: 1px solid var(--border); border-radius: 9px; margin-bottom: .6rem; overflow: hidden; }
+  details summary { padding: .9rem 1rem; font-size: .9rem; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  details summary::after { content: "＋"; color: var(--muted); }
+  details[open] summary::after { content: "－"; }
+  details .detail-body { padding: 0 1rem 1rem; font-size: .88rem; color: var(--muted); line-height: 1.65; }
+  details .detail-body ol, details .detail-body ul { margin: .5rem 0 0 1.2rem; display: flex; flex-direction: column; gap: .35rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  .path-badge { display: inline-block; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25); color: #a89fff; border-radius: 7px; padding: .15rem .6rem; font-family: "SF Mono", Consolas, monospace; font-size: .85rem; }
+
+  .footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem 0 1rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">Local Update Guide</div>
+  <h1>Update DepthFusion on Your Mac</h1>
+  <p>Pull the latest code, sync dependencies, restart services. Takes about 2 minutes.</p>
+</div>
+
+<div class="container">
+
+  <div class="callout info" style="margin-top:2rem;">
+    <div class="callout-icon">💡</div>
+    <div>This guide is for the <strong>dev repo install</strong> at <span class="path-badge">~/projects/depthfusion</span> using <code>uv</code>. If you used the one-line installer (repo at <code>~/depthfusion</code>), see the <a href="local-install.html" style="color:#a89fff;">local install guide</a> update section instead.</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step-header">
+    <div class="step-num purple">1</div>
+    <div class="step-title">
+      <h2>Open Terminal <span class="time-chip">⏱ 10 sec</span></h2>
+      <p>Press ⌘ Space, type Terminal, press Enter.</p>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step-header">
+    <div class="step-num teal">2</div>
+    <div class="step-title">
+      <h2>Pull and sync <span class="time-chip">⏱ 30 sec</span></h2>
+      <p>Two commands — copy and paste them together.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="code-block">
+      <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'pull')">Copy</button></div>
+      <div class="code-body" id="pull">cd ~/projects/depthfusion && git pull && uv sync --extra mac-mlx</div>
+    </div>
+    <p>You'll see git output, then <code>uv</code> installing any new dependencies. When it finishes, you're running the latest code.</p>
+    <div class="callout tip">
+      <div class="callout-icon">ℹ️</div>
+      <div><code>uv sync --extra mac-mlx</code> reads <code>pyproject.toml</code> and updates the <code>.venv</code> with the full Mac MLX stack atomically — equivalent to <code>pip install -e ".[mac-mlx]"</code> but faster and locked. Omitting <code>--extra mac-mlx</code> strips MLX, torch, sentence-transformers, and ChromaDB from the environment.</div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step-header">
+    <div class="step-num green">3</div>
+    <div class="step-title">
+      <h2>Restart the MCP service <span class="time-chip">⏱ 5 sec</span></h2>
+      <p>So Claude Desktop picks up the new code.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Restart the REST / MCP server</h3>
+    <div class="code-block">
+      <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'restart-rest')">Copy</button></div>
+      <div class="code-body" id="restart-rest">launchctl unload ~/Library/LaunchAgents/com.depthfusion.rest.plist
+launchctl load  ~/Library/LaunchAgents/com.depthfusion.rest.plist</div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Also running the local MLX model? Restart that too.</summary>
+    <div class="detail-body">
+      <p>Only needed if you're using <code>mac-mlx</code> mode with a local Gemma/Qwen model. Skip if you're in <code>local</code> or <code>vps-cpu</code> mode.</p>
+      <div class="code-block" style="margin:.6rem 0;">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'restart-mlx')">Copy</button></div>
+        <div class="code-body" id="restart-mlx">launchctl unload ~/Library/LaunchAgents/com.depthfusion.mlx-server.plist
+launchctl load  ~/Library/LaunchAgents/com.depthfusion.mlx-server.plist</div>
+      </div>
+    </div>
+  </details>
+
+  <!-- STEP 4 -->
+  <div class="step-header">
+    <div class="step-num amber">4</div>
+    <div class="step-title">
+      <h2>Restart Claude Desktop <span class="time-chip">⏱ 15 sec</span></h2>
+      <p>Claude Desktop caches the MCP connection — a full quit and reopen is required.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <p>Click the Claude icon in your <strong>menu bar</strong> (top-right of screen) → <strong>Quit Claude</strong>.</p>
+    <p>Then reopen Claude from your Applications folder or Dock.</p>
+    <div class="callout warn">
+      <div class="callout-icon">⚠️</div>
+      <div><strong>Don't just close the window.</strong> Claude keeps running in the background when you close the window. You must choose <strong>Quit</strong> from the menu bar to fully restart it.</div>
+    </div>
+  </div>
+
+  <!-- VERIFY -->
+  <div class="verify-box">
+    <div class="verify-title">✅ Confirm the update worked</div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:.9rem;">Open a <strong>brand new chat</strong> in Claude Desktop and type:</p>
+    <div class="code-block">
+      <div class="code-header"><div class="code-lang">Claude Desktop — new chat</div><button class="copy-btn" onclick="copyCode(this,'verify')">Copy</button></div>
+      <div class="code-body" id="verify">depthfusion_status</div>
+    </div>
+    <div class="callout success" style="margin-top:1rem;">
+      <div class="callout-icon">🎉</div>
+      <div>Claude responds with version info and the list of available tools. You're on the latest build.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- TROUBLESHOOTING -->
+  <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Troubleshooting</p>
+
+  <details>
+    <summary>git pull says "Already up to date" — is anything wrong?</summary>
+    <div class="detail-body">
+      <p>No. You already have the latest code. Still restart the services and Claude Desktop if you think something changed — the <code>uv sync</code> step updates dependencies even if the source code didn't change.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>uv: command not found</summary>
+    <div class="detail-body">
+      <p><code>uv</code> isn't on your PATH in this Terminal session. Try:</p>
+      <div class="code-block" style="margin:.5rem 0;">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'uv-path')">Copy</button></div>
+        <div class="code-body" id="uv-path">source $HOME/.local/bin/env 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
+cd ~/projects/depthfusion && git pull && uv sync --extra mac-mlx</div>
+      </div>
+      <p>If that still fails, install uv: <code>curl -LsSf https://astral.sh/uv/install.sh | sh</code> then open a new Terminal window.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>launchctl says "Could not find specified service"</summary>
+    <div class="detail-body">
+      <p>The plist file doesn't exist — either the installer wasn't run on this machine, or it used a different path. Check what's loaded:</p>
+      <div class="code-block" style="margin:.5rem 0;">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'launchctl-list')">Copy</button></div>
+        <div class="code-body" id="launchctl-list">ls ~/Library/LaunchAgents/ | grep depthfusion</div>
+      </div>
+      <p>If nothing shows up, the service wasn't installed with launchd. In that case the MCP server is started by Claude Desktop directly and you just need to restart Claude Desktop — no launchctl commands needed.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>depthfusion_status still shows the old version after update</summary>
+    <div class="detail-body">
+      <ol>
+        <li>Make sure you opened a <strong>brand new chat</strong> — existing chats cache the tool list.</li>
+        <li>Fully quit Claude Desktop from the menu bar and reopen it.</li>
+        <li>Confirm the service restarted: <code>launchctl list | grep depthfusion</code> — it should show a PID.</li>
+        <li>Check the running version directly: <code>curl http://localhost:7300/health</code> — the response includes the version.</li>
+      </ol>
+    </div>
+  </details>
+
+  <details>
+    <summary>Something broke after the update — how do I roll back?</summary>
+    <div class="detail-body">
+      <p>Roll back to the previous commit:</p>
+      <div class="code-block" style="margin:.5rem 0;">
+        <div class="code-header"><div class="code-lang">Terminal</div><button class="copy-btn" onclick="copyCode(this,'rollback')">Copy</button></div>
+        <div class="code-body" id="rollback">cd ~/projects/depthfusion
+git log --oneline -5        # find the commit you want to go back to
+git checkout &lt;commit-hash&gt;  # replace with the hash from above
+uv sync --extra mac-mlx</div>
+      </div>
+      <p>Then restart services and Claude Desktop as in Steps 3 and 4. To return to the latest: <code>git checkout main && uv sync --extra mac-mlx</code>.</p>
+    </div>
+  </details>
+
+  <div class="footer">
+    DepthFusion v1.2.1 · <a href="https://github.com/gregdigittal/depthfusion" style="color:var(--muted);">GitHub</a>
+  </div>
+</div>
+
+<script>
+  function copyCode(btn, id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText((el.innerText || el.textContent).trim()).then(function() {
+      btn.textContent = 'Copied!'; btn.classList.add('copied');
+      setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }).catch(function(){ btn.textContent = 'Failed'; });
+  }
+</script>
+</body>
+</html>

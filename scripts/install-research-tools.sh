@@ -9,7 +9,7 @@
 # Prerequisites (checked, not installed):
 #   * DepthFusion already installed (via pip + `python -m depthfusion.install.install`)
 #   * systemd --user available (for the weekly timer)
-#   * Python 3.10+ in PATH (for the miner + weekly scripts)
+#   * Python 3.11+ in PATH (for the miner + weekly scripts)
 #
 # Safe to run multiple times — each step detects existing state and skips.
 # Does NOT install DepthFusion itself; the quickstart guide handles that
@@ -71,7 +71,7 @@ run() {
 say "Prerequisite checks"
 
 if ! command -v python3 >/dev/null 2>&1; then
-  err "python3 not in PATH. Install Python 3.10+ and re-run."
+  err "python3 not in PATH. Install Python 3.11+ and re-run."
   exit 1
 fi
 

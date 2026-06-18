@@ -1,0 +1,99 @@
+/* ════════════════════════════════════════════════════════════════
+   DepthFusion · Motion system
+   Keyframes + the LogoMark animation vocabulary. The brand idea is
+   photographic: memory "develops" — blur → sharp, dim → glowing —
+   and then "breathes" patiently. All loops respect reduced-motion.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Ambient glow breathing (logo plate / orbs) ── */
+@keyframes df-breathe {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,142,58,.30)); }
+  50%      { filter: drop-shadow(0 0 16px rgba(255,142,58,.65)); }
+}
+
+/* ── "Develop": emerge from blurred, dim, sepia → sharp & bright ── */
+@keyframes df-develop {
+  0%   { opacity: 0; filter: blur(7px) brightness(.4) sepia(.7); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; filter: blur(0) brightness(1) sepia(0); }
+}
+
+/* ── Node pulse (graph nodes / logo nodes) ── */
+@keyframes df-node-breath {
+  0%, 100% { r: 4px; opacity: .55; }
+  50%      { r: 5.4px; opacity: 1; }
+}
+@keyframes df-hub-breath {
+  0%, 100% { r: 6.4px; opacity: .85; }
+  50%      { r: 7.4px; opacity: 1; }
+}
+
+/* ── Spoke draw-in ── */
+@keyframes df-spoke-draw {
+  from { stroke-dashoffset: 26; opacity: 0; }
+  to   { stroke-dashoffset: 0;  opacity: .55; }
+}
+
+/* ── Content emerge (developing print): blur+dim → sharp ── */
+@keyframes df-emerge {
+  from { opacity: 0; filter: blur(6px); transform: translateY(6px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+/* ── Safelight pulse (pips, status dots) ── */
+@keyframes df-pip {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,142,58,.5); }
+  50%      { opacity: .55; box-shadow: 0 0 0 4px rgba(255,142,58,0); }
+}
+
+/* ── Liquid ripple (developing tray surface) ── */
+@keyframes df-ripple { 0%,100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+/* ── Skeleton shimmer ── */
+@keyframes df-shimmer { to { background-position: -200% 0; } }
+
+/* ════════════════════════════════════════════════════════════════
+   LOGO ANIMATION VOCABULARY
+   Apply one (or stack) to a <LogoMark animation="…"> wrapper.
+   ════════════════════════════════════════════════════════════════ */
+.df-logo { display: inline-block; line-height: 0; }
+.df-logo svg { display: block; }
+
+/* breathe — patient amber glow on the whole mark */
+.df-logo--breathe { animation: df-breathe var(--dur-breathe) var(--ease) infinite; }
+
+/* develop — the mark resolves out of the chemistry, once, on mount */
+.df-logo--develop .df-logo__mark { animation: df-develop var(--dur-develop) var(--ease-develop) both; }
+
+/* pulse — nodes & hub breathe on a stagger (the memory "thinking") */
+.df-logo--pulse .df-logo__node { animation: df-node-breath var(--dur-node) var(--ease) infinite; }
+.df-logo--pulse .df-logo__hub  { animation: df-hub-breath var(--dur-node) var(--ease) infinite; }
+.df-logo--pulse .df-logo__node:nth-of-type(1) { animation-delay: 0s; }
+.df-logo--pulse .df-logo__node:nth-of-type(2) { animation-delay: .5s; }
+.df-logo--pulse .df-logo__node:nth-of-type(3) { animation-delay: 1s; }
+
+/* draw — spokes draw in on mount */
+.df-logo--draw .df-logo__spoke {
+  stroke-dasharray: 26;
+  animation: df-spoke-draw 1.4s var(--ease-develop) both;
+}
+.df-logo--draw .df-logo__spoke:nth-of-type(2) { animation-delay: .15s; }
+.df-logo--draw .df-logo__spoke:nth-of-type(3) { animation-delay: .3s; }
+
+/* ── Content entrance utilities ── */
+.df-emerge { animation: df-emerge var(--dur-develop) var(--ease-develop) both; }
+.df-emerge-1 { animation-delay: .15s; }
+.df-emerge-2 { animation-delay: .45s; }
+.df-emerge-3 { animation-delay: .75s; }
+
+.df-pip { animation: df-pip 2.4s var(--ease) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .df-logo--breathe, .df-logo--develop .df-logo__mark, .df-logo--pulse .df-logo__node,
+  .df-logo--pulse .df-logo__hub, .df-logo--draw .df-logo__spoke,
+  .df-emerge, .df-pip {
+    animation: none !important;
+  }
+  .df-logo--develop .df-logo__mark { opacity: 1; filter: none; }
+  .df-logo--draw .df-logo__spoke { stroke-dashoffset: 0; opacity: .55; }
+}

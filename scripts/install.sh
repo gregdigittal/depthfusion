@@ -14,14 +14,14 @@ echo "====================="
 
 # 1. Python version check
 if ! command -v python3 &>/dev/null; then
-    echo "Error: python3 not found. Install Python 3.10+ and try again." >&2
+    echo "Error: python3 not found. Install Python 3.11+ and try again." >&2
     exit 1
 fi
 PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
 PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
-    echo "Error: Python 3.10+ required (found $PY_VER)" >&2
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
+    echo "Error: Python 3.11+ required (found $PY_VER)" >&2
     exit 1
 fi
 echo "✓ Python $PY_VER"
@@ -63,6 +63,25 @@ mkdir -p "$CONFIG_DIR"
 printf 'DEPTHFUSION_API_KEY=%s\n' "$API_KEY" > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 echo "✓ API key saved to $ENV_FILE"
+
+# 5b. Optional: HNSW embedding index (requires hnswlib; BM25-only recall works without it)
+echo ""
+echo "Enable HNSW embedding index for fused BM25+vector recall? [y/N]"
+echo "  (Adds ~50 MB sentence-transformers model; skip if you prefer BM25-only)"
+# shellcheck disable=SC2162
+read -r HNSW_CHOICE
+if [[ "${HNSW_CHOICE,,}" == "y" ]]; then
+    printf '\nDEPTHFUSION_HNSW_ENABLED=true\n' >> "$ENV_FILE"
+    printf 'DEPTHFUSION_HNSW_INDEX_PATH=%s/.depthfusion/hnsw\n' "$HOME" >> "$ENV_FILE"
+    if "$VENV_PATH/bin/pip" install --quiet "hnswlib>=0.7"; then
+        echo "✓ hnswlib installed — HNSW fused recall active"
+    else
+        echo "  ⚠ hnswlib install failed — HNSW flag written but index will be disabled until hnswlib is installed"
+        echo "    Run: $VENV_PATH/bin/pip install 'hnswlib>=0.7'"
+    fi
+else
+    echo "  Skipping HNSW — BM25-only recall active (you can enable later via DEPTHFUSION_HNSW_ENABLED=true)"
+fi
 
 # 6. Register MCP server in claude_desktop_config.json
 PYTHON_BIN="$VENV_PATH/bin/python"

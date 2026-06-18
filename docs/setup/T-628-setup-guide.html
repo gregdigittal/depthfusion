@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T-628 Setup Guide</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      border-bottom: 1px solid #2d3748;
+      padding-bottom: 28px;
+      margin-bottom: 36px;
+    }
+    .badge {
+      display: inline-block;
+      background: #1a3a5c;
+      color: #63b3ed;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f7fafc;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #a0aec0;
+      font-size: 15px;
+    }
+
+    /* ── Intro box ── */
+    .intro {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-left: 4px solid #4299e1;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 36px;
+      font-size: 15px;
+      color: #cbd5e0;
+    }
+    .intro strong { color: #e2e8f0; }
+
+    /* ── Before you start ── */
+    .prereq {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-left: 4px solid #d69e2e;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 36px;
+    }
+    .prereq h3 {
+      color: #f6e05e;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .prereq p { font-size: 15px; color: #cbd5e0; }
+
+    /* ── Steps ── */
+    .step {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px;
+      border-bottom: 1px solid #2d3748;
+    }
+
+    .step-number {
+      background: #2b6cb0;
+      color: #bee3f8;
+      font-size: 13px;
+      font-weight: 700;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #f7fafc;
+    }
+
+    .step-body {
+      padding: 20px 24px;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: #a0aec0;
+      margin-bottom: 18px;
+    }
+    .step-desc strong { color: #cbd5e0; }
+
+    /* ── Command block ── */
+    .cmd-block {
+      background: #0d1117;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .cmd-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px;
+      background: #161b22;
+      border-bottom: 1px solid #2d3748;
+    }
+
+    .cmd-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #718096;
+    }
+
+    .copy-btn {
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      color: #a0aec0;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .copy-btn:hover { background: #4a5568; color: #e2e8f0; }
+    .copy-btn.copied { background: #276749; border-color: #38a169; color: #9ae6b4; }
+
+    .copy-btn svg { width: 13px; height: 13px; }
+
+    pre {
+      padding: 16px 18px;
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* ── Success / Error boxes ── */
+    .outcome {
+      border-radius: 7px;
+      padding: 14px 16px;
+      font-size: 13.5px;
+      margin-bottom: 12px;
+    }
+    .outcome:last-child { margin-bottom: 0; }
+
+    .success {
+      background: #1a2e22;
+      border: 1px solid #276749;
+      color: #9ae6b4;
+    }
+    .success .outcome-label {
+      color: #68d391;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .failure {
+      background: #2d1b1b;
+      border: 1px solid #742a2a;
+      color: #feb2b2;
+    }
+    .failure .outcome-label {
+      color: #fc8181;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .outcome code {
+      background: rgba(255,255,255,0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    /* ── Package table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      margin-top: 14px;
+    }
+    th {
+      text-align: left;
+      padding: 9px 12px;
+      background: #161b22;
+      color: #718096;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #2d3748;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #1a202c;
+      color: #cbd5e0;
+      vertical-align: top;
+    }
+    td:first-child {
+      font-family: monospace;
+      font-size: 13px;
+      color: #90cdf4;
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Troubleshoot section ── */
+    .troubleshoot {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+    .troubleshoot-header {
+      background: #2d1b1b;
+      border-bottom: 1px solid #742a2a;
+      padding: 14px 24px;
+    }
+    .troubleshoot-header h3 {
+      color: #fc8181;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .troubleshoot-body { padding: 20px 24px; }
+
+    .problem {
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid #2d3748;
+    }
+    .problem:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+    .problem-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fbd38d;
+      margin-bottom: 8px;
+    }
+    .problem-desc {
+      font-size: 13.5px;
+      color: #a0aec0;
+      margin-bottom: 14px;
+    }
+
+    /* ── Done box ── */
+    .done-box {
+      background: #1a2e22;
+      border: 1px solid #276749;
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .done-box .check { font-size: 36px; margin-bottom: 10px; }
+    .done-box h3 { color: #68d391; font-size: 18px; margin-bottom: 8px; }
+    .done-box p { color: #9ae6b4; font-size: 14px; }
+
+    /* ── Quick ref ── */
+    .quick-ref {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .quick-ref-header {
+      padding: 14px 24px;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .quick-ref-header h3 {
+      color: #a0aec0;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #718096;
+      margin-top: 10px;
+    }
+    .note strong { color: #a0aec0; }
+
+    /* highlight */
+    .hl-green { color: #68d391; }
+    .hl-yellow { color: #f6e05e; }
+    .hl-blue { color: #90cdf4; }
+    .hl-comment { color: #4a5568; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">T-628 · Lane C · E-56</div>
+    <h1>Desktop App Setup Guide</h1>
+    <p class="subtitle">Install missing system libraries and verify the Tauri app compiles cleanly on this server</p>
+  </div>
+
+  <!-- Intro -->
+  <div class="intro">
+    <strong>What this guide does:</strong> The desktop app code is already written and complete.
+    Before it can be compiled, this Linux server needs several system libraries installed.
+    Follow each numbered step in order. Every command is written out in full — just copy and paste it.
+    You do not need to know Rust, TypeScript, or Tauri.
+  </div>
+
+  <!-- Prereq -->
+  <div class="prereq">
+    <h3>⚠ Before you start</h3>
+    <p>You need to be connected to the server via SSH. Open a terminal and run:<br><br>
+    <code style="background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:4px;font-family:monospace;">ssh gregmorris@176.9.147.206</code><br><br>
+    All commands below are typed into that SSH session. Do not run them on your local machine.</p>
+  </div>
+
+  <!-- ── STEP 1 ── -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">1</div>
+      <div class="step-title">Install the missing system libraries</div>
+    </div>
+    <div class="step-body">
+      <p class="step-desc">
+        Copy the entire block below and paste it into the terminal. Press <strong>Enter</strong>.
+        It will ask for your password — type it and press Enter (nothing will appear on screen while you type, that is normal).
+        This downloads and installs five packages. It takes roughly <strong>1–2 minutes</strong>.
+      </p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo apt update && sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre><span class="hl-comment"># Update the package list, then install all required libraries</span>
+sudo apt update && sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev</pre>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Package</th><th>What it is</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>libwebkit2gtk-4.1-dev</td>
+            <td>The browser engine Tauri uses to render the app's interface</td>
+          </tr>
+          <tr>
+            <td>libgdk-pixbuf2.0-dev</td>
+            <td>Image/pixel buffer support (the dev headers the build needs)</td>
+          </tr>
+          <tr>
+            <td>libxdo-dev</td>
+            <td>Window and keyboard automation library Tauri links against</td>
+          </tr>
+          <tr>
+            <td>libayatana-appindicator3-dev</td>
+            <td>System tray icon support</td>
+          </tr>
+          <tr>
+            <td>librsvg2-dev</td>
+            <td>SVG rendering used for app icons</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="outcome success" style="margin-top:18px;">
+        <div class="outcome-label">✓ Success looks like</div>
+        The last line ends with something like:<br>
+        <code>Processing triggers for libc-bin ...</code><br>
+        No lines beginning with <code>E:</code>
+      </div>
+      <div class="outcome failure">
+        <div class="outcome-label">✗ If you see an error</div>
+        Look for a line starting with <code>E: Unable to locate package ...</code>.
+        Note the package name and go to the <strong>Troubleshooting</strong> section at the bottom.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2 ── -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">2</div>
+      <div class="step-title">Navigate to the app folder</div>
+    </div>
+    <div class="step-body">
+      <p class="step-desc">
+        All remaining commands must be run from inside the app folder.
+        Run the command below to move there.
+      </p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre>cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app</pre>
+      </div>
+
+      <p class="step-desc">Confirm you are in the right place by running:</p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="pwd">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre>pwd</pre>
+      </div>
+
+      <div class="outcome success">
+        <div class="outcome-label">✓ Success looks like</div>
+        <code>/home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app</code>
+      </div>
+      <div class="outcome failure">
+        <div class="outcome-label">✗ If the path is different</div>
+        Do not proceed. Re-run the <code>cd</code> command above exactly as written.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3 ── -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">3</div>
+      <div class="step-title">Install JavaScript packages</div>
+    </div>
+    <div class="step-body">
+      <p class="step-desc">
+        The app's visual interface is written in TypeScript (a variant of JavaScript).
+        This command downloads all the third-party JS packages it depends on —
+        similar to installing Python packages with <code>pip install</code>.
+        Takes about <strong>30–60 seconds</strong>.
+      </p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="npm install">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre>npm install</pre>
+      </div>
+
+      <div class="outcome success">
+        <div class="outcome-label">✓ Success looks like</div>
+        Ends with a line like: <code>added 312 packages, and audited 313 packages in 45s</code><br>
+        The exact numbers do not matter. No lines beginning with <code>npm error</code>.
+      </div>
+      <div class="outcome failure">
+        <div class="outcome-label">✗ If you see npm error lines</div>
+        Confirm you are in the correct folder (Step 2), then try running <code>npm install</code> again.
+        If it fails a second time, copy the error lines and send them back.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4 ── -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">4</div>
+      <div class="step-title">Check the TypeScript code compiles</div>
+    </div>
+    <div class="step-body">
+      <p class="step-desc">
+        This compiles the frontend (what you see in the app window) and checks for any
+        TypeScript errors. Takes about <strong>5–15 seconds</strong>.
+      </p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="npm run build">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre>npm run build</pre>
+      </div>
+
+      <div class="outcome success">
+        <div class="outcome-label">✓ Success looks like</div>
+        Last line reads: <code>✓ built in 1.23s</code> (time will vary)<br>
+        A <code>dist/</code> folder is created in the current directory.
+      </div>
+      <div class="outcome failure">
+        <div class="outcome-label">✗ If you see TypeScript errors</div>
+        Lines beginning with <code>error TS</code> indicate a code problem.
+        Copy everything from the first <code>error TS</code> line to the end and send it back.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 5 ── -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">5</div>
+      <div class="step-title">Check the Rust code compiles</div>
+    </div>
+    <div class="step-body">
+      <p class="step-desc">
+        This is the main verification step. The desktop shell of the app is written in Rust.
+        This command checks the Rust code for errors <strong>without</strong> doing a full build
+        (a full build would take 5+ minutes — this check takes 2–3 minutes on the first run
+        because it downloads Rust packages, then under 30 seconds on subsequent runs).
+        <br><br>
+        You will see many lines of text scroll past — this is normal. It is compiling
+        third-party libraries.
+      </p>
+
+      <div class="cmd-block">
+        <div class="cmd-toolbar">
+          <span class="cmd-label">Terminal command</span>
+          <button class="copy-btn" onclick="copyCmd(this)" data-cmd="cargo check --manifest-path src-tauri/Cargo.toml">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="10" rx="1"/>
+              <path d="M3 11V3a1 1 0 011-1h8"/>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre>cargo check --manifest-path src-tauri/Cargo.toml</pre>
+      </div>
+
+      <p class="note">While it runs you will see lines like:<br>
+        <code style="color:#4a5568;">Downloading crates ...</code><br>
+        <code style="color:#4a5568;">Compiling tauri v2.11.2</code><br>
+        <code style="color:#4a5568;">Compiling app v0.1.0</code><br>
+        This is expected. Wait for it to finish.
+      </p>
+
+      <div class="outcome success" style="margin-top:14px;">
+        <div class="outcome-label">✓ Success looks like</div>
+        The very last line reads:<br>
+        <code>Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 14s</code><br>
+        (The time will vary. The word <strong>Finished</strong> is what matters.)<br><br>
+        Yellow <code>warning:</code> lines are fine — only <code>error[E...]</code> lines in red indicate a problem.
+      </div>
+      <div class="outcome failure">
+        <div class="outcome-label">✗ If you see error lines</div>
+        Look at the first <code>error[</code> line and check the <strong>Troubleshooting</strong> section below.
+        If the error is not listed there, copy everything from the first <code>error[</code> to the word
+        <code>Finished</code> (or <code>aborting</code>) and send it back.
+      </div>
+    </div>
+  </div>
+
+  <!-- Done box -->
+  <div class="done-box">
+    <div class="check">✅</div>
+    <h3>All done</h3>
+    <p>When Step 5 shows <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">Finished</code> with no red error lines, T-628 is verified.<br>
+    Report back with the last 3 lines of output from Step 5.</p>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="troubleshoot">
+    <div class="troubleshoot-header">
+      <h3>Troubleshooting</h3>
+    </div>
+    <div class="troubleshoot-body">
+
+      <div class="problem">
+        <div class="problem-title">Error: <code>pkg-config could not find: gdk-pixbuf-2.0</code></div>
+        <div class="problem-desc">
+          Step 1 did not complete properly. Run the two commands below, then repeat Step 5.
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-toolbar">
+            <span class="cmd-label">Fix command</span>
+            <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo apt update && sudo apt install -y libwebkit2gtk-4.1-dev libgdk-pixbuf2.0-dev">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="8" height="10" rx="1"/>
+                <path d="M3 11V3a1 1 0 011-1h8"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre>sudo apt update && sudo apt install -y libwebkit2gtk-4.1-dev libgdk-pixbuf2.0-dev</pre>
+        </div>
+      </div>
+
+      <div class="problem">
+        <div class="problem-title">Error: <code>pkg-config could not find: webkit2gtk-4.1</code></div>
+        <div class="problem-desc">
+          The package installed but the system library index needs refreshing. Run this, then repeat Step 5.
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-toolbar">
+            <span class="cmd-label">Fix command</span>
+            <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo ldconfig">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="8" height="10" rx="1"/>
+                <path d="M3 11V3a1 1 0 011-1h8"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre>sudo ldconfig</pre>
+        </div>
+      </div>
+
+      <div class="problem">
+        <div class="problem-title">Error: <code>E: Unable to locate package libwebkit2gtk-4.1-dev</code></div>
+        <div class="problem-desc">
+          The apt package list is stale or the package name differs on your Ubuntu version.
+          Run the update command first, then try installing just that one package.
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-toolbar">
+            <span class="cmd-label">Fix command — Step A</span>
+            <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo apt update">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="8" height="10" rx="1"/>
+                <path d="M3 11V3a1 1 0 011-1h8"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre>sudo apt update</pre>
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-toolbar">
+            <span class="cmd-label">Fix command — Step B</span>
+            <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo apt install -y libwebkit2gtk-4.1-dev">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="8" height="10" rx="1"/>
+                <path d="M3 11V3a1 1 0 011-1h8"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre>sudo apt install -y libwebkit2gtk-4.1-dev</pre>
+        </div>
+        <div class="problem-desc" style="margin-top:10px;margin-bottom:0;">
+          If Step B still fails, send back the exact error line — the package may need a PPA on older Ubuntu versions.
+        </div>
+      </div>
+
+      <div class="problem">
+        <div class="problem-title">Red <code>error[E0...]</code> lines (Rust compile errors)</div>
+        <div class="problem-desc">
+          These indicate a code problem rather than an environment problem. Do not try to fix them yourself.
+          Copy everything from the first <code>error[</code> line to the end of the output and send it back.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Quick ref -->
+  <div class="quick-ref" style="margin-top:28px;">
+    <div class="quick-ref-header">
+      <h3>All commands — quick reference</h3>
+      <button class="copy-btn" onclick="copyCmd(this)" data-cmd="sudo apt update && sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev
+cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app
+npm install
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="4" y="4" width="8" height="10" rx="1"/>
+          <path d="M3 11V3a1 1 0 011-1h8"/>
+        </svg>
+        Copy all
+      </button>
+    </div>
+    <pre><span class="hl-comment"># Step 1 — install system libraries</span>
+sudo apt update && sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev
+
+<span class="hl-comment"># Step 2 — go to the app folder</span>
+cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app
+
+<span class="hl-comment"># Step 3 — install JavaScript packages</span>
+npm install
+
+<span class="hl-comment"># Step 4 — check TypeScript</span>
+npm run build
+
+<span class="hl-comment"># Step 5 — check Rust (takes 2–3 min on first run)</span>
+cargo check --manifest-path src-tauri/Cargo.toml</pre>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+  function copyCmd(btn) {
+    const text = btn.getAttribute('data-cmd');
+    navigator.clipboard.writeText(text).then(() => {
+      btn.classList.add('copied');
+      btn.innerHTML = `
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="2,8 6,12 14,4"/>
+        </svg>
+        Copied!`;
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = `
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="4" width="8" height="10" rx="1"/>
+            <path d="M3 11V3a1 1 0 011-1h8"/>
+          </svg>
+          Copy`;
+      }, 2000);
+    });
+  }
+</script>
+</body>
+</html>

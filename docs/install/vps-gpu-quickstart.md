@@ -1,5 +1,7 @@
 # vps-gpu Quickstart — GPU-accelerated DepthFusion + research tools
 
+> **Note: This doc describes V1 behavior.** V2 server setup is documented in `docs/v2/admin-runbooks.md` (§1 Initial Server Setup + First-User Enrollment). The V2 installer adds OIDC configuration, database initialization, and TLS setup steps not covered here. If you are running the `v2-enterprise` branch, refer to the V2 admin runbooks instead.
+
 > **Target:** Hetzner GEX44 (NVIDIA RTX 4000 SFF Ada) or any CUDA-12+ host
 > **Time:** ~4 hours (mostly GPU-driver + Gemma model download)
 > **Produces:** working DepthFusion in `vps-gpu` mode + weekly regression monitor + initial prompt corpus
@@ -52,9 +54,9 @@ For the rest of this guide, "Gemma 4" without qualification means the
 nvidia-smi                  # must show GPU; ≥ 20 GB VRAM for Gemma 4 26B AWQ
 nvcc --version              # CUDA 12.0+
 
-# Python — 3.10 or newer; "or newer" means any modern Python is fine.
-# Ubuntu 24.04 ships 3.12 as default. Don't try to install 3.10
-# specifically on 24.04 — it's not in the repos and isn't needed.
+# Python — 3.11 or newer; "or newer" means any modern Python is fine.
+# Ubuntu 24.04 ships 3.12 as default. 3.11 is the minimum required.
+# Don't try to install 3.11 specifically on 24.04 — 3.12 is the default.
 python3 --version
 
 # Build tools + venv module (fresh-install gotcha — venv isn't
@@ -387,6 +389,126 @@ the exact invocation.
 
 ---
 
+## 7. Enable HNSW vector index (recommended)
+
+HNSW is an approximate nearest-neighbour index that fuses with BM25 to
+give vector-similarity-boosted recall. `hnswlib` is already installed by
+the `[vps-gpu]` extras — you only need to add two env vars and restart.
+
+> **Non-vps-gpu installs (e.g. Mac `local` mode):** `hnswlib` is not in
+> the `local` or `vps-cpu` extras. Install it manually:
+> ```bash
+> pip install 'hnswlib>=0.7'
+> ```
+> **zsh users:** quote the version specifier — without quotes, zsh interprets
+> `>=` as an output-redirection operator and you get `zsh: 0.7 not found`
+> instead of a pip install. Single quotes (`'hnswlib>=0.7'`) prevent this.
+
+```bash
+# Add to ~/.claude/depthfusion.env
+cat >> ~/.claude/depthfusion.env <<'EOF'
+DEPTHFUSION_HNSW_ENABLED=true
+DEPTHFUSION_VECTOR_SEARCH_ENABLED=true
+EOF
+```
+
+Reload and verify:
+
+```bash
+# Reload the shell so systemd services pick up the new vars
+deactivate 2>/dev/null; exec bash
+
+# Confirm HNSW is active on the MCP server (restart it first):
+systemctl --user restart depthfusion-mcp   # if running as a service
+# or restart manually: kill $(lsof -ti:7301) && nohup ... &
+
+python3 -c "
+from depthfusion.retrieval.hnsw_store import HNSWStore
+s = HNSWStore()
+print('hnsw_available:', s.is_available())
+"
+# Expected: hnsw_available: True
+```
+
+After HNSW is active, recall responses include `strategy: "bm25+hnsw-fused"` and
+`hnsw_available: true`. The index is built incrementally — each `publish_context`
+upserts into HNSW automatically when enabled.
+
+---
+
+## 8. Start the REST API as a persistent systemd service (optional)
+
+The REST API (`127.0.0.1:7300`) exposes all 29 MCP tools over HTTP. It is
+required for the `depthfusion-pp-cli` generated CLI (§9). The service file
+is included in the repo:
+
+```bash
+# Install the user-level systemd service
+cp ~/projects/depthfusion/infra/systemd/depthfusion-rest.service \
+   ~/.config/systemd/user/
+
+systemctl --user daemon-reload
+systemctl --user enable --now depthfusion-rest
+
+# Verify it started:
+systemctl --user status depthfusion-rest
+curl -s http://127.0.0.1:7300/status | python3 -m json.tool
+# Expected: {"status": "ok", ...}
+```
+
+> **Required env vars** — the service reads `~/.claude/depthfusion.env` via
+> systemd `EnvironmentFile`. Ensure the following are set before starting:
+> `DEPTHFUSION_REST_API=true`, `DEPTHFUSION_HNSW_ENABLED=true`,
+> `DEPTHFUSION_VECTOR_SEARCH_ENABLED=true`, `DEPTHFUSION_MODE=vps-gpu`.
+
+See `infra/systemd/README.md` for the full install reference and upgrade notes.
+
+---
+
+## 9. Install the generated CLI (optional)
+
+`depthfusion-pp-cli` is a Go CLI exposing all 29 API endpoints as subcommands,
+plus three compound commands (`discovery-audit`, `graph-inspect`, `batch-recall`).
+It requires the REST API (§8) to be running.
+
+The binary ships pre-built at:
+
+```
+~/printing-press/library/depthfusion/build/stage/bin/depthfusion-pp-cli
+~/printing-press/library/depthfusion/build/stage/bin/depthfusion-pp-mcp
+```
+
+Add it to your PATH:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc — already present if you used the agent-ops installer
+export PATH="$HOME/printing-press/library/depthfusion/build/stage/bin:$PATH"
+source ~/.zshrc
+
+# Verify
+depthfusion-pp-cli status
+depthfusion-pp-cli recall relevant --query "test" --json
+```
+
+The MCP HTTP server is fail-closed: every request requires a Bearer token.
+Set `DEPTHFUSION_MCP_TOKEN` on the server and export the same value as
+`DEPTHFUSION_API_KEY` in your client environment before running CLI commands.
+To expose the server on a non-loopback interface, set
+`DEPTHFUSION_MCP_HOST=0.0.0.0` in the env file (and ensure `DEPTHFUSION_MCP_TOKEN`
+is configured and a firewall rule is in place).
+
+The companion MCP server (`depthfusion-pp-mcp`) mirrors all commands as agent
+tools. Register it with Claude Code:
+
+```bash
+claude mcp add --scope user depthfusion-cli \
+  ~/printing-press/library/depthfusion/build/stage/bin/depthfusion-pp-mcp
+```
+
+Full CLI reference: `docs/cli.md`.
+
+---
+
 ## Done
 
 You now have:
@@ -396,6 +518,9 @@ You now have:
 - ✅ Weekly regression monitor scheduled (user-level)
 - ✅ Initial prompt corpus mined
 - ✅ All three research tools available under `scripts/`
+- ✅ HNSW vector index enabled (§7) — BM25+HNSW fused recall active
+- ✅ REST API running as a persistent systemd service on 127.0.0.1:7300 (§8)
+- ✅ `depthfusion-pp-cli` and `depthfusion-pp-mcp` on PATH (§9)
 
 ## Operational notes
 

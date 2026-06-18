@@ -6,7 +6,7 @@ This guide installs DepthFusion on Windows 10/11 and registers it with Claude De
 
 ## Prerequisites
 
-- **Python 3.10+** — download from [python.org](https://python.org) (check "Add Python to PATH" during install)
+- **Python 3.11+** — download from [python.org](https://python.org) (check "Add Python to PATH" during install)
 - **Git** — download from [git-scm.com](https://git-scm.com)
 - **Claude Desktop** — installed and signed in
 

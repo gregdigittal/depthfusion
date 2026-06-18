@@ -90,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             messages = body.get("messages", [])
-            max_tokens = body.get("max_tokens", 512)
+            max_tokens = body.get("max_tokens", 1024)
             temperature = float(body.get("temperature", 0.0))
 
             # Apply chat template
@@ -102,15 +102,37 @@ class Handler(BaseHTTPRequestHandler):
                 prompt = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
 
             # Generate (main thread — Metal-safe)
-            # temp renamed to temperature in mlx_lm 0.31.x
-            response_text = mlx_lm.generate(
-                model,
-                tokenizer,
-                prompt=prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                verbose=True,
-            )
+            # mlx_lm API: temperature kwarg removed in 0.21+; use sampler instead.
+            import inspect as _inspect
+            _gen_kwargs: dict = dict(max_tokens=max_tokens, verbose=True)
+            if "temperature" in _inspect.signature(mlx_lm.generate).parameters:
+                _gen_kwargs["temperature"] = temperature
+            else:
+                try:
+                    from mlx_lm.sample_utils import make_sampler as _make_sampler
+                except ImportError:
+                    from mlx_lm.utils import make_sampler as _make_sampler  # type: ignore[no-redef]
+                _gen_kwargs["sampler"] = _make_sampler(temp=temperature)
+            response_text = mlx_lm.generate(model, tokenizer, prompt=prompt, **_gen_kwargs)
+
+            # Gemma 4 emits chain-of-thought inside a <|channel>thought block.
+            # Strip it and return only the final clean answer.
+            if "<|channel>thought" in response_text:
+                # Drop the thinking section entirely; the final answer follows after it.
+                # The model emits <|channel>response (or just text) after thinking ends.
+                if "<|channel>response" in response_text:
+                    response_text = response_text.split("<|channel>response", 1)[-1].strip()
+                else:
+                    # No explicit end marker: take the last non-bullet paragraph as the answer.
+                    after = response_text.split("<|channel>thought", 1)[-1]
+                    paragraphs = [p.strip() for p in after.split("\n\n") if p.strip()]
+                    # Walk from the end; pick the first paragraph that reads like a sentence.
+                    for para in reversed(paragraphs):
+                        if not para.lstrip().startswith(("*", "-", "#")):
+                            response_text = para
+                            break
+                    else:
+                        response_text = paragraphs[-1] if paragraphs else after.strip()
 
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
@@ -147,7 +169,20 @@ class Handler(BaseHTTPRequestHandler):
 # Serve
 # ---------------------------------------------------------------------------
 
+import socket as _socket
+
+
+class _Server(HTTPServer):
+    # Explicitly set SO_REUSEADDR so launchd restarts don't hit EADDRINUSE
+    # while the OS is still draining TIME_WAIT from the previous instance.
+    allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
+
 try:
-    HTTPServer((args.host, args.port), Handler).serve_forever()
+    _Server((args.host, args.port), Handler).serve_forever()
 except KeyboardInterrupt:
     print("\n[mlx-serve] stopped.")

@@ -12,6 +12,132 @@ Conventions:
 
 ## [Unreleased]
 
+### Added
+
+- `docs/install/mac-mlx-quickstart.md` — complete install guide for Apple Silicon Macs: launchd plist setup, MLX-LM inference server, Claude Desktop + Claude Code CLI registration, HNSW cold-start note, troubleshooting section (launchctl load pitfall, duplicate plist labels, zsh paste issues)
+- `docs/install/README.md` updated — Mac MLX guide added to the install guide table
+- `scripts/mac-parity.sh` — idempotent plistlib-based script to add missing E-31 env vars (`DEPTHFUSION_GRAPH_ENABLED`, `DEPTHFUSION_COGNITIVE_RETRIEVAL`, `DEPTHFUSION_DECISION_MEMORY`, `DEPTHFUSION_OPERATIONAL_MEMORY`) to the macOS launchd plist and reload the service; supports `--dry-run`
+
+### Changed
+
+- **Canonical 21-tool set** — parity audit removed 11 low-value / unshipped tools from the MCP server. All platforms now expose exactly 21 tools. Removed: `depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_describe_capabilities`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`. Underlying Python functions are retained; only the MCP surface registration was removed.
+- **REST API feature-flag bug fix** — all 16 endpoint handlers in `api/rest.py` called `DepthFusionConfig()` (bare constructor, all flags False) instead of `DepthFusionConfig.from_env()`. Feature-flagged tools (`graph_*`, `cognitive_retrieval`, `decision_memory`, `operational_memory`) were silently excluded from REST responses on all platforms regardless of env vars. Fixed with global replacement.
+
+### Fixed
+
+- **REST `/context` endpoint wiring bug** — `POST /context` now wraps the request body into the `arguments["item"]` shape expected by `_tool_publish_context`. Previously all REST publish calls returned `{"error": "publish_context: 'item' must be an object"}`. The endpoint now generates an `item_id` (UUID), uses `"rest-api"` as `source_agent`, and folds `project`/`session_id` into `item.metadata`. MCP tool (`depthfusion_publish_context`) was unaffected.
+
+---
+
+## [v0.6.0-alpha] — 2026-05-23
+
+**Theme:** Event Graph Fabric — multi-agent shared memory, agent provenance graph, `fabric_seed` cold-start mode. Covers E-46.
+
+### Added
+
+**Event Graph Fabric (E-46):**
+- `S-141` `event` Entity type and four new edge relationships (`AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM`) added to the knowledge graph vocabulary; `StreamBackend` Protocol + `RedisStreamBackend` (Redis Streams XADD/XREAD); `EventStore` class with `publish()`, `get_recent_events()`, `subscribe_stream()`, graceful Redis degradation (best-effort stream, graph write always succeeds)
+- `S-142` REST endpoints: `POST /v1/events/publish`, `GET /v1/events/stream` (SSE), `GET /v1/events/seed`; `DEPTHFUSION_API_TAILSCALE=1` bind on Tailscale interface IP (loopback always active; token required for non-loopback per infra-exposure.md); `redis>=5.0` added to new `fabric` optional-dependency extra
+- `S-143` `fabric_seed` mode for `depthfusion_session_seed` MCP tool — cold-start context bundle ranked by `recall_relevance × recency_decay × log(1+observer_count)`; write-path content-hash deduplication (100 concurrent publishes of identical content → 1 MemoryEntity + 100 EventEntities); three new MCP tools: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`
+- `S-144` Provenance query endpoints: `GET /v1/graph/agent/{agent_id}/trail` (all AGENT_PUBLISHED/AGENT_RECEIVED events for an agent, time-filtered), `GET /v1/graph/memory/{entity_id}/observers` (distinct agents with AGENT_RECEIVED edges, with timestamps)
+- `S-145` Performance baselines: publish p99 = 30ms (SLA < 500ms, 16× headroom); `fabric_seed` p99 = 110ms (SLA < 2s, 18× headroom); `/trail` p99 = 50ms (SLA < 500ms, 9× headroom); `/observers` p99 = 8.5ms (SLA < 500ms, 59× headroom); graceful degradation verified; results in `docs/performance/event-graph-baseline-2026-05-23.md`
+- `S-146` Documentation: README "Shared Memory Fabric" section with 5-command curl quickstart; `docs/fabric/tailscale-setup.md`, `docs/fabric/api-reference.md`, `docs/fabric/kafka-flink-migration.md`
+
+### Fixed
+
+- **CI lint/type errors in E-46 code** — two post-release fix commits resolved all ruff and mypy issues introduced by the fabric feature:
+  - `bench_degradation.py`, `bench_fabric_seed.py`, `bench_publish_sse.py`: removed unused imports (F401) and fixed import sort order (I001)
+  - `bench_provenance_queries.py`: E501 line-length violations in comment and print statement fixed
+  - `event_store.py`: F401 (`asynccontextmanager`), I001 import order, E501 on `_event_entity_id` signature; mypy `Cannot infer type of lambda` fixed (closure capture replaces default-arg capture); mypy `Coroutine has no __aiter__` fixed by changing `StreamBackend.subscribe` from `async def` to `def` (async generators return `AsyncIterator` directly — no `await` at the call site)
+  - `mcp/server.py`: E501 on three dict-literal and datetime-chain expressions
+  - `test_event_store.py`, `test_events_api.py`, `test_mcp_server.py`: F401 and I001 fixes; E741 ambiguous variable `l` renamed to `ln`
+  - `pyproject.toml`: added `pytest-asyncio>=0.23` to `[dev]` extras (required for `@pytest.mark.asyncio` tests)
+
+---
+
+## [v1.2.0] — 2026-05-22
+
+**Theme:** HNSW approximate nearest-neighbour embedding index + BM25-HNSW fused recall (ruflo-mod contract), CI matrix hardening, security updates, REST API systemd service, and generated CLI. Covers E-45.
+
+### Added
+
+**HNSW Embedding Index (E-45):**
+- `S-134` `HNSWStore` — `hnswlib`-backed approximate nearest-neighbour index with lazy `LocalEmbeddingBackend` (384-dim `all-MiniLM-L6-v2`), label map (`.labels.json` sidecar), metadata (`.meta.json` sidecar), auto-save every 100 upserts, atomic writes via tmp + `os.replace()`; graceful degradation to no-op when `hnswlib` is absent
+- `S-135` `depthfusion_hnsw_capability` MCP tool — returns `HNSWCapability` shape (`enabled`, `backend`, `model`, `dimension`, `index_path`, `entry_count`) regardless of index state; always-on, no feature flag required; designed for the agent-ops bridge startup probe
+- `S-136` `publish_context` HNSW integration — every publish upserts into the HNSW index when `DEPTHFUSION_HNSW_ENABLED=true`; `indexed_in_hnsw: bool` field added to all `publish_context` responses (additive, back-compat with existing callers)
+- `S-137` BM25+HNSW fused recall — when HNSW is available, `recall_relevant` applies post-hoc cosine fusion: BM25 scores first, HNSW cosine similarity boosts matching items and appends HNSW-only hits; `final_score = 0.6 × bm25_score + 0.4 × hnsw_cosine`; results re-sorted and sliced to `top_k`
+- `S-138` Recall response contract extension — `strategy` field (`"bm25-only"` / `"bm25+hnsw-fused"`) and `hnsw_available: bool` added to ALL `recall_relevant` response paths including empty results, filtered queries, index/timeline modes, and error paths; additive, back-compat
+- `S-139` Graceful SIGTERM/SIGINT shutdown — HNSW store saves to disk on graceful server shutdown; registered via `_register_hnsw_shutdown()` at server start (main-thread guarded)
+- `S-140` New `hnsw` extras group in `pyproject.toml` — `hnswlib>=0.7`; also added to `vps-gpu` and `mac-mlx` extras; `hnswlib` is optional — all code paths degrade gracefully without it
+
+### New env vars (E-45)
+
+| Env Var | Controls | Default |
+|---|---|---|
+| `DEPTHFUSION_HNSW_ENABLED` | Enable HNSW index + fused BM25+vector recall | `false` |
+| `DEPTHFUSION_HNSW_INDEX_PATH` | Directory for HNSW index files + sidecars | `~/.depthfusion/hnsw/` |
+| `DEPTHFUSION_EMBEDDING_MODEL` | sentence-transformers model for HNSW embeddings | `all-MiniLM-L6-v2` |
+
+### Test totals (v1.2.0)
+- **2000 passed · 9 skipped · 0 failed** (up from 1986 in v1.1.0)
+- 9 skipped: hnswlib-gated tests — skip gracefully when `hnswlib` is not installed in the dev venv
+- MCP tool count: **29** (28 in v1.1.0 + `depthfusion_hnsw_capability`)
+
+**REST API systemd service:**
+- `infra/systemd/depthfusion-rest.service` — user-level systemd unit for the FastAPI REST API
+  (`127.0.0.1:7300`); reads `~/.claude/depthfusion.env` via `EnvironmentFile`; `Restart=on-failure`
+- `infra/systemd/README.md` — install instructions: `cp`, `daemon-reload`, `enable --now`
+
+**HNSW activated on VPS (operator change — 2026-05-22):**
+- `DEPTHFUSION_HNSW_ENABLED=true` and `DEPTHFUSION_VECTOR_SEARCH_ENABLED=true` added to
+  `~/.claude/depthfusion.env` on the `vps-gpu` host; both services restarted; recall now
+  uses `strategy: "bm25+hnsw-fused"` with real `vector_score` values (e.g. 0.4242)
+- `docs/install/vps-gpu-quickstart.md` — §7 (HNSW enablement), §8 (REST API systemd service),
+  §9 (generated CLI install) added; "Done" checklist updated
+
+**Generated CLI (`depthfusion-pp-cli` / `depthfusion-pp-mcp`):**
+- 30-command Go CLI generated from `infra/depthfusion/openapi-spec.yaml` via cli-printing-press v4.11.0
+  (29 generated + 3 compound); Scorecard: A (83%); binaries at
+  `~/printing-press/library/depthfusion/build/stage/bin/`
+- Compound commands: `discovery-audit` (discovery age/conflict audit),
+  `graph-inspect` (BM25 recall → graph traversal), `batch-recall` (concurrent multi-query dedup)
+- `depthfusion-pp-mcp` — stdio MCP server mirroring all 30 commands as agent tools;
+  registered as `depthfusion-cli` in Claude Code (`claude mcp add --scope user`)
+- `docs/cli.md` — full CLI reference (install, auth, common workflows, compound commands, MCP server)
+- `infra/depthfusion/openapi-spec.yaml` — 29-endpoint OpenAPI 3.0 spec reverse-engineered from
+  MCP tool signatures; source of truth for CLI generation
+- `infra/depthfusion/catalog.yaml` — local cli-printing-press catalog entry
+
+### CI
+
+- **Windows CI matrix** — all 9/9 jobs green (ubuntu/macos/windows × Python 3.10/3.11/3.12); Windows
+  switched to subprocess-free test allowlist (`test_core`, `test_session`, `test_hooks`, `test_storage`,
+  `test_cognitive`, `test_regression`) — 292 tests in ~2 min vs prior 40–60 min timeout; Ubuntu runs
+  the full suite as authoritative reference
+- **Node.js 24 opt-in** — `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` in both workflows ahead of
+  GitHub's 2026-06-02 forced migration
+
+### Fixed
+
+- `core/file_locking.py` — `# type: ignore[attr-defined]` on `fcntl.flock`/`LOCK_EX`/`LOCK_SH`/
+  `LOCK_UN` calls; mypy false-positive on Windows (runtime-guarded behind `try/except ImportError`)
+- `api/rest.py` — `body: SetMemoryScoreBody = ...` Ellipsis default annotated with
+  `# type: ignore[assignment]`; FastAPI idiom not understood by mypy
+
+### Security
+
+- **34 → 0 Dependabot alerts**: urllib3 `2.7.0`, cryptography `46.0.7`, setuptools `78.1.1`,
+  requests `2.33.0`, jinja2 `3.1.6`, certifi `2024.7.4`, idna `3.15`, configobj `5.0.9`,
+  pyasn1 `0.6.3`, wheel `0.46.2`, pytest `9.0.3`
+- **chromadb `>=0.4` → `>=1.0`** in all chromadb extras — eliminates 0.x dep paths that brought in
+  vulnerable Mako, PyJWT, and Markdown versions
+- **Explicit lower bounds** in all chromadb extras: `Mako>=1.3.12`, `PyJWT>=2.12.0`,
+  `Pygments>=2.20.0`, `Markdown>=3.8.1`
+
+### Housekeeping
+
+- `.gitignore` extended: `.claude/`, `.pm/`, `.rollback/`, `.codex`, `text.txt`, `.remember/`
+
 ---
 
 ## [v1.1.0] — 2026-05-20

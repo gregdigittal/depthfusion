@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Design Handoff · 2026-06-15</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  /* ── Color Tokens ─── */
+  --c-bg:        #030712;   /* gray-950 */
+  --c-surface:   #111827;   /* gray-900 */
+  --c-surface-2: #1a2332;   /* between gray-900 & gray-800 (card hover) */
+  --c-border:    #1f2937;   /* gray-800 */
+  --c-border-2:  #374151;   /* gray-700 (input focus) */
+  --c-text:      #f3f4f6;   /* gray-100 */
+  --c-text-2:    #d1d5db;   /* gray-300 */
+  --c-muted:     #9ca3af;   /* gray-400 */
+  --c-faint:     #6b7280;   /* gray-500 */
+  --c-faintest:  #4b5563;   /* gray-600 */
+  --c-indigo:    #4f46e5;   /* indigo-600 */
+  --c-indigo-h:  #6366f1;   /* indigo-500 (hover) */
+  --c-indigo-lt: #818cf8;   /* indigo-400 */
+  --c-indigo-xl: #a5b4fc;   /* indigo-300 (selected edge) */
+  --c-green:     #4ade80;   /* green-400 */
+  --c-emerald:   #10b981;   /* emerald-500 (concept node) */
+  --c-amber:     #f59e0b;   /* amber-500 (decision node) */
+  --c-red:       #dc2626;   /* red-600 */
+  --c-red-lt:    #f87171;   /* red-400 */
+  /* ── Typography ─── */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  /* ── Spacing (4px grid) ─── */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  /* ── Radius ─── */
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px;
+  /* ── Shadows ─── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.6);
+  --shadow-xl: 0 20px 40px rgba(0,0,0,.7);
+}
+html { font-family: var(--font); background: #0f1117; color: #c8ccd4; font-size: 15px; line-height: 1.6; }
+a { color: var(--c-indigo-lt); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--font-mono); font-size: 0.82em; background: rgba(255,255,255,.07); padding: 1px 5px; border-radius: 4px; color: var(--c-indigo-xl); }
+
+/* ── Layout ──────────────────────────────────────────── */
+.doc { max-width: 1080px; margin: 0 auto; padding: 48px 32px 96px; }
+.toc { position: sticky; top: 0; z-index: 100; background: rgba(15,17,23,.95); backdrop-filter: blur(8px); border-bottom: 1px solid #1f2937; padding: 10px 32px; display: flex; gap: 20px; font-size: 12px; overflow-x: auto; white-space: nowrap; }
+.toc a { color: var(--c-muted); }
+.toc a:hover { color: var(--c-text); }
+section { margin-top: 64px; }
+h1 { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--c-border); }
+h3 { font-size: 14px; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+p { color: var(--c-muted); line-height: 1.7; margin-bottom: 12px; }
+
+/* ── Header band ─────────────────────────────────────── */
+.doc-header { padding-bottom: 32px; border-bottom: 1px solid var(--c-border); }
+.doc-header h1 { margin-bottom: 8px; }
+.doc-header .meta { display: flex; gap: 16px; font-size: 12px; color: var(--c-faint); flex-wrap: wrap; }
+.badge-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 20px; border: 1px solid; }
+.badge-version { background: rgba(79,70,229,.15); color: var(--c-indigo-lt); border-color: rgba(79,70,229,.3); }
+.badge-status  { background: rgba(74,222,128,.12); color: #86efac; border-color: rgba(74,222,128,.25); }
+
+/* ── Token table ─────────────────────────────────────── */
+.token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.token-cell { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-md); }
+.token-swatch { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; border: 1px solid rgba(255,255,255,.08); }
+.token-info { font-size: 11px; }
+.token-name { color: var(--c-text); font-weight: 500; }
+.token-hex  { color: var(--c-faint); font-family: var(--font-mono); }
+
+/* ── Type scale ──────────────────────────────────────── */
+.type-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.type-table th { text-align: left; padding: 8px 12px; background: var(--c-border); color: var(--c-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.type-table td { padding: 10px 12px; border-bottom: 1px solid var(--c-border); vertical-align: middle; }
+.type-table tr:last-child td { border-bottom: none; }
+.type-preview { color: var(--c-text); }
+
+/* ── Mockup stage ────────────────────────────────────── */
+.stage { background: #1a1f2e; border: 1px solid var(--c-border); border-radius: var(--r-xl); padding: 32px; margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: center; min-height: 80px; }
+.stage.dark-bg { background: var(--c-bg); }
+.stage.padded { padding: 48px; }
+.stage-label { font-size: 11px; color: var(--c-faint); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; }
+
+/* ── Component docs ──────────────────────────────────── */
+.comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+@media (max-width: 720px) { .comp-grid { grid-template-columns: 1fr; } }
+.comp-meta table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.comp-meta td { padding: 5px 8px; border-bottom: 1px solid var(--c-border); vertical-align: top; }
+.comp-meta td:first-child { color: var(--c-muted); white-space: nowrap; width: 100px; font-weight: 500; }
+.comp-meta td:last-child { color: var(--c-text-2); }
+.comp-meta tr:last-child td { border-bottom: none; }
+
+/* ── Review callout ──────────────────────────────────── */
+.callout { border-left: 3px solid; padding: 12px 16px; border-radius: 0 var(--r-md) var(--r-md) 0; margin-bottom: 12px; font-size: 13px; }
+.callout-keep    { border-color: var(--c-green);   background: rgba(74,222,128,.06); }
+.callout-revise  { border-color: var(--c-amber);   background: rgba(245,158,11,.06); }
+.callout-issue   { border-color: var(--c-red);     background: rgba(220,38,38,.07);  }
+.callout-note    { border-color: var(--c-indigo-lt); background: rgba(79,70,229,.07); }
+.callout strong  { display: block; margin-bottom: 4px; }
+.callout-keep   strong { color: #86efac; }
+.callout-revise strong { color: #fcd34d; }
+.callout-issue  strong { color: #fca5a5; }
+.callout-note   strong { color: var(--c-indigo-xl); }
+
+/* ── Row layout helper ───────────────────────────────── */
+.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.col { flex: 1; min-width: 200px; }
+.spacer { height: 16px; }
+
+/* ════════════════════════════════════════════════════════
+   ACTUAL APP MOCKUPS — mimic Tailwind v4 dark theme
+   ════════════════════════════════════════════════════════ */
+
+/* LogoMark */
+.logo-mark svg { display: block; }
+
+/* SignIn page */
+.signin-page {
+  background: var(--c-bg); min-height: 340px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px; padding: 40px 24px;
+  border-radius: var(--r-xl); position: relative; color: var(--c-text);
+}
+.signin-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+.signin-desc { color: var(--c-muted); font-size: 13px; text-align: center; max-width: 260px; line-height: 1.6; }
+.signin-version { position: absolute; bottom: 12px; font-size: 11px; color: var(--c-faintest); }
+.signin-error { color: var(--c-red-lt); font-size: 13px; }
+
+/* Button */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: var(--r-md); font-size: 13px; font-weight: 500; border: none; cursor: pointer; transition: background .15s; }
+.btn-primary { background: var(--c-indigo); color: #fff; }
+.btn-primary:hover { background: var(--c-indigo-h); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-danger { background: rgba(220,38,38,.8); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-ghost { background: transparent; color: var(--c-muted); border: 1px solid var(--c-border-2); font-size: 11px; padding: 6px 12px; }
+.btn-ghost:hover { color: var(--c-text); border-color: var(--c-faintest); }
+
+/* App shell */
+.app-shell { background: var(--c-bg); border-radius: var(--r-xl); overflow: hidden; border: 1px solid var(--c-border); }
+.app-header { background: var(--c-bg); border-bottom: 1px solid var(--c-border); padding: 12px 20px;
+  display: flex; align-items: center; gap: 12px; }
+.app-header-brand { display: flex; align-items: center; gap: 8px; }
+.app-header-brand span { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; color: var(--c-text); }
+.nav-tabs { display: flex; gap: 4px; margin-left: 8px; }
+.nav-tab { padding: 6px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .1s; color: var(--c-muted); border: none; background: none; }
+.nav-tab.active { background: var(--c-border); color: #fff; }
+.nav-tab:hover:not(.active) { background: rgba(31,41,55,.5); color: #fff; }
+.app-header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.app-version { font-size: 11px; color: var(--c-faintest); }
+.settings-btn { padding: 6px; border-radius: var(--r-sm); border: none; background: none; color: var(--c-muted); cursor: pointer; font-size: 15px; }
+.settings-btn:hover { background: var(--c-border); color: var(--c-text); }
+.signout-btn { font-size: 11px; color: var(--c-faint); background: none; border: none; padding: 4px 8px; border-radius: var(--r-sm); cursor: pointer; }
+.signout-btn:hover { background: rgba(31,41,55,.5); color: var(--c-text-2); }
+
+/* Page frame */
+.page-body { background: var(--c-bg); padding: 0; min-height: 280px; }
+.page-header { padding: 16px 24px; border-bottom: 1px solid var(--c-border); }
+.page-header h2 { font-size: 15px; font-weight: 600; color: #fff; border: none; padding: 0; margin: 0; }
+
+/* Dashboard tiles */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding: 24px; }
+.tile { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); overflow: hidden; }
+.tile-head { padding: 12px 16px; border-bottom: 1px solid var(--c-border); }
+.tile-head span { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
+.tile-body { padding: 16px; }
+.tile-stat-big { font-size: 26px; font-weight: 700; color: #fff; }
+.tile-stat-lbl { font-size: 11px; color: var(--c-faint); margin-top: 2px; }
+.tile-stat-med { font-size: 18px; font-weight: 600; color: var(--c-indigo-lt); }
+.activity-list { list-style: none; }
+.activity-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(31,41,55,.6); }
+.activity-item:last-child { border-bottom: none; }
+.activity-label { font-size: 12px; color: var(--c-text-2); line-height: 1.4; }
+.activity-time  { font-size: 11px; color: var(--c-faintest); white-space: nowrap; flex-shrink: 0; }
+.progress-bar   { height: 8px; background: var(--c-border); border-radius: 9px; overflow: hidden; margin-top: 10px; }
+.progress-fill  { height: 100%; background: var(--c-indigo); border-radius: 9px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-green); display: inline-block; }
+
+/* Search page */
+.search-bar-wrap { padding: 16px 24px; border-bottom: 1px solid var(--c-border); }
+.search-row { display: flex; gap: 12px; max-width: 520px; }
+.search-input-wrap { flex: 1; position: relative; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--c-faint); }
+.search-input {
+  width: 100%; background: var(--c-surface); border: 1px solid var(--c-border-2); border-radius: var(--r-md);
+  padding: 9px 16px 9px 36px; font-size: 13px; color: var(--c-text); outline: none; font-family: var(--font);
+}
+.search-input:focus { border-color: var(--c-indigo); }
+.search-input::placeholder { color: var(--c-faint); }
+.search-body { display: flex; gap: 16px; padding: 24px; min-height: 220px; }
+
+/* Facet panel */
+.facet-panel { width: 224px; flex-shrink: 0; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); overflow: hidden; height: fit-content; }
+.facet-head { padding: 12px 16px; border-bottom: 1px solid var(--c-border); font-size: 11px; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: .06em; }
+.facet-section { border-bottom: 1px solid var(--c-border); }
+.facet-section-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--c-text-2); }
+.facet-section-head:hover { background: rgba(255,255,255,.03); }
+.facet-toggle { color: var(--c-faint); font-size: 10px; }
+.facet-body { padding: 8px 16px 12px; }
+.facet-opt { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; color: var(--c-text-2); cursor: pointer; }
+.facet-opt input[type=radio], .facet-opt input[type=checkbox] { accent-color: var(--c-indigo-h); }
+
+/* Result card */
+.result-card {
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl);
+  padding: 16px; cursor: pointer; transition: border-color .15s; margin-bottom: 10px;
+}
+.result-card:hover { border-color: var(--c-faintest); }
+.result-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.result-title { font-size: 14px; font-weight: 600; color: var(--c-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.result-badges { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.result-snippet { font-size: 12px; color: var(--c-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; }
+.result-snippet mark { background: rgba(99,102,241,.35); color: #c7d2fe; border-radius: 3px; padding: 0 2px; }
+.result-footer { display: flex; align-items: center; gap: 12px; }
+.score-bar-wrap { display: flex; align-items: center; gap: 6px; }
+.score-bar { width: 80px; height: 6px; background: var(--c-border); border-radius: 9px; overflow: hidden; }
+.score-fill { height: 100%; background: var(--c-indigo); border-radius: 9px; }
+.score-pct { font-size: 11px; color: var(--c-muted); }
+.result-date   { font-size: 11px; color: var(--c-faint); }
+.result-locator{ font-size: 11px; color: var(--c-indigo-lt); font-family: var(--font-mono); }
+
+/* Classification badges */
+.badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; border: 1px solid; text-transform: capitalize; letter-spacing: .02em; }
+.badge-public       { background: rgba(34,197,94,.15); color: #86efac; border-color: rgba(34,197,94,.25); }
+.badge-internal     { background: rgba(59,130,246,.15); color: #93c5fd; border-color: rgba(59,130,246,.25); }
+.badge-confidential { background: rgba(234,179,8,.15);  color: #fde047; border-color: rgba(234,179,8,.25);  }
+.badge-restricted   { background: rgba(239,68,68,.15);  color: #fca5a5; border-color: rgba(239,68,68,.25);  }
+.badge-source       { background: rgba(79,70,229,.15); color: #a5b4fc; border-color: rgba(79,70,229,.25); }
+
+/* Empty states */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--c-faint); }
+.empty-state .emoji { font-size: 36px; margin-bottom: 12px; }
+.empty-state p { font-size: 13px; }
+.empty-state small { font-size: 11px; margin-top: 4px; display: block; color: var(--c-faintest); }
+
+/* Graph page */
+.graph-toolbar { display: flex; align-items: center; gap: 16px; padding: 10px 24px; border-bottom: 1px solid var(--c-border); font-size: 12px; color: var(--c-muted); }
+.graph-stat { display: flex; align-items: center; gap: 4px; }
+.graph-hint { margin-left: auto; font-size: 11px; color: var(--c-faintest); }
+.graph-area { display: flex; gap: 0; overflow: hidden; min-height: 240px; }
+.canvas-area { flex: 1; background: var(--c-bg); position: relative; display: flex; align-items: center; justify-content: center; }
+.canvas-demo { position: relative; width: 100%; height: 240px; }
+/* SVG graph demo */
+.node-inspector { width: 256px; flex-shrink: 0; background: var(--c-surface); border-left: 1px solid var(--c-border); padding: 16px; height: fit-content; }
+.node-inspector h4 { font-size: 12px; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; display: flex; justify-content: space-between; }
+.insp-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; font-size: 12px; }
+.insp-label { color: var(--c-faint); }
+.insp-value { color: var(--c-text-2); text-align: right; font-family: var(--font-mono); }
+.insp-value.normal { font-family: var(--font); }
+.insp-btn { margin-top: 12px; width: 100%; }
+
+/* Settings page */
+.settings-page { max-width: 560px; margin: 0 auto; padding: 24px; }
+.settings-section { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); padding: 20px; margin-bottom: 16px; }
+.settings-section h3 { font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 16px; text-transform: none; letter-spacing: 0; }
+.avatar-ring { width: 48px; height: 48px; border-radius: 50%; background: var(--c-indigo); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.profile-name  { font-size: 15px; font-weight: 600; color: var(--c-text); }
+.profile-email { font-size: 12px; color: var(--c-muted); }
+.profile-role  { display: inline-flex; align-items: center; margin-top: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: rgba(79,70,229,.2); color: var(--c-indigo-xl); }
+.settings-label { font-size: 12px; font-weight: 500; color: var(--c-muted); margin-bottom: 6px; display: block; }
+.settings-input { width: 100%; background: var(--c-bg); border: 1px solid var(--c-border-2); border-radius: var(--r-md); padding: 8px 12px; font-size: 13px; color: var(--c-text); font-family: var(--font); outline: none; }
+.settings-input:focus { border-color: var(--c-indigo); }
+.settings-row { display: flex; gap: 8px; }
+
+/* Watermark overlay */
+.watermark-demo { position: relative; background: var(--c-surface); border-radius: var(--r-lg); padding: 24px; min-height: 120px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.watermark-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; user-select: none; }
+
+/* Node type chips */
+.node-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: var(--r-md); border: 1px solid; font-size: 12px; font-weight: 500; }
+.node-doc  { background: rgba(99,102,241,.15); color: #a5b4fc; border-color: rgba(99,102,241,.3); }
+.node-con  { background: rgba(16,185,129,.12); color: #6ee7b7; border-color: rgba(16,185,129,.25); }
+.node-dec  { background: rgba(245,158,11,.12); color: #fcd34d; border-color: rgba(245,158,11,.25); }
+
+/* Separator */
+hr { border: none; border-top: 1px solid var(--c-border); margin: 40px 0; }
+
+/* Interaction state table */
+.state-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+.state-table th { text-align: left; padding: 6px 10px; background: var(--c-border); color: var(--c-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.state-table td { padding: 8px 10px; border-bottom: 1px solid var(--c-border); color: var(--c-text-2); vertical-align: top; }
+.state-table tr:last-child td { border-bottom: none; }
+.state-key { font-family: var(--font-mono); font-size: 11px; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px; color: var(--c-indigo-xl); }
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <strong style="color:#fff;margin-right:8px">DepthFusion Design Handoff</strong>
+  <a href="#tokens">Tokens</a>
+  <a href="#typography">Typography</a>
+  <a href="#logo">LogoMark</a>
+  <a href="#auth">Auth Shell</a>
+  <a href="#app-shell">App Shell</a>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#search">Search</a>
+  <a href="#graph">Graph</a>
+  <a href="#settings">Settings</a>
+  <a href="#components">Components</a>
+  <a href="#watermark">Watermark</a>
+  <a href="#review">Design Review</a>
+</nav>
+
+<div class="doc">
+
+<!-- ── Header ────────────────────────────────────────── -->
+<div class="doc-header">
+  <h1>DepthFusion — Design Handoff</h1>
+  <div class="meta">
+    <span>Generated: 2026-06-15</span>
+    <span class="badge-pill badge-version">Tauri v2 · React 18 · Tailwind v4</span>
+    <span class="badge-pill badge-status">Pre-review draft</span>
+  </div>
+  <div style="margin-top:16px;">
+    <p><strong style="color:#fff">Scope:</strong> Covers all 14 UI components and 5 page layouts currently shipped on the <code>main</code> branch. This document is intended for Claude Design review before the production readiness sprint. All mockups are live HTML/CSS reproductions — no screenshots, no external assets.</p>
+    <p><strong style="color:#fff">Auth constraint:</strong> Auth logic lives exclusively in <code>app/src/lib/auth.ts</code>. UI page components may be refactored freely; the underlying auth state machine (<code>idle | pending | authenticated | error</code>) must not change.</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §1 DESIGN TOKENS
+     ══════════════════════════════════════════════════════ -->
+<section id="tokens">
+<h2>§1 — Design Tokens</h2>
+
+<h3>Color System</h3>
+<p>Tailwind v4 CSS-first configuration. Colors are applied via utility classes; the tokens below are the Tailwind defaults translated to hex.</p>
+
+<h3 style="margin-top:20px">Background & Surface</h3>
+<div class="token-grid" style="margin-bottom:20px">
+  <div class="token-cell"><div class="token-swatch" style="background:#030712"></div><div class="token-info"><div class="token-name">gray-950 · App BG</div><div class="token-hex">#030712</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#111827"></div><div class="token-info"><div class="token-name">gray-900 · Card/Surface</div><div class="token-hex">#111827</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#1f2937"></div><div class="token-info"><div class="token-name">gray-800 · Border</div><div class="token-hex">#1f2937</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#374151"></div><div class="token-info"><div class="token-name">gray-700 · Input border</div><div class="token-hex">#374151</div></div></div>
+</div>
+
+<h3>Text</h3>
+<div class="token-grid" style="margin-bottom:20px">
+  <div class="token-cell"><div class="token-swatch" style="background:#ffffff"></div><div class="token-info"><div class="token-name">white · Headings, active</div><div class="token-hex">#ffffff</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#f3f4f6"></div><div class="token-info"><div class="token-name">gray-100 · Body text</div><div class="token-hex">#f3f4f6</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#d1d5db"></div><div class="token-info"><div class="token-name">gray-300 · Secondary</div><div class="token-hex">#d1d5db</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#9ca3af"></div><div class="token-info"><div class="token-name">gray-400 · Muted</div><div class="token-hex">#9ca3af</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#6b7280"></div><div class="token-info"><div class="token-name">gray-500 · Faint/placeholder</div><div class="token-hex">#6b7280</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#4b5563"></div><div class="token-info"><div class="token-name">gray-600 · Very faint</div><div class="token-hex">#4b5563</div></div></div>
+</div>
+
+<h3>Accent & Status</h3>
+<div class="token-grid" style="margin-bottom:20px">
+  <div class="token-cell"><div class="token-swatch" style="background:#4f46e5"></div><div class="token-info"><div class="token-name">indigo-600 · CTA default</div><div class="token-hex">#4f46e5</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#6366f1"></div><div class="token-info"><div class="token-name">indigo-500 · CTA hover</div><div class="token-hex">#6366f1</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#818cf8"></div><div class="token-info"><div class="token-name">indigo-400 · Latency stat</div><div class="token-hex">#818cf8</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#a5b4fc"></div><div class="token-info"><div class="token-name">indigo-300 · Selected edge</div><div class="token-hex">#a5b4fc</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#4ade80"></div><div class="token-info"><div class="token-name">green-400 · Sync indicator</div><div class="token-hex">#4ade80</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#dc2626"></div><div class="token-info"><div class="token-name">red-600 · Sign out / error</div><div class="token-hex">#dc2626</div></div></div>
+</div>
+
+<h3>Graph Node Colors</h3>
+<div class="token-grid" style="margin-bottom:20px">
+  <div class="token-cell"><div class="token-swatch" style="background:#6366f1"></div><div class="token-info"><div class="token-name">indigo-500 · Document</div><div class="token-hex">#6366f1</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#10b981"></div><div class="token-info"><div class="token-name">emerald-500 · Concept</div><div class="token-hex">#10b981</div></div></div>
+  <div class="token-cell"><div class="token-swatch" style="background:#f59e0b"></div><div class="token-info"><div class="token-name">amber-500 · Decision</div><div class="token-hex">#f59e0b</div></div></div>
+</div>
+
+<h3>Spacing Scale (4px grid)</h3>
+<div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:4px">
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:4px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-1 · 4px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:8px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-2 · 8px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:12px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-3 · 12px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:16px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-4 · 16px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:20px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-5 · 20px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:24px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-6 · 24px
+  </div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)">
+    <div style="width:32px;height:24px;background:var(--c-indigo);border-radius:2px;margin:0 auto 4px"></div>sp-8 · 32px
+  </div>
+</div>
+
+<h3 style="margin-top:20px">Border Radius</h3>
+<div class="row" style="gap:12px; flex-wrap:wrap">
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)"><div style="width:40px;height:40px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:6px;margin:0 auto 4px"></div>r-sm 6px<br><span style="color:var(--c-faintest)">buttons, tabs</span></div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)"><div style="width:40px;height:40px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;margin:0 auto 4px"></div>r-md 8px<br><span style="color:var(--c-faintest)">inputs, badges</span></div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)"><div style="width:40px;height:40px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;margin:0 auto 4px"></div>r-lg 12px<br><span style="color:var(--c-faintest)">cards, panels</span></div>
+  <div style="text-align:center; font-size:11px; color:var(--c-muted)"><div style="width:40px;height:40px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:16px;margin:0 auto 4px"></div>r-xl 16px<br><span style="color:var(--c-faintest)">modals, sheets</span></div>
+</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §2 TYPOGRAPHY
+     ══════════════════════════════════════════════════════ -->
+<section id="typography">
+<h2>§2 — Typography</h2>
+<p>Font stack uses system-ui (Inter where available). No web font loaded — avoids latency in the desktop app. <code>font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif</code></p>
+<table class="type-table">
+<thead><tr><th>Role</th><th>Size</th><th>Weight</th><th>Color</th><th>Preview</th></tr></thead>
+<tbody>
+  <tr><td>Page title (sign-in)</td><td>30px / 1.875rem</td><td>700</td><td>white</td><td class="type-preview" style="font-size:22px;font-weight:700">DepthFusion</td></tr>
+  <tr><td>Section heading (h2)</td><td>20px</td><td>600</td><td>white</td><td class="type-preview" style="font-size:18px;font-weight:600">Dashboard</td></tr>
+  <tr><td>App brand name</td><td>15px</td><td>600</td><td>gray-100</td><td class="type-preview" style="font-size:15px;font-weight:600">DepthFusion</td></tr>
+  <tr><td>Nav tab</td><td>13px</td><td>500</td><td>gray-400 / white active</td><td class="type-preview" style="font-size:13px;font-weight:500;color:#9ca3af">Search</td></tr>
+  <tr><td>Body / result title</td><td>14px</td><td>600</td><td>gray-100</td><td class="type-preview" style="font-size:14px;font-weight:600">Architecture ADR-003</td></tr>
+  <tr><td>Snippet / body copy</td><td>12–13px</td><td>400</td><td>gray-400</td><td class="type-preview" style="font-size:12px;color:#9ca3af">The microservices pattern describes…</td></tr>
+  <tr><td>Label / meta</td><td>11–12px</td><td>400–500</td><td>gray-500–600</td><td class="type-preview" style="font-size:11px;color:#6b7280">3 min ago · docs/adr</td></tr>
+  <tr><td>Section label (caps)</td><td>11px</td><td>600</td><td>gray-400</td><td class="type-preview" style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af">Filters</td></tr>
+  <tr><td>Stat (large)</td><td>24–26px</td><td>700</td><td>white</td><td class="type-preview" style="font-size:24px;font-weight:700">247</td></tr>
+  <tr><td>Mono / locator</td><td>11–12px</td><td>400</td><td>indigo-400</td><td class="type-preview" style="font-size:11px;font-family:monospace;color:#818cf8">docs/adr/ADR-003</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §3 LOGOMARK
+     ══════════════════════════════════════════════════════ -->
+<section id="logo">
+<h2>§3 — LogoMark Component</h2>
+<div class="comp-grid">
+<div>
+  <h3>Props &amp; Spec</h3>
+  <div class="comp-meta"><table>
+    <tr><td>File</td><td><code>app/src/components/LogoMark.tsx</code></td></tr>
+    <tr><td>Props</td><td><code>size?: number</code> (default 32)</td></tr>
+    <tr><td>Sizes used</td><td>64px sign-in · 24px header · 32px settings</td></tr>
+    <tr><td>viewBox</td><td>0 0 64 64</td></tr>
+    <tr><td>Primary color</td><td><code>#4f46e5</code> (indigo-600)</td></tr>
+    <tr><td>Background rect</td><td>rx=14, full fill indigo</td></tr>
+    <tr><td>Outer nodes</td><td>3 circles r=5 at corners, stroke indigo</td></tr>
+    <tr><td>Center hub</td><td>r=7 fill indigo</td></tr>
+    <tr><td>Spokes</td><td>60% opacity lines hub→outer</td></tr>
+    <tr><td>Triangle</td><td>30% opacity perimeter outline</td></tr>
+  </table></div>
+</div>
+<div>
+  <h3>Sizes</h3>
+  <div class="stage" style="gap:32px;align-items:center">
+    <!-- 64px -->
+    <div style="text-align:center">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" rx="14" fill="#4f46e5"/>
+        <line x1="32" y1="32" x2="32" y2="10" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="14" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="50" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <polygon points="32,10 14,50 50,50" fill="none" stroke="white" stroke-opacity=".3" stroke-width="1"/>
+        <circle cx="32" cy="10" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="14" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="50" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="32" cy="32" r="7" fill="white"/>
+      </svg>
+      <div style="font-size:11px;color:var(--c-faint);margin-top:8px">64px · sign-in</div>
+    </div>
+    <!-- 32px -->
+    <div style="text-align:center">
+      <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" rx="14" fill="#4f46e5"/>
+        <line x1="32" y1="32" x2="32" y2="10" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="14" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="50" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <polygon points="32,10 14,50 50,50" fill="none" stroke="white" stroke-opacity=".3" stroke-width="1"/>
+        <circle cx="32" cy="10" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="14" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="50" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="32" cy="32" r="7" fill="white"/>
+      </svg>
+      <div style="font-size:11px;color:var(--c-faint);margin-top:8px">32px · settings</div>
+    </div>
+    <!-- 24px -->
+    <div style="text-align:center">
+      <svg width="24" height="24" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" rx="14" fill="#4f46e5"/>
+        <line x1="32" y1="32" x2="32" y2="10" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="14" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <line x1="32" y1="32" x2="50" y2="50" stroke="#4f46e5" stroke-opacity=".6" stroke-width="1.5"/>
+        <polygon points="32,10 14,50 50,50" fill="none" stroke="white" stroke-opacity=".3" stroke-width="1"/>
+        <circle cx="32" cy="10" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="14" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="50" cy="50" r="5" fill="white" fill-opacity=".85" stroke="#4f46e5" stroke-width="1"/>
+        <circle cx="32" cy="32" r="7" fill="white"/>
+      </svg>
+      <div style="font-size:11px;color:var(--c-faint);margin-top:8px">24px · header</div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="callout callout-revise"><strong>Design Note</strong> The outer nodes disappear at 16px and below due to stroke/fill density. If the app ever needs a 16px favicon or tray icon, a simplified version (just the hub + background rect) should be prepared as a separate SVG variant.</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §4 AUTH SHELL
+     ══════════════════════════════════════════════════════ -->
+<section id="auth">
+<h2>§4 — Auth Shell (Unauthenticated State)</h2>
+<div class="stage-label">Idle state (default)</div>
+<div class="signin-page" style="border:1px solid var(--c-border)">
+  <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#4f46e5"/><line x1="32" y1="32" x2="32" y2="10" stroke="white" stroke-opacity=".6" stroke-width="1.5"/><line x1="32" y1="32" x2="14" y2="50" stroke="white" stroke-opacity=".6" stroke-width="1.5"/><line x1="32" y1="32" x2="50" y2="50" stroke="white" stroke-opacity=".6" stroke-width="1.5"/><polygon points="32,10 14,50 50,50" fill="none" stroke="white" stroke-opacity=".3" stroke-width="1"/><circle cx="32" cy="10" r="5" fill="white"/><circle cx="14" cy="50" r="5" fill="white"/><circle cx="50" cy="50" r="5" fill="white"/><circle cx="32" cy="32" r="7" fill="white"/></svg>
+  <div class="signin-title">DepthFusion</div>
+  <p class="signin-desc">AI-powered context retrieval and knowledge management. Sign in with your identity provider to continue.</p>
+  <button class="btn btn-primary">Sign in</button>
+  <span class="signin-version">v0.4.2</span>
+</div>
+<div class="spacer"></div>
+<div class="stage-label">Pending state (browser opening)</div>
+<div class="signin-page" style="border:1px solid var(--c-border)">
+  <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#4f46e5"/><circle cx="32" cy="10" r="5" fill="white"/><circle cx="14" cy="50" r="5" fill="white"/><circle cx="50" cy="50" r="5" fill="white"/><circle cx="32" cy="32" r="7" fill="white"/></svg>
+  <div class="signin-title">DepthFusion</div>
+  <p class="signin-desc">AI-powered context retrieval and knowledge management. Sign in with your identity provider to continue.</p>
+  <button class="btn btn-primary" disabled>Opening browser…</button>
+  <span class="signin-version">v0.4.2</span>
+</div>
+<div class="spacer"></div>
+<div class="stage-label">Error state</div>
+<div class="signin-page" style="border:1px solid var(--c-border)">
+  <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#4f46e5"/><circle cx="32" cy="10" r="5" fill="white"/><circle cx="14" cy="50" r="5" fill="white"/><circle cx="50" cy="50" r="5" fill="white"/><circle cx="32" cy="32" r="7" fill="white"/></svg>
+  <div class="signin-title">DepthFusion</div>
+  <p class="signin-desc">AI-powered context retrieval and knowledge management. Sign in with your identity provider to continue.</p>
+  <p class="signin-error" role="alert">Authentication failed. Please try again.</p>
+  <button class="btn btn-primary">Sign in</button>
+  <span class="signin-version">v0.4.2</span>
+</div>
+
+<div class="spacer"></div>
+<table class="state-table">
+<thead><tr><th>AuthState.status</th><th>Button text</th><th>Button state</th><th>Error shown</th></tr></thead>
+<tbody>
+  <tr><td><code>idle</code></td><td>Sign in</td><td>Enabled</td><td>—</td></tr>
+  <tr><td><code>pending</code></td><td>Opening browser…</td><td>Disabled (opacity .5)</td><td>—</td></tr>
+  <tr><td><code>error</code></td><td>Sign in</td><td>Enabled</td><td>Error message in red-400</td></tr>
+  <tr><td><code>authenticated</code></td><td colspan="3">Not rendered — app shell shown instead</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §5 APP SHELL
+     ══════════════════════════════════════════════════════ -->
+<section id="app-shell">
+<h2>§5 — App Shell (Authenticated)</h2>
+<div class="stage-label">Header — Dashboard active</div>
+<div class="app-shell">
+  <div class="app-header">
+    <div class="app-header-brand">
+      <svg width="24" height="24" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#4f46e5"/><circle cx="32" cy="10" r="5" fill="white"/><circle cx="14" cy="50" r="5" fill="white"/><circle cx="50" cy="50" r="5" fill="white"/><circle cx="32" cy="32" r="7" fill="white"/></svg>
+      <span>DepthFusion</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active">Dashboard</button>
+      <button class="nav-tab">Search</button>
+      <button class="nav-tab">Graph</button>
+    </div>
+    <div class="app-header-right">
+      <span class="app-version">v0.4.2</span>
+      <button class="settings-btn">⚙</button>
+      <button class="signout-btn">Sign out</button>
+    </div>
+  </div>
+  <div class="page-body" style="padding:16px 24px; color:var(--c-muted); font-size:13px">← Page content area fills here</div>
+</div>
+
+<div class="spacer"></div>
+<table class="state-table">
+<thead><tr><th>Element</th><th>Size / Padding</th><th>Behaviour</th></tr></thead>
+<tbody>
+  <tr><td>Header</td><td>px-5 py-3 · 48px total height</td><td>Fixed at top, flex row, shrink-0</td></tr>
+  <tr><td>Brand name</td><td>15px 600</td><td>Non-interactive — logo + text pair</td></tr>
+  <tr><td>Nav tab active</td><td>px-3 py-1.5 · bg-gray-800 text-white</td><td>Route indicator</td></tr>
+  <tr><td>Nav tab idle</td><td>text-gray-400 · hover bg-gray-800/50</td><td>Route switch on click</td></tr>
+  <tr><td>Settings ⚙</td><td>p-1.5 rounded-md</td><td>Active = bg-gray-800 text-white</td></tr>
+  <tr><td>Sign out</td><td>text-xs text-gray-500</td><td>Calls logout() → resets route to dashboard</td></tr>
+  <tr><td>DocumentViewer</td><td>w-[640px] shrink-0</td><td>Slides in from right within flex row</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §6 DASHBOARD PAGE
+     ══════════════════════════════════════════════════════ -->
+<section id="dashboard">
+<h2>§6 — Dashboard Page</h2>
+<div class="callout callout-issue"><strong>Data Status: All Hardcoded</strong> All 4 tile values are mock data — RecentActivity (4 fixed entries), SearchStats (247 queries, 142ms), StorageUsage (4.2/20GB), SyncStatus (green, "3 min ago", "1,204 docs"). No API wiring exists yet. This is a known gap for the production readiness sprint.</div>
+
+<div class="stage dark-bg" style="padding:0; overflow:hidden; border-radius:var(--r-xl);">
+<div style="width:100%">
+  <div class="page-header"><h2 class="page-header-inner" style="font-size:15px;font-weight:600;color:#fff;margin:0;border:none;padding:0">Dashboard</h2></div>
+  <div class="tile-grid">
+    <!-- Recent Activity -->
+    <div class="tile" style="grid-column:span 2">
+      <div class="tile-head"><span>Recent Activity</span></div>
+      <div class="tile-body">
+        <ul class="activity-list">
+          <li class="activity-item"><span class="activity-label">Searched "microservices patterns"</span><span class="activity-time">2 min ago</span></li>
+          <li class="activity-item"><span class="activity-label">Opened "Architecture ADR-003"</span><span class="activity-time">14 min ago</span></li>
+          <li class="activity-item"><span class="activity-label">Viewed graph: auth concepts</span><span class="activity-time">1 hr ago</span></li>
+          <li class="activity-item"><span class="activity-label">Downloaded "Q1 Report.pdf"</span><span class="activity-time">3 hr ago</span></li>
+        </ul>
+      </div>
+    </div>
+    <!-- Search Stats -->
+    <div class="tile">
+      <div class="tile-head"><span>Search Stats</span></div>
+      <div class="tile-body">
+        <div class="tile-stat-big">247</div>
+        <div class="tile-stat-lbl">Queries this week</div>
+        <div class="spacer"></div>
+        <div class="tile-stat-med">142ms</div>
+        <div class="tile-stat-lbl">Avg. latency</div>
+      </div>
+    </div>
+    <!-- Storage -->
+    <div class="tile">
+      <div class="tile-head"><span>Storage Usage</span></div>
+      <div class="tile-body">
+        <div class="tile-stat-big">4.2 GB</div>
+        <div class="tile-stat-lbl">of 20 GB used</div>
+        <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" style="width:21%"></div></div>
+        <div style="font-size:11px;color:var(--c-faintest);margin-top:4px">21% used</div>
+      </div>
+    </div>
+    <!-- Sync -->
+    <div class="tile">
+      <div class="tile-head"><span>Sync Status</span></div>
+      <div class="tile-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="sync-dot"></span><span style="font-size:13px;color:var(--c-text-2)">Synced</span></div>
+        <div style="font-size:12px;color:var(--c-faint)">Last sync: 3 min ago</div>
+        <div style="font-size:12px;color:var(--c-faintest);margin-top:4px">1,204 documents indexed</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="spacer"></div>
+<h3>TileGrid Layout Spec</h3>
+<table class="state-table">
+<thead><tr><th>Property</th><th>Value</th></tr></thead>
+<tbody>
+  <tr><td>Container</td><td><code>gap-4 p-6</code> (24px gap, 24px padding)</td></tr>
+  <tr><td>Grid columns</td><td><code>repeat(auto-fill, minmax(280px, 1fr))</code></td></tr>
+  <tr><td>Multi-col tile</td><td><code>gridColumn: span N</code> from <code>tile.width</code></td></tr>
+  <tr><td>Multi-row tile</td><td><code>gridRow: span N</code> from <code>tile.height</code></td></tr>
+  <tr><td>Tile background</td><td>gray-900, border gray-800, rounded-xl</td></tr>
+  <tr><td>Tile header</td><td>px-4 py-3, border-b gray-800, text-sm font-semibold gray-300</td></tr>
+  <tr><td>Tile body</td><td>p-4</td></tr>
+  <tr><td>Layout config source</td><td><code>useDashboard()</code> hook → <code>tiles</code> array</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §7 SEARCH PAGE
+     ══════════════════════════════════════════════════════ -->
+<section id="search">
+<h2>§7 — Search Page</h2>
+
+<div class="stage dark-bg" style="padding:0;overflow:hidden;border-radius:var(--r-xl)">
+<div style="width:100%">
+  <div class="search-bar-wrap">
+    <div class="search-row">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" placeholder="Search knowledge graph… (⌘K)" value="microservices patterns" readonly>
+      </div>
+      <button class="btn-ghost">Hide filters</button>
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--c-faint)">3 results · 142ms</div>
+  </div>
+  <div class="search-body">
+    <!-- Facet panel -->
+    <div class="facet-panel">
+      <div class="facet-head">Filters</div>
+      <div class="facet-section">
+        <div class="facet-section-head"><span>Date range</span><span class="facet-toggle">▲</span></div>
+        <div class="facet-body">
+          <label class="facet-opt"><input type="radio" name="dr" checked> All time</label>
+          <label class="facet-opt"><input type="radio" name="dr"> Last 7 days</label>
+          <label class="facet-opt"><input type="radio" name="dr"> Last 30 days</label>
+          <label class="facet-opt"><input type="radio" name="dr"> Last 90 days</label>
+        </div>
+      </div>
+      <div class="facet-section">
+        <div class="facet-section-head"><span>Source type</span><span class="facet-toggle">▲</span></div>
+        <div class="facet-body">
+          <label class="facet-opt"><input type="checkbox" checked> Document</label>
+          <label class="facet-opt"><input type="checkbox"> Web</label>
+          <label class="facet-opt"><input type="checkbox"> Email</label>
+          <label class="facet-opt"><input type="checkbox"> Slack</label>
+          <label class="facet-opt"><input type="checkbox"> Code</label>
+          <label class="facet-opt"><input type="checkbox"> Database</label>
+        </div>
+      </div>
+      <div class="facet-section" style="border-bottom:none">
+        <div class="facet-section-head"><span>Classification</span><span class="facet-toggle">▲</span></div>
+        <div class="facet-body">
+          <label class="facet-opt"><input type="checkbox"> Public</label>
+          <label class="facet-opt"><input type="checkbox"> Internal</label>
+          <label class="facet-opt"><input type="checkbox"> Confidential</label>
+          <label class="facet-opt"><input type="checkbox"> Restricted</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div style="flex:1">
+      <!-- Result 1 -->
+      <div class="result-card">
+        <div class="result-card-top">
+          <div class="result-title">Microservices Architecture Patterns — ADR-003</div>
+          <div class="result-badges">
+            <span class="badge badge-internal">internal</span>
+            <span class="badge badge-source">Document</span>
+          </div>
+        </div>
+        <div class="result-snippet">The <mark>microservices</mark> <mark>patterns</mark> documented in this ADR cover service decomposition, inter-service communication, and data ownership boundaries for the platform…</div>
+        <div class="result-footer">
+          <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:92%"></div></div><span class="score-pct">92%</span></div>
+          <span class="result-date">2026-05-14</span>
+          <span class="result-locator">docs/adr/ADR-003.md</span>
+        </div>
+      </div>
+      <!-- Result 2 -->
+      <div class="result-card">
+        <div class="result-card-top">
+          <div class="result-title">Microservices Deployment Runbook</div>
+          <div class="result-badges">
+            <span class="badge badge-confidential">confidential</span>
+            <span class="badge badge-source">Document</span>
+          </div>
+        </div>
+        <div class="result-snippet">Step-by-step runbook for deploying <mark>microservices</mark> to production. Covers blue-green deployments, canary rollouts, and rollback procedures…</div>
+        <div class="result-footer">
+          <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:74%"></div></div><span class="score-pct">74%</span></div>
+          <span class="result-date">2026-03-02</span>
+          <span class="result-locator">ops/runbooks/deploy.md</span>
+        </div>
+      </div>
+      <!-- Empty state -->
+      <div class="empty-state" style="display:none">
+        <div class="emoji">🔍</div>
+        <p>No results for "xyz"</p>
+        <small>Try adjusting your filters</small>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="spacer"></div>
+<h3>Empty States</h3>
+<div class="row">
+  <div class="col stage dark-bg" style="min-height:160px">
+    <div class="empty-state">
+      <div class="emoji">🧠</div>
+      <p>Start typing to search your knowledge graph</p>
+      <small>Use ⌘K to focus the search box</small>
+    </div>
+  </div>
+  <div class="col stage dark-bg" style="min-height:160px">
+    <div class="empty-state">
+      <div class="emoji">🔍</div>
+      <p>No results for "xyz"</p>
+      <small>Try adjusting your filters</small>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §8 GRAPH PAGE
+     ══════════════════════════════════════════════════════ -->
+<section id="graph">
+<h2>§8 — Graph Page</h2>
+<div class="stage dark-bg" style="padding:0;overflow:hidden;border-radius:var(--r-xl)">
+<div style="width:100%">
+  <div class="graph-toolbar">
+    <span class="graph-stat">🔵 12 nodes</span>
+    <span class="graph-stat">→ 18 edges</span>
+    <span class="graph-hint">Scroll to zoom · Drag to pan</span>
+  </div>
+  <div class="graph-area">
+    <div class="canvas-area">
+      <!-- SVG approximation of graph canvas -->
+      <svg width="100%" height="220" viewBox="0 0 500 220" style="display:block">
+        <rect width="500" height="220" fill="#030712"/>
+        <!-- Edges -->
+        <line x1="160" y1="110" x2="250" y2="60" stroke="#4b5563" stroke-width="1.5"/>
+        <line x1="160" y1="110" x2="250" y2="160" stroke="#4b5563" stroke-width="1.5"/>
+        <line x1="250" y1="60" x2="340" y2="80" stroke="#4b5563" stroke-width="1.5"/>
+        <line x1="250" y1="160" x2="340" y2="140" stroke="#4b5563" stroke-width="1.5"/>
+        <line x1="340" y1="80" x2="340" y2="140" stroke="#4b5563" stroke-width="1.5"/>
+        <line x1="160" y1="110" x2="80" y2="80" stroke="#a5b4fc" stroke-width="1.5"/><!-- selected -->
+        <!-- Node glows -->
+        <circle cx="160" cy="110" r="38" fill="#6366f1" fill-opacity=".08"/>
+        <circle cx="250" cy="60" r="32" fill="#10b981" fill-opacity=".08"/>
+        <circle cx="250" cy="160" r="32" fill="#10b981" fill-opacity=".08"/>
+        <circle cx="340" cy="80" r="32" fill="#f59e0b" fill-opacity=".08"/>
+        <circle cx="340" cy="140" r="32" fill="#f59e0b" fill-opacity=".08"/>
+        <circle cx="80" cy="80" r="32" fill="#6366f1" fill-opacity=".08"/>
+        <!-- Nodes -->
+        <circle cx="160" cy="110" r="28" fill="#6366f133" stroke="#6366f1" stroke-width="2"/>
+        <circle cx="250" cy="60" r="28" fill="#10b98133" stroke="#10b981" stroke-width="2"/>
+        <circle cx="250" cy="160" r="28" fill="#10b98133" stroke="#10b981" stroke-width="2"/>
+        <circle cx="340" cy="80" r="28" fill="#f59e0b33" stroke="#f59e0b" stroke-width="2"/>
+        <circle cx="340" cy="140" r="28" fill="#f59e0b33" stroke="#f59e0b" stroke-width="2"/>
+        <circle cx="80" cy="80" r="28" fill="#6366f133" stroke="#a5b4fc" stroke-width="2.5"/>
+        <!-- Labels -->
+        <text x="160" y="113" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">Auth ADR</text>
+        <text x="250" y="63" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">OIDC</text>
+        <text x="250" y="163" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">JWT</text>
+        <text x="340" y="83" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">Migrate?</text>
+        <text x="340" y="143" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">Deploy?</text>
+        <text x="80" y="83" text-anchor="middle" fill="#e5e7eb" font-size="10" font-weight="700" font-family="sans-serif">Auth Doc</text>
+      </svg>
+    </div>
+    <!-- Node inspector -->
+    <div class="node-inspector">
+      <h4>Node Inspector <span style="font-size:11px;color:var(--c-faintest);cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0">✕</span></h4>
+      <div class="insp-row"><span class="insp-label">Type</span><span class="insp-value normal">📄 Document</span></div>
+      <div class="insp-row"><span class="insp-label">Label</span><span class="insp-value normal" style="color:var(--c-text)">Auth Doc</span></div>
+      <div class="insp-row"><span class="insp-label">ID</span><span class="insp-value" style="color:var(--c-indigo-lt)">node-0042</span></div>
+      <div class="insp-row"><span class="insp-label">Position</span><span class="insp-value">x: 80 · y: 80</span></div>
+      <div class="insp-row"><span class="insp-label">Provenance</span><span class="insp-value normal">—</span></div>
+      <button class="btn btn-primary insp-btn" style="font-size:12px;padding:7px 12px">Open Document</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="spacer"></div>
+<h3>Node Type Legend</h3>
+<div class="row" style="gap:8px">
+  <div class="node-chip node-doc">📄 Document · <code style="color:inherit;background:none;font-size:11px">#6366f1</code></div>
+  <div class="node-chip node-con">💡 Concept · <code style="color:inherit;background:none;font-size:11px">#10b981</code></div>
+  <div class="node-chip node-dec">⚖️ Decision · <code style="color:inherit;background:none;font-size:11px">#f59e0b</code></div>
+</div>
+
+<div class="spacer"></div>
+<h3>GraphCanvas Technical Spec</h3>
+<table class="state-table">
+<thead><tr><th>Property</th><th>Value</th></tr></thead>
+<tbody>
+  <tr><td>Renderer</td><td>2D Canvas API (not SVG/WebGL)</td></tr>
+  <tr><td>NODE_RADIUS</td><td>28px</td></tr>
+  <tr><td>Edge color</td><td><code>#4b5563</code> (gray-600) · 1.5/scale width</td></tr>
+  <tr><td>Selected edge</td><td><code>#a5b4fc</code> (indigo-300)</td></tr>
+  <tr><td>Node fill</td><td>color + <code>33</code> alpha (20% opacity circle)</td></tr>
+  <tr><td>Node glow</td><td>shadowColor=color, shadowBlur applied before fill</td></tr>
+  <tr><td>Labels</td><td>11px bold, centered, ellipsis if &gt; node diameter</td></tr>
+  <tr><td>Zoom range</td><td>0.2× – 4× (wheel: ×1.1 up, ×0.9 down)</td></tr>
+  <tr><td>Pan</td><td>mousedown/move/up/leave drag pattern</td></tr>
+  <tr><td>Sizing</td><td>ResizeObserver on wrapper element</td></tr>
+  <tr><td>Culling</td><td>Viewport bounds check before drawing</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §9 SETTINGS PAGE
+     ══════════════════════════════════════════════════════ -->
+<section id="settings">
+<h2>§9 — Settings Page</h2>
+<div class="stage dark-bg" style="padding:24px;border-radius:var(--r-xl)">
+<div class="settings-page" style="width:100%;margin:0;padding:0">
+  <!-- Profile -->
+  <div class="settings-section">
+    <h3>Profile</h3>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="avatar-ring">G</div>
+      <div>
+        <div class="profile-name">Greg Morris</div>
+        <div class="profile-email">morrgreg@gmail.com</div>
+        <div class="profile-role">admin</div>
+      </div>
+    </div>
+  </div>
+  <!-- Server URL -->
+  <div class="settings-section">
+    <h3>Server</h3>
+    <label class="settings-label">Server URL</label>
+    <div class="settings-row">
+      <input class="settings-input" style="flex:1" value="http://127.0.0.1:7474" readonly>
+      <button class="btn btn-primary" style="padding:8px 16px;font-size:13px">Save</button>
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--c-green)">✓ Saved</div>
+  </div>
+  <!-- Account / Sign out -->
+  <div class="settings-section">
+    <h3>Account</h3>
+    <button class="btn btn-danger" style="font-size:13px;padding:8px 20px">Sign out</button>
+  </div>
+</div>
+</div>
+
+<div class="spacer"></div>
+<table class="state-table">
+<thead><tr><th>Element</th><th>Detail</th></tr></thead>
+<tbody>
+  <tr><td>Container</td><td>max-w-2xl mx-auto within overflow-y-auto full height</td></tr>
+  <tr><td>Avatar</td><td>48px circle, indigo-600 bg, first initial of name from JWT claims</td></tr>
+  <tr><td>Profile data</td><td>JWT <code>id_token</code> decoded → name, email, role via <code>extractRole(claims)</code></td></tr>
+  <tr><td>Role badge</td><td>indigo-300 text, rgba indigo bg</td></tr>
+  <tr><td>Server URL input</td><td>Pre-filled from <code>getServerUrl()</code> IPC call</td></tr>
+  <tr><td>Save success</td><td>Green "✓ Saved" text appears below input</td></tr>
+  <tr><td>Sign out</td><td>Calls <code>logout()</code> from auth.ts → resets route to dashboard</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §10 COMPONENTS CATALOG
+     ══════════════════════════════════════════════════════ -->
+<section id="components">
+<h2>§10 — Component Catalog</h2>
+
+<!-- Classification Badges -->
+<h3 style="margin-bottom:12px">Classification Badge System</h3>
+<p>Used in ResultCard and potentially DocumentViewer. Four tiers with consistent alpha pattern: 15% bg opacity, 25% border opacity.</p>
+<div class="row" style="gap:8px;margin-bottom:16px">
+  <span class="badge badge-public">public</span>
+  <span class="badge badge-internal">internal</span>
+  <span class="badge badge-confidential">confidential</span>
+  <span class="badge badge-restricted">restricted</span>
+</div>
+<table class="state-table" style="margin-bottom:32px">
+<thead><tr><th>Level</th><th>BG</th><th>Text</th><th>Border</th><th>Tailwind classes (approx)</th></tr></thead>
+<tbody>
+  <tr><td>public</td><td>green-500/20</td><td>green-300</td><td>green-500/30</td><td><code>bg-green-500/20 text-green-300 border-green-500/30</code></td></tr>
+  <tr><td>internal</td><td>blue-500/15</td><td>blue-300</td><td>blue-500/25</td><td><code>bg-blue-500/15 text-blue-300 border-blue-500/25</code></td></tr>
+  <tr><td>confidential</td><td>yellow-500/15</td><td>yellow-300</td><td>yellow-500/25</td><td><code>bg-yellow-500/15 text-yellow-300 border-yellow-500/25</code></td></tr>
+  <tr><td>restricted</td><td>red-500/15</td><td>red-300</td><td>red-500/25</td><td><code>bg-red-500/15 text-red-300 border-red-500/25</code></td></tr>
+</tbody>
+</table>
+
+<!-- Result Card full detail -->
+<h3 style="margin-bottom:12px">ResultCard — All Classification States</h3>
+<div>
+  <div class="result-card">
+    <div class="result-card-top">
+      <div class="result-title">Public knowledge base article on system design</div>
+      <div class="result-badges"><span class="badge badge-public">public</span><span class="badge badge-source">Web</span></div>
+    </div>
+    <div class="result-snippet">An introduction to <mark>microservices patterns</mark> covering service decomposition and data ownership.</div>
+    <div class="result-footer">
+      <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:65%"></div></div><span class="score-pct">65%</span></div>
+      <span class="result-date">2026-01-12</span>
+      <span class="result-locator">web/article-1234</span>
+    </div>
+  </div>
+  <div class="result-card">
+    <div class="result-card-top">
+      <div class="result-title">Internal Engineering Wiki — Platform Teams</div>
+      <div class="result-badges"><span class="badge badge-internal">internal</span><span class="badge badge-source">Document</span></div>
+    </div>
+    <div class="result-snippet">Internal wiki page describing platform team responsibilities and on-call rotations.</div>
+    <div class="result-footer">
+      <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:48%"></div></div><span class="score-pct">48%</span></div>
+      <span class="result-date">2026-04-03</span>
+      <span class="result-locator">docs/wiki/platform</span>
+    </div>
+  </div>
+  <div class="result-card">
+    <div class="result-card-top">
+      <div class="result-title">CONFIDENTIAL — Acquisition Memo Q2 2026</div>
+      <div class="result-badges"><span class="badge badge-confidential">confidential</span><span class="badge badge-source">Email</span></div>
+    </div>
+    <div class="result-snippet">Confidential acquisition briefing. Do not distribute outside the executive team.</div>
+    <div class="result-footer">
+      <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:81%"></div></div><span class="score-pct">81%</span></div>
+      <span class="result-date">2026-05-28</span>
+      <span class="result-locator">email/inbox/2026-05-28</span>
+    </div>
+  </div>
+  <div class="result-card">
+    <div class="result-card-top">
+      <div class="result-title">RESTRICTED — Signing Keys Infrastructure</div>
+      <div class="result-badges"><span class="badge badge-restricted">restricted</span><span class="badge badge-source">Code</span></div>
+    </div>
+    <div class="result-snippet">RESTRICTED access. Infrastructure credentials and key rotation procedures for production signing.</div>
+    <div class="result-footer">
+      <div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:95%"></div></div><span class="score-pct">95%</span></div>
+      <span class="result-date">2026-06-01</span>
+      <span class="result-locator">infra/secrets/keys</span>
+    </div>
+  </div>
+</div>
+
+<div class="spacer"></div>
+<h3>FacetPanel — Collapsed State</h3>
+<div class="stage dark-bg" style="padding:24px;justify-content:flex-start">
+  <div style="font-size:12px;color:var(--c-muted);display:flex;gap:8px;align-items:center">
+    <span>FacetPanel returns <code>null</code> when <code>collapsed=true</code> — panel disappears entirely, results expand to fill width.</span>
+  </div>
+</div>
+
+<div class="spacer"></div>
+<h3>Buttons</h3>
+<div class="stage" style="gap:12px;flex-wrap:wrap;align-items:center">
+  <button class="btn btn-primary">Sign in</button>
+  <button class="btn btn-primary" disabled>Opening browser…</button>
+  <button class="btn btn-danger">Sign out</button>
+  <button class="btn-ghost">Hide filters</button>
+  <button class="btn-ghost">Show filters</button>
+</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §11 WATERMARK OVERLAY
+     ══════════════════════════════════════════════════════ -->
+<section id="watermark">
+<h2>§11 — WatermarkOverlay Component</h2>
+<div class="comp-grid">
+<div>
+  <div class="comp-meta"><table>
+    <tr><td>File</td><td><code>app/src/components/WatermarkOverlay.tsx</code></td></tr>
+    <tr><td>Props</td><td><code>label?: string</code> (default "RESTRICTED")</td></tr>
+    <tr><td></td><td><code>opacity?: number</code> (default 0.08)</td></tr>
+    <tr><td>Technique</td><td>SVG data URI as CSS <code>background-image</code></td></tr>
+    <tr><td>Repeat</td><td><code>background-repeat: repeat</code></td></tr>
+    <tr><td>Tile size</td><td>220 × 120 px</td></tr>
+    <tr><td>Text</td><td>22px bold white, letter-spacing 4, rotate(-30°)</td></tr>
+    <tr><td>Position</td><td><code>absolute inset-0 z-10 pointer-events-none</code></td></tr>
+    <tr><td>Accessibility</td><td><code>aria-hidden="true"</code></td></tr>
+    <tr><td>Selection</td><td><code>user-select: none</code></td></tr>
+  </table></div>
+</div>
+<div>
+  <div class="watermark-demo">
+    <div class="watermark-layer">
+      <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="position:absolute;inset:0">
+        <defs>
+          <pattern id="wm" x="0" y="0" width="220" height="120" patternUnits="userSpaceOnUse">
+            <text x="110" y="60" text-anchor="middle" dominant-baseline="middle"
+              font-size="22" font-weight="bold" fill="white" opacity="0.08"
+              letter-spacing="4" transform="rotate(-30 110 60)">RESTRICTED</text>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#wm)"/>
+      </svg>
+    </div>
+    <div style="position:relative;z-index:20;font-size:13px;color:var(--c-text-2);text-align:center">
+      <p>Document content renders here.</p>
+      <p style="margin-top:8px;font-size:11px;color:var(--c-faint)">Watermark is above the content layer (z-10) but pointer-events: none so text is selectable.</p>
+    </div>
+  </div>
+</div>
+</div>
+<div class="callout callout-revise"><strong>Design Note — Opacity Calibration</strong> At 8% opacity, the RESTRICTED text is barely visible against gray-900 surfaces. On lighter document content it will be more visible. Consider making <code>opacity</code> context-dependent (e.g., 0.06 over dark surfaces, 0.10 over white/light PDF content).</div>
+<div class="callout callout-revise"><strong>Design Note — Label Customization</strong> The <code>label</code> prop accepts arbitrary strings but the SVG tile width (220px) was sized for "RESTRICTED" (9 chars). Shorter labels look sparse; longer ones clip. A dynamic SVG <code>viewBox</code> or text measurement approach would make the watermark more robust.</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     §12 DESIGN REVIEW ANNOTATIONS
+     ══════════════════════════════════════════════════════ -->
+<section id="review">
+<h2>§12 — Design Review Annotations</h2>
+<p>Items for Claude Design review, organized by severity. Items marked <strong>Keep</strong> should be preserved; <strong>Revise</strong> are improvement opportunities; <strong>Issue</strong> are functional problems.</p>
+
+<h3 style="margin-top:24px">System-level</h3>
+<div class="callout callout-keep"><strong>Keep — Consistent dark base</strong> The gray-950 → gray-900 → gray-800 hierarchy creates a clear depth model. Every surface elevation is legible at a glance. Do not introduce additional gray levels or it will dilute the hierarchy.</div>
+<div class="callout callout-keep"><strong>Keep — Indigo as the sole CTA color</strong> Indigo-600/500 is used consistently for every interactive action (button, input focus, badge, score bar, node color, locator text). Resist adding a second accent for edge cases — coherence is a strength here.</div>
+<div class="callout callout-revise"><strong>Revise — No focus ring on keyboard navigation</strong> None of the mockup elements show a focus ring style beyond the indigo input border. Tauri apps are used with keyboards. Add <code>focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950</code> to all interactive elements (buttons, nav tabs, result cards).</div>
+<div class="callout callout-revise"><strong>Revise — Missing loading skeleton states</strong> Graph data and search results both have async fetch paths. Currently there are no skeleton/shimmer states — only the empty states exist. Consider adding a skeleton for the initial load (before data arrives but not "empty").</div>
+<div class="callout callout-issue"><strong>Issue — No toast/notification system</strong> Server save success shows inline text. Auth errors show inline text. Failed publishes would have no visible feedback path. Before production, a lightweight toast component (bottom-right, auto-dismiss 3s) should be considered for transient state feedback.</div>
+
+<h3 style="margin-top:24px">Auth Shell</h3>
+<div class="callout callout-keep"><strong>Keep — Centered, minimal sign-in</strong> The full-screen centered layout is clean and appropriate for an enterprise desktop app. Don't add decorative elements or illustrations — the LogoMark is sufficient.</div>
+<div class="callout callout-revise"><strong>Revise — Version number positioning</strong> <code>absolute bottom-4</code> means the version overlaps content on small windows. Use a flex column with <code>mt-auto</code> at the bottom of the flex container instead to avoid overlap.</div>
+<div class="callout callout-revise"><strong>Revise — Error state lacks retry guidance</strong> The error message "Authentication failed. Please try again." is generic. Consider surfacing the specific error code from <code>authState.error</code> in a collapsible detail section for enterprise support scenarios.</div>
+
+<h3 style="margin-top:24px">App Shell &amp; Navigation</h3>
+<div class="callout callout-keep"><strong>Keep — Header height and density</strong> 48px header (py-3 + content) is compact and right for a desktop app. Navigation and utility buttons share the row without crowding.</div>
+<div class="callout callout-revise"><strong>Revise — No visual separator between nav area and utility buttons</strong> On wide screens, the space between the last nav tab and the settings button is ambiguous. A thin <code>border-l border-gray-800</code> before the utility group would clarify the structure.</div>
+<div class="callout callout-revise"><strong>Revise — DocumentViewer width is fixed 640px</strong> On 1280px screens this takes 50% of the viewport for the drawer, leaving Search or Graph with only 640px. Consider a resizable panel or relative width (e.g., 40% min 480px max 720px).</div>
+
+<h3 style="margin-top:24px">Dashboard</h3>
+<div class="callout callout-issue"><strong>Issue — All data is hardcoded</strong> The four tiles display mock data. They should either be clearly marked as "Demo mode" or wired to real APIs before the production readiness milestone.</div>
+<div class="callout callout-revise"><strong>Revise — No tile refresh mechanism</strong> SyncStatus shows "3 min ago" but there's no refresh button or auto-update cycle. A visible last-updated timestamp that refreshes periodically would improve trust signals for enterprise users.</div>
+<div class="callout callout-revise"><strong>Revise — StorageUsage progress bar color</strong> At 21% the indigo bar is fine, but at 80%+ users need a warning signal. Consider amber at 75% and red at 90%. This needs to be data-driven once the API is wired.</div>
+
+<h3 style="margin-top:24px">Search</h3>
+<div class="callout callout-keep"><strong>Keep — ⌘K global shortcut</strong> Keyboard-first access to search is a strong UX choice for a power-user tool. Keep the shortcut hint in the placeholder.</div>
+<div class="callout callout-keep"><strong>Keep — Client-side facet filtering</strong> Filtering the existing result set client-side (rather than re-fetching) gives instant feedback. Appropriate for the current data size.</div>
+<div class="callout callout-revise"><strong>Revise — FacetPanel width (w-56 = 224px)</strong> On narrow windows (e.g., 800px app width) the panel takes 28% of the content area. Consider hiding it behind the toggle by default on window width &lt; 900px.</div>
+<div class="callout callout-revise"><strong>Revise — Snippet term highlighting regex</strong> The <code>highlightSnippet()</code> function splits on whitespace — it won't highlight partial matches or stemmed variants. Fine for MVP; flag as improvement for semantic search.</div>
+<div class="callout callout-revise"><strong>Revise — ScoreBar threshold signaling</strong> The indigo score bar doesn't indicate confidence levels. Consider color transitions: green &gt;80%, indigo 50-80%, amber &lt;50%.</div>
+
+<h3 style="margin-top:24px">Graph</h3>
+<div class="callout callout-keep"><strong>Keep — Canvas 2D rendering approach</strong> For graphs with hundreds of nodes, Canvas outperforms SVG. The viewport culling implementation is the right architectural choice.</div>
+<div class="callout callout-revise"><strong>Revise — No empty state for graph</strong> If <code>/api/v1/graph</code> returns 0 nodes, the canvas renders a blank dark rectangle. Add an empty state ("No knowledge graph data yet — start by ingesting documents").</div>
+<div class="callout callout-revise"><strong>Revise — NodeInspector Provenance is hardcoded "—"</strong> The Provenance field always shows "—". Either wire it to real data or remove the field from the inspector until it's available.</div>
+<div class="callout callout-revise"><strong>Revise — No loading state for graph fetch</strong> The graph data is fetched async. During loading, the canvas area is blank. Add a spinner or skeleton overlay.</div>
+<div class="callout callout-issue"><strong>Issue — No zoom controls in toolbar</strong> The "scroll to zoom" hint is the only zoom affordance. Enterprise users may not discover scroll-to-zoom. Add +/− buttons with reset-to-fit alongside the node/edge count.</div>
+
+<h3 style="margin-top:24px">Settings</h3>
+<div class="callout callout-keep"><strong>Keep — JWT-sourced profile data</strong> Reading name/email/role from the ID token avoids a separate API call and keeps the settings page fast. Good pattern.</div>
+<div class="callout callout-revise"><strong>Revise — No save error state</strong> The server URL save path shows a success state but has no visible error if the URL is invalid or unreachable. Add a red error variant alongside the green success state.</div>
+<div class="callout callout-revise"><strong>Revise — Sign out button color in a settings form context</strong> The <code>bg-red-600/80</code> destructive button sits directly in a settings card without a separator or warning copy. Consider adding a short explanation ("This will clear your local session and require re-authentication") before the button.</div>
+
+<h3 style="margin-top:24px">Accessibility Gaps (pre-production checklist)</h3>
+<table class="state-table">
+<thead><tr><th>Component</th><th>Gap</th><th>Priority</th></tr></thead>
+<tbody>
+  <tr><td>All interactive elements</td><td>Missing <code>focus-visible</code> ring</td><td>High</td></tr>
+  <tr><td>ResultCard</td><td><code>role="article"</code> should be explicit; currently just a div</td><td>Medium</td></tr>
+  <tr><td>GraphCanvas</td><td>Canvas has no ARIA label or keyboard navigation for nodes</td><td>High (desktop)</td></tr>
+  <tr><td>FacetPanel toggle</td><td>▲/▼ toggle buttons have no accessible label</td><td>Medium</td></tr>
+  <tr><td>SignInButton</td><td>Loading state announced via aria-live or aria-busy</td><td>Medium</td></tr>
+  <tr><td>WatermarkOverlay</td><td>✓ Already has aria-hidden="true"</td><td>Done</td></tr>
+  <tr><td>NodeInspector close</td><td>✕ button has no accessible label</td><td>Medium</td></tr>
+  <tr><td>Error messages</td><td>Auth error has role="alert" ✓ · Settings errors: missing</td><td>Medium</td></tr>
+</tbody>
+</table>
+</section>
+
+<hr>
+<div style="text-align:center;padding:32px 0;color:var(--c-faintest);font-size:12px">
+  DepthFusion Design Handoff · Generated 2026-06-15 · Pre-production review draft<br>
+  Source branch: <code>main</code> · Auth constraint: <strong>Do not modify <code>app/src/lib/auth.ts</code></strong>
+</div>
+
+</div><!-- /.doc -->
+</body>
+</html>

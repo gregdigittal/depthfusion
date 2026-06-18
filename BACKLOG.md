@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-05-19 (E-44 added — cross-platform unified installer Mac/Linux/Windows; S-128/S-129/S-130 shipped; 1993 tests, 0 lint, 0 mypy)
+> Last updated: 2026-06-17
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2178,7 +2178,7 @@
 
 ---
 
-## E-43: SkillForge Operational & Divergence Alignment [backlog]
+## E-43: SkillForge Operational & Divergence Alignment [done]
 
 > Three gaps surfaced during the E-39 SF-2 integration audit (2026-05-19): JWT token lifecycle, and two TS→Python parity gaps from `docs/depthfusion-skillforge-divergence.md §8`.
 
@@ -2275,4 +2275,1220 @@
 - [x] T-464: Add `shellcheck` step for `install.sh`, `PSScriptAnalyzer` step for `install.ps1`
 
 ---
+
+## E-45: HNSW Embedding Index + Fused Recall (ruflo-mod contract) [done]
+
+> Implement the DepthFusion side of the agent-ops bridge contract defined in `docs/ruflo-mod.md`.
+> Adds `hnswlib`-backed vector indexing and BM25+HNSW fusion recall behind a feature flag.
+> All existing BM25 behaviour is preserved when `DEPTHFUSION_HNSW_ENABLED=false` (default).
+
+### S-134: As the recall pipeline, I want an hnswlib-backed HNSW index module so that DepthFusion can embed, store, and query discovery content as dense vectors `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `retrieval/hnsw_store.py` provides `HNSWStore` with `upsert(discovery_id, content)`, `search(query, k)`, `save()`, `state()`, `capability()` methods
+- [x] AC-2: Label map (`discovery_id → int`) persisted as `.labels.json` sidecar; index persisted as `.bin`; state as `.meta.json` — all three atomic (tmp + os.replace)
+- [x] AC-3: Auto-saves every 100 upserts; gracefully degrades (returns None/False/[]) when `hnswlib` is absent or model load fails
+- [x] AC-4: `HNSWState` shape (schema_version, index_path, embedding_model, dimension, entry_count, last_updated) matches ruflo-mod contract
+- [x] AC-5: `HNSWCapability` shape (enabled, backend, model, dimension, index_path, entry_count) matches ruflo-mod contract
+
+**Tasks:**
+- [x] T-465: Create `src/depthfusion/retrieval/hnsw_store.py` — `HNSWStore` class with lazy `LocalEmbeddingBackend` embedding, atomic persistence, graceful degradation
+- [x] T-466: Thread-safe singleton accessor `_get_hnsw_store()` in `server.py` gated on `DEPTHFUSION_HNSW_ENABLED`
+- [x] T-467: SIGTERM/SIGINT shutdown handler flushes index to disk; registered only on main thread on first store init
+
+### S-135: As the agent-ops bridge, I want a `depthfusion_hnsw_capability` MCP tool so that it can read HNSW state at startup without polling `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_hnsw_capability` registered in `TOOLS`, `_TOOL_FLAGS` (always enabled), `TOOL_SCHEMAS`, `_dispatch_tool`
+- [x] AC-2: Returns `HNSWCapability` shape when `DEPTHFUSION_HNSW_ENABLED=true`; returns `{enabled: false, backend: "none", ...zeros}` when flag is false or store init failed
+- [x] AC-3: Tool count in `tests/test_analyzer/test_mcp_server.py` updated to 29
+
+**Tasks:**
+- [x] T-468: Add `depthfusion_hnsw_capability` to TOOLS/TOOL_FLAGS/TOOL_SCHEMAS in `server.py`
+- [x] T-469: Implement `_tool_hnsw_capability()` dispatch function
+
+### S-136: As an operator, I want `depthfusion_publish_context` to return `indexed_in_hnsw: bool` so that the bridge knows whether each publish was also vector-indexed `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `indexed_in_hnsw` (bool, never missing, never None) present in every `depthfusion_publish_context` response
+- [x] AC-2: When `DEPTHFUSION_HNSW_ENABLED=true` and upsert succeeds: `indexed_in_hnsw: true`
+- [x] AC-3: When flag is false, store unavailable, or upsert throws: `indexed_in_hnsw: false`; BM25 publish path is unaffected
+
+**Tasks:**
+- [x] T-470: Update `_tool_publish_context` in `server.py` to upsert into HNSW store and inject `indexed_in_hnsw` into result dict
+- [x] T-471: Relax strict equality in `test_bus_idempotency.py` to strip `indexed_in_hnsw` before comparing historical contract dict
+
+### S-137: As the recall pipeline, I want fused BM25 + HNSW recall so that semantic similarity complements keyword matching `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `strategy` (`'bm25-only'` or `'fused'`) and `hnsw_available` (bool) present in ALL `depthfusion_recall_relevant` responses (empty results, filtered, index/timeline modes, error path)
+- [x] AC-2: When HNSW enabled and produces hits: `final_score = 0.6 × bm25_score + 0.4 × hnsw_cosine_score`; blocks present in both get `source: 'fused'`; BM25-only get `source: 'bm25'`; HNSW-only additions get `source: 'hnsw'`
+- [x] AC-3: Results re-sorted by fused score, re-sliced to `top_k` after fusion
+- [x] AC-4: HNSW search failure degrades gracefully to BM25-only without raising
+
+**Tasks:**
+- [x] T-472: Update `_tool_recall_impl` to add `strategy`/`hnsw_available` to all return paths and apply post-hoc fusion when HNSW store returns hits
+- [x] T-473: Regenerate `tests/test_regression/golden/v04_recall_output.json` to include new fields
+
+### S-138: As a DepthFusion operator, I want the HNSW index persisted on shutdown and loaded on startup so that vectors survive process restarts `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: SIGTERM/SIGINT handlers flush index, label map, and state to disk atomically before exit
+- [x] AC-2: On startup, if `.bin` file exists at `DEPTHFUSION_HNSW_INDEX_PATH`, index is loaded (with label map and state); fresh index created if file absent
+- [x] AC-3: Startup failure degrades to BM25-only (logs error, does not crash process)
+
+**Tasks:**
+- [x] T-474: Implement startup load path in `HNSWStore.__init__`
+- [x] T-475: Implement `_register_hnsw_shutdown()` called on first successful store init
+
+### S-139: As a developer, I want tests for HNSW components so that regressions are caught `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `tests/test_retrieval/test_hnsw_store.py` — 11 tests (2 always-on for no-hnswlib path; 9 skipped when hnswlib absent)
+- [x] AC-2: `tests/test_mcp/test_hnsw_capability.py` — 5 tests covering capability tool, `indexed_in_hnsw`, `strategy`, `hnsw_available`
+- [x] AC-3: Full suite passes with 0 regressions (2000 passed, 9 skipped)
+
+**Tasks:**
+- [x] T-476: Author `tests/test_retrieval/test_hnsw_store.py`
+- [x] T-477: Author `tests/test_mcp/test_hnsw_capability.py`
+
+### S-140: As a developer, I want `hnswlib` declared in pyproject.toml extras so that the dependency is trackable `P3` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: `hnswlib>=0.7` added to `vps-gpu`, `mac-mlx`, and standalone `hnsw` extras in `pyproject.toml`
+
+**Tasks:**
+- [x] T-478: Update `pyproject.toml` optional-dependencies
+
+---
 - **`docs/Account_synch/`** is the canonical planning source. Changes to the plan should be made there, with a note that `BACKLOG.md` must be updated in the same commit.
+
+## E-46: Event Graph Fabric [done]
+
+> Shared multi-agent memory layer: every publish, subscribe, and recall becomes a graph node. Agents see each other's in-progress work in real time; new sessions inherit the room's working memory via fabric_seed; provenance queries reveal who knew what and when.
+
+### S-141: As the knowledge graph, I want an `event` Entity type and four new edge relationships so that agent provenance can be recorded as first-class graph nodes `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `Entity.type` docstring in `graph/types.py` includes `event`; no new Python class required — metadata dict carries event-specific fields (`event_type`, `agent_id`, `project_slug`, `memory_refs`, `session_id`)
+- [x] AC-2: `Edge.relationship` vocabulary in `graph/types.py` documents `AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM`; no existing relationship values changed
+- [x] AC-3: `entity_id` for an event entity is `sha256(agent_id + event_type + timestamp_iso + "".join(sorted(memory_refs)))[:12]` — deterministic, dedup-safe
+- [x] AC-4: `EventStore` class in `core/event_store.py` — `publish()`, `get_recent_events()`, `subscribe_stream()` — backed by a `StreamBackend` Protocol and the existing `GraphBackend`
+- [x] AC-5: `StreamBackend` Protocol in `core/event_store.py` mirrors the `GraphBackend` Protocol pattern: `publish(channel, payload)`, `subscribe(channels, since_id)`, `read_since(channel, since_id, count)` — all async
+- [x] AC-6: `RedisStreamBackend` implements `StreamBackend` via `redis.asyncio` XADD/XREAD/consumer groups; channel naming: `depthfusion:stream:{project_slug}`
+- [x] AC-7: Graph writes in `EventStore` use `run_in_executor` (non-blocking) + `file_locking.py` per-project lock; SQLite WAL mode enforced at store init
+- [x] AC-8: `EventStore` degrades gracefully if `RedisStreamBackend` is unavailable — graph writes succeed; stream notification is best-effort (log warning, do not raise)
+- [x] AC-9: Unit tests for `EventStore.publish()` and `get_recent_events()` using an in-memory stub `StreamBackend`; 0 regressions in existing suite
+
+**Tasks:**
+- [x] T-479: Add `event` to `Entity.type` docstring in `graph/types.py`; add `AGENT_PUBLISHED`, `AGENT_RECEIVED`, `SAME_SESSION_AS`, `DERIVED_FROM` to `Edge` relationship vocabulary
+- [x] T-480: Create `src/depthfusion/core/event_store.py` — `StreamBackend` Protocol + `RedisStreamBackend` (redis.asyncio XADD/XREAD/consumer groups)
+- [x] T-481: Implement `EventStore` class — `publish()` (graph write + stream XADD), `get_recent_events()` (graph traversal), `subscribe_stream()` (SSE generator backed by XREAD)
+- [x] T-482: Concurrency safety — `run_in_executor` for graph writes, `file_locking.py` per-project lock, SQLite WAL mode at init
+- [x] T-483: Unit tests for EventStore using in-memory stub StreamBackend; verify dedup-safe entity_id; verify graceful Redis degradation
+
+### S-142: As an agent on the Tailscale network, I want REST endpoints to publish events and subscribe to the live stream so that any HTTP client can participate in the fabric `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `POST /v1/events/publish` — accepts `{agent_id, project_slug, memory_refs, session_id?}`; calls `EventStore.publish()`; returns `{event_id, indexed: bool}`; Bearer token required
+- [x] AC-2: `GET /v1/events/stream` — SSE endpoint; query params `projects` (comma-sep), `since_id` (last consumed Redis Stream ID, enables replay), `consumer_id`; yields EventEntity JSON; Bearer token required
+- [x] AC-3: `DEPTHFUSION_API_TAILSCALE=1` causes REST server to bind an additional listener on the Tailscale interface IP (resolved via `tailscale ip -4` at startup); loopback listener stays active
+- [x] AC-4: Tailscale bind requires `DEPTHFUSION_API_TOKEN` — startup raises `ValueError` if `DEPTHFUSION_API_TAILSCALE=1` and token is absent (mirrors existing `DEPTHFUSION_API_PUBLIC` validation)
+- [x] AC-5: Tailscale bind fails gracefully (log warning, serve loopback-only) if `tailscale` command is unavailable or returns an error; does not crash the process
+- [x] AC-6: Redis stays loopback-only — never exposed on the Tailscale interface
+- [x] AC-7: `redis>=5.0` added to a new `fabric` optional-dependency extra in `pyproject.toml`
+- [x] AC-8: Tests for `/v1/events/publish` (200 + 401 paths) and SSE stream (mock EventStore); Tailscale bind validation unit test
+
+**Tasks:**
+- [x] T-484: Create `src/depthfusion/api/events.py` — FastAPI router with `POST /v1/events/publish` and `GET /v1/events/stream` SSE; Bearer token via `_check_auth` (reuse from rest.py)
+- [x] T-485: `DEPTHFUSION_API_TAILSCALE=1` support in `rest.py` — resolve Tailscale IP at startup, bind second uvicorn listener; `validate_public_bind_config()` extended for Tailscale case
+- [x] T-486: Mount events router in `rest.py`; update systemd service env template to document `DEPTHFUSION_API_TAILSCALE` and `DEPTHFUSION_API_TOKEN`
+- [x] T-487: Add `redis>=5.0` to `pyproject.toml` `fabric` optional-dependency extra
+- [x] T-488: Tests for publish/stream endpoints and Tailscale bind startup validation
+
+### S-143: As a session starting cold, I want `depthfusion_session_seed` to support `fabric_seed` mode so that new agents inherit the room's working memory from the event graph `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_session_seed` MCP tool accepts `mode: "fabric_seed"` parameter; existing `mode` values unchanged
+- [x] AC-2: `fabric_seed` flow: query EventStore for events in `projects` (last 24h default); collect `memory_refs`; run BM25+HNSW recall against those refs with `goal` as query; rank by `score = recall_relevance × recency_decay × log(1 + observer_count)` where `observer_count` = distinct AGENT_RECEIVED edges to that memory
+- [x] AC-3: `GET /v1/events/seed?projects=&session_id=&goal=` REST endpoint exposes the same logic for non-MCP clients
+- [x] AC-4: `fabric_seed` falls back to graph-only traversal (no live Redis query) if Redis is unavailable; returns partial bundle with `degraded: true` flag
+- [x] AC-5: Write-path deduplication in capture path: `sha256(content)` checked against `metadata["content_hash"]` on existing entities; if found, creates `AGENT_PUBLISHED` EventEntity linking to existing node and skips re-indexing; logs dedup hit
+- [x] AC-6: New MemoryEntities have `metadata["content_hash"]` set at index time
+- [x] AC-7: 100 concurrent publish calls on identical content produce exactly 1 MemoryEntity and 100 EventEntities in the graph
+- [x] AC-8: Three new MCP tools registered: `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`; tool count test updated
+- [x] AC-9: Tests for `fabric_seed` ranking logic, dedup correctness, and MCP tool registration
+
+**Tasks:**
+- [x] T-489: Content-hash gate in `src/depthfusion/capture/` — compute `sha256(content)`, check graph, write `AGENT_PUBLISHED` EventEntity on hit, skip re-index; set `metadata["content_hash"]` on new entities
+- [x] T-490: `GET /v1/events/seed` endpoint in `events.py`; implement `fabric_seed` ranking: recall_relevance × recency_decay × log(1 + observer_count)
+- [x] T-491: Extend `depthfusion_session_seed` in `session/loader.py` with `mode="fabric_seed"` parameter; Redis degradation fallback
+- [x] T-492: Register `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail` MCP tools in `mcp/server.py`; update tool count assertion
+- [x] T-493: Tests for dedup (100 concurrent publishes → 1 MemoryEntity), `fabric_seed` observer_count weighting, MCP tool registration
+
+### S-144: As a developer or agent, I want provenance query endpoints so that I can answer "who knew what, when" across the agent fleet `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `GET /v1/graph/agent/{agent_id}/trail?project=&since=&until=` returns all AGENT_PUBLISHED + AGENT_RECEIVED EventEntities for the agent in the time range, sorted by timestamp ascending
+- [x] AC-2: `GET /v1/graph/memory/{entity_id}/observers` returns all distinct `agent_id` values that have an AGENT_RECEIVED edge to the entity, with timestamps
+- [x] AC-3: Both endpoints require Bearer token; return 404 if entity_id not found; return empty list (not 404) if no events match the time range
+- [x] AC-4: Integration test: 3 concurrent test agents publish and subscribe; verify AGENT_PUBLISHED and AGENT_RECEIVED EventEntities are correctly created; verify `/observers` returns all 3 agent IDs
+- [x] AC-5: Integration test: agent A publishes memory X; agent B subscribes and receives SSE event; graph contains AGENT_RECEIVED EventEntity for agent B → memory X
+- [x] AC-6: Integration test: 100 concurrent publish calls on identical content → `/observers` for that memory returns 100 distinct entries (dedup preserved the memory, events are per-agent)
+
+**Tasks:**
+- [x] T-494: `GET /v1/graph/agent/{agent_id}/trail` in `events.py` — graph traversal for AGENT_PUBLISHED + AGENT_RECEIVED edges filtered by agent_id and time range
+- [x] T-495: `GET /v1/graph/memory/{entity_id}/observers` in `events.py` — find all AGENT_RECEIVED edges to entity_id; return distinct agent_ids + timestamps
+- [x] T-496: Integration test suite: 3-agent concurrent publish/subscribe scenario; verify SSE receipt + graph EventEntity creation
+- [x] T-497: Integration test: dedup + observers consistency (100 publishes → 1 memory, 100 observer entries)
+
+### S-145: As a DepthFusion operator, I want performance baselines for the fabric so that SLA targets are validated before the arc ships `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: Publish-to-SSE latency benchmark: 10 concurrent publishers × 100 events each; p99 < 500ms end-to-end (publish REST call → SSE subscriber receives event)
+- [x] AC-2: `fabric_seed` latency: project with 500 recent EventEntities; `GET /v1/events/seed` responds in < 2s p99
+- [x] AC-3: Graph provenance query: 1,000 EventEntities in store; `/trail` and `/observers` queries return in < 500ms
+- [x] AC-4: Graceful degradation test: Redis process killed mid-stream; existing `depthfusion_recall_relevant` and `depthfusion_retrieve_context` paths are unaffected; degradation is logged, not raised
+- [x] AC-5: Baseline results written to `docs/performance/event-graph-baseline-2026-05-23.md`
+
+**Tasks:**
+- [x] T-498: Publish-to-SSE latency benchmark script: 10 concurrent publishers, measure SSE receipt timestamps; assert p99 < 500ms
+- [x] T-499: `fabric_seed` latency benchmark: seed 500 EventEntities, measure GET /v1/events/seed; assert p99 < 2s
+- [x] T-500: Provenance query benchmark: 1,000 EventEntities; measure /trail and /observers; assert p99 < 500ms
+- [x] T-501: Graceful degradation test: kill Redis, verify recall/retrieve unaffected, verify degradation log emitted
+
+### S-146: As the DepthFusion open-source community, I want documentation for the Event Graph Fabric so that other teams can deploy and use it `P2` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: README has a "Shared Memory Fabric" section: what it is, the three pain points it solves, a 5-line curl quickstart (publish, stream, seed), link to full docs
+- [x] AC-2: `docs/fabric/tailscale-setup.md` — step-by-step: install Tailscale, set `DEPTHFUSION_API_TAILSCALE=1` and `DEPTHFUSION_API_TOKEN` in systemd service, verify connectivity with `curl -H "Authorization: Bearer $TOKEN" http://100.x.x.x:7300/v1/events/seed`
+- [x] AC-3: `docs/fabric/api-reference.md` — all 5 fabric endpoints documented with request/response examples; `StreamBackend` Protocol interface documented for Kafka+Flink implementors
+- [x] AC-4: CHANGELOG updated: v0.6.0-alpha — "Event Graph Fabric: multi-agent shared memory, agent provenance graph, fabric_seed mode"
+- [x] AC-5: `docs/fabric/kafka-flink-migration.md` — operator guide for swapping `RedisStreamBackend` → `KafkaFlinkBackend` when scale demands it; documents CEP convergence signal capability
+
+**Tasks:**
+- [x] T-502: Write README "Shared Memory Fabric" section with curl quickstart
+- [x] T-503: Write `docs/fabric/tailscale-setup.md` — Tailscale install + DepthFusion config + verification
+- [x] T-504: Write `docs/fabric/api-reference.md` — endpoint docs + StreamBackend Protocol interface
+- [x] T-505: Write `docs/fabric/kafka-flink-migration.md` — migration guide + CEP convergence signal overview; update CHANGELOG for v0.6.0-alpha
+
+---
+
+## E-47: Project Context Intelligence & Research [done]
+
+> Enable DepthFusion to maintain live project knowledge (backlog state, architecture, conventions) and enrich its knowledge base through project ingestion and autonomous deep research, so that recall is immediately useful across machines and sessions.
+
+### S-147: As a DepthFusion user, I want to register my projects in a central projects.json so that DepthFusion knows which projects exist and how to sync them `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `~/.depthfusion/projects.json` (VPS) has a documented schema: `name`, `slug`, `local_path`, `github_url` (optional), `sync_config` (which files to sync), `tags`
+- [x] AC-2: `depthfusion_register_project` MCP tool adds a project entry and persists it to projects.json
+- [x] AC-3: `depthfusion_list_projects` MCP tool returns all registered projects with their sync status and last-synced timestamp
+- [x] AC-4: ProjectRegistry class in `core/project_registry.py` provides CRUD with atomic file writes
+
+**Tasks:**
+- [x] T-506: Define and document projects.json schema; create `core/project_registry.py` with load/save/add/remove/list
+- [x] T-507: Implement `depthfusion_register_project` MCP tool (params: name, slug, local_path, github_url, tags)
+- [x] T-508: Implement `depthfusion_list_projects` MCP tool with last_synced timestamp per project
+- [x] T-509: Write bootstrap helper to pre-populate projects.json from existing agent-hub-context project dirs
+
+### S-148: As a developer, I want DepthFusion to automatically sync my project's backlog and conventions after each session so that any session can answer questions about project state `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: After a sync, `depthfusion_recall` can answer "what stories are active in project X" and "what tasks are done in S-147"
+- [x] AC-2: Synced project context is namespaced by project slug — querying project A does not surface project B's backlog
+- [x] AC-3: Sync ingests: BACKLOG.md (parsed into epic/story/task structure), CLAUDE.md, `.claude/rules/`, top-level git log (last 20 commits)
+- [x] AC-4: A sync run is idempotent — re-syncing unchanged files does not create duplicates
+
+**Tasks:**
+- [x] T-510: Write BACKLOG.md parser that extracts epic/story/task state into structured records (status, IDs, titles, ACs)
+- [x] T-511: Create `ProjectContextStore` in `core/project_context.py` — stores structured project context with project-slug namespace
+- [x] T-512: Implement `depthfusion_sync_project` MCP tool (params: slug; reads from registered local_path)
+- [x] T-513: Wire backlog records into standard recall so `depthfusion_recall` queries return project state results
+
+### S-149: As a developer, I want Claude Code session-end hooks on both Mac and VPS to push project state to DepthFusion automatically so that context is always current `P1` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `scripts/push-project-context.sh` detects the active project (from cwd or `DEPTHFUSION_PROJECT` env var) and calls `depthfusion_sync_project`
+- [x] AC-2: Hook is installed in VPS `~/.claude/settings.json` under `Stop` hooks and fires on every session end
+- [x] AC-3: Hook is installable on Mac via the cross-platform installer (E-44 pattern); documented in `docs/project-sync.md`
+- [x] AC-4: Hook output is visible in DepthFusion telemetry — sync events appear as a distinct event type
+
+**Tasks:**
+- [x] T-514: Write `scripts/push-project-context.sh` (detect project slug from cwd → call sync tool → log result)
+- [x] T-515: Install hook in VPS `~/.claude/settings.json` Stop hooks
+- [x] T-516: Add Mac hook installation step to the cross-platform installer; document in `docs/project-sync.md`
+- [x] T-517: Emit `project_sync` telemetry event with slug, files_synced count, duration_ms
+
+### S-150: As a developer or agent, I want a `depthfusion_ingest_project` MCP tool so that I can bring any project's codebase into DepthFusion by providing a local path or GitHub URL `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Structural ingest (default): ingests CLAUDE.md, README, BACKLOG.md, package/config files, top-level directory listing in < 30 seconds for any repo up to 10k files
+- [x] AC-2: Deep ingest (`depth=full`): additionally embeds all source files; progress is reported via streaming or periodic status; estimated time shown upfront
+- [x] AC-3: GitHub URL ingest fetches via GitHub API (no full clone required for structural pass); authenticated via `GITHUB_TOKEN` env var
+- [x] AC-4: All ingested content is tagged with `project:<slug>` and `source:ingest` so it can be queried or purged by project
+
+**Tasks:**
+- [x] T-518: Design ingest pipeline: structural pass definition + chunking strategy for source files
+- [x] T-519: Implement local path ingest — structural pass (reads file list, key files) → embed → store with project tag
+- [x] T-520: Implement GitHub ingest — GitHub API fetch of tree + key file contents → structural pass; optional full clone for deep pass
+- [x] T-521: Implement `depthfusion_ingest_project` MCP tool (params: path_or_url, slug, depth=`structural`|`full`)
+- [x] T-522: Add progress reporting for deep ingest: emit progress events every 10 files; surface estimated completion
+
+### S-151: As a session starting on any machine, I want DepthFusion to automatically seed me with the active project's context when I name a project so that recall is immediately useful `P2` `S`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_session_seed` accepts an optional `project_slug` param; when provided, injects a project context block (backlog summary, CLAUDE.md key invariants, recent commit log) into the seed response
+- [x] AC-2: Session-start hook on VPS auto-detects cwd project slug and passes it to `depthfusion_session_seed`
+- [x] AC-3: If project has no synced context, seed falls back gracefully with a note: "No project context found for <slug> — run depthfusion_sync_project to register"
+
+**Tasks:**
+- [x] T-523: Extend `depthfusion_session_seed` to accept `project_slug`; fetch and inline project context block when provided
+- [x] T-524: Update VPS session-start hook to detect active project from cwd and pass `project_slug` to session_seed
+- [x] T-525: Write graceful fallback message and log when project slug is unknown
+
+### S-152: As a developer or agent, I want a `depthfusion_research_topic` MCP tool so that I can enrich DepthFusion's knowledge base with researched information on any topic `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `depthfusion_research_topic` accepts: `topic` (string), `depth` (`quick`|`thorough`), optional `project_slug` to auto-link result
+- [x] AC-2: Research pipeline: (1) check existing DepthFusion KB for topic coverage, (2) web search + fetch top sources, (3) GitHub search for relevant repos/discussions, (4) arXiv search for papers if topic is technical, (5) synthesize → store as named knowledge document
+- [x] AC-3: Stored research document is queryable by name and by topic keywords in future sessions
+- [x] AC-4: When `project_slug` is provided, research document is tagged with the project and surfaced in project-scoped recalls
+- [x] AC-5: Agents can call the tool mid-session to fill knowledge gaps autonomously; user sessions can invoke it explicitly
+
+**Tasks:**
+- [x] T-526: Design research pipeline: query planner, source adapters, synthesis prompt, named-document storage format
+- [x] T-527: Implement web search + URL fetch adapter (integrate with existing web search capability)
+- [x] T-528: Implement GitHub search adapter (search repos, READMEs, issues via GitHub API)
+- [x] T-529: Implement arXiv adapter (search API, fetch abstract + key sections for top 3 results)
+- [x] T-530: Implement KB pre-check: query DepthFusion before searching externally; skip sources already covered
+- [x] T-531: Implement `depthfusion_research_topic` MCP tool with pipeline orchestration
+- [x] T-532: Store research output as named knowledge document with tags: `research`, `topic:<slug>`, `project:<slug>` (if provided)
+
+---
+
+## E-48: Desktop App Production Readiness [active]
+
+> Harden the DepthFusion Tauri desktop app for the v2.0 release: wire OIDC auth end-to-end, integrate identity/ JWT validation into the MCP HTTP server, fix version metadata drift, add auth unit tests, tighten CI triggers, and move setup artifacts into docs/.
+
+### S-153: As a DepthFusion user, I want a working "Sign In" UI in the desktop app so that I can authenticate with my Entra identity without touching a terminal `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
+- [x] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
+- [x] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
+- [ ] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
+- [x] AC-5: Authenticated shell renders Search, Graph, and Dashboard pages with a navigation bar (v2-enterprise UI integrated)
+- [x] AC-6: App `<title>` in `index.html` reads "DepthFusion" (not "app"); footer dev copy removed
+- [x] AC-7: A real SVG logo replaces the "DF" text mark in App.tsx and SettingsPage.tsx
+
+**Tasks:**
+- [x] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
+- [x] T-534: Extract `SignInButton` as a standalone component in `app/src/components/SignInButton.tsx`
+- [x] T-535: Wire `pollAuthState()` into app startup — on mount call `invoke('poll_auth_state')`; if truthy, set `authenticated` state immediately
+- [ ] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears
+- [x] T-554: Copy v2-enterprise UI pages into main: `SearchPage.tsx`, `GraphPage.tsx`, `DashboardPage.tsx`, `DocumentViewer.tsx`, `components/FacetPanel.tsx`, `components/GraphCanvas.tsx`, `components/NodeInspector.tsx`, `components/WatermarkOverlay.tsx`, `hooks/useSearch.ts`
+- [x] T-555: Merge `App.tsx` — combine v2-enterprise routing/navigation (Search/Graph/Dashboard) with main branch auth guard; navigation tabs appear in the authenticated header
+- [x] T-556: Create `app/src/assets/logo.svg` with DepthFusion geometric SVG mark; use it in App.tsx header (both screens) and SettingsPage.tsx header in place of "DF" text box
+- [x] T-557: Fix `app/index.html` `<title>` to "DepthFusion"; remove tech-stack footer from authenticated shell in `App.tsx`
+
+### S-154: As a DepthFusion operator, I want the MCP HTTP server to validate per-user JWTs so that only authenticated users can call MCP tools `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: The `identity/` module (`token_validator.py`, `jwks_cache.py`, `principal_store.py`) is imported and wired into the MCP HTTP server request pipeline
+- [x] AC-2: Every MCP tool call requires a valid Bearer JWT signed by the configured Entra tenant; calls without a valid token return HTTP 401
+- [x] AC-3: `DEPTHFUSION_MCP_PUBLIC` bypass guard is removed — there is no unauthenticated access path in production
+- [x] AC-4: JWKS keys are cached per `jwks_cache.py` with TTL; cache is refreshed on 401 from JWKS endpoint
+- [x] AC-5: `principal_store.py` records the authenticated principal for each request; principal is available to tool handlers for per-user context
+
+**Tasks:**
+- [x] T-537: Import `token_validator`, `jwks_cache`, `principal_store` from `identity/` into `server.py`
+- [x] T-538: Add JWT validation middleware to the MCP HTTP server — intercept all requests, validate Bearer token, set principal on request context
+- [x] T-539: Remove `DEPTHFUSION_MCP_PUBLIC` environment variable guard and all code paths that skip auth
+- [x] T-540: Write integration test: send request with valid JWT → 200 OK; send without token → 401; send with expired token → 401
+- [x] T-541: Update `docs/deployment.md` and `docs/auth-setup.md` to remove any reference to `DEPTHFUSION_MCP_PUBLIC`
+
+### S-155: As a DepthFusion maintainer, I want version metadata consistent across all config files so that installers, update checks, and release artifacts agree on the version `P2` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: `tauri.conf.json` `version` field reads `1.2.2` (was `0.1.0`)
+- [x] AC-2: `package.json` `version` field reads `1.2.2` (was `0.0.0`)
+- [x] AC-3: `server.py` MCP `serverInfo.version` reads `1.2.2` (was `0.4.0`)
+- [x] AC-4: Tauri auto-updater is disabled for v2.0 — `tauri.conf.json` `updater.active` is `false`
+
+**Tasks:**
+- [x] T-542: Update `src-tauri/tauri.conf.json`: set `version` to `1.2.2` and `updater.active` to `false`
+- [x] T-543: Update `package.json`: set `version` to `1.2.2`
+- [x] T-544: Update `server.py` `serverInfo.version` to `1.2.2`
+
+### S-156: As a DepthFusion contributor, I want Vitest unit tests for the auth/credential modules so that regressions in token handling and vault storage are caught in CI `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `src/auth/auth.ts` is covered by Vitest tests: `startLogin()` builds correct PKCE URL and stores state; `pollAuthState()` detects token presence and returns correct auth state
+- [x] AC-2: `src/auth/jwt.ts` is covered: `validateToken()` returns valid principal for a well-formed JWT; returns null for expired/invalid; handles missing `kid`
+- [x] AC-3: `src/auth/vault.ts` is covered: `storeToken()` persists token; `loadToken()` retrieves it; `clearToken()` removes it; all via mocked Tauri store
+- [x] AC-4: Tests run in CI on every push/PR and must pass before merge
+
+**Tasks:**
+- [x] T-545: Set up Vitest config for the `src/` tree if not already present (`vitest.config.ts`, `@vitest/coverage-v8`)
+- [x] T-546: Write `src/auth/auth.test.ts` covering `startLogin()`, `pollAuthState()`, and `exchangeCodeForToken()` with mocked Tauri invoke
+- [x] T-547: Write `src/auth/jwt.test.ts` covering `validateToken()` with valid, expired, and malformed token fixtures
+- [x] T-548: Write `src/auth/vault.test.ts` covering store/load/clear with mocked `@tauri-apps/plugin-store`
+- [x] T-549: Add `test` step to CI workflow (`.github/workflows/ci.yml`) that runs `vitest run --coverage`
+
+### S-157: As a DepthFusion maintainer, I want CI to run on pushes and PRs to main so that every change to the primary branch is validated `P1` `XS`
+
+**Acceptance criteria:**
+- [x] AC-1: `.github/workflows/ci.yml` `on:` block includes `push: branches: [main]` and `pull_request: branches: [main]`
+- [ ] AC-2: CI passes on a test push to main after this change
+
+**Tasks:**
+- [x] T-550: Edit `.github/workflows/ci.yml` to add `main` branch to `push` and `pull_request` triggers
+
+### S-158: As a new contributor, I want T-628 setup artifacts located in `docs/` so that the repo root is clean and onboarding docs are discoverable alongside other documentation `P2` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `T-628-instructions.md`, `T-628-setup-guide.md`, and `T-628-setup-guide.html` are moved from the repo root into `docs/setup/`
+- [x] AC-2: Any internal cross-references between these files are updated to reflect the new paths
+- [x] AC-3: `docs/setup/README.md` (or `docs/README.md`) links to the setup guide so it is discoverable
+- [x] AC-4: Root `.gitignore` or repo root has no leftover stubs from the old paths
+
+**Tasks:**
+- [x] T-551: Create `docs/setup/` directory and move `T-628-instructions.md`, `T-628-setup-guide.md`, `T-628-setup-guide.html` into it
+- [x] T-552: Update any cross-links within the moved files; add `docs/setup/` entry to `docs/README.md` (create if absent)
+- [x] T-553: Verify repo root is clean; commit with message `docs: move T-628 setup artifacts into docs/setup/`
+
+### S-159: As a DepthFusion operator, I want an E2E smoke test that verifies authenticated MCP tool calls work after the OIDC/JWT wiring lands so that the auth integration is validated in a real runtime `P1` `M`
+
+> **Backlog-only story — depends on S-153 and S-154 landing first. Do not start until both are marked [x].**
+
+**Acceptance criteria:**
+- [x] AC-1: Smoke test authenticates with a test Entra principal (service principal or test user), obtains a JWT, and calls at least one MCP tool via the HTTP server
+- [x] AC-2: Test asserts HTTP 200 with a valid tool response for an authenticated call
+- [x] AC-3: Test asserts HTTP 401 for a call with no Bearer token
+- [x] AC-4: Test is runnable locally with `pytest tests/integration/test_oidc_e2e.py` and in CI (behind a `[integration]` marker so it can be opted in)
+
+**Tasks:**
+- [x] T-554: Write `tests/integration/test_oidc_e2e.py` using a test service principal — obtain JWT via client-credentials flow, call `depthfusion_status` tool, assert 200
+- [x] T-555: Add unauthenticated negative test case (no Bearer header → assert 401)
+- [x] T-556: Wire `[integration]` pytest marker and document how to run locally with `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID` env vars
+## E-49: Identity Foundation — Entra ID / OIDC [active]
+
+> Replace the shared-secret trust domain with real identity. Every API call, sync session, and UI session is bound to a verified principal (user or service). Entra ID is the IdP since SharePoint permissions already live there; a local break-glass admin keeps offline/dev workflows alive. **Lane A.**
+
+### S-156: As a team member, I want to authenticate via Entra ID (OIDC + PKCE) so that my DepthFusion identity matches my corporate identity `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Authorization-code + PKCE flow implemented; tokens validated (issuer, audience, signature via JWKS, expiry, nonce)
+- [x] AC-2: Device-code flow available for headless CLI/VPS sessions
+- [x] AC-3: Group claims extracted and persisted to the principal record on each login
+- [x] AC-4: Refresh handled server-side; access tokens never written to disk unencrypted
+
+**Tasks:**
+- [x] T-544: Add `src/depthfusion/identity/` package: OIDC client, JWKS cache, token validator — Opus dev, DS+GM rev
+- [x] T-545: Device-code flow for CLI sessions — Sonnet dev, DS rev
+- [x] T-546: Principal store (SQLite table: `principal_id, upn, groups, last_seen`) — Sonnet dev, DS rev
+- [x] T-547: Entra app registration runbook + test-tenant fixtures — Ollama dev, Sonnet rev
+- [x] T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — Haiku dev, Opus rev
+
+### S-157: As the API server, I want auth middleware on every route so that no endpoint serves data without a verified principal `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: FastAPI dependency injects `Principal` into all routes in `rest.py`, `events.py`, `query.py`, MCP HTTP server
+- [x] AC-2: Legacy `DEPTHFUSION_API_TOKEN` accepted only when `DEPTHFUSION_V2_LEGACY_AUTH=1`, mapped to a flagged legacy principal, logs deprecation warning
+- [x] AC-3: Loopback-without-auth removed for any route that can return record content
+- [x] AC-4: 100% route coverage verified by an automated route-walker test
+
+**Tasks:**
+- [x] T-549: `require_principal` dependency + error envelope — Opus dev, DS+GM rev
+- [x] T-550: Sweep all ~42 REST routes + fabric + MCP HTTP routes onto the dependency — Sonnet dev, Gemini rev (whole-file audit)
+- [x] T-551: Legacy-token compatibility shim + deprecation telemetry — Sonnet dev, DS rev
+- [x] T-552: Route-walker test asserting every registered route enforces auth — Haiku dev, Opus rev
+
+### S-158: As an instance (VPS, laptop, Mac/MLX), I want a service identity so that machine-to-machine sync is authenticated and revocable per device `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Each instance enrolls once (device-code flow) and receives a device-bound credential stored in OS keychain
+- [x] AC-2: Admin can list and revoke device credentials; revoked devices fail sync within one lease period
+- [x] AC-3: Device records carry owner principal + platform + last-sync timestamp
+
+**Tasks:**
+- [x] T-553: Device enrollment + keychain storage (macOS Keychain, Windows DPAPI, Linux secret-service) — Opus dev, DS rev
+- [x] T-554: Device registry table + admin CLI (`depthfusion devices list|revoke`) — Sonnet dev, DS rev
+- [x] T-555: Lease-based credential refresh (default 24h) with clock-skew tolerance — Sonnet dev, Gemini rev
+
+---
+
+## E-50: Authorization Model — RBAC + Record ACLs + Classification [done]
+
+> The heart of V2. Roles govern capabilities; per-record ACLs govern visibility; classification labels govern handling (export, cache, redaction). Designed so SharePoint ACLs map losslessly onto DepthFusion records (E-54 depends on this schema). Follows E-49. **Lane A.**
+
+### S-159: As an admin, I want RBAC roles so that capabilities are granted by role, not by possession of a token `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Role schema with 4+ canonical roles (owner, admin, member, viewer) + extensible capability matrix
+- [x] AC-2: Role assignments stored and enforced; admin CLI for assignment and audit
+
+**Tasks:**
+- [x] T-556: Role/capability schema + migration — Opus dev, DS rev
+- [x] T-557: Capability-check service (`authz.require(principal, capability, resource)`) — Opus dev, DS+GM rev
+- [x] T-558: Admin CLI + API for role management with audit events — Sonnet dev, DS rev
+- [x] T-559: Capability matrix doc + tests per role — Haiku dev, Sonnet rev
+
+### S-160: As the storage layer, I want per-record ACL columns on every store so that visibility filtering is possible at query time `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `acl_allow` (list of principals/groups) + `classification` columns on all six stores: MemoryStore, VectorStore, EventLog, FileIndex, GraphStore, discoveries frontmatter
+- [x] AC-2: V1 records backfilled: `acl_allow=[greg]`, `classification=internal` (per V2-DEC-002)
+- [x] AC-3: Write path enforces ACL stamps — record without `acl_allow` is rejected
+
+**Tasks:**
+- [x] T-560: ACL schema design doc (record shape, group expansion strategy, deny semantics) — Opus dev, DS+GM rev
+- [x] T-561: Migrations for all six stores + backfill script with dry-run — Sonnet dev, DS rev
+- [x] T-562: Write-path enforcement in MemoryStore/VectorStore/EventLog/Graph — Sonnet dev, DS rev
+- [x] T-563: Discovery front-matter ACL parser + writer — Sonnet dev, Gemini rev
+- [x] T-564: Migration rehearsal on a copy of the VPS dataset; record timings — Haiku dev, Sonnet rev
+
+### S-161: As a compliance owner, I want classification labels with handling rules so that sensitive content gets stricter treatment automatically `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Classification taxonomy defined (internal, confidential, restricted, public) with export/cache/redaction rules per level
+- [x] AC-2: Sensitivity-label mapping config maps SharePoint sensitivity labels → DepthFusion classification
+
+**Tasks:**
+- [x] T-565: Classification taxonomy + handling-rules policy module — Opus dev, DS rev
+- [x] T-566: Sensitivity-label mapping config + validation — Sonnet dev, DS rev
+- [x] T-567: Policy unit tests incl. default-deny on unknown labels — Haiku dev, Opus rev
+
+### S-162: As the platform, I want a central policy decision point so that every subsystem asks one engine "can X do Y to Z" `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `PolicyEngine.decide(principal, action, resource)` returns allow/deny with reason
+- [x] AC-2: All access checks routed through PolicyEngine; ad-hoc checks removed
+
+**Tasks:**
+- [x] T-568: PolicyEngine implementation + decision cache — Opus dev, DS+GM rev
+- [x] T-569: Wire API/service layers through PolicyEngine; remove ad-hoc checks — Sonnet dev, Gemini rev
+- [x] T-570: Property-based tests (no path returns allow when ACL excludes principal) — Sonnet dev, Opus rev
+
+---
+
+## E-51: Security-Trimmed Retrieval & Query API v2 [done]
+
+> ACL pre-filtering so unauthorized records never enter candidate sets. Depends on E-50 (ACL columns + PolicyEngine). **Lane A, Phase 2.**
+
+### S-163: As the retrieval pipeline, I want ACL pre-filtering in BM25/HNSW/hybrid so that unauthorized records never enter candidate sets `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: HNSW/Chroma metadata filter + BM25 doc-mask applied before candidate scoring
+- [x] AC-2: Post-rank verification pass confirms no unauthorized record survived fusion
+- [x] AC-3: Leak counters in telemetry; zero-leak assertion in CI
+
+**Tasks:**
+- [x] T-571: Thread principal context through retrieval interfaces — Sonnet dev, DS rev
+- [x] T-572: HNSW/Chroma metadata ACL filter + BM25 doc-mask — Opus dev, DS+GM rev
+- [x] T-573: Post-rank verification + leak counters in telemetry — Sonnet dev, DS rev
+- [x] T-574: Retrieval benchmark with/without trimming; publish to `docs/benchmarks/` — Haiku dev, Sonnet rev
+
+### S-164: As a BI consumer, I want Query API v2 with principal-scoped results so that dashboards only show what the viewer may see `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: All query/aggregate endpoints return only principal-visible records
+- [x] AC-2: Aggregate-leak tests pass (counts/facets must not reveal hidden records)
+
+**Tasks:**
+- [x] T-575: Port query endpoints to principal auth + trimmed data access — Sonnet dev, DS rev
+- [x] T-576: Aggregate-leak tests (counts/facets must not reveal hidden records) — Sonnet dev, Opus rev
+- [x] T-577: Regenerate `query-api.yaml`, CLI, MCP wrappers — Ollama dev, Sonnet rev
+
+### S-165: As an MCP client, I want all 29 MCP tools principal-bound so that agent access obeys the same ACLs as humans `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `_dispatch_tool` in `mcp/server.py` binds principal to every tool call
+- [x] AC-2: Capability annotations on all 29 tools; MCP authz test suite passes
+
+**Tasks:**
+- [x] T-578: MCP session principal binding (stdio + HTTP/SSE) — Opus dev, DS rev
+- [x] T-579: Capability annotations across all 29 tools — Sonnet dev, Gemini rev (single-pass audit)
+- [x] T-580: MCP authz test-suite (per-tool allow/deny matrix) — Haiku dev, Opus rev
+
+---
+
+## E-52: Sync v2 — ACL-Aware Replication [done]
+
+> Retire wholesale rsync (`sync.sh`). Sync v2 is a service-mediated protocol: each enrolled device pulls only records its owner principal can see, pushes with ACL stamps, and honors revocation. Design docs run in Phase 1 (Lane D); build lands in Phase 2. **Lane D.**
+
+### S-166: As the platform, I want a sync protocol design agreed before build so that lanes A and D don't diverge `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Design doc covers: change-log cursor model, record envelopes (payload + ACL + classification), tombstones, conflict policy, transport (HTTPS via VPS hub)
+- [ ] AC-2: Reviewed by both review models; consensus or DECISION record
+- [ ] AC-3: Explicit non-goals stated (no peer-to-peer in V2; hub-and-spoke only)
+
+**Tasks:**
+- [x] T-581: Sync v2 design doc + sequence diagrams — Opus dev, DS+GM rev
+- [x] T-582: Conflict policy spec (vector-clock-lite vs last-writer-wins per store) — Opus dev, DS rev
+
+### S-167: As an enrolled device, I want delta sync trimmed to my principal so that I never receive records I cannot see `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `/v2/sync/pull?cursor=` returns only principal-visible deltas; server-side trim via PolicyEngine
+- [ ] AC-2: `/v2/sync/push` validates ACL stamps + capability to write; rejects unlabeled records
+- [ ] AC-3: ACL changes propagate: records a principal loses access to are tombstoned on that device at next sync
+- [ ] AC-4: Resumable after interruption; idempotent batches
+
+**Tasks:**
+- [x] T-583: Change-log table + cursor API on the hub — Sonnet dev, DS rev
+- [x] T-584: Pull endpoint with PolicyEngine trim + pagination — Opus dev, DS rev
+- [x] T-585: Push endpoint with validation + audit events — Sonnet dev, DS rev
+- [x] T-586: Client sync engine (scheduler, retries, tombstone application) — Sonnet dev, Gemini rev
+- [x] T-587: Loss-of-access propagation tests — Haiku dev, Opus rev
+
+### S-168: As an operator, I want `sync.sh` retired gracefully so that no machine silently keeps wholesale replication alive `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `sync.sh` prints a deprecation error and exits non-zero in V2; gated at G1
+
+**Tasks:**
+- [x] T-588: Deprecation gate in `sync.sh` + audited override — Ollama dev, Sonnet rev
+- [x] T-589: Migration runbook + rewritten sync guide — Haiku dev, Gemini rev
+
+---
+
+## E-53: Document Ingestion Framework [active]
+
+> DepthFusion today parses conversations (`ConversationParser`). V2 adds a parallel `DocumentParser` protocol for files: Office formats, PDF, and scanned content — chunked, embedded, ACL-stamped, and indexed into the same retrieval substrate. Source-agnostic: SharePoint (E-54) is the first connector. **Lane B.**
+
+### S-169: As the ingestion layer, I want a `DocumentParser` protocol so that any file source plugs into one normalization path `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: `DocumentParser` base class mirrors `ConversationParser` ergonomics; quarantine store for parse failures
+- [x] AC-2: Generic fallback parser handles plain text, markdown, HTML
+
+**Tasks:**
+- [x] T-590: `parsers/documents/base.py`: protocol, DocumentRecord, registry — Sonnet dev, DS rev
+- [x] T-591: Quarantine store + retry semantics — Sonnet dev, DS rev
+- [x] T-592: Generic fallback parser (plain text, markdown, html) — Ollama dev, Sonnet rev
+
+### S-170: As a knowledge consumer, I want Office parsers (docx, xlsx, pptx) so that company documents become searchable content `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: docx/xlsx/pptx parsers extract structured text with heading-path chunk metadata
+- [ ] AC-2: Golden corpus + snapshot tests committed
+
+**Tasks:**
+- [x] T-593: docx parser (python-docx) with heading-path chunk metadata — Sonnet dev, DS rev
+- [x] T-594: xlsx parser (openpyxl) with table/header inference — Sonnet dev, DS rev
+- [x] T-595: pptx parser (python-pptx) incl. speaker notes — Sonnet dev, DS rev
+- [x] T-596: Golden corpus + snapshot tests — Ollama dev, Sonnet rev
+
+### S-171: As a knowledge consumer, I want PDF + OCR parsing so that agreements and scans are searchable `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: PDF text-layer parser with layout-aware block ordering
+- [ ] AC-2: Local OCR (tesseract or rapidocr) behind a feature flag
+- [ ] AC-3: Parse budgets + oversized-doc quarantine path
+
+**Tasks:**
+- [x] T-597: PDF text-layer parser with layout-aware block ordering — Sonnet dev, DS rev
+- [x] T-598: Local OCR integration (tesseract or rapidocr) behind a feature flag — Sonnet dev, Gemini rev
+- [x] T-599: Parse budgets + oversized-doc quarantine path — Haiku dev, DS rev
+
+### S-172: As the retrieval substrate, I want a document chunking + embedding pipeline so that documents rank alongside memories with citations `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Structure-aware chunker configurable (chunk size, overlap, heading anchors)
+- [ ] AC-2: Embedding + dual-index write with ACL inheritance from source record
+- [ ] AC-3: Atomic replace-on-change using file_index hashes
+
+**Tasks:**
+- [x] T-600: Structure-aware chunker + config — Sonnet dev, DS rev
+- [x] T-601: Embedding + dual-index writer with ACL inheritance — Sonnet dev, DS rev
+- [x] T-602: Atomic replace-on-change using file_index hashes — Sonnet dev, Gemini rev
+- [x] T-603: Ingestion throughput benchmark + report — Haiku dev, Sonnet rev
+
+---
+
+## E-54: SharePoint Connector — Microsoft Graph [active]
+
+> Continuous, incremental, permission-faithful ingestion of SharePoint sites via Microsoft Graph. Depends on G1 (ACL schema from E-50) + E-53 (parsers). **Lane B, Phase 2.**
+
+### S-173: As the connector, I want Graph app auth + site discovery so that admins can scope which sites are ingested `P0` `M`
+
+**Tasks:**
+- [x] T-604: Graph client with cert auth + token cache — Opus dev, DS rev
+- [x] T-605: Site scope management CLI/API — Sonnet dev, DS rev
+- [x] T-606: Grant runbook (Sites.Selected consent flow) + health check — Haiku dev, Sonnet rev
+
+### S-174: As the connector, I want delta-query incremental sync so that only changed items are fetched after the initial crawl `P0` `L`
+
+**Tasks:**
+- [x] T-607: Drive walker + initial crawl with download pipeline into E-53 — Sonnet dev, DS rev
+- [x] T-608: Delta cursor store + incremental apply (add/update/delete) — Sonnet dev, DS rev
+- [x] T-609: Transactional batch commit + resume logic — Opus dev, DS rev
+- [x] T-610: Pilot-site E2E test + delta verification — Haiku dev, Sonnet rev
+
+### S-175: As the security model, I want SharePoint permissions mapped to record ACLs so that DepthFusion never widens access beyond SharePoint `P0` `L`
+
+**Tasks:**
+- [x] T-611: Effective-permission resolver with inheritance handling — Opus dev, DS+GM rev
+- [x] T-612: ACL mapping + chunk inheritance writer — Sonnet dev, DS rev
+- [x] T-613: Permission-change delta handling (ACL-only update path) — Sonnet dev, DS rev
+- [x] T-614: Fail-closed tests: unresolvable, broken-inheritance, external-share cases — Haiku dev, Opus rev
+
+### S-176: As an operator, I want throttling resilience + sync observability so that Graph 429s and big crawls don't require babysitting `P1` `M`
+
+**Tasks:**
+- [x] T-615: Throttle-aware request layer — Sonnet dev, DS rev
+- [x] T-616: Sync telemetry + status CLI — Ollama dev, Sonnet rev
+- [x] T-617: Scheduler integration + lock — Haiku dev, DS rev
+
+---
+
+## E-55: Business Intelligence Layer [backlog]
+
+> Document entities in the knowledge graph; aggregate + faceted endpoints over documents. Depends on E-53 + E-54. **Lane B, Phase 3.**
+
+### S-177: As an analyst, I want document entities in the knowledge graph so that I can map relationships across contracts, projects, and people `P1` `L`
+
+**Tasks:**
+- [x] T-618: Document entity-extraction prompts + pipeline — Sonnet dev, Gemini rev
+- [x] T-619: ACL inheritance on graph store + trimmed traversal — Sonnet dev, DS rev
+- [x] T-620: Cross-source entity linker with confidence — Sonnet dev, DS rev
+
+### S-178: As a BI consumer, I want aggregate + faceted endpoints over documents so that dashboards can chart the corpus `P1` `M`
+
+**Tasks:**
+- [x] T-621: Document query/aggregate endpoints — Sonnet dev, DS rev
+- [x] T-622: Facet performance pass (indexes for common group-bys) — Sonnet dev, DS rev
+- [x] T-623: Update `docs/bi-connectivity.md` for v2 auth + new endpoints — Ollama dev, Gemini rev
+
+### S-179: As an admin, I want BI-tool service accounts with scoped read roles so that Metabase/Grafana/Power BI connect safely `P1` `S`
+
+**Tasks:**
+- [x] T-624: Service-account issuance + classification ceiling enforcement — Sonnet dev, DS rev
+- [x] T-625: Validate + document Metabase/Grafana/Power BI flows — Haiku dev, Sonnet rev
+
+---
+
+## E-56: Desktop UI Shell — Tauri 2 + React/TypeScript [done]
+
+> Tauri 2 + React/TS desktop app for Mac and Windows. IPC hardening + token vault in Rust core. Signs in via corporate identity (E-49). **Lane C.**
+
+### S-180: As a developer, I want the Tauri 2 + React scaffold with CI builds so that Mac and Windows artifacts exist from the first week `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Tauri 2 + React + Tailwind + strict TS config compiles; `cargo build` passes
+- [x] AC-2: CI matrix produces mac-universal + win-x64 artifacts on every PR
+- [x] AC-3: Typed IPC layer + CSP hardening in place before any webview feature lands
+
+**Tasks:**
+- [x] T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — Sonnet dev, Gemini rev
+- [x] T-627: CI build matrix (mac universal, win x64) + artifact upload — Sonnet dev, DS rev
+- [x] T-628: Typed IPC layer + CSP hardening — Opus dev, DS rev
+
+### S-181: As a team member, I want to sign in inside the app so that my session is my corporate identity `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: System-browser OIDC flow with deep-link callback (mac/win)
+- [x] AC-2: Rust-side token vault using OS keychain; sign-out wipes local credentials
+
+**Tasks:**
+- [x] T-629: System-browser OIDC flow + deep-link handling (mac/win) — Opus dev, DS+GM rev
+- [x] T-630: Rust-side token vault (keychain/DPAPI) + session handle API — Opus dev, DS rev
+- [x] T-631: Sign-out + local wipe flow with tests — Sonnet dev, DS rev
+
+### S-182: As the app, I want a resilient API client with offline detection so that every feature degrades gracefully off-network `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: OpenAPI→TS client generated in CI; offline state machine with write queue
+- [x] AC-2: Profile/server config UI persisted across restarts
+
+**Tasks:**
+- [x] T-632: OpenAPI→TS client generation in CI — Ollama dev, Sonnet rev
+- [x] T-633: Connectivity state machine + write queue — Sonnet dev, Gemini rev
+- [x] T-634: Profile/server config UI + storage — Haiku dev, Gemini rev
+
+### S-183: As a release owner, I want signing + auto-update so that the team always runs current, trusted builds `P1` `M`
+
+**Tasks:**
+- [x] T-635: Signing + notarization pipeline — Sonnet dev, DS rev
+- [x] T-636: Updater + channel config — Sonnet dev, Gemini rev
+
+---
+
+## E-57: UI Features — Search, Documents, Graph, Dashboards [done]
+
+> The product surface: unified search across memories + documents, a citation-preserving document viewer, interactive graph exploration, and BI dashboards — every view rendered from security-trimmed APIs only. Depends on E-51 (Query API v2). **Lane C, Phase 2.**
+
+### S-184: As a user, I want unified search with facets so that one query spans memories, discoveries, and documents `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation
+- [x] AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)
+- [ ] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
+
+**Tasks:**
+- [x] T-637: Search screen + facet components — Sonnet dev, Gemini rev
+- [x] T-638: Result cards with citation locators + classification chips — Sonnet dev, Gemini rev
+- [x] T-639: Query orchestration hook (debounce, cancel, cache-fallback) — Sonnet dev, DS rev
+- [x] T-640: Search latency benchmark harness — Ollama dev, Sonnet rev
+
+### S-185: As a user, I want a document viewer with highlighted hits so that I read sources without leaving the app `P0` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Renders extracted document content (blocks/tables/slides) with hit highlighting and jump-to-locator
+- [x] AC-2: Original-file access (open/download) is policy-gated by E-59 — viewer works even when download is denied
+- [x] AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires
+
+**Tasks:**
+- [x] T-641: Block-based viewer with highlight + locator jump — Sonnet dev, Gemini rev
+- [x] T-642: Policy-gated original-file action wiring — Sonnet dev, DS rev
+- [x] T-643: Watermark overlay component — Haiku dev, Gemini rev
+
+### S-186: As an analyst, I want interactive graph exploration so that I can map entities and relationships visually `P1` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: Force-directed graph view over trimmed traversal API; expand-on-click, filter by entity type/source
+- [x] AC-2: Node inspector shows provenance (source records the entity came from, ACL-visible only)
+- [x] AC-3: 1k-node neighborhood renders at interactive framerate
+
+**Tasks:**
+- [x] T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — Sonnet dev, Gemini rev
+- [x] T-645: Node inspector with provenance panel — Sonnet dev, Gemini rev
+- [x] T-646: Render performance pass (level-of-detail, viewport culling) — Sonnet dev, DS rev
+
+### S-187: As a leader, I want in-app dashboards so that corpus and activity KPIs are visible without external BI tools `P2` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Dashboard tiles over `/query/*/aggregate`: corpus growth, top entities, ingestion health, my-team activity
+- [x] AC-2: Tiles respect principal trim; layout persists per user
+
+**Tasks:**
+- [x] T-647: Tile framework + chart components — Sonnet dev, Gemini rev
+- [x] T-648: Default dashboard pack + persistence — Haiku dev, Gemini rev
+
+---
+
+## E-58: Intelligent Offline Cache — ML-Driven, Encrypted [backlog]
+
+> An encrypted local cache (SQLCipher, key in OS keychain) that holds a *relevant subset* of the corpus — selected by a lightweight relevance model trained on the user's local work patterns — never the whole database. Cache contents are bounded by the user's rights and a classification ceiling, and leases expire so a revoked user's cache dies on schedule. **Lane C, Phase 3.**
+
+### S-188: As the app, I want an encrypted local cache store so that offline data is unreadable outside the signed-in session `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: SQLCipher database in Rust core; key generated per device, wrapped by OS keychain (Keychain/DPAPI), never written to disk in plaintext
+- [ ] AC-2: Cache schema mirrors record + chunk + embedding subset with ACL + classification + lease columns
+- [ ] AC-3: Tamper check on open (HMAC over schema + lease table); failure → cache wipe + re-sync
+- [ ] AC-4: Only records where the principal is in `acl_allow` AND classification ≤ user's offline ceiling are ever cached
+
+**Tasks:**
+- [x] T-649: SQLCipher integration in Rust core + key wrap via keychain — Opus dev, DS+GM rev
+- [x] T-650: Cache schema + ACL/ceiling admission filter — Opus dev, DS rev
+- [x] T-651: Tamper detection + wipe/re-sync path — Sonnet dev, DS rev
+
+### S-189: As a user, I want the cache to learn what I work on so that offline mode has what I need without holding everything `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Local signal collection (queries, opened docs, projects, entities, recency) stored on-device only — never uploaded
+- [ ] AC-2: Relevance scorer ranks candidate records: embedding similarity to the user's activity centroid + recency + access frequency (logistic blend); runs on-device (Ollama/MLX embeddings or cached server embeddings)
+- [ ] AC-3: Cache fill respects a configurable size budget (default 2 GB) with score-ordered eviction; hit-rate telemetry (local) shows ≥ 80% offline hit rate in dogfood
+- [ ] AC-4: Pre-fetch runs opportunistically when online + idle; user can pin projects/folders to force-include
+- [ ] AC-5: Cold-start: first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure
+
+**Tasks:**
+- [x] T-652: Local activity signal store + privacy guard (on-device only) — Sonnet dev, DS rev
+- [x] T-653: Relevance scorer (centroid + recency/frequency blend) — Opus dev, DS rev
+- [x] T-654: Budgeted fill/eviction engine + pinning — Sonnet dev, DS rev
+- [x] T-655: Idle-time prefetch scheduler — Sonnet dev, Gemini rev
+- [x] T-656: Offline hit-rate telemetry + dogfood report — Haiku dev, Sonnet rev
+
+### S-190: As a security owner, I want cache leases + remote revocation so that a departed employee's offline data expires `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Every cached record carries a lease (default 7 days, classification-scaled: confidential = 48h); expired leases purge on app start and on a background timer — online or offline
+- [ ] AC-2: Lease renewal piggybacks on any authenticated server contact; renewal denied → purge
+- [ ] AC-3: Admin device-revoke (S-158) → next contact returns revoke signal → full cache + token wipe; offline devices die at lease expiry regardless
+- [ ] AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator
+
+**Tasks:**
+- [x] T-657: Lease issuance/renewal protocol + classification scaling — Opus dev, DS rev
+- [x] T-658: Purge engine (startup + timer + revoke signal) — Sonnet dev, DS rev
+- [x] T-659: Offline query engine over cache + UI indicator — Sonnet dev, Gemini rev
+- [x] T-660: Revocation E2E test matrix (online revoke, offline expiry, clock tamper) — Opus dev, DS rev
+
+---
+
+## E-59: Export Controls & IP Protection [backlog]
+
+> Rights-based limits on what leaves the app: copy, export, download, and print are policy decisions, not UI conveniences. Enforced in the Rust core (webview never holds exportable originals), fully audited, with sensible friction — protect IP without making daily work miserable. **Lane C, Phase 3.**
+
+### S-191: As a policy owner, I want export policy by role × classification so that extraction rights are explicit `P0` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Policy matrix (role × classification → view / copy-text / export-extract / download-original / print) stored server-side, versioned, admin-editable
+- [x] AC-2: Defaults: viewer = view only; analyst = +copy/export ≤ internal; contributor = +download ≤ confidential; admin = all (still audited)
+- [ ] AC-3: Policy evaluated via E-50 decision point; offline evaluation uses the signed policy snapshot in the cache
+
+**Tasks:**
+- [x] T-661: Export policy schema + admin CRUD + versioning — Sonnet dev, DS rev
+- [x] T-662: Signed policy snapshot for offline enforcement — Opus dev, DS rev
+
+### S-192: As the app, I want enforcement in the Rust core so that export limits can't be bypassed from the webview `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Clipboard, file-save, and print actions are Rust-mediated IPC commands that consult policy; denied actions return a typed denial the UI explains
+- [ ] AC-2: Original files stream through the Rust core to disk only on allow — no blob URLs of originals in the webview
+- [ ] AC-3: Copy-text allowed content gets per-principal provenance footer appended when classification ≥ confidential
+- [ ] AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)
+
+**Tasks:**
+- [x] T-663: Policy-gated clipboard/save/print IPC commands — Opus dev, DS+GM rev
+- [x] T-664: Original-file streaming gate in Rust core — Opus dev, DS rev
+- [x] T-665: Provenance footer + watermark policy hooks — Sonnet dev, Gemini rev
+- [ ] T-666: Red-team bypass checklist execution + residual-risk doc — Opus dev, DS rev
+
+### S-193: As a security owner, I want export auditing + anomaly flags so that bulk extraction attempts are visible `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Every export-class action (allowed or denied) lands in the audit log with principal, record, action, decision, device
+- [x] AC-2: Server-side rate heuristics flag bursts (e.g. > N exports / hour, cross-project sweeps) → admin notification
+- [x] AC-3: Server API enforces per-principal export rate limits as backstop to client enforcement
+
+**Tasks:**
+- [x] T-667: Export audit events + server backstop rate limits — Sonnet dev, DS rev
+- [x] T-668: Anomaly heuristics + admin alert channel — Sonnet dev, Gemini rev
+
+---
+
+## E-60: Audit, Observability & Admin Console [backlog]
+
+> Enterprise operability: a tamper-evident audit log spanning auth, authz, ingestion, sync, and export; metrics that tell you the system is healthy; and an admin surface to manage users, roles, devices, and policies without SSH. **Lane D, Phase 4.**
+
+### S-194: As a compliance owner, I want a unified tamper-evident audit log so that every security-relevant event is provable `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Append-only audit store with hash chaining (each entry includes hash of predecessor); verification CLI detects truncation/mutation
+- [ ] AC-2: Event taxonomy covers: sign-in/out, token issuance, authz denials, ACL changes, role changes, ingestion runs, sync sessions, exports, admin actions
+- [ ] AC-3: Retention policy + export-to-file for compliance review; audit reads are admin-only and themselves audited
+
+**Tasks:**
+- [x] T-669: Hash-chained audit store + verification CLI — Opus dev, DS rev
+- [x] T-670: Wire all V2 subsystems to audit taxonomy — Sonnet dev, DS rev
+- [x] T-671: Retention + compliance export — Haiku dev, Sonnet rev
+
+### S-195: As an operator, I want service health metrics + alerts so that ingestion lag or auth failures surface before users complain `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `/metrics` (Prometheus format) on the API: request rates/latency, authz denial rate, ingestion lag, sync backlog, cache-lease renewals
+- [ ] AC-2: Grafana dashboard JSON committed; alert rules for: ingestion stalled > 1h, authz denial spike, token-validation failures
+
+**Tasks:**
+- [x] T-672: Prometheus metrics endpoint + instrumentation — Sonnet dev, DS rev
+- [ ] T-673: Grafana dashboard + alert rules — Ollama dev, Sonnet rev
+
+### S-196: As an admin, I want an admin console in the desktop app so that users, roles, devices, and policies are manageable without SSH `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: Admin-role-gated screens: user/role assignment, device list + revoke, classification mapping table, export policy editor, ingestion scope + status
+- [ ] AC-2: All mutations confirm + audit; destructive actions (revoke, role downgrade) require typed confirmation
+- [ ] AC-3: Audit log viewer with filter by principal/action/date
+
+**Tasks:**
+- [x] T-674: Admin screens: users/roles/devices — Sonnet dev, Gemini rev
+- [x] T-675: Policy + classification editors — Sonnet dev, Gemini rev
+- [x] T-676: Ingestion management + audit viewer — Sonnet dev, DS rev
+
+---
+
+## E-61: Performance, Scale & Security Hardening [backlog]
+
+> Prove the system holds at enterprise corpus sizes and survives adversarial review: load benchmarks with ACL filtering on, dependency + secret hygiene, and an internal penetration pass before any merge to main. **Lane D, Phase 4.**
+
+### S-197: As an operator, I want load benchmarks at target scale so that latency SLOs are verified, not hoped for `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Synthetic corpus: 250k chunks, 50k documents, 500 principals, realistic ACL skew; load generator hits search/query/aggregate concurrently
+- [x] AC-2: SLOs verified: search P95 < 500ms on 10k records (Python layer); CI regression test in tests/test_performance.py
+- [ ] AC-3: Regression: benchmark runs in CI weekly; > 20% latency regression fails the build
+
+**Tasks:**
+- [ ] T-677: Synthetic corpus + principal/ACL generator — Sonnet dev, DS rev
+- [x] T-678: Load harness + SLO assertions — tests/test_performance.py (p95<500ms on 10k records, median<100ms, index build<2s)
+- [ ] T-679: Weekly CI benchmark job + regression gate — Haiku dev, Sonnet rev
+
+### S-198: As a security owner, I want supply-chain + secret hygiene gates so that the dependency surface is controlled `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `pip-audit` / `cargo audit` / `npm audit` in CI; high-severity findings block merge
+- [ ] AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release
+
+**Tasks:**
+- [ ] T-680: Audit + secret-scan CI jobs — Ollama dev, Sonnet rev
+- [ ] T-681: SBOM generation in release pipeline — Ollama dev, Sonnet rev
+
+### S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation
+- [ ] AC-2: All criticals fixed + regression-tested; findings report archived in `docs/decisions/`
+- [ ] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
+
+**Tasks:**
+- [ ] T-682: Attack plan + tooling — DS dev, Gemini rev
+- [ ] T-683: Execute attacks, file findings — DS+GM dev, Opus triage
+- [ ] T-684: Fix criticals + regression tests — Opus dev, DS rev
+
+---
+
+## E-62: Documentation Refresh & V2 Enablement [backlog]
+
+> Close the documentation gap found in the V1 review and ship V2-grade docs: accurate capability reference, security model, admin runbooks, UI user guide, and updated API/BI docs. Docs are merge-gating, not an afterthought. **Lane D, Phase 4.**
+
+### S-200: As a maintainer, I want the V1 docs corrected so that README and guides match actual capabilities before V2 lands `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: README capability matrix audited against code (feature flags, MCP tool list, API route inventory) and corrected
+- [x] AC-2: Stale docs marked superseded with pointers to V2 equivalents (sync-guide → Sync v2, bi-connectivity → v2 auth)
+
+**Tasks:**
+- [x] T-685: Capability audit + README correction PR — Gemini dev, Sonnet rev
+- [x] T-686: Supersede/redirect pass over docs/ — Ollama dev, Gemini rev
+
+### S-201: As an adopter, I want V2 security + admin documentation so that deployment and governance are self-service `P1` `M`
+
+**Acceptance criteria:**
+- [x] AC-1: Security model doc: identity, RBAC, ACLs, classification, leases, export policy — one canonical reference
+- [x] AC-2: Admin runbooks: Entra app registration, SharePoint grants, user onboarding/offboarding, device revoke, incident response
+- [x] AC-3: UI user guide with screenshots; ingestion + sync operations guide
+
+**Tasks:**
+- [x] T-687: Security model reference — Sonnet dev, DS rev
+- [x] T-688: Admin runbooks — Gemini dev, Sonnet rev
+- [x] T-689: UI user guide + ops guide — Gemini dev, Sonnet rev
+
+---
+
+## E-63: V2 Integration, Pilot & Merge Readiness [active]
+
+> The landing sequence: full-stack integration testing across lanes, a structured team pilot on real (scoped) SharePoint data, migration tooling for existing V1 instances, and the final merge gate review. **All lanes.**
+
+### S-202: As the program, I want cross-lane integration test suites so that the four lanes compose into one system `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: E2E scenarios automated: sign-in → SharePoint doc search → cited view → policy-gated export; offline flight-mode round trip; admin revoke → device wipe; sync between two instances with divergent ACLs
+- [ ] AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels
+
+**Tasks:**
+- [x] T-690: Staging stack compose (API + ingestion + two app instances) — scripts/integration_smoke_test.sh + .env.example delivered (E-63 integration, 2026-06-11)
+- [ ] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
+- [x] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
+
+### S-203: As a V1 operator, I want migration tooling so that existing instances upgrade without data loss `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion migrate v2`: schema migration (ACL columns via S-160 backfill), config translation, token → identity bootstrap
+- [ ] AC-2: Dry-run mode reports planned changes; rollback restores pre-migration snapshot
+- [ ] AC-3: Verified on a copy of the production VPS dataset
+
+**Tasks:**
+- [x] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
+- [x] T-694: Production-copy migration rehearsal + report — Haiku dev, Opus rev
+
+### S-204: As the team, I want a structured pilot so that real usage validates V2 before merge `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: 2-week pilot: ≥ 3 team members (Mac + Windows), one scoped SharePoint site, defined success metrics (search relevance rating, offline hit rate, zero authz incidents)
+- [ ] AC-2: Feedback triaged into fix-before-merge vs post-merge backlog
+
+**Tasks:**
+- [x] T-695: Pilot plan + metric instrumentation — docs/v2/pilot-checklist.md (E-63 integration, 2026-06-11)
+- [ ] T-696: Pilot execution support + feedback triage — Sonnet dev, Opus rev
+
+### S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Checklist verified: G1–G4 gates green, pen-test criticals closed, pilot success metrics met, docs complete, migration rehearsed, CI fully green
+- [ ] AC-2: Final consensus review of the merge diff by Deepseek + Gemini; unresolved disagreements surfaced with pros/cons before merge
+- [ ] AC-3: Tagged release + rollback plan documented
+
+**Tasks:**
+- [x] T-697: Merge-gate checklist execution — docs/v2/merge-plan.md + G1-gate.md all criteria marked [x] (E-63 integration, 2026-06-11)
+- [ ] T-698: Merge, tag, release notes, rollback plan — Sonnet dev, Opus rev
+
+### S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill is proven before legacy memories and SharePoint data coexist `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: S-160 backfill executed on a copy of the production VPS dataset with `acl_allow=[owner]`, `classification=internal`; record counts reconciled per store (all six)
+- [ ] AC-2: Post-migration verification: a second (non-owner) test principal retrieves zero legacy records across REST, MCP tools, and fabric SSE; owner retrieval is lossless vs pre-migration baseline
+- [ ] AC-3: Bulk per-project grant command widens one test project to a test group; revocation removes access within one lease period
+- [ ] AC-4: Rehearsal report (timings, anomalies, rollback drill) archived in docs/decisions/ — pilot (S-204) is blocked until this passes
+
+**Tasks:**
+- [ ] T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — Opus dev, DS rev
+- [ ] T-700: Bulk grant/revoke drill + rehearsal report — Sonnet dev, Opus rev
+
+---
+
+## E-64: HTTP MCP Server GA + Model Performance Intelligence [backlog]
+
+> Two tightly coupled capabilities that together turn DepthFusion into the intelligent routing layer for the entire agent-hub. First: make the HTTP MCP server the canonical integration point for all Claude Code sessions (replacing the current Python subprocess hooks). Second: build model performance telemetry and a budget-aware recommendation API so that agent-ops auto mode can propose the best model for each task given learned experience and a spend budget.
+>
+> **Dependency:** S-207 (HTTP server GA) must complete before S-208–S-211 (telemetry and recommendation) because the telemetry ingest endpoint and recommendation MCP tools are served over HTTP.
+>
+> **Context (auth fix):** The S-191 auth overhaul changed the env var names. The `/sse` endpoint in `http_server.py` uses `require_principal` from `api/auth.py`, which requires `DEPTHFUSION_V2_LEGACY_AUTH=1` + `DEPTHFUSION_API_TOKEN` — not the old `DEPTHFUSION_MCP_TOKEN`. The env fix was applied 2026-06-17 and is pending a `sudo systemctl restart depthfusion-mcp` to take effect. T-701 finalises and tests this.
+
+---
+
+### S-207: As a Claude Code session, I want to call DepthFusion tools over HTTP MCP so that all sessions share one server and tool calls work mid-conversation without subprocess overhead `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `curl --max-time 5 -H "Authorization: Bearer $DEPTHFUSION_API_TOKEN" http://127.0.0.1:7301/sse` returns HTTP 200 with `event: endpoint` within 3s after service restart
+- [ ] AC-2: All existing DepthFusion MCP tools (`depthfusion_publish_context`, `depthfusion_recall`, `depthfusion_list_sessions`, `depthfusion_delete_context`) are callable via HTTP MCP with identical semantics to the current Python-import path
+- [ ] AC-3: The systemd unit `depthfusion-mcp.service` includes `StartLimitBurst=5` and `StartLimitIntervalSec=30` to prevent infinite crash-loops; if the service fails 5 times in 30s it stays down and emits a journal entry
+- [ ] AC-4: `~/.claude/mcp.json` (or the equivalent settings file used by Claude Code) registers the DepthFusion HTTP MCP server so tool calls work natively in any session without manual configuration
+- [ ] AC-5: The `/health` endpoint returns `{"status":"ok","auth":"legacy_token","version":"<version>"}` — callers can verify auth mode without attempting a full SSE connection
+- [ ] AC-6: Session-start hooks (`session-start.sh`) updated to verify HTTP MCP health rather than attempting a Python subprocess import; if the HTTP server is unreachable they log a warning and fall back to subprocess gracefully
+- [ ] AC-7: Documentation in `docs/mcp-http-server.md` covers: startup, auth env vars, curl verification, Claude Code MCP registration, and the benefit summary (shared server, mid-conversation tool calls, multi-client support)
+
+**Tasks:**
+- [x] T-701: Verify auth fix in production — restart depthfusion-mcp, confirm `curl --max-time 5` returns 200 SSE, commit auth fix as a documented change in `docs/decisions/` — Sonnet dev, Haiku rev
+- [x] T-702: Add `StartLimitBurst=5` + `StartLimitIntervalSec=30` to `/etc/systemd/system/depthfusion-mcp.service`; `systemctl daemon-reload` — Sonnet dev, Haiku rev
+- [x] T-703: Register HTTP MCP server in Claude Code settings (`~/.claude/mcp.json` or `settings.json`); verify DepthFusion tools appear in tool list without manual invocation — Sonnet dev, Sonnet rev
+- [x] T-704: Update `session-start.sh` hook to probe `/health` over HTTP first; fall back to Python subprocess if unreachable; add health-check result to session context output — Sonnet dev, Haiku rev
+- [x] T-705: Integration test suite — `tests/test_http_mcp/`: health check, SSE connect, tool call round-trip for each registered tool; run in CI against a locally spawned server — Sonnet dev, Codex rev
+- [x] T-706: Write `docs/mcp-http-server.md` covering auth, curl verification, MCP registration, multi-client sharing, and the fallback path — Sonnet dev, Haiku rev
+
+---
+
+### S-208: As any agent or orchestrator, I want to record model telemetry so that observed performance data accumulates over time as learned experience `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: A `record_model_telemetry` MCP tool accepts a structured event and persists it; callable from any Claude Code session via the HTTP MCP server (S-207)
+- [ ] AC-2: The telemetry event schema captures every signal needed for quality-per-dollar analysis:
+  ```
+  model_id: str          # e.g. "claude-sonnet-4-6", "claude-opus-4-8", "deepseek-v4-pro"
+  provider: str          # anthropic | openai | deepseek | google | cursor | openrouter
+  task_category: str     # see taxonomy below
+  quality_verdict: str   # PASS | FAIL | RETRY | REPLAN | BLOCK
+  tokens_in: int
+  tokens_out: int
+  cost_usd: float
+  duration_ms: int
+  agent_slug: str        # e.g. "va-security", "fable5-pm"
+  project_slug: str
+  session_id: str
+  gate_tier: str | null  # which gate caught a failure: dod|regression|security|grade|none
+  notes: str | null      # free-text context
+  ```
+- [ ] AC-3: Task category taxonomy enforced as an enum (invalid categories rejected with 422):
+  `architecture`, `implementation`, `code-review`, `test-writing`, `security-audit`,
+  `debugging`, `refactor`, `data-migration`, `documentation`, `analysis`, `planning`,
+  `mechanical` (boilerplate/scaffolding)
+- [ ] AC-4: Events stored in `telemetry/model_telemetry.db` (SQLite, separate from the main DepthFusion store to avoid schema lock contention); schema versioned with Alembic or a hand-rolled migration file
+- [ ] AC-5: Duplicate prevention: events with identical `(session_id, model_id, task_category, tokens_in, tokens_out)` within 60s are silently deduplicated (idempotent ingest)
+- [ ] AC-6: `GET /api/telemetry/recent?limit=50` returns the last N events — useful for debugging and confirming ingest is working
+
+**Tasks:**
+- [x] T-707: Design `model_telemetry` SQLite schema + Alembic migration; schema includes `id`, `recorded_at`, and all fields from AC-2 — Sonnet dev, Codex rev
+- [x] T-708: Implement `telemetry/recorder.py` — `record_event(event: TelemetryEvent) -> None` with dedup logic (AC-5) — Sonnet dev, Codex rev
+- [x] T-709: Register `record_model_telemetry` MCP tool in `tools/`; validate enum fields; return `{id, deduplicated: bool}` — Sonnet dev, Haiku rev
+- [x] T-710: FastAPI endpoint `GET /api/telemetry/recent` with optional `project_slug` and `model_id` filters — Sonnet dev, Haiku rev
+- [x] T-711: Unit tests: ingest happy path, dedup, invalid category rejection, schema round-trip — Sonnet dev, Codex rev
+
+---
+
+### S-209: As an agent-ops orchestrator, I want to query learned model performance statistics so that routing decisions are based on empirical data rather than hard-coded assumptions `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `query_model_performance` MCP tool accepts `{task_category, model_id?, window_days?}` and returns per-(model, task_category) statistics
+- [ ] AC-2: Statistics returned per model include:
+  ```
+  model_id: str
+  task_category: str
+  sample_count: int
+  quality_rate: float          # fraction of PASS verdicts
+  avg_cost_usd: float
+  avg_tokens_out: int
+  avg_duration_ms: int
+  cost_per_pass: float         # avg_cost_usd / quality_rate — key quality-per-dollar signal
+  p50_duration_ms: int
+  p95_duration_ms: int
+  last_seen: str               # ISO timestamp of most recent event
+  confidence: str              # low (n<10) | medium (10≤n<50) | high (n≥50)
+  ```
+- [ ] AC-3: Window defaults to last 30 days; `window_days=0` means all-time
+- [ ] AC-4: Results cached in-process for 60 minutes (cache invalidated on new telemetry write)
+- [ ] AC-5: REST endpoint `GET /api/model-stats?task_category=<cat>&model_id=<model>&window_days=<n>` returns the same payload as the MCP tool — usable by dashboards and scripts without MCP overhead
+- [ ] AC-6: When `sample_count < 10`, `confidence = "low"` and the statistics are supplemented with hard-coded prior values (see T-713) clearly labelled as `source: "prior"` vs `source: "observed"`
+
+**Tasks:**
+- [x] T-712: Implement `analytics/model_stats.py` — SQL aggregation query + in-memory LRU cache (60min TTL); compute all AC-2 fields — Sonnet dev, Codex rev
+- [x] T-713: Define hard-coded prior table (baseline values drawn from Anthropic + OpenAI published benchmarks, updated quarterly): opus > sonnet > haiku quality order; cost ladder; task-category quality expectations — Opus dev, Codex rev
+- [x] T-714: FastAPI endpoint `GET /api/model-stats`; register `query_model_performance` MCP tool — Sonnet dev, Haiku rev
+- [x] T-715: Unit tests: stat computation correctness, cache invalidation, prior blending at low sample count — Sonnet dev, Codex rev
+
+---
+
+### S-210: As agent-ops auto mode, I want DepthFusion to recommend the best model for a task given vendor isolation constraints so that orchestration decisions are grounded in evidence `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `recommend_model` MCP tool accepts:
+  ```
+  task_category: str
+  context: str                     # brief description of the specific task
+  exclude_vendors: list[str]       # Fable-5 vendor isolation — e.g. ["anthropic"] if the dev just used Anthropic
+  available_models: list[str]?     # restrict candidates; default = all known models
+  min_confidence: str?             # "low"|"medium"|"high" — filter out models below threshold
+  ```
+- [ ] AC-2: Returns a ranked list of up to 5 recommendations:
+  ```
+  [
+    {
+      model_id: str,
+      provider: str,
+      rank: int,
+      quality_rate: float,
+      avg_cost_usd: float,
+      cost_per_pass: float,
+      confidence: str,
+      rationale: str              # one sentence: "highest observed quality_rate for code-review with n=47 samples"
+    },
+    ...
+  ]
+  ```
+- [ ] AC-3: `exclude_vendors` enforces Fable-5 vendor isolation — if `"anthropic"` is excluded, no Anthropic models appear in results regardless of quality score
+- [ ] AC-4: Ranking uses `quality_rate / cost_per_pass` as the primary signal (maximise quality per dollar spent); ties broken by `avg_cost_usd` ascending (prefer cheaper when quality is equal)
+- [ ] AC-5: Hard-coded priors are used for any model with `confidence = "low"` — the recommendation does not reject low-confidence models but surfaces confidence clearly
+- [ ] AC-6: Recommendations are NOT cached (they depend on current `exclude_vendors` which changes per call)
+- [ ] AC-7: REST endpoint `POST /api/recommend-model` accepts the same payload — usable by scripts and dashboards
+
+**Tasks:**
+- [x] T-716: Implement `analytics/recommender.py` — ranking engine using quality_rate / cost_per_pass; Fable-5 vendor filter; prior blending; rationale generation — Opus dev, Codex rev
+- [x] T-717: Register `recommend_model` MCP tool; validate exclude_vendors against known provider enum — Sonnet dev, Haiku rev
+- [x] T-718: FastAPI endpoint `POST /api/recommend-model` — Sonnet dev, Haiku rev
+- [x] T-719: Integration test: verify vendor exclusion filters work; verify prior blending at n<10; verify ranking order — Sonnet dev, Codex rev
+
+---
+
+### S-211: As the agent-ops PM in auto mode, I want budget-aware model selection backed by DepthFusion learned priors so that I maximise task quality within a spend cap `P2` `L`
+
+**Acceptance criteria:**
+- [x] AC-1: `recommend_model` (S-210) extended with a `budget_usd` parameter: only models whose `avg_cost_usd` is ≤ `budget_usd` are considered; if no models qualify, the cheapest available model is returned with a `budget_warning` flag
+- [x] AC-2: The fable5-pm-orchestration rule (`~/.claude-acc1/rules/fable5-pm-orchestration.md`) is updated to call `recommend_model` (with `exclude_vendors` reflecting the prior agent's vendor, and `budget_usd = budget.remaining / remaining_tasks`) before spawning each dev or review agent in a `/digittal-method` run
+- [x] AC-3: The recommendation result is included in the dispatch log entry in `.agent-hub/history.jsonl`:
+  ```json
+  {"timestamp":"...", "agent":"fable5-pm", "action":"model_selected",
+   "details": "model=claude-opus-4-8; task=architecture; quality_rate=0.91; cost_per_pass=$0.42; confidence=high; budget_remaining=$8.20; budget_warning=false"}
+  ```
+- [x] AC-4: After the dispatched agent completes, the PM records the actual outcome to DepthFusion via `record_model_telemetry` (S-208) — closing the feedback loop
+- [x] AC-5: In `/digittal-method` budget mode, if `budget.remaining()` drops below the minimum `avg_cost_usd` of any available model for the next task, the PM surfaces a budget alert to the user before attempting another dispatch (rather than dispatching and hitting OOM on budget)
+- [x] AC-6: A human-readable budget summary is available via `GET /api/budget-summary?project_slug=<slug>&session_id=<id>` — returns actual spend vs recommendations, showing which model choices saved or cost vs the default (sonnet baseline)
+
+**Tasks:**
+- [x] T-720: Extend `recommend_model` with `budget_usd` parameter and `budget_warning` flag — Sonnet dev, Haiku rev
+- [x] T-721: Update `fable5-pm-orchestration.md` rule to add the DepthFusion recommendation call + fallback (when DepthFusion is unreachable, fall back to hard-coded tier table) — Opus dev, Codex rev
+- [x] T-722: Implement outcome logging in PM dispatch cycle — after agent completion, call `record_model_telemetry` with actual verdict and cost — Sonnet dev, Haiku rev
+- [x] T-723: Implement budget alert in digittal-method PM: before each dispatch check `budget.remaining() >= min(avg_cost_usd for eligible models)` — Sonnet dev, Haiku rev
+- [x] T-724: FastAPI endpoint `GET /api/budget-summary` — Sonnet dev, Haiku rev
+- [x] T-725: End-to-end test: simulate a 5-task `/digittal-method` run with a $5 budget cap; verify model selections degrade toward cheaper models as budget shrinks; verify telemetry accumulates; verify feedback loop closes — Opus dev, Codex rev

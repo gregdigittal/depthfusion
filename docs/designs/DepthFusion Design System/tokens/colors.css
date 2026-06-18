@@ -1,0 +1,48 @@
+/* ════════════════════════════════════════════════════════════════
+   DepthFusion · Color tokens — "Darkroom Amber"
+   A sodium-safelight palette: warm near-black paper, amber glow,
+   ember flame, warm ivory type. No blue, no indigo, no cold dev-mode.
+   A single cold accent (--cold) exists only for "missing / lost" states.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces (warm near-black "paper") ── */
+  --bg:            #09070a;   /* deepest — app background */
+  --surface:       #120e0b;   /* panel / card */
+  --surface-2:     #1a140f;   /* raised panel */
+  --surface-3:     #251c14;   /* lifted / hover */
+  --border:        #3a2a1e;   /* rules, borders */
+  --border-strong: #4a3527;   /* input borders, dividers */
+
+  /* ── Type (warm ivory) ── */
+  --text:      #efe6d6;   /* primary */
+  --text-2:    #c7b89a;   /* secondary */
+  --muted:     #8a7a5f;   /* tertiary / labels */
+  --faint:     #6f6047;   /* quaternary */
+  --faintest:  #5a4e3e;   /* hints / disabled */
+
+  /* ── Accent (the safelight) ── */
+  --accent:        #ff8e3a;   /* primary — sodium amber, 590nm */
+  --accent-hover:  #ffa45c;   /* hover */
+  --accent-soft:   #c2701f;   /* secondary amber */
+  --accent-bright: #ffb877;   /* highlight / selected edge */
+  --on-accent:     #1a0d04;   /* text/marks on an amber fill */
+  --accent-wash:   rgba(255,142,58,.14);  /* tint fills */
+  --ember:         #c2410c;   /* deep flame */
+
+  /* ── Status (warm-shifted) ── */
+  --ok:        #c2701f;   --ok-soft:     #e0a35a;   /* success / synced */
+  --warn:      #d8934a;   --warn-soft:   #e8b272;   /* warning */
+  --danger:    #c2410c;   --danger-soft: #e8743f;   /* destructive / error */
+  --cold:      #3e5b5e;   --cold-soft:   #6f9396;   /* the one cold accent: lost/missing */
+
+  /* ── Knowledge-graph node types ── */
+  --node-doc:      #ff8e3a;   /* document  */
+  --node-concept:  #c2701f;   /* concept   */
+  --node-decision: #d8934a;   /* decision  */
+
+  /* ── Document classification (warm, cohesive, no blue) ── */
+  --cls-public:       #8a9a52;   /* olive  */
+  --cls-internal:     #6f9396;   /* cold teal (uses the one cold accent) */
+  --cls-confidential: #d8934a;   /* amber  */
+  --cls-restricted:   #c2410c;   /* ember  */
+}

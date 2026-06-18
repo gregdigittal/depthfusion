@@ -1,0 +1,35 @@
+/* ════════════════════════════════════════════════════════════════
+   DepthFusion · Typography tokens
+   Display = Fraunces (variable serif, opsz axis is load-bearing).
+   Body = Inter Tight. Mono = JetBrains Mono.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Families ── */
+  --font-sans:    'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', 'Fira Mono', ui-monospace, monospace;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+  /* ── Display tuning (Fraunces wants light weight + tight tracking) ── */
+  --display-weight:  300;        /* @kind font */
+  --display-spacing: -0.035em;   /* @kind font */
+
+  /* ── Type scale (px) ── */
+  --fs-hero:   72px;   /* @kind font */
+  --fs-h1:     30px;   /* @kind font */
+  --fs-h2:     20px;   /* @kind font */
+  --fs-stat:   26px;   /* @kind font */
+  --fs-title:  15px;   /* @kind font */
+  --fs-body:   13px;   /* @kind font */
+  --fs-snippet:12px;   /* @kind font */
+  --fs-label:  11px;   /* @kind font */
+  --fs-micro:  10px;   /* @kind font */
+
+  /* ── Weights ── */
+  --fw-regular: 400;   /* @kind font */
+  --fw-medium:  500;   /* @kind font */
+  --fw-semibold:600;   /* @kind font */
+  --fw-bold:    700;   /* @kind font */
+
+  /* ── Tracking for mono "slate" captions ── */
+  --tracking-slate: 0.18em;   /* @kind font */
+}

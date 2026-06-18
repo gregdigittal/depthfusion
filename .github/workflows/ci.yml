@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "app/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "app/**"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  test:
+    name: "Python ${{ matrix.python-version }} / ubuntu-latest"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest tests/ -x -q --ignore=tests/test_benchmark --ignore=tests/test_benchmarks --ignore=tests/test_integration
+
+      - name: Lint with ruff
+        run: ruff check src/
+
+      - name: Type check with mypy
+        run: mypy src/depthfusion/core/ src/depthfusion/recursive/ src/depthfusion/mcp/ --ignore-missing-imports
+
+  frontend-test:
+    name: "Frontend (TypeScript + Vitest)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm --dir app install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm --dir app tsc --noEmit
+
+      - name: Run tests
+        run: pnpm --dir app test

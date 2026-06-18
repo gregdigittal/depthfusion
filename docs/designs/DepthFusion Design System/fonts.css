@@ -1,0 +1,6 @@
+/* DepthFusion — webfonts (Darkroom Amber identity).
+   Fraunces = display serif (the load-bearing part of the identity, opsz axis matters),
+   Inter Tight = body sans, JetBrains Mono = mono.
+   Served from Google Fonts CDN. To self-host, replace this @import with local
+   @font-face rules pointing at files in assets/fonts/ (same family names). */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap");

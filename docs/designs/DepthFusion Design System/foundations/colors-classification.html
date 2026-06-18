@@ -1,0 +1,31 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Classification & graph nodes" subtitle="Warm, cohesive, no blue" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><link rel="stylesheet" href="../styles.css">
+<style>
+ html,body{margin:0;background:var(--bg)}
+ .wrap{padding:22px 24px;display:flex;flex-direction:column;gap:16px}
+ .grid{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+ .cell{display:flex;align-items:center;gap:10px}
+ .sw{width:30px;height:30px;border-radius:5px;border:1px solid rgba(239,230,214,.08);flex-shrink:0}
+ .n{font:500 11px var(--font-mono);color:var(--text);display:block}
+ .h{font:10px var(--font-mono);color:var(--faint)}
+ .lbl{font:10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+</style></head>
+<body class="df"><div class="wrap">
+ <div>
+  <div class="lbl" style="margin-bottom:9px">Classification</div>
+  <div class="grid">
+   <div class="cell"><div class="sw" style="background:var(--cls-public)"></div><div><span class="n">--cls-public</span><span class="h">olive</span></div></div>
+   <div class="cell"><div class="sw" style="background:var(--cls-internal)"></div><div><span class="n">--cls-internal</span><span class="h">cold teal</span></div></div>
+   <div class="cell"><div class="sw" style="background:var(--cls-confidential)"></div><div><span class="n">--cls-confidential</span><span class="h">amber</span></div></div>
+   <div class="cell"><div class="sw" style="background:var(--cls-restricted)"></div><div><span class="n">--cls-restricted</span><span class="h">ember</span></div></div>
+  </div>
+ </div>
+ <div>
+  <div class="lbl" style="margin-bottom:9px">Graph nodes</div>
+  <div class="grid">
+   <div class="cell"><div class="sw" style="background:var(--node-doc)"></div><div><span class="n">--node-doc</span><span class="h">document</span></div></div>
+   <div class="cell"><div class="sw" style="background:var(--node-concept)"></div><div><span class="n">--node-concept</span><span class="h">concept</span></div></div>
+   <div class="cell"><div class="sw" style="background:var(--node-decision)"></div><div><span class="n">--node-decision</span><span class="h">decision</span></div></div>
+  </div>
+ </div>
+</div></body></html>

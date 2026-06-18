@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion V2 — Build Plan (Enterprise Edition)</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2d3748;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --green:#3fb950;
+    --amber:#d29922; --red:#f85149; --purple:#bc8cff; --teal:#39c5cf;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);margin:0;padding:0;line-height:1.55}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 24px 80px}
+  header.hero{border-bottom:1px solid var(--border);padding:48px 24px 32px;
+    background:linear-gradient(180deg,#11161f 0%,var(--bg) 100%)}
+  header.hero .wrap{padding-top:0;padding-bottom:0}
+  h1{font-size:2rem;margin:0 0 8px}
+  .subtitle{color:var(--muted);font-size:1.05rem;margin-bottom:16px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .meta-pill{background:var(--panel);border:1px solid var(--border);border-radius:20px;
+    padding:4px 14px;font-size:.82rem;color:var(--muted)}
+  .meta-pill b{color:var(--text)}
+  h2{font-size:1.4rem;margin:48px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  h3{font-size:1.05rem;margin:24px 0 8px}
+  p{margin:8px 0}
+  .muted{color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.88rem}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--accent);font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  code{background:var(--panel2);border:1px solid var(--border);border-radius:4px;
+    padding:1px 6px;font-size:.84em;font-family:"SF Mono",Consolas,Menlo,monospace}
+  pre{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:14px;overflow-x:auto;font-size:.82rem;line-height:1.5}
+  pre code{background:none;border:none;padding:0}
+  /* badges */
+  .badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:.72rem;
+    font-weight:700;letter-spacing:.02em;vertical-align:middle;white-space:nowrap}
+  .p0{background:#5a1e1e;color:#ff9d9a}.p1{background:#5a4a1e;color:#ffd27a}
+  .p2{background:#1e3a5a;color:#9ecbff}.p3{background:#2a2a3a;color:#b3b3cc}
+  .fx{background:#23303f;color:#9ecbff}
+  .m-cl{background:#3b2a52;color:#d2b3ff}   /* Claude */
+  .m-ds{background:#173a4a;color:#7fd4ee}   /* DeepSeek */
+  .m-gm{background:#1d4030;color:#86e0a8}   /* Gemini */
+  .m-ol{background:#46371b;color:#ffce80}   /* Ollama */
+  .m-or{background:#402838;color:#ff9ecb}   /* OpenRouter */
+  .lane{background:#222b38;color:#8ecbff;border:1px solid #2d4258}
+  /* epics */
+  details.epic{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    margin:14px 0;overflow:hidden}
+  details.epic>summary{cursor:pointer;padding:14px 18px;font-size:1.05rem;font-weight:600;
+    display:flex;align-items:center;gap:10px;list-style:none}
+  details.epic>summary::-webkit-details-marker{display:none}
+  details.epic>summary:before{content:"▸";color:var(--accent);transition:transform .15s}
+  details.epic[open]>summary:before{transform:rotate(90deg)}
+  .epic-body{padding:4px 22px 18px;border-top:1px solid var(--border)}
+  .epic-desc{color:var(--muted);font-size:.9rem;border-left:3px solid var(--accent);
+    padding:6px 12px;margin:12px 0;background:rgba(88,166,255,.05)}
+  .story{margin:18px 0 6px;padding:12px 14px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:8px}
+  .story-title{font-weight:600;margin-bottom:6px}
+  .ac,.tasks{margin:8px 0 2px 4px;padding-left:0;list-style:none;font-size:.88rem}
+  .ac li,.tasks li{margin:4px 0;padding-left:24px;position:relative}
+  .ac li:before{content:"☐";position:absolute;left:0;color:var(--amber)}
+  .tasks li:before{content:"☐";position:absolute;left:0;color:var(--teal)}
+  .sect-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);margin-top:10px;font-weight:700}
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px 24px}
+  .toc ol{margin:6px 0;padding-left:22px}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .callout{border:1px solid var(--border);border-left:4px solid var(--amber);
+    background:rgba(210,153,34,.06);border-radius:8px;padding:12px 16px;margin:16px 0;font-size:.9rem}
+  .callout.green{border-left-color:var(--green);background:rgba(63,185,80,.06)}
+  .callout.red{border-left-color:var(--red);background:rgba(248,81,73,.06)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:800px){.grid2{grid-template-columns:1fr}}
+  .phasebar{display:flex;gap:4px;margin:18px 0;flex-wrap:wrap}
+  .phase{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px;font-size:.8rem}
+  .phase b{display:block;color:var(--accent);margin-bottom:4px}
+  @media print{
+    body{background:#fff;color:#111}
+    details.epic{page-break-inside:avoid}
+    details.epic[open]>summary:before{content:""}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+<div class="wrap">
+  <h1>DepthFusion V2 — Build Plan</h1>
+  <div class="subtitle">Enterprise-grade: identity &amp; ACLs, SharePoint ingestion, security-trimmed retrieval, desktop UI with intelligent offline cache, and IP export controls.</div>
+  <div class="meta-row">
+    <span class="meta-pill">Branch: <b>v2-enterprise</b></span>
+    <span class="meta-pill">Baseline: <b>v0.5.2 (E-47 / S-152 / T-532)</b></span>
+    <span class="meta-pill">Numbering: <b>E-48+ / S-153+ / T-533+</b></span>
+    <span class="meta-pill">Date: <b>2026-06-10</b></span>
+    <span class="meta-pill">Harness: <b>Claude Code (workflows, parallel lanes)</b></span>
+  </div>
+</div>
+</header>
+
+<div class="wrap">
+
+<h2 id="toc">Contents</h2>
+<div class="toc">
+<ol>
+  <li><a href="#legend">Legend &amp; conventions</a></li>
+  <li><a href="#orchestration">Harness orchestration: model routing, consensus protocol, parallel lanes</a></li>
+  <li><a href="#phases">Phase map &amp; dependency gates</a></li>
+  <li><a href="#e48">E-48 — V2 Program Setup &amp; Harness Orchestration</a></li>
+  <li><a href="#e49">E-49 — Identity Foundation (Entra ID / OIDC)</a></li>
+  <li><a href="#e50">E-50 — Authorization Model (RBAC + Record ACLs + Classification)</a></li>
+  <li><a href="#e51">E-51 — Security-Trimmed Retrieval &amp; Query API v2</a></li>
+  <li><a href="#e52">E-52 — Sync v2: ACL-Aware Replication</a></li>
+  <li><a href="#e53">E-53 — Document Ingestion Framework</a></li>
+  <li><a href="#e54">E-54 — SharePoint Connector (Microsoft Graph)</a></li>
+  <li><a href="#e55">E-55 — Business Intelligence Layer</a></li>
+  <li><a href="#e56">E-56 — Desktop UI Shell (Tauri 2 + React/TS)</a></li>
+  <li><a href="#e57">E-57 — UI Features: Search, Documents, Graph, Dashboards</a></li>
+  <li><a href="#e58">E-58 — Intelligent Local Cache (ML-driven, offline-first)</a></li>
+  <li><a href="#e59">E-59 — Export Controls &amp; IP Protection</a></li>
+  <li><a href="#e60">E-60 — Audit, Observability &amp; Admin Console</a></li>
+  <li><a href="#e61">E-61 — Performance, Scale &amp; Security Hardening</a></li>
+  <li><a href="#e62">E-62 — Documentation Refresh &amp; V2 Enablement</a></li>
+  <li><a href="#e63">E-63 — V2 Integration, Pilot &amp; Merge Readiness</a></li>
+  <li><a href="#risks">Risk register &amp; surfaced decisions</a></li>
+  <li><a href="#summary-counts">Plan totals</a></li>
+</ol>
+</div>
+
+<h2 id="legend">1. Legend &amp; conventions</h2>
+<table>
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td><span class="badge p0">P0</span> <span class="badge p1">P1</span> <span class="badge p2">P2</span> <span class="badge p3">P3</span></td>
+<td>Priority: Critical / High / Medium / Nice-to-have (matches BACKLOG.md)</td></tr>
+<tr><td><span class="badge fx">XS</span> <span class="badge fx">S</span> <span class="badge fx">M</span> <span class="badge fx">L</span> <span class="badge fx">XL</span></td>
+<td>Effort: &lt;1h / hours / 1 day / 2–3 days / week+ (matches BACKLOG.md)</td></tr>
+<tr><td><span class="badge m-cl">CL-O</span> <span class="badge m-cl">CL-S</span> <span class="badge m-cl">CL-H</span></td>
+<td>Claude Opus / Sonnet / Haiku (via Claude CLI — the harness itself)</td></tr>
+<tr><td><span class="badge m-ds">DS</span></td><td>DeepSeek V4 Pro CLI</td></tr>
+<tr><td><span class="badge m-gm">GM</span></td><td>Gemini CLI (long-context audits, large-file review)</td></tr>
+<tr><td><span class="badge m-ol">OL</span></td><td>Ollama local model (cheap batch work: scaffolds, docstrings, lint fixes)</td></tr>
+<tr><td><span class="badge m-or">OR</span></td><td>OpenRouter (tiebreak third opinion, burst capacity)</td></tr>
+<tr><td><span class="badge lane">Lane A–D</span></td><td>Parallel workstream executed as an independent Claude Code workflow/worktree</td></tr>
+</table>
+<p class="muted">Every task carries <code>dev:</code> and <code>rev:</code> model assignments. The dev model writes the code; the review model performs independent review. Disagreement triggers the consensus protocol (§2).</p>
+
+<h2 id="orchestration">2. Harness orchestration</h2>
+
+<h3>2.1 Model routing policy (cost ⇄ quality balance)</h3>
+<table>
+<tr><th>Work class</th><th>Dev model</th><th>Review model</th><th>Rationale</th></tr>
+<tr><td>Security-critical (auth, ACL filters, export gating, crypto)</td>
+  <td><span class="badge m-cl">CL-O</span></td><td><span class="badge m-ds">DS</span> + <span class="badge m-gm">GM</span> (dual review)</td>
+  <td>Highest-stakes code gets the strongest dev model and two independent reviewers.</td></tr>
+<tr><td>Core backend (services, parsers, sync engine, connectors)</td>
+  <td><span class="badge m-cl">CL-S</span></td><td><span class="badge m-ds">DS</span></td>
+  <td>Sonnet quality at sustainable cost; DeepSeek is a genuinely different model family for review.</td></tr>
+<tr><td>Frontend (React/TS components, styling, state)</td>
+  <td><span class="badge m-cl">CL-S</span></td><td><span class="badge m-gm">GM</span></td>
+  <td>Gemini reviews UI code well and its long context handles whole-component-tree review cheaply.</td></tr>
+<tr><td>Tests, fixtures, docstrings, scaffolding, lint sweeps</td>
+  <td><span class="badge m-ol">OL</span> or <span class="badge m-cl">CL-H</span></td><td><span class="badge m-cl">CL-S</span> (spot-check)</td>
+  <td>Cheap models for high-volume low-risk output; Sonnet spot-checks 1-in-N.</td></tr>
+<tr><td>Large-file / whole-module audits (&gt;50K tokens)</td>
+  <td>—</td><td><span class="badge m-gm">GM</span></td>
+  <td>Gemini's context window audits entire modules in one pass.</td></tr>
+<tr><td>Consensus tiebreak (advisory only)</td>
+  <td>—</td><td><span class="badge m-or">OR</span></td>
+  <td>Third independent opinion before escalating to you; never decides alone.</td></tr>
+</table>
+
+<h3>2.2 Consensus protocol (your dev/review standard, codified)</h3>
+<pre><code>1. DEV    : dev-model implements ticket on its lane branch; self-tests pass.
+2. REVIEW : review-model reviews the diff with a structured checklist
+            (correctness, security, perf, conventions, test coverage).
+3. AGREE? : reviewer approves → merge to lane branch → ticket done.
+4. REBUT  : reviewer objects → dev-model gets ONE rebuttal round
+            (fix or written defense).
+5. STILL SPLIT → OR (OpenRouter) renders an advisory third opinion.
+6. ESCALATE: if 2-of-3 consensus is still absent, a DECISION ticket is
+            written to docs/decisions/V2-DEC-NNN.md containing:
+            - the question, each model's position, pros/cons table,
+              recommendation strength, and blast radius.
+            → surfaced to YOU. Work on that ticket pauses; the lane
+              continues with the next unblocked ticket.</code></pre>
+<div class="callout">All decision records live in <code>docs/decisions/</code> with the <code>V2-DEC-</code> prefix so they're auditable after merge. The harness never silently picks a side on a split decision.</div>
+
+<h3>2.3 Parallel lanes (Claude Code workflows + git worktrees)</h3>
+<table>
+<tr><th>Lane</th><th>Scope</th><th>Epics</th><th>Worktree branch</th></tr>
+<tr><td><span class="badge lane">Lane A</span></td><td>Identity, authorization, trimmed retrieval</td><td>E-49, E-50, E-51</td><td><code>v2/lane-a-authz</code></td></tr>
+<tr><td><span class="badge lane">Lane B</span></td><td>Ingestion: parsers + SharePoint connector</td><td>E-53, E-54, E-55</td><td><code>v2/lane-b-ingest</code></td></tr>
+<tr><td><span class="badge lane">Lane C</span></td><td>Desktop UI, cache, export controls</td><td>E-56, E-57, E-58, E-59</td><td><code>v2/lane-c-ui</code></td></tr>
+<tr><td><span class="badge lane">Lane D</span></td><td>Sync v2, audit/observability, testing, release</td><td>E-52, E-60, E-61, E-62</td><td><code>v2/lane-d-platform</code></td></tr>
+</table>
+<p class="muted">Lanes merge into <code>v2-enterprise</code> at phase gates only (§3). E-48 runs first on the trunk branch — it builds the rails every lane runs on.</p>
+
+<h2 id="phases">3. Phase map &amp; dependency gates</h2>
+<div class="phasebar">
+  <div class="phase"><b>Phase 0 — Rails</b>E-48. Branch, CI, routing config, consensus tooling. Everything blocks on this.</div>
+  <div class="phase"><b>Phase 1 — Foundation</b>E-49→E-50 (Lane A), E-53 (Lane B), E-56 (Lane C), E-52 design (Lane D) run in parallel.</div>
+  <div class="phase"><b>Phase 2 — Integration</b>E-51 (needs E-50), E-54 (needs E-50+E-53), E-57 (needs E-51 API), E-52 build.</div>
+  <div class="phase"><b>Phase 3 — Intelligence</b>E-55, E-58, E-59 (needs E-50+E-57).</div>
+  <div class="phase"><b>Phase 4 — Hardening</b>E-60, E-61, E-62 → v2.0 release gate.</div>
+</div>
+<table>
+<tr><th>Gate</th><th>Exit criteria</th></tr>
+<tr><td><b>G0 → Phase 1</b></td><td>CI green on <code>v2-enterprise</code>; model-routing config committed; consensus workflow executes end-to-end on a dummy ticket.</td></tr>
+<tr><td><b>G1 → Phase 2</b></td><td>OIDC login works against Entra ID test tenant; ACL schema migrated; DocumentParser protocol merged; Tauri shell boots on Mac + Windows.</td></tr>
+<tr><td><b>G2 → Phase 3</b></td><td>SharePoint delta sync ingests a pilot site with ACL fidelity; security-trimmed query API passes the leak test-suite; UI search works online.</td></tr>
+<tr><td><b>G3 → Phase 4</b></td><td>Offline cache + export controls demoed; BI endpoints security-trimmed; zero P0 defects open.</td></tr>
+<tr><td><b>G4 → Merge</b></td><td>Full E-61 suite green incl. penetration checks; migration guide validated on a clone of prod VPS; v2.0.0 tagged.</td></tr>
+</table>
+<h2 id="epics">4. Epics</h2>
+
+<details class="epic" open id="e48-d">
+<summary id="e48">E-48: V2 Program Setup &amp; Harness Orchestration <span class="badge p0">P0</span> <span class="badge lane">Trunk</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Build the rails: the <code>v2-enterprise</code> branch, CI quality gates, the model-routing configuration, and the consensus workflow tooling that every subsequent ticket runs through. Nothing else starts until G0 passes.</div>
+
+<div class="story">
+<div class="story-title">S-153: As the V2 program, I want a dedicated branch with CI gates so that all lane work lands against a stable, enforced baseline <span class="badge p0">P0</span> <span class="badge fx">S</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>v2-enterprise</code> branch created from latest main; four lane worktree branches created</li>
+<li>AC-2: CI runs ruff + mypy + pytest on every lane PR; merge to <code>v2-enterprise</code> blocked on green</li>
+<li>AC-3: Branch protection: lane → trunk merges require the consensus record reference in PR body</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-533: Create <code>v2-enterprise</code> + lane branches, push, configure protection — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-534: Add V2 CI workflow (lint, types, tests, coverage floor 80%) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-535: PR template requiring ticket ID + consensus status + model attribution — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-154: As the harness, I want a declarative model-routing config so that every ticket is dispatched to the right dev/review models automatically <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>.claude/v2-routing.yaml</code> maps work-class → dev model, review model(s), tiebreak model</li>
+<li>AC-2: Routing covers Claude CLI, DeepSeek CLI, Gemini CLI, Ollama, OpenRouter with per-model invocation templates</li>
+<li>AC-3: Cost guardrail: per-ticket token budget recorded; Opus usage requires work-class=security justification</li>
+<li>AC-4: Fallback chain defined (e.g. DS unavailable → GM reviews) and logged when triggered</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-536: Define routing schema + work-class taxonomy — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-537: Write per-CLI invocation wrappers (<code>scripts/v2/route.sh</code>) with timeout + retry — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-538: Token/cost ledger appended per invocation to <code>~/.claude/v2-cost.jsonl</code> — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-539: Smoke-test routing against all five providers from the VPS — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-155: As the developer, I want the consensus workflow codified as a Claude Code workflow so that dev→review→rebut→tiebreak→escalate runs without manual stitching <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Workflow takes a ticket ID, runs dev model, then review model with structured checklist output (JSON verdict)</li>
+<li>AC-2: One rebuttal round automated; OpenRouter advisory invoked only on persistent split</li>
+<li>AC-3: Unresolved splits generate <code>docs/decisions/V2-DEC-NNN.md</code> with pros/cons table and halt the ticket (not the lane)</li>
+<li>AC-4: Dry-run on a dummy ticket demonstrates both the agree path and the escalate path</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-540: Review checklist prompt templates (backend / frontend / security variants) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-541: Consensus state machine script (verdict parse, rebuttal loop, escalation writer) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-542: DECISION ticket template with pros/cons + blast-radius fields — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-543: End-to-end dry run (agree path + forced-split path); fix findings — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e49-d">
+<summary id="e49">E-49: Identity Foundation — Entra ID / OIDC <span class="badge p0">P0</span> <span class="badge lane">Lane A</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Replace the shared-secret trust domain with real identity. Every API call, sync session, and UI session is bound to a verified principal (user or service). Entra ID is the IdP since SharePoint permissions already live there; a local break-glass admin keeps offline/dev workflows alive.</div>
+
+<div class="story">
+<div class="story-title">S-156: As a team member, I want to authenticate via Entra ID (OIDC + PKCE) so that my DepthFusion identity matches my corporate identity <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Authorization-code + PKCE flow implemented; tokens validated (issuer, audience, signature via JWKS, expiry, nonce)</li>
+<li>AC-2: Device-code flow available for headless CLI/VPS sessions</li>
+<li>AC-3: Group claims extracted and persisted to the principal record on each login</li>
+<li>AC-4: Refresh handled server-side; access tokens never written to disk unencrypted</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-544: Add <code>src/depthfusion/identity/</code> package: OIDC client, JWKS cache, token validator — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-545: Device-code flow for CLI sessions — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-546: Principal store (SQLite table: principal_id, upn, groups, last_seen) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-547: Entra app registration runbook + test-tenant fixtures — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-548: Negative tests: expired, wrong-audience, tampered, replayed tokens — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-157: As the API server, I want auth middleware on every route so that no endpoint serves data without a verified principal <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: FastAPI dependency injects <code>Principal</code> into all routes in <code>rest.py</code>, <code>events.py</code>, <code>query.py</code>, MCP HTTP server</li>
+<li>AC-2: Legacy <code>DEPTHFUSION_API_TOKEN</code> accepted only when <code>DEPTHFUSION_V2_LEGACY_AUTH=1</code>, mapped to a flagged legacy principal, and logs a deprecation warning</li>
+<li>AC-3: Loopback-without-auth removed for any route that can return record content</li>
+<li>AC-4: 100% route coverage verified by an automated route-walker test</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-549: <code>require_principal</code> dependency + error envelope — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-550: Sweep all ~42 REST routes + fabric + MCP HTTP routes onto the dependency — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev (whole-file audit)</li>
+<li>T-551: Legacy-token compatibility shim + deprecation telemetry — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-552: Route-walker test asserting every registered route enforces auth — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-158: As an instance (VPS, laptop, Mac/MLX), I want a service identity so that machine-to-machine sync is authenticated and revocable per device <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Each instance enrolls once (device-code flow) and receives a device-bound credential stored in OS keychain</li>
+<li>AC-2: Admin can list and revoke device credentials; revoked devices fail sync within one lease period</li>
+<li>AC-3: Device records carry owner principal + platform + last-sync timestamp</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-553: Device enrollment + keychain storage (macOS Keychain, Windows DPAPI, Linux secret-service) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-554: Device registry table + admin CLI (<code>depthfusion devices list|revoke</code>) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-555: Lease-based credential refresh (default 24h) with clock-skew tolerance — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e50-d">
+<summary id="e50">E-50: Authorization Model — RBAC, Record ACLs, Classification <span class="badge p0">P0</span> <span class="badge lane">Lane A</span></summary>
+<div class="epic-body">
+<div class="epic-desc">The heart of V2. Roles govern capabilities; per-record ACLs govern visibility; classification labels govern handling (export, cache, redaction). Designed so SharePoint ACLs map losslessly onto DepthFusion records (E-54 depends on this schema).</div>
+
+<div class="story">
+<div class="story-title">S-159: As an admin, I want RBAC roles so that capabilities are granted by role, not by possession of a token <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Built-in roles: <code>admin</code>, <code>maintainer</code>, <code>analyst</code>, <code>contributor</code>, <code>reader</code> with a documented capability matrix</li>
+<li>AC-2: Role assignment by principal or Entra group; group-derived roles refresh on login</li>
+<li>AC-3: Capability checks enforced server-side at the service layer (not just route decorators)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-556: Role/capability schema + migration — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-557: Capability-check service (<code>authz.require(principal, capability, resource)</code>) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-558: Admin CLI + API for role management with audit events — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-559: Capability matrix doc + tests per role — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-160: As the storage layer, I want per-record ACL columns on every store so that visibility filtering is possible at query time <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>acl_allow</code> (principals/groups), <code>classification</code>, <code>source_ref</code>, <code>owner</code> columns added to memory_store, vector_store metadata, event_log, file_index, graph store, discoveries</li>
+<li>AC-2: Migration backfills existing records to <code>classification=internal</code>, <code>acl_allow=[owner]</code> (owner-only per V2-DEC-002; widen via bulk per-project admin grants) — explicit, reversible</li>
+<li>AC-3: Write paths require ACL fields; missing ACL = rejected write in V2 mode</li>
+<li>AC-4: Discovery markdown files gain YAML front-matter ACL block; loader parses + enforces it</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-560: ACL schema design doc (record shape, group expansion strategy, deny semantics) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-561: Migrations for all six stores + backfill script with dry-run — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-562: Write-path enforcement in MemoryStore/VectorStore/EventLog/Graph — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-563: Discovery front-matter ACL parser + writer — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-564: Migration rehearsal on a copy of the VPS dataset; record timings — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-161: As a compliance owner, I want classification labels with handling rules so that sensitive content gets stricter treatment automatically <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Labels: <code>public</code>, <code>internal</code>, <code>confidential</code>, <code>restricted</code>; each maps to handling rules (cacheable?, exportable?, watermark?, offline-allowed?)</li>
+<li>AC-2: SharePoint sensitivity labels map onto this taxonomy (mapping table, configurable)</li>
+<li>AC-3: Handling rules queryable by UI/cache/export subsystems via one policy module</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-565: Classification taxonomy + handling-rules policy module — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-566: Sensitivity-label mapping config + validation — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-567: Policy unit tests incl. default-deny on unknown labels — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-162: As the platform, I want a central policy decision point so that every subsystem asks one engine "can X do Y to Z" <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>PolicyEngine.check(principal, action, record) → Decision(allow, reason)</code> consumed by API, retrieval, sync, cache, export</li>
+<li>AC-2: Decisions cacheable per (principal, action, record-class) with bounded TTL; cache invalidated on role/ACL change</li>
+<li>AC-3: Every deny is auditable with reason code</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-568: PolicyEngine implementation + decision cache — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-569: Wire API/service layers through PolicyEngine; remove ad-hoc checks — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-570: Property-based tests (no path returns allow when ACL excludes principal) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e51-d">
+<summary id="e51">E-51: Security-Trimmed Retrieval &amp; Query API v2 <span class="badge p0">P0</span> <span class="badge lane">Lane A</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Retrieval (BM25 + HNSW + hybrid + reranker), the Query API, and MCP tools must only ever surface records the calling principal can see. Trimming happens pre-rank where possible and is re-verified post-rank — never trust a single filter layer.</div>
+
+<div class="story">
+<div class="story-title">S-163: As the retrieval pipeline, I want ACL pre-filtering in BM25/HNSW/hybrid so that unauthorized records never enter candidate sets <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Candidate generation accepts a principal context; ACL filter applied inside BM25 and vector search (metadata filter), not after fusion</li>
+<li>AC-2: Post-rank re-verification pass drops any record failing PolicyEngine (defense in depth)</li>
+<li>AC-3: Recall@10 regression vs unfiltered baseline &lt; 2% for authorized content (benchmarked)</li>
+<li>AC-4: Reranker input never includes unauthorized snippets</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-571: Thread principal context through retrieval interfaces — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-572: HNSW/Chroma metadata ACL filter + BM25 doc-mask — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-573: Post-rank verification + leak counters in telemetry — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-574: Retrieval benchmark with/without trimming; publish to docs/benchmarks — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-164: As a BI consumer, I want Query API v2 with principal-scoped results so that dashboards only show what the viewer may see <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>/query/*</code> endpoints require principal auth; <code>DEPTHFUSION_QUERY_API_KEY</code> retired behind legacy flag</li>
+<li>AC-2: Aggregates computed over the principal-visible subset only (no count leakage)</li>
+<li>AC-3: OpenAPI spec regenerated; CLI + MCP clients regenerated against v2 spec</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-575: Port query endpoints to principal auth + trimmed data access — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-576: Aggregate-leak tests (counts/facets must not reveal hidden records) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+<li>T-577: Regenerate <code>query-api.yaml</code>, CLI, MCP wrappers — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-165: As an MCP client, I want all 29 MCP tools principal-bound so that agent access obeys the same ACLs as humans <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: MCP session binds to an enrolled device + principal at startup; tools execute under that principal</li>
+<li>AC-2: MCP-only tools (register_project, ingest_project, …) gated by capability checks</li>
+<li>AC-3: Tool responses pass through the same post-rank verification as REST</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-578: MCP session principal binding (stdio + HTTP/SSE) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-579: Capability annotations across all 29 tools — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev (single-pass audit)</li>
+<li>T-580: MCP authz test-suite (per-tool allow/deny matrix) — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e52-d">
+<summary id="e52">E-52: Sync v2 — ACL-Aware Replication <span class="badge p0">P0</span> <span class="badge lane">Lane D</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Retire wholesale <code>rsync</code> (<code>sync.sh</code>). Sync v2 is a service-mediated protocol: each enrolled device pulls only records its owner principal can see, pushes with ACL stamps, and honors revocation. This closes the biggest leak path before SharePoint data arrives.</div>
+
+<div class="story">
+<div class="story-title">S-166: As the platform, I want a sync protocol design agreed before build so that lanes A and D don't diverge <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Design doc covers: change-log cursor model, record envelopes (payload + ACL + classification), tombstones, conflict policy, transport (HTTPS via VPS hub)</li>
+<li>AC-2: Reviewed by both review models; consensus or DECISION record</li>
+<li>AC-3: Explicit non-goals stated (no peer-to-peer in V2; hub-and-spoke only)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-581: Sync v2 design doc + sequence diagrams — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-582: Conflict policy spec (vector-clock-lite vs last-writer-wins per store) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-167: As an enrolled device, I want delta sync trimmed to my principal so that I never receive records I cannot see <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>/v2/sync/pull?cursor=</code> returns only principal-visible deltas; server-side trim via PolicyEngine</li>
+<li>AC-2: <code>/v2/sync/push</code> validates ACL stamps + capability to write; rejects unlabeled records</li>
+<li>AC-3: ACL changes propagate: records a principal loses access to are tombstoned on that device at next sync</li>
+<li>AC-4: Resumable after interruption; idempotent batches</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-583: Change-log table + cursor API on the hub — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-584: Pull endpoint with PolicyEngine trim + pagination — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-585: Push endpoint with validation + audit events — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-586: Client sync engine (scheduler, retries, tombstone application) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-587: Loss-of-access propagation tests — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-168: As an operator, I want <code>sync.sh</code> retired gracefully so that no machine silently keeps wholesale replication alive <span class="badge p1">P1</span> <span class="badge fx">S</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>sync.sh</code> prints a deprecation error and exits non-zero in V2 mode (override flag for emergencies, audited)</li>
+<li>AC-2: Migration runbook: cron/systemd timer removal, device enrollment steps per machine</li>
+<li>AC-3: docs/sync-guide.md rewritten for Sync v2</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-588: Deprecation gate in sync.sh + audited override — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-589: Migration runbook + rewritten sync guide — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+<details class="epic" id="e53-d">
+<summary id="e53">E-53: Document Ingestion Framework <span class="badge p0">P0</span> <span class="badge lane">Lane B</span></summary>
+<div class="epic-body">
+<div class="epic-desc">DepthFusion today parses conversations (<code>ConversationParser</code>). V2 adds a parallel <code>DocumentParser</code> protocol for files: Office formats, PDF, and scanned content — chunked, embedded, ACL-stamped, and indexed into the same retrieval substrate. Source-agnostic: SharePoint (E-54) is just the first connector.</div>
+
+<div class="story">
+<div class="story-title">S-169: As the ingestion layer, I want a <code>DocumentParser</code> protocol so that any file source plugs into one normalization path <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Protocol mirrors <code>ConversationParser</code> ergonomics: <code>parse(path|stream) → DocumentRecord</code> (text blocks, structure, tables, metadata, source_ref, acl, classification)</li>
+<li>AC-2: Registry maps MIME/extension → parser; unknown types route to generic text-extraction fallback with a warning</li>
+<li>AC-3: Parser failures quarantine the file (no partial index entries) with a retriable error record</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-590: <code>parsers/documents/base.py</code>: protocol, DocumentRecord, registry — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-591: Quarantine store + retry semantics — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-592: Generic fallback parser (plain text, markdown, html) — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-170: As a knowledge consumer, I want Office parsers (docx, xlsx, pptx) so that company documents become searchable content <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: docx: headings/paragraph structure, tables, embedded metadata; xlsx: sheet/table extraction with header inference; pptx: slide text + notes</li>
+<li>AC-2: Structure preserved into chunk metadata (heading path, sheet name, slide number) for citation-quality retrieval</li>
+<li>AC-3: 50-file golden corpus parses with zero crashes; outputs snapshot-tested</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-593: docx parser (python-docx) with heading-path chunk metadata — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-594: xlsx parser (openpyxl) with table/header inference — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-595: pptx parser (python-pptx) incl. speaker notes — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-596: Golden corpus + snapshot tests — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-171: As a knowledge consumer, I want PDF + OCR parsing so that agreements and scans are searchable <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Text-layer PDFs parsed natively (pymupdf); page + heading metadata kept</li>
+<li>AC-2: Image-only pages detected and OCR'd locally (no cloud OCR — IP stays on-prem)</li>
+<li>AC-3: Per-document parse budget enforced (timeout + page cap) so one 2,000-page scan can't stall a sync run</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-597: PDF text-layer parser with layout-aware block ordering — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-598: Local OCR integration (tesseract or rapidocr) behind a feature flag — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-599: Parse budgets + oversized-doc quarantine path — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-172: As the retrieval substrate, I want a document chunking + embedding pipeline so that documents rank alongside memories with citations <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Structure-aware chunking (respect headings/tables/slides; configurable size/overlap); each chunk carries source_ref + locator for citation</li>
+<li>AC-2: Chunks embedded via existing embedding stack and indexed into BM25 + HNSW with ACL metadata inherited from the document</li>
+<li>AC-3: Re-ingestion of a changed file replaces prior chunks atomically (no stale duplicates) via file_index content_hash</li>
+<li>AC-4: Throughput benchmark: ≥ 200 typical office docs/hour on the VPS (CPU mode)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-600: Structure-aware chunker + config — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-601: Embedding + dual-index writer with ACL inheritance — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-602: Atomic replace-on-change using file_index hashes — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-603: Ingestion throughput benchmark + report — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e54-d">
+<summary id="e54">E-54: SharePoint Connector — Microsoft Graph <span class="badge p0">P0</span> <span class="badge lane">Lane B</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Continuous, incremental, permission-faithful ingestion of SharePoint sites via Microsoft Graph: site/drive discovery, delta queries, per-item ACL capture mapped onto E-50's model, and resilience against Graph throttling. Depends on G1 (ACL schema) + E-53 (parsers).</div>
+
+<div class="story">
+<div class="story-title">S-173: As the connector, I want Graph app auth + site discovery so that admins can scope which sites are ingested <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: App-only auth (client credentials + certificate) with <code>Sites.Selected</code> least-privilege grants per site</li>
+<li>AC-2: <code>depthfusion sharepoint sites list|add|remove</code> manages the ingest scope; scope persisted with admin audit trail</li>
+<li>AC-3: Connection health check endpoint/CLI verifies grants before first sync</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-604: Graph client with cert auth + token cache — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-605: Site scope management CLI/API — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-606: Grant runbook (Sites.Selected consent flow) + health check — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-174: As the connector, I want delta-query incremental sync so that only changed items are fetched after the initial crawl <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Initial full crawl per drive, then <code>/delta</code> cursors persisted; adds/updates/deletes applied incrementally</li>
+<li>AC-2: Deletes in SharePoint tombstone the corresponding records + chunks within one sync cycle</li>
+<li>AC-3: Crash-safe: sync resumes from last committed cursor; partial batches roll back</li>
+<li>AC-4: Pilot site (≥ 5k items) syncs end-to-end; second run transfers only deltas</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-607: Drive walker + initial crawl with download pipeline into E-53 — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-608: Delta cursor store + incremental apply (add/update/delete) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-609: Transactional batch commit + resume logic — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-610: Pilot-site E2E test + delta verification — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-175: As the security model, I want SharePoint permissions mapped to record ACLs so that DepthFusion never widens access beyond SharePoint <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Per-item effective permissions resolved (site/library/folder inheritance + unique permissions) to Entra users/groups</li>
+<li>AC-2: Mapped to <code>acl_allow</code> on every record + chunk; sensitivity labels mapped via S-161 table</li>
+<li>AC-3: Permission changes in SharePoint propagate on delta sync (ACL update without re-parsing content)</li>
+<li>AC-4: Fail-closed: items whose permissions cannot be resolved are ingested as <code>restricted</code> (admin-only) and flagged</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-611: Effective-permission resolver with inheritance handling — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-612: ACL mapping + chunk inheritance writer — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-613: Permission-change delta handling (ACL-only update path) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-614: Fail-closed tests: unresolvable, broken-inheritance, external-share cases — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-176: As an operator, I want throttling resilience + sync observability so that Graph 429s and big crawls don't require babysitting <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Retry-After honored; adaptive concurrency with exponential backoff + jitter</li>
+<li>AC-2: Sync run metrics (items, bytes, failures, throttle events, duration) in telemetry + a <code>sharepoint status</code> CLI</li>
+<li>AC-3: Scheduled sync via existing scheduler with overlap-prevention lock</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-615: Throttle-aware request layer — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-616: Sync telemetry + status CLI — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-617: Scheduler integration + lock — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e55-d">
+<summary id="e55">E-55: Business Intelligence Layer <span class="badge p1">P1</span> <span class="badge lane">Lane B</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Turn ingested corpora into BI: entity extraction over documents into the knowledge graph, aggregate/mapping endpoints, and hardened external BI-tool connectivity (Metabase/Grafana/Power BI) — all security-trimmed.</div>
+
+<div class="story">
+<div class="story-title">S-177: As an analyst, I want document entities in the knowledge graph so that I can map relationships across contracts, projects, and people <span class="badge p1">P1</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Graph extractor runs over document chunks (orgs, people, projects, dates, monetary values, agreement terms) using mode-appropriate backend (local model on MLX/Ollama, Haiku on VPS)</li>
+<li>AC-2: Graph nodes/edges inherit source-record ACLs; traversal is principal-trimmed</li>
+<li>AC-3: Cross-source linking: SharePoint entities link to conversation-derived entities where names match (with confidence score)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-618: Document entity-extraction prompts + pipeline — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-619: ACL inheritance on graph store + trimmed traversal — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-620: Cross-source entity linker with confidence — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-178: As a BI consumer, I want aggregate + faceted endpoints over documents so that dashboards can chart the corpus <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>/query/documents</code> (filter: site, type, classification, date, entities) + <code>/query/documents/aggregate</code> (group-by + counts) with pagination</li>
+<li>AC-2: All aggregates computed over principal-visible records (S-164 semantics)</li>
+<li>AC-3: Endpoints documented in regenerated OpenAPI + bi-connectivity guide</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-621: Document query/aggregate endpoints — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-622: Facet performance pass (indexes for common group-bys) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-623: Update docs/bi-connectivity.md for v2 auth + new endpoints — <span class="badge m-ol">OL</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-179: As an admin, I want BI-tool service accounts with scoped read roles so that Metabase/Grafana/Power BI connect safely <span class="badge p1">P1</span> <span class="badge fx">S</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Service principals with <code>reader</code> role + explicit classification ceiling (e.g. BI sees ≤ internal by default)</li>
+<li>AC-2: Per-tool setup guides validated against live Metabase + Grafana on the VPS</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-624: Service-account issuance + classification ceiling enforcement — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-625: Validate + document Metabase/Grafana/Power BI flows — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e56-d">
+<summary id="e56">E-56: Desktop UI Shell — Tauri 2 + React/TypeScript <span class="badge p0">P0</span> <span class="badge lane">Lane C</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Cross-platform (macOS + Windows) desktop app. Tauri 2 gives a small, signed binary with a Rust core — the Rust side owns secrets, the encrypted cache, and export enforcement so the webview never holds raw keys. React/TS + Tailwind on the front. CI builds both platforms from day one.</div>
+
+<div class="story">
+<div class="story-title">S-180: As a developer, I want the Tauri 2 + React scaffold with CI builds so that Mac and Windows artifacts exist from the first week <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>ui/</code> workspace: Tauri 2, React 18 + TypeScript strict, Tailwind, vitest; Rust workspace with clippy + fmt gates</li>
+<li>AC-2: CI matrix builds macOS (universal) + Windows (x64) on every lane PR; artifacts uploaded</li>
+<li>AC-3: IPC boundary defined: typed commands only, no arbitrary JS→Rust eval; CSP locked down</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-626: Scaffold Tauri 2 + React + Tailwind + strict TS config — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-627: CI build matrix (mac universal, win x64) + artifact upload — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-628: Typed IPC layer + CSP hardening — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-181: As a team member, I want to sign in inside the app so that my session is my corporate identity <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: OIDC + PKCE via system browser (no embedded-webview credential entry); deep-link callback into the app</li>
+<li>AC-2: Tokens held in Rust core, stored via OS keychain; webview gets only short-lived session handles</li>
+<li>AC-3: Device enrollment (S-158) triggered on first sign-in; sign-out revokes local credentials + wipes session cache</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-629: System-browser OIDC flow + deep-link handling (mac/win) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-630: Rust-side token vault (keychain/DPAPI) + session handle API — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-631: Sign-out + local wipe flow with tests — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-182: As the app, I want a resilient API client with offline detection so that every feature degrades gracefully off-network <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Generated TS client from Query API v2 OpenAPI; all calls carry principal session</li>
+<li>AC-2: Connectivity state machine (online / degraded / offline) surfaced app-wide; queued writes replay on reconnect</li>
+<li>AC-3: Server selection: local instance ↔ VPS hub configurable per profile</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-632: OpenAPI→TS client generation in CI — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-633: Connectivity state machine + write queue — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-634: Profile/server config UI + storage — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-183: As a release owner, I want signing + auto-update so that the team always runs current, trusted builds <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: macOS notarized + Windows signed builds out of CI (secrets in CI vault)</li>
+<li>AC-2: Tauri updater with signed manifests; staged rollout channel (beta → stable)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-635: Signing + notarization pipeline — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-636: Updater + channel config — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e57-d">
+<summary id="e57">E-57: UI Features — Search, Documents, Graph, Dashboards <span class="badge p0">P0</span> <span class="badge lane">Lane C</span></summary>
+<div class="epic-body">
+<div class="epic-desc">The product surface: unified search across memories + documents, a citation-preserving document viewer, interactive graph exploration, and BI dashboards — every view rendered from security-trimmed APIs only.</div>
+
+<div class="story">
+<div class="story-title">S-184: As a user, I want unified search with facets so that one query spans memories, discoveries, and documents <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation</li>
+<li>AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)</li>
+<li>AC-3: P95 round-trip &lt; 400ms online against VPS over Tailscale; offline falls back to cache (E-58)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-637: Search screen + facet components — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-638: Result cards with citation locators + classification chips — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-639: Query orchestration hook (debounce, cancel, cache-fallback) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-640: Search latency benchmark harness — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-185: As a user, I want a document viewer with highlighted hits so that I read sources without leaving the app <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Renders extracted document content (blocks/tables/slides) with hit highlighting and jump-to-locator</li>
+<li>AC-2: Original-file access (open/download) is policy-gated by E-59 — viewer works even when download is denied</li>
+<li>AC-3: Restricted content shows watermark overlay (principal + timestamp) when policy requires</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-641: Block-based viewer with highlight + locator jump — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-642: Policy-gated original-file action wiring — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-643: Watermark overlay component — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-186: As an analyst, I want interactive graph exploration so that I can map entities and relationships visually <span class="badge p1">P1</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Force-directed graph view over trimmed traversal API; expand-on-click, filter by entity type/source</li>
+<li>AC-2: Node inspector shows provenance (source records the entity came from, ACL-visible only)</li>
+<li>AC-3: 1k-node neighborhood renders at interactive framerate</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-644: Graph canvas (webgl/canvas lib) + expand/filter interactions — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-645: Node inspector with provenance panel — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-646: Render performance pass (level-of-detail, viewport culling) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-187: As a leader, I want in-app dashboards so that corpus and activity KPIs are visible without external BI tools <span class="badge p2">P2</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Dashboard tiles over <code>/query/*/aggregate</code>: corpus growth, top entities, ingestion health, my-team activity</li>
+<li>AC-2: Tiles respect principal trim; layout persists per user</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-647: Tile framework + chart components — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-648: Default dashboard pack + persistence — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+<details class="epic" id="e58-d">
+<summary id="e58">E-58: Intelligent Offline Cache — ML-Driven, Encrypted <span class="badge p0">P0</span> <span class="badge lane">Lane C</span></summary>
+<div class="epic-body">
+<div class="epic-desc">The offline story: an encrypted local cache (SQLCipher, key in OS keychain) that holds a <em>relevant subset</em> of the corpus — selected by a lightweight relevance model trained on the user's local work patterns — never the whole database. Cache contents are bounded by the user's rights and a classification ceiling, and leases expire so a revoked user's cache dies on schedule.</div>
+
+<div class="story">
+<div class="story-title">S-188: As the app, I want an encrypted local cache store so that offline data is unreadable outside the signed-in session <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: SQLCipher database in Rust core; key generated per device, wrapped by OS keychain (Keychain/DPAPI), never written to disk in plaintext</li>
+<li>AC-2: Cache schema mirrors record + chunk + embedding subset with ACL + classification + lease columns</li>
+<li>AC-3: Tamper check on open (HMAC over schema + lease table); failure → cache wipe + re-sync</li>
+<li>AC-4: Only records where the principal is in <code>acl_allow</code> AND classification ≤ user's offline ceiling are ever cached</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-649: SQLCipher integration in Rust core + key wrap via keychain — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-650: Cache schema + ACL/ceiling admission filter — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-651: Tamper detection + wipe/re-sync path — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-189: As a user, I want the cache to learn what I work on so that offline mode has what I need without holding everything <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Local signal collection (queries, opened docs, projects, entities, recency) stored on-device only — never uploaded</li>
+<li>AC-2: Relevance scorer ranks candidate records: embedding similarity to the user's activity centroid + recency + access frequency (logistic blend); runs on-device (Ollama/MLX embeddings or cached server embeddings)</li>
+<li>AC-3: Cache fill respects a configurable size budget (default 2 GB) with score-ordered eviction; hit-rate telemetry (local) shows ≥ 80% offline hit rate in dogfood</li>
+<li>AC-4: Pre-fetch runs opportunistically when online + idle; user can pin projects/folders to force-include</li>
+<li>AC-5: Cold-start (V2-DEC-001): first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-652: Local activity signal store + privacy guard (on-device only) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-653: Relevance scorer (centroid + recency/frequency blend) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-654: Budgeted fill/eviction engine + pinning — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-655: Idle-time prefetch scheduler — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-656: Offline hit-rate telemetry + dogfood report — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-190: As a security owner, I want cache leases + remote revocation so that a departed employee's offline data expires <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Every cached record carries a lease (default 7 days, classification-scaled: confidential = 48h); expired leases purge on app start and on a background timer — online or offline</li>
+<li>AC-2: Lease renewal piggybacks on any authenticated server contact; renewal denied → purge</li>
+<li>AC-3: Admin device-revoke (S-158) → next contact returns revoke signal → full cache + token wipe; offline devices die at lease expiry regardless</li>
+<li>AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-657: Lease issuance/renewal protocol + classification scaling — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-658: Purge engine (startup + timer + revoke signal) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-659: Offline query engine over cache + UI indicator — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-660: Revocation E2E test matrix (online revoke, offline expiry, clock tamper) — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e59-d">
+<summary id="e59">E-59: Export Controls & IP Protection <span class="badge p0">P0</span> <span class="badge lane">Lane C</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Rights-based limits on what leaves the app: copy, export, download, and print are policy decisions, not UI conveniences. Enforced in the Rust core (webview never holds exportable originals), fully audited, with sensible friction — protect IP without making daily work miserable.</div>
+
+<div class="story">
+<div class="story-title">S-191: As a policy owner, I want export policy by role × classification so that extraction rights are explicit <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Policy matrix (role × classification → view / copy-text / export-extract / download-original / print) stored server-side, versioned, admin-editable</li>
+<li>AC-2: Defaults: viewer = view only; analyst = +copy/export ≤ internal; contributor = +download ≤ confidential; admin = all (still audited)</li>
+<li>AC-3: Policy evaluated via E-50 decision point; offline evaluation uses the signed policy snapshot in the cache</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-661: Export policy schema + admin CRUD + versioning — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-662: Signed policy snapshot for offline enforcement — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-192: As the app, I want enforcement in the Rust core so that export limits can't be bypassed from the webview <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Clipboard, file-save, and print actions are Rust-mediated IPC commands that consult policy; denied actions return a typed denial the UI explains</li>
+<li>AC-2: Original files stream through the Rust core to disk only on allow — no blob URLs of originals in the webview</li>
+<li>AC-3: Copy-text allowed content gets per-principal provenance footer appended when classification ≥ confidential</li>
+<li>AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-663: Policy-gated clipboard/save/print IPC commands — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-664: Original-file streaming gate in Rust core — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-665: Provenance footer + watermark policy hooks — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-666: Red-team bypass checklist execution + residual-risk doc — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-193: As a security owner, I want export auditing + anomaly flags so that bulk extraction attempts are visible <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Every export-class action (allowed or denied) lands in the audit log with principal, record, action, decision, device</li>
+<li>AC-2: Server-side rate heuristics flag bursts (e.g. &gt; N exports / hour, cross-project sweeps) → admin notification</li>
+<li>AC-3: Server API enforces per-principal export rate limits as backstop to client enforcement</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-667: Export audit events + server backstop rate limits — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-668: Anomaly heuristics + admin alert channel — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e60-d">
+<summary id="e60">E-60: Audit, Observability & Admin Console <span class="badge p1">P1</span> <span class="badge lane">Lane D</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Enterprise operability: a tamper-evident audit log spanning auth, authz, ingestion, sync, and export; metrics that tell you the system is healthy; and an admin surface to manage users, roles, devices, and policies without SSH.</div>
+
+<div class="story">
+<div class="story-title">S-194: As a compliance owner, I want a unified tamper-evident audit log so that every security-relevant event is provable <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Append-only audit store with hash chaining (each entry includes hash of predecessor); verification CLI detects truncation/mutation</li>
+<li>AC-2: Event taxonomy covers: sign-in/out, token issuance, authz denials, ACL changes, role changes, ingestion runs, sync sessions, exports, admin actions</li>
+<li>AC-3: Retention policy + export-to-file for compliance review; audit reads are admin-only and themselves audited</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-669: Hash-chained audit store + verification CLI — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-670: Wire all V2 subsystems to audit taxonomy — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-671: Retention + compliance export — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-195: As an operator, I want service health metrics + alerts so that ingestion lag or auth failures surface before users complain <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>/metrics</code> (Prometheus format) on the API: request rates/latency, authz denial rate, ingestion lag, sync backlog, cache-lease renewals</li>
+<li>AC-2: Grafana dashboard JSON committed; alert rules for: ingestion stalled &gt; 1h, authz denial spike, token-validation failures</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-672: Prometheus metrics endpoint + instrumentation — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-673: Grafana dashboard + alert rules — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-196: As an admin, I want an admin console in the desktop app so that users, roles, devices, and policies are manageable without SSH <span class="badge p1">P1</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Admin-role-gated screens: user/role assignment, device list + revoke, classification mapping table, export policy editor, ingestion scope + status</li>
+<li>AC-2: All mutations confirm + audit; destructive actions (revoke, role downgrade) require typed confirmation</li>
+<li>AC-3: Audit log viewer with filter by principal/action/date</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-674: Admin screens: users/roles/devices — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-675: Policy + classification editors — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-676: Ingestion management + audit viewer — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e61-d">
+<summary id="e61">E-61: Performance, Scale & Security Hardening <span class="badge p1">P1</span> <span class="badge lane">Lane D</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Prove the system holds at enterprise corpus sizes and survives adversarial review: load benchmarks with ACL filtering on, dependency + secret hygiene, and an internal penetration pass before any merge to main.</div>
+
+<div class="story">
+<div class="story-title">S-197: As an operator, I want load benchmarks at target scale so that latency SLOs are verified, not hoped for <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Synthetic corpus: 250k chunks, 50k documents, 500 principals, realistic ACL skew; load generator hits search/query/aggregate concurrently</li>
+<li>AC-2: SLOs verified: search P95 &lt; 300ms server-side with trimming on; ingestion sustained ≥ 200 docs/h during query load</li>
+<li>AC-3: Regression: benchmark runs in CI weekly; &gt; 20% latency regression fails the build</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-677: Synthetic corpus + principal/ACL generator — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-678: Load harness + SLO assertions — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-679: Weekly CI benchmark job + regression gate — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-198: As a security owner, I want supply-chain + secret hygiene gates so that the dependency surface is controlled <span class="badge p1">P1</span> <span class="badge fx">S</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>pip-audit</code> / <code>cargo audit</code> / <code>npm audit</code> in CI; high-severity findings block merge</li>
+<li>AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-680: Audit + secret-scan CI jobs — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-681: SBOM generation in release pipeline — <span class="badge m-ol">OL</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation</li>
+<li>AC-2: All criticals fixed + regression-tested; findings report archived in <code>docs/decisions/</code></li>
+<li>AC-3: Performed by a model lane that did <em>not</em> build the defenses (Deepseek + Gemini drive attacks; Claude fixes)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-682: Attack plan + tooling — <span class="badge m-ds">DS</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-683: Execute attacks, file findings — <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> dev, <span class="badge m-cl">CL-O</span> triage</li>
+<li>T-684: Fix criticals + regression tests — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e62-d">
+<summary id="e62">E-62: Documentation Refresh & V2 Enablement <span class="badge p1">P1</span> <span class="badge lane">Lane D</span></summary>
+<div class="epic-body">
+<div class="epic-desc">Close the documentation gap found in the V1 review and ship V2-grade docs: accurate capability reference, security model, admin runbooks, UI user guide, and updated API/BI docs. Docs are merge-gating, not an afterthought.</div>
+
+<div class="story">
+<div class="story-title">S-200: As a maintainer, I want the V1 docs corrected so that README and guides match actual capabilities before V2 lands <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: README capability matrix audited against code (feature flags, MCP tool list, API route inventory) and corrected</li>
+<li>AC-2: Stale docs marked superseded with pointers to V2 equivalents (sync-guide → Sync v2, bi-connectivity → v2 auth)</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-685: Capability audit + README correction PR — <span class="badge m-gm">GM</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-686: Supersede/redirect pass over docs/ — <span class="badge m-ol">OL</span> dev, <span class="badge m-gm">GM</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-201: As an adopter, I want V2 security + admin documentation so that deployment and governance are self-service <span class="badge p1">P1</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Security model doc: identity, RBAC, ACLs, classification, leases, export policy — one canonical reference</li>
+<li>AC-2: Admin runbooks: Entra app registration, SharePoint grants, user onboarding/offboarding, device revoke, incident response</li>
+<li>AC-3: UI user guide with screenshots; ingestion + sync operations guide</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-687: Security model reference — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-688: Admin runbooks — <span class="badge m-gm">GM</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+<li>T-689: UI user guide + ops guide — <span class="badge m-gm">GM</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="epic" id="e63-d">
+<summary id="e63">E-63: V2 Integration, Pilot & Merge Readiness <span class="badge p0">P0</span> <span class="badge lane">All lanes</span></summary>
+<div class="epic-body">
+<div class="epic-desc">The landing sequence: full-stack integration testing across lanes, a structured team pilot on real (scoped) SharePoint data, migration tooling for existing V1 instances, and the final merge gate review.</div>
+
+<div class="story">
+<div class="story-title">S-202: As the program, I want cross-lane integration test suites so that the four lanes compose into one system <span class="badge p0">P0</span> <span class="badge fx">L</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: E2E scenarios automated: sign-in → SharePoint doc search → cited view → policy-gated export; offline flight-mode round trip; admin revoke → device wipe; sync between two instances with divergent ACLs</li>
+<li>AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-690: Staging stack compose (API + ingestion + two app instances) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-692: Nightly run + triage automation — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-S</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-203: As a V1 operator, I want migration tooling so that existing instances upgrade without data loss <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: <code>depthfusion migrate v2</code>: schema migration (ACL columns via S-160 backfill), config translation, token → identity bootstrap</li>
+<li>AC-2: Dry-run mode reports planned changes; rollback restores pre-migration snapshot</li>
+<li>AC-3: Verified on a copy of the production VPS dataset</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-693: Migration CLI + dry-run/rollback — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-694: Production-copy migration rehearsal + report — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-204: As the team, I want a structured pilot so that real usage validates V2 before merge <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: 2-week pilot: ≥ 3 team members (Mac + Windows), one scoped SharePoint site, defined success metrics (search relevance rating, offline hit rate, zero authz incidents)</li>
+<li>AC-2: Feedback triaged into fix-before-merge vs post-merge backlog</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-695: Pilot plan + metric instrumentation — <span class="badge m-cl">CL-H</span> dev, <span class="badge m-gm">GM</span> rev</li>
+<li>T-696: Pilot execution support + feedback triage — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green <span class="badge p0">P0</span> <span class="badge fx">S</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: Checklist verified: G1–G4 gates green, pen-test criticals closed, pilot success metrics met, docs complete, migration rehearsed, CI fully green</li>
+<li>AC-2: Final consensus review of the merge diff by Deepseek + Gemini; unresolved disagreements surfaced to you with pros/cons before merge</li>
+<li>AC-3: Tagged release + rollback plan documented</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-697: Merge-gate checklist execution — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span>+<span class="badge m-gm">GM</span> rev</li>
+<li>T-698: Merge, tag, release notes, rollback plan — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+
+<div class="story">
+<div class="story-title">S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill (V2-DEC-002) is proven before legacy memories and SharePoint data coexist <span class="badge p0">P0</span> <span class="badge fx">M</span></div>
+<div class="sect-label">Acceptance criteria</div>
+<ul class="ac">
+<li>AC-1: S-160 backfill executed on a copy of the production VPS dataset with <code>acl_allow=[owner]</code>, <code>classification=internal</code>; record counts reconciled per store (all six)</li>
+<li>AC-2: Post-migration verification: a second (non-owner) test principal retrieves zero legacy records across REST, MCP tools, and fabric SSE; owner retrieval is lossless vs pre-migration baseline</li>
+<li>AC-3: Bulk per-project grant command widens one test project to a test group; revocation removes access within one lease period</li>
+<li>AC-4: Rehearsal report (timings, anomalies, rollback drill) archived in docs/decisions/ — pilot (S-204) is blocked until this passes</li>
+</ul>
+<div class="sect-label">Tasks</div>
+<ul class="tasks">
+<li>T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — <span class="badge m-cl">CL-O</span> dev, <span class="badge m-ds">DS</span> rev</li>
+<li>T-700: Bulk grant/revoke drill + rehearsal report — <span class="badge m-cl">CL-S</span> dev, <span class="badge m-cl">CL-O</span> rev</li>
+</ul>
+</div>
+</div>
+</details>
+
+<h2 id="risks">5. Risk register &amp; surfaced decisions</h2>
+<p>Per your consensus protocol: where dev and review models are likely to disagree — or where the trade-off is a business call rather than a technical one — the decision is surfaced here in advance with pros and cons. Items marked <b>DECIDE</b> need your call before the owning ticket starts; items marked <b>RISK</b> have a chosen mitigation baked into the plan but are listed so you can veto.</p>
+
+<table>
+<tr><th>#</th><th>Type</th><th>Topic</th><th>Blocks</th><th>Options / mitigation</th></tr>
+<tr>
+  <td>D-1</td><td><b>DECIDE</b></td><td>Identity provider scope</td><td>S-156 (E-49)</td>
+  <td><b>Option A — Entra ID only.</b> Pros: single IdP, matches SharePoint ACL source of truth, least code. Cons: hard dependency on tenant admin consent; offline-first dev machines need device-code flow. <b>Option B — Entra ID + local fallback accounts.</b> Pros: works without tenant connectivity, simpler pilots. Cons: two auth paths to secure and audit, fallback accounts weaken the ACL story. <i><b>RESOLVED 2026-06-10:</b> Option A + one sealed break-glass admin (audited, alert-on-use). See v2-build-orchestration.md §9.</i></td>
+</tr>
+<tr>
+  <td>D-2</td><td><b>DECIDE</b></td><td>ACL enforcement point</td><td>S-160 (E-50)</td>
+  <td><b>Option A — security-trimmed retrieval (filter at query time).</b> Pros: one store, no duplication, labels stay current. Cons: every retrieval path must be audited; one missed path leaks. <b>Option B — per-role partitioned indexes.</b> Pros: structurally impossible to leak across partitions. Cons: storage multiplied per role, consolidation/dedup runs per partition, role changes force re-index. <i><b>RESOLVED 2026-06-10:</b> Option A, dual-layer (pre-rank filter + post-rank PolicyEngine re-verify); leak-hunt suite is a merge gate. See v2-build-orchestration.md §9.</i></td>
+</tr>
+<tr>
+  <td>D-3</td><td><b>DECIDE</b></td><td>UI shell</td><td>S-180 (E-56)</td>
+  <td><b>Option A — Tauri 2 + React/TS.</b> Pros: ~10MB binaries, Rust core makes extraction controls tamper-resistant, native keychain access. Cons: smaller ecosystem than Electron, Rust skills needed for the IP-protection layer. <b>Option B — Electron.</b> Pros: largest ecosystem, fastest hiring. Cons: ~150MB+ apps, Node main process is easier to tamper with for data-exfil controls. <i><b>RESOLVED 2026-06-10:</b> Option A (Tauri 2 + React/TS). See v2-build-orchestration.md §9.</i></td>
+</tr>
+<tr>
+  <td>D-4</td><td><b>DECIDE</b></td><td>SharePoint ingestion licence cost</td><td>S-173 (E-54)</td>
+  <td>Microsoft Graph delta queries on large tenants can hit metered API pricing for <code>/drives</code> content. <b>Option A — full-content sync.</b> Best retrieval quality, highest cost. <b>Option B — metadata-first sync, content fetched on first retrieval hit.</b> ~80% cheaper, first-hit latency penalty. <i><b>RESOLVED 2026-06-10 (reverses prior default):</b> Option A — full-content, site-scoped, with a size/type parse ceiling (oversized/media → metadata-only + on-demand fetch). Monitor metered Graph billing on the pilot site before widening. See v2-build-orchestration.md §9.</i></td>
+</tr>
+<tr>
+  <td>R-1</td><td>RISK</td><td>Sync v2 replicating before ACLs land</td><td>E-53</td>
+  <td>Current <code>rsync</code> sync copies everything to every machine. Mitigation baked in: legacy sync is frozen (read-only) at gate G1; Sync v2 (ACL-aware replication) is the only writer thereafter. Do not onboard new team machines between G1 and E-53 completion.</td>
+</tr>
+<tr>
+  <td>R-2</td><td>RISK</td><td>Model-cost drift on review lanes</td><td>All</td>
+  <td>Consensus reviews double inference cost on every ticket. Mitigation: routing table sends only P0/security tickets to frontier-model review (CL-O); P2/P3 reviews go to Deepseek/Gemini. The cost ledger (T-538) surfaces drift early; Fable-5 reviews it at each phase gate.</td>
+</tr>
+<tr>
+  <td>R-3</td><td>RISK</td><td>SQLCipher key loss = data loss</td><td>E-58</td>
+  <td>Encrypted local stores are unrecoverable without the key. Mitigation: keys held in OS keychain plus admin-escrowed recovery key on the VPS (E-58); recovery drill is an explicit test in E-61.</td>
+</tr>
+<tr>
+  <td>R-4</td><td>RISK</td><td>Pilot disruption to current users</td><td>E-63</td>
+  <td>V2 changes auth on every API route. Mitigation: V1 instances keep running on the main branch throughout; pilot machines opt in to <code>v2-enterprise</code> builds; merge gate G5 requires one full week of clean pilot telemetry.</td>
+</tr>
+</table>
+
+<h2 id="summary-counts">6. Plan totals</h2>
+<table>
+<tr><th>Scope</th><th>Count</th><th>Range</th></tr>
+<tr><td>Epics</td><td>16</td><td>E-48 … E-63</td></tr>
+<tr><td>User stories</td><td>54</td><td>S-153 … S-206</td></tr>
+<tr><td>Tasks</td><td>168</td><td>T-533 … T-700</td></tr>
+</table>
+<p class="note">Numbering continues directly from the V1 backlog (last: E-47 / S-152 / T-532). When transcribing into <code>BACKLOG.md</code>, each epic above maps 1:1 to the markdown structure already in use.</p>
+
+</div>
+</body>
+</html>

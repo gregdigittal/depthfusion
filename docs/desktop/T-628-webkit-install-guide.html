@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T-628 — Install webkit2gtk &amp; gdk-pixbuf on the VPS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      background: #0f1117;
+      color: #e2e8f0;
+      padding: 0 1rem 4rem;
+    }
+
+    /* ── header ── */
+    .hero {
+      background: linear-gradient(135deg, #1a1f2e 0%, #0f3460 100%);
+      border-bottom: 3px solid #3b82f6;
+      padding: 2.5rem 2rem 2rem;
+      margin: 0 -1rem 2.5rem;
+    }
+    .hero h1 { font-size: 2rem; font-weight: 700; color: #93c5fd; margin-bottom: .4rem; }
+    .hero .subtitle { color: #94a3b8; font-size: 1rem; }
+    .badge {
+      display: inline-block;
+      background: #1d4ed8;
+      color: #bfdbfe;
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .2rem .6rem;
+      border-radius: 9999px;
+      margin-right: .5rem;
+      vertical-align: middle;
+    }
+
+    /* ── layout ── */
+    .container { max-width: 860px; margin: 0 auto; }
+
+    /* ── section cards ── */
+    .step {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-left: 5px solid #3b82f6;
+      border-radius: 10px;
+      padding: 1.75rem 1.75rem 1.5rem;
+      margin-bottom: 1.75rem;
+    }
+    .step.warning { border-left-color: #f59e0b; }
+    .step.success { border-left-color: #10b981; }
+    .step.error   { border-left-color: #ef4444; }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .step-number {
+      background: #3b82f6;
+      color: #fff;
+      font-weight: 700;
+      font-size: .85rem;
+      min-width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step.warning .step-number { background: #f59e0b; color: #000; }
+    .step.success .step-number { background: #10b981; }
+    .step.error   .step-number { background: #ef4444; }
+
+    .step h2 { font-size: 1.15rem; font-weight: 700; color: #e2e8f0; }
+    .step h3 { font-size: .95rem; font-weight: 600; color: #94a3b8; margin-top: 1.25rem; margin-bottom: .4rem; }
+
+    p { margin-bottom: .75rem; color: #cbd5e1; }
+
+    /* ── code blocks ── */
+    .code-block {
+      position: relative;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .code-block .cb-label {
+      background: #161b22;
+      color: #8b949e;
+      font-size: .72rem;
+      font-weight: 600;
+      padding: .35rem .75rem;
+      border-bottom: 1px solid #30363d;
+      font-family: monospace;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .code-block pre {
+      padding: 1rem 1.1rem;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: .88rem;
+      line-height: 1.55;
+      color: #c9d1d9;
+      white-space: pre;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 2.35rem;
+      right: .6rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: .72rem;
+      padding: .25rem .6rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .copy-btn:hover { background: #30363d; color: #c9d1d9; }
+    .copy-btn.copied { color: #10b981; border-color: #10b981; }
+
+    /* ── inline code ── */
+    code {
+      background: #1f2937;
+      color: #93c5fd;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .85em;
+      padding: .1em .35em;
+      border-radius: 4px;
+    }
+
+    /* ── success / expected-output boxes ── */
+    .expect {
+      background: #052e16;
+      border: 1px solid #166534;
+      border-radius: 6px;
+      padding: .75rem 1rem;
+      margin: .75rem 0;
+    }
+    .expect .expect-label {
+      font-size: .72rem;
+      font-weight: 700;
+      color: #4ade80;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .35rem;
+    }
+    .expect pre {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .83rem;
+      color: #86efac;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── failure boxes ── */
+    .fail-box {
+      background: #1c0a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 6px;
+      padding: .75rem 1rem;
+      margin: .75rem 0;
+    }
+    .fail-box .fail-label {
+      font-size: .72rem;
+      font-weight: 700;
+      color: #f87171;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .35rem;
+    }
+    .fail-box pre {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .83rem;
+      color: #fca5a5;
+      white-space: pre-wrap;
+    }
+
+    /* ── info callouts ── */
+    .callout {
+      display: flex;
+      gap: .75rem;
+      background: #172033;
+      border: 1px solid #1e40af;
+      border-radius: 6px;
+      padding: .75rem 1rem;
+      margin: .75rem 0;
+    }
+    .callout .icon { font-size: 1.2rem; flex-shrink: 0; margin-top: .05rem; }
+    .callout p { margin: 0; color: #93c5fd; font-size: .9rem; }
+
+    /* ── table ── */
+    table { width: 100%; border-collapse: collapse; margin: .75rem 0 1rem; font-size: .875rem; }
+    th { background: #1e293b; color: #94a3b8; font-weight: 600; text-align: left; padding: .55rem .85rem; border: 1px solid #2d3748; }
+    td { color: #cbd5e1; padding: .5rem .85rem; border: 1px solid #2d3748; vertical-align: top; }
+    tr:nth-child(even) td { background: #111827; }
+
+    /* ── quick-ref ── */
+    .quick-ref {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .quick-ref h2 { color: #93c5fd; font-size: 1.1rem; margin-bottom: 1rem; }
+
+    /* ── footer ── */
+    footer {
+      text-align: center;
+      color: #4b5563;
+      font-size: .8rem;
+      margin-top: 3rem;
+      border-top: 1px solid #1f2937;
+      padding-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Install webkit2gtk &amp; gdk-pixbuf on the VPS</h1>
+    <p class="subtitle">
+      <span class="badge">T-628</span>
+      <span class="badge">Lane C — Tauri 2 Shell</span>
+      VPS: <code style="background:transparent;color:#93c5fd;">176.9.147.206</code>
+      &nbsp;·&nbsp; Ubuntu 22.04 LTS
+    </p>
+  </div>
+
+  <!-- WHAT & WHY -->
+  <div class="step warning">
+    <div class="step-header">
+      <div class="step-number" style="background:#f59e0b;color:#000;">!</div>
+      <h2>What's blocking the build — and why</h2>
+    </div>
+    <p>
+      The DepthFusion desktop app is built with <strong>Tauri 2</strong>, a framework that
+      wraps your web UI inside a native desktop window. On Linux, Tauri uses the system's
+      browser engine (<strong>WebKitGTK 4.1</strong>) to render that window.
+    </p>
+    <p>
+      The code is complete and correct. The build fails because the server is missing the
+      <em>development headers</em> that the Rust compiler needs to link against WebKitGTK.
+      Think of it like trying to build a LEGO set when the instruction booklet is missing —
+      the pieces are fine; you just can't proceed without the reference.
+    </p>
+    <div class="callout">
+      <span class="icon">⚠️</span>
+      <p>
+        <strong>Tauri 2 requires <code>libwebkit2gtk-4.1-dev</code></strong>, not the older
+        <code>libwebkit2gtk-4.0-dev</code>. Installing the wrong version will appear to
+        succeed but then fail at link time with cryptic symbol errors. This guide installs
+        the correct version.
+      </p>
+    </div>
+  </div>
+
+  <!-- PRE-FLIGHT -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">0</div>
+      <h2>Before you start — SSH into the server</h2>
+    </div>
+    <p>Open a terminal on your laptop and connect to the VPS:</p>
+    <div class="code-block">
+      <div class="cb-label">your laptop terminal</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>ssh gregmorris@176.9.147.206</pre>
+    </div>
+    <p>You'll get a prompt like <code>gregmorris@server:~$</code>. All commands from here
+    are typed into <em>that</em> SSH session.</p>
+    <p>Confirm the Ubuntu version (optional sanity check):</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>lsb_release -a</pre>
+    </div>
+    <div class="expect">
+      <div class="expect-label">Expected output (Ubuntu 22.04)</div>
+      <pre>Distributor ID: Ubuntu
+Description:    Ubuntu 22.04.x LTS
+Release:        22.04</pre>
+    </div>
+    <div class="callout">
+      <span class="icon">ℹ️</span>
+      <p>If you're on Ubuntu 20.04 the commands are identical — the packages exist there too.</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 — check what's already installed -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">1</div>
+      <h2>Check what's already installed (optional but useful)</h2>
+    </div>
+    <p>This command tells you whether the critical package is present.
+       If it prints <code>OK</code> you can skip to Step 4 to verify the full set.</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>pkg-config --exists webkit2gtk-4.1 &amp;&amp; echo "webkit2gtk-4.1: ALREADY INSTALLED" || echo "webkit2gtk-4.1: MISSING — run Step 2"</pre>
+    </div>
+    <div class="expect">
+      <div class="expect-label">If already installed</div>
+      <pre>webkit2gtk-4.1: ALREADY INSTALLED</pre>
+    </div>
+    <div class="fail-box">
+      <div class="fail-label">If missing (normal — this is the problem we're fixing)</div>
+      <pre>webkit2gtk-4.1: MISSING — run Step 2</pre>
+    </div>
+  </div>
+
+  <!-- STEP 2 — update apt -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">2</div>
+      <h2>Update the package list</h2>
+    </div>
+    <p>This refreshes the list of available packages from Ubuntu's servers.
+       It doesn't install anything yet — it just makes sure <code>apt</code>
+       knows about the latest versions.</p>
+    <div class="code-block">
+      <div class="cb-label">server — takes ~10 seconds</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo apt-get update</pre>
+    </div>
+    <p>You'll be asked for your password. Type it and press <kbd>Enter</kbd>.
+       Nothing will appear as you type — that's normal on Linux.</p>
+    <div class="expect">
+      <div class="expect-label">Success looks like (last few lines)</div>
+      <pre>...
+Fetched 24.1 MB in 8s (3,012 kB/s)
+Reading package lists... Done</pre>
+    </div>
+    <div class="fail-box">
+      <div class="fail-label">If you see a lock error like this</div>
+      <pre>E: Could not get lock /var/lib/dpkg/lock-frontend...</pre>
+    </div>
+    <p>Another process is using apt. Wait 60 seconds and try again. If it persists:</p>
+    <div class="code-block">
+      <div class="cb-label">server (only if lock error)</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo killall apt apt-get 2>/dev/null; sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock; sudo dpkg --configure -a</pre>
+    </div>
+    <p>Then retry <code>sudo apt-get update</code>.</p>
+  </div>
+
+  <!-- STEP 3 — install packages -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">3</div>
+      <h2>Install the Tauri 2 build dependencies</h2>
+    </div>
+    <p>
+      This is the main step. It installs <strong>7 packages</strong> that Tauri 2 requires
+      on Linux. Copy and paste the entire block — it's one command spread across multiple lines
+      using <code>\</code> (backslash) for readability.
+    </p>
+    <div class="code-block">
+      <div class="cb-label">server — takes 1–3 minutes depending on bandwidth</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo apt-get install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf-2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  libssl-dev \
+  build-essential</pre>
+    </div>
+
+    <h3>What each package does</h3>
+    <table>
+      <tr><th>Package</th><th>Why Tauri 2 needs it</th></tr>
+      <tr><td><code>libwebkit2gtk-4.1-dev</code></td><td>The browser engine (WebKit) that renders the app's UI inside the native window. <strong>Must be 4.1 — not 4.0.</strong></td></tr>
+      <tr><td><code>libgdk-pixbuf-2.0-dev</code></td><td>Image rendering support. Used by GTK (the window toolkit) to display icons and images.</td></tr>
+      <tr><td><code>libxdo-dev</code></td><td>Keyboard/window automation library that Tauri links against on Linux.</td></tr>
+      <tr><td><code>libayatana-appindicator3-dev</code></td><td>System tray icon support. Required even if you're not using a tray icon.</td></tr>
+      <tr><td><code>librsvg2-dev</code></td><td>SVG rendering, used for the app's icon in various resolutions.</td></tr>
+      <tr><td><code>libssl-dev</code></td><td>TLS/HTTPS support for Tauri's HTTP client.</td></tr>
+      <tr><td><code>build-essential</code></td><td>The C compiler (<code>gcc</code>) and linker (<code>ld</code>). Required for the Rust build to compile C dependencies.</td></tr>
+    </table>
+
+    <div class="expect">
+      <div class="expect-label">Success — last few lines look like this</div>
+      <pre>Setting up libwebkit2gtk-4.1-dev:amd64 (2.44.x-0ubuntu0.22.04.x) ...
+Setting up libgdk-pixbuf-2.0-dev:amd64 (2.42.x+dfsg-1) ...
+Processing triggers for libc-bin (2.35-0ubuntu3.x) ...</pre>
+    </div>
+    <div class="fail-box">
+      <div class="fail-label">If you see: E: Unable to locate package libwebkit2gtk-4.1-dev</div>
+    </div>
+    <p>The Ubuntu package repositories might be from Ubuntu 20.04 which doesn't have 4.1.
+       Add the PPA and retry:</p>
+    <div class="code-block">
+      <div class="cb-label">server (only if package not found)</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo add-apt-repository ppa:webkit-team/ppa -y &amp;&amp; sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgdk-pixbuf-2.0-dev</pre>
+    </div>
+    <div class="fail-box">
+      <div class="fail-label">If you see: E: Unable to locate package libayatana-appindicator3-dev</div>
+    </div>
+    <p>This package has a different name on some Ubuntu builds. Try the libappindicator variant:</p>
+    <div class="code-block">
+      <div class="cb-label">server (only if libayatana-... not found)</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo apt-get install -y libappindicator3-dev</pre>
+    </div>
+  </div>
+
+  <!-- STEP 4 — verify -->
+  <div class="step success">
+    <div class="step-header">
+      <div class="step-number">4</div>
+      <h2>Verify all packages installed correctly</h2>
+    </div>
+    <p>This checks the two most important packages using the same tool the Rust build system uses:</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>pkg-config --exists --print-errors webkit2gtk-4.1 &amp;&amp; echo "✓ webkit2gtk-4.1 OK"
+pkg-config --exists --print-errors gdk-pixbuf-2.0 &amp;&amp; echo "✓ gdk-pixbuf-2.0 OK"</pre>
+    </div>
+    <div class="expect">
+      <div class="expect-label">Both lines must print OK</div>
+      <pre>✓ webkit2gtk-4.1 OK
+✓ gdk-pixbuf-2.0 OK</pre>
+    </div>
+    <div class="fail-box">
+      <div class="fail-label">If pkg-config says "No package ... found" even after installing</div>
+    </div>
+    <p>Refresh the shared library cache and retry:</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>sudo ldconfig</pre>
+    </div>
+    <p>Then re-run the two <code>pkg-config</code> commands above.</p>
+  </div>
+
+  <!-- STEP 5 — go to worktree -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">5</div>
+      <h2>Navigate to the T-628 worktree</h2>
+    </div>
+    <p>The T-628 Tauri code lives in a git worktree (an isolated copy of the repo on a
+       feature branch). Navigate there:</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app</pre>
+    </div>
+    <p>Confirm you're in the right place:</p>
+    <div class="code-block">
+      <div class="cb-label">server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>pwd &amp;&amp; ls src-tauri/</pre>
+    </div>
+    <div class="expect">
+      <div class="expect-label">Expected</div>
+      <pre>/home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app
+Cargo.lock  Cargo.toml  capabilities  icons  src  tauri.conf.json</pre>
+    </div>
+  </div>
+
+  <!-- STEP 6 — npm install -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-number">6</div>
+      <h2>Install JavaScript dependencies</h2>
+    </div>
+    <p>The frontend (TypeScript/React) needs its packages downloaded first.
+       This is equivalent to <code>pip install -r requirements.txt</code> — it downloads
+       packages into <code>node_modules/</code>.</p>
+    <div class="code-block">
+      <div class="cb-label">server — ~30–60 seconds on first run</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>npm install</pre>
+    </div>
+    <div class="expect">
+      <div class="expect-label">Success</div>
+      <pre>added 312 packages, and audited 313 packages in 47s</pre>
+    </div>
+    <p>The exact package count doesn't matter. No <code>npm error</code> lines is what matters.</p>
+  </div>
+
+  <!-- STEP 7 — cargo check -->
+  <div class="step success">
+    <div class="step-header">
+      <div class="step-number">7</div>
+      <h2>Verify the Rust code compiles</h2>
+    </div>
+    <p>
+      This is the key verification step. <code>cargo check</code> type-checks all the
+      Rust code and confirms the linker can find the system libraries we just installed.
+      It does <strong>not</strong> produce a final binary — it just validates everything
+      compiles correctly. The first run downloads Rust crates (packages) and takes
+      <strong>2–4 minutes</strong>.
+    </p>
+    <div class="code-block">
+      <div class="cb-label">server — first run takes 2–4 minutes</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>cargo check --manifest-path src-tauri/Cargo.toml</pre>
+    </div>
+
+    <h3>What you'll see while it runs</h3>
+    <p>Lines like these appear as Rust downloads and compiles dependencies. This is normal:</p>
+    <div class="expect">
+      <div class="expect-label">Normal output during run</div>
+      <pre>  Downloading crates ...
+  Downloaded webkit2gtk v0.20.x
+  Compiling tauri v2.11.x
+  Compiling tauri-runtime-wry v2.x.x
+  Compiling app v0.1.0 (/home/gregmorris/.../src-tauri)</pre>
+    </div>
+    <p>Yellow <code>warning:</code> lines are fine — only red <code>error[E...]</code> lines are problems.</p>
+
+    <div class="expect">
+      <div class="expect-label">✅ SUCCESS — last line</div>
+      <pre>    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 34s</pre>
+    </div>
+
+    <div class="fail-box">
+      <div class="fail-label">❌ FAIL — pkg-config error (environment problem, not code)</div>
+      <pre>error: failed to run custom build command for `webkit2gtk v0.20.x`
+...
+pkg-config could not find: webkit2gtk-4.1</pre>
+    </div>
+    <p>Go back to Step 4 — the package wasn't installed or <code>ldconfig</code> wasn't run.</p>
+
+    <div class="fail-box">
+      <div class="fail-label">❌ FAIL — Rust compile error (code problem, not environment)</div>
+      <pre>error[E0412]: cannot find type `SomeType` in this scope</pre>
+    </div>
+    <p>This is a code error, not an environment issue. Copy the full error block
+       (everything between <code>error[</code> and <code>Finished</code>) and
+       send it back for diagnosis.</p>
+  </div>
+
+  <!-- DONE -->
+  <div class="step success">
+    <div class="step-header">
+      <div class="step-number" style="font-size:1rem;">✓</div>
+      <h2>You're done</h2>
+    </div>
+    <p>
+      When Step 7 shows <code>Finished</code> with no red errors, the VPS build environment
+      for T-628 is fully configured. The Tauri 2 app can now compile on this server.
+    </p>
+    <p>
+      Report back with the <strong>last 3 lines</strong> of output from Step 7 and T-628 will
+      be marked verified.
+    </p>
+  </div>
+
+  <!-- QUICK REFERENCE -->
+  <div class="quick-ref">
+    <h2>Quick reference — all commands in order</h2>
+    <div class="code-block">
+      <div class="cb-label">copy &amp; run in sequence on the server</div>
+      <button class="copy-btn" onclick="copyCode(this)">Copy all</button>
+      <pre><span style="color:#6e7681"># Step 2 — update package list</span>
+sudo apt-get update
+
+<span style="color:#6e7681"># Step 3 — install Tauri 2 system dependencies</span>
+sudo apt-get install -y \
+  libwebkit2gtk-4.1-dev \
+  libgdk-pixbuf-2.0-dev \
+  libxdo-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  libssl-dev \
+  build-essential
+
+<span style="color:#6e7681"># Step 4 — verify packages</span>
+pkg-config --exists --print-errors webkit2gtk-4.1 &amp;&amp; echo "✓ webkit2gtk-4.1 OK"
+pkg-config --exists --print-errors gdk-pixbuf-2.0 &amp;&amp; echo "✓ gdk-pixbuf-2.0 OK"
+
+<span style="color:#6e7681"># Step 5 — navigate to app</span>
+cd /home/gregmorris/projects/depthfusion/.claude/worktrees/v2-lane-c-ui/app
+
+<span style="color:#6e7681"># Step 6 — install JS dependencies</span>
+npm install
+
+<span style="color:#6e7681"># Step 7 — verify Rust compiles (takes 2–4 min first run)</span>
+cargo check --manifest-path src-tauri/Cargo.toml</pre>
+    </div>
+  </div>
+
+  <footer>
+    T-628 · DepthFusion V2 Lane C · webkit2gtk install guide · 2026-06-13
+  </footer>
+
+</div>
+
+<script>
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!-- @dsCard group="Motion" viewport="700x230" name="Motion · develop & breathe" subtitle="Slow, patient easing — memory develops into view" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><link rel="stylesheet" href="../styles.css">
+<style>
+ html,body{margin:0;background:var(--bg)}
+ .wrap{padding:24px 26px;display:flex;gap:30px;align-items:stretch}
+ .stage{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:20px;display:flex;flex-direction:column;gap:9px;justify-content:center;position:relative;overflow:hidden}
+ .stage::after{content:"";position:absolute;inset:0;background:radial-gradient(300px 200px at 80% 20%,var(--accent-wash),transparent 70%);pointer-events:none}
+ .dev{font-family:var(--font-display);font-weight:300;letter-spacing:-.03em;color:var(--text);font-size:26px}
+ .dev em{font-style:italic;color:var(--accent)}
+ .cap{font:10px var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faintest)}
+ .pip{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:7px;vertical-align:middle}
+ .tokens{width:248px;flex-shrink:0;display:flex;flex-direction:column;gap:7px}
+ .tk{display:flex;justify-content:space-between;font:11px var(--font-mono);color:var(--text-2);border-bottom:1px solid var(--border);padding-bottom:6px}
+ .tk .k{color:var(--faint)}
+ .lbl{font:10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+</style></head>
+<body class="df"><div class="wrap">
+ <div class="stage">
+  <span class="cap"><span class="pip df-pip"></span>tray 01 · developer · 20°C</span>
+  <div id="dev" class="dev df-emerge">A memory <em>that develops</em></div>
+  <span class="cap" id="cap2">47 fragments emerging</span>
+ </div>
+ <div class="tokens">
+  <div class="lbl">Easing &amp; duration</div>
+  <div class="tk"><span class="k">--ease</span><span>.4,0,.2,1</span></div>
+  <div class="tk"><span class="k">--ease-develop</span><span>.2,.6,.2,1</span></div>
+  <div class="tk"><span class="k">--dur-quick</span><span>150ms</span></div>
+  <div class="tk"><span class="k">--dur-medium</span><span>400ms</span></div>
+  <div class="tk"><span class="k">--dur-develop</span><span>2400ms</span></div>
+  <div class="tk" style="border:none"><span class="k">--dur-breathe</span><span>6s</span></div>
+ </div>
+</div>
+<script>
+  // Re-trigger the "develop" emerge so the motion reads in the static card.
+  const el = document.getElementById('dev');
+  setInterval(() => {
+    el.classList.remove('df-emerge'); void el.offsetWidth; el.classList.add('df-emerge');
+  }, 3600);
+</script>
+</body></html>

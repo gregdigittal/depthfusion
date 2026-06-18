@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion — Team VPS Setup &amp; Tailscale Guide</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2e3e;
+    --accent: #6c63ff; --teal: #4ecdc4; --green: #22c55e;
+    --amber: #f59e0b; --red: #ef4444;
+    --text: #e8eaf0; --muted: #7c849a;
+    --code-bg: #0d1117; --code-text: #c9d1d9;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f5f9; --card: #ffffff; --border: #dde0ea; --text: #1a1d27; --muted: #5c6070; --code-bg: #1a1d27; --code-text: #c9d1d9; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px; }
+
+  /* ── Hero ── */
+  .hero { background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 3rem 2rem 2.5rem; text-align: center; }
+  .hero-badge { display: inline-block; background: rgba(108,99,255,.15); color: #a89fff; border: 1px solid rgba(108,99,255,.3); border-radius: 2rem; padding: .25rem .9rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1rem; }
+  .hero h1 { font-size: 2.1rem; font-weight: 700; color: #fff; margin-bottom: .5rem; letter-spacing: -.02em; }
+  .hero p { font-size: 1rem; color: var(--muted); max-width: 520px; margin: 0 auto .5rem; }
+  .hero-sub { font-size: .82rem; color: #484f58; margin-top: .75rem; }
+
+  .container { max-width: 700px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  /* ── Audience tab ── */
+  .audience-tabs { display: flex; gap: .4rem; margin: 2rem 0 0; }
+  .atab { flex: 1; padding: .9rem 1rem; border-radius: 10px 10px 0 0; font-size: .92rem; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all .15s; text-align: center; border-bottom: none; }
+  .atab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .audience-body { border: 1px solid var(--border); border-radius: 0 0 12px 12px; background: var(--card); padding: .4rem 0 0; }
+
+  /* ── Sections ── */
+  .section-header { display: flex; align-items: center; gap: 1rem; margin: 2.5rem 0 1.25rem; }
+  .section-badge { width: 2.4rem; height: 2.4rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; background: var(--accent); color: #fff; }
+  .section-badge.teal { background: var(--teal); color: #0f1117; }
+  .section-badge.green { background: var(--green); color: #0f1117; }
+  .section-badge.amber { background: var(--amber); color: #0f1117; }
+  .section-title-text h2 { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+  .section-title-text p { font-size: .85rem; color: var(--muted); margin-top: .1rem; }
+
+  /* ── Step card ── */
+  .step-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.3rem 1.4rem; margin-bottom: 1rem; }
+  .step-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .4rem; }
+  .step-card p { font-size: .9rem; color: var(--muted); margin-bottom: .75rem; }
+  .step-card p:last-child { margin-bottom: 0; }
+
+  /* ── Code ── */
+  .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin: .6rem 0; }
+  .code-header { display: flex; justify-content: space-between; align-items: center; padding: .45rem .9rem; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.03); }
+  .code-lang { font-size: .68rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .copy-btn { font-size: .75rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 5px; padding: .2rem .55rem; cursor: pointer; transition: all .15s; }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .code-body { padding: .8rem 1rem; font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: .88rem; color: var(--code-text); line-height: 1.55; overflow-x: auto; white-space: pre; }
+
+  /* ── Callouts ── */
+  .callout { border-radius: 9px; padding: .85rem 1rem; font-size: .88rem; display: flex; gap: .65rem; align-items: flex-start; margin: .75rem 0; }
+  .callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info  { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: #bdb5ff; }
+  .callout.warn  { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: #fcd34d; }
+  .callout.tip   { background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.25); color: #99f6f0; }
+  .callout.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+  .callout.critical { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; }
+
+  .dl-btn { display: inline-flex; align-items: center; gap: .6rem; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; font-size: .95rem; border-radius: 9px; padding: .75rem 1.4rem; margin: .5rem 0; transition: opacity .15s; }
+  .dl-btn:hover { opacity: .88; }
+  .dl-btn.teal { background: var(--teal); color: #0f1117; }
+
+  /* ── Platform toggle ── */
+  .platform-toggle { display: flex; gap: .4rem; margin-bottom: 1rem; }
+  .ptab { padding: .4rem 1rem; border-radius: 7px; font-size: .88rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all .15s; }
+  .ptab.active { background: var(--teal); border-color: var(--teal); color: #0f1117; }
+  .pblock { display: none; }
+  .pblock.active { display: block; }
+
+  /* ── Architecture diagram ── */
+  .arch-diagram { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; font-family: "SF Mono", Consolas, monospace; font-size: .82rem; color: var(--muted); line-height: 1.8; }
+  .arch-diagram .label { color: var(--accent); font-weight: 700; }
+  .arch-diagram .arrow { color: var(--teal); }
+
+  /* ── Verify box ── */
+  .verify-box { background: var(--card); border: 2px solid var(--green); border-radius: 14px; padding: 1.5rem 1.6rem; margin-top: 2.5rem; }
+  .verify-title { font-size: 1.1rem; font-weight: 700; color: var(--green); margin-bottom: .75rem; }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; display: flex; flex-direction: column; gap: .6rem; margin: .75rem 0; }
+  .checklist li { display: flex; align-items: flex-start; gap: .75rem; font-size: .9rem; }
+  .checklist .chk { font-size: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+  .checklist .chk-text strong { display: block; }
+  .checklist .chk-text span { font-size: .82rem; color: var(--muted); }
+
+  /* ── Progress ── */
+  .progress-bar { display: flex; gap: 0; margin: 2rem 0 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .progress-step { flex: 1; padding: .6rem .5rem; text-align: center; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--card); border-right: 1px solid var(--border); cursor: default; }
+  .progress-step:last-child { border-right: none; }
+  .progress-step.active { background: var(--accent); color: #fff; }
+  .progress-step.done { background: rgba(34,197,94,.15); color: var(--green); }
+
+  /* ── Troubleshoot ── */
+  details { background: var(--card); border: 1px solid var(--border); border-radius: 9px; margin-bottom: .6rem; overflow: hidden; }
+  details summary { padding: .9rem 1rem; font-size: .9rem; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; color: var(--text); }
+  details summary::after { content: "＋"; color: var(--muted); }
+  details[open] summary::after { content: "－"; }
+  details .detail-body { padding: 0 1rem 1rem; font-size: .88rem; color: var(--muted); line-height: 1.65; }
+  details .detail-body ol, details .detail-body ul { margin: .5rem 0 0 1.2rem; display: flex; flex-direction: column; gap: .4rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem 0 1rem; }
+  .time-chip { display: inline-flex; align-items: center; gap: .35rem; background: rgba(78,205,196,.1); border: 1px solid rgba(78,205,196,.2); color: var(--teal); border-radius: 99px; font-size: .75rem; font-weight: 600; padding: .2rem .65rem; margin-left: .4rem; }
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO -->
+<div class="hero">
+  <div class="hero-badge">Team Setup · VPS + Tailscale</div>
+  <h1>DepthFusion for Your Team</h1>
+  <p>One shared server. The whole team connects through a private network. Shared memory that makes your AI smarter for everyone.</p>
+  <p class="hero-sub">Two guides below — pick the one that applies to you.</p>
+</div>
+
+<div class="container">
+
+  <!-- Architecture overview -->
+  <div class="arch-diagram">
+    <div style="text-align:center;color:var(--text);font-weight:700;margin-bottom:1rem;font-family:sans-serif;font-size:.9rem;">How it works</div>
+    <div style="display:flex;flex-direction:column;gap:.15rem;">
+      <div>  <span class="label">Team member A</span> — Mac / Windows / Linux</div>
+      <div>  <span class="label">Team member B</span> — Mac / Windows / Linux   <span class="arrow">─────┐</span></div>
+      <div>  <span class="label">Team member C</span> — Mac / Windows / Linux   <span style="color:var(--muted);">     │ Tailscale</span></div>
+      <div>  <span style="color:var(--muted);">        ↓                                       │ encrypted</span></div>
+      <div>  <span class="arrow">Claude Desktop / Claude Code CLI</span>           <span style="color:var(--muted);">     │ tunnel</span></div>
+      <div>  <span style="color:var(--muted);">        │                                       │</span></div>
+      <div>  <span style="color:var(--muted);">        └────────────────────────────────────┘</span></div>
+      <div>                                <span class="arrow">▼</span></div>
+      <div>  <span class="label">DepthFusion server</span> on Linux VPS <span style="color:var(--muted);">(port 7301)</span></div>
+      <div>  <span style="color:var(--muted);">  · 29 MCP tools  · Shared memory store</span></div>
+      <div>  <span style="color:var(--muted);">  · Recall, search, context bridge tools</span></div>
+    </div>
+  </div>
+
+  <!-- Audience tabs -->
+  <div style="margin-top:2rem;">
+    <p style="font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;">Select your role</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:2rem;">
+      <div id="rolecard-admin" onclick="showRole('admin')" style="cursor:pointer;background:var(--card);border:2px solid var(--border);border-radius:12px;padding:1.2rem;text-align:center;transition:all .2s;">
+        <div style="font-size:2rem;margin-bottom:.4rem;">🔧</div>
+        <div style="font-weight:700;margin-bottom:.3rem;">I'm the admin</div>
+        <div style="font-size:.82rem;color:var(--muted);">Setting up the VPS server for my team</div>
+      </div>
+      <div id="rolecard-member" onclick="showRole('member')" style="cursor:pointer;background:var(--card);border:2px solid var(--border);border-radius:12px;padding:1.2rem;text-align:center;transition:all .2s;">
+        <div style="font-size:2rem;margin-bottom:.4rem;">👤</div>
+        <div style="font-weight:700;margin-bottom:.3rem;">I'm a team member</div>
+        <div style="font-size:.82rem;color:var(--muted);">The server is already set up — I just need to connect</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ ADMIN GUIDE -->
+  <div id="role-admin" style="display:none;">
+
+    <div class="callout critical">
+      <div class="callout-icon">🔒</div>
+      <div><strong>Admin guide — for the person setting up the server.</strong> This guide sets up a Linux VPS so the whole team can connect. You need root access to the server. Time: about 30 minutes on a fresh server.</div>
+    </div>
+
+    <!-- What you need -->
+    <div class="section-header">
+      <div class="section-badge">✓</div>
+      <div class="section-title-text">
+        <h2>What you need before starting</h2>
+        <p>Make sure you have all of these before you begin.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <ul class="checklist">
+        <li><div class="chk">🖥</div><div class="chk-text"><strong>A Linux VPS with root access</strong><span>Ubuntu 20.04 or 22.04 recommended. 2 CPU cores, 4 GB RAM minimum. Any cloud provider works (Hetzner, DigitalOcean, Linode, AWS, etc.)</span></div></li>
+        <li><div class="chk">🔑</div><div class="chk-text"><strong>An Anthropic API key</strong><span>Get one from console.anthropic.com/settings/keys — this is separate from your Claude subscription.</span></div></li>
+        <li><div class="chk">🌐</div><div class="chk-text"><strong>A Tailscale account</strong><span>Free account at tailscale.com. You'll need your Tailscale auth key from tailscale.com/settings/keys.</span></div></li>
+        <li><div class="chk">💻</div><div class="chk-text"><strong>SSH access to the VPS</strong><span>You should be able to run <code>ssh root@your-server-ip</code> from your computer.</span></div></li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <div class="progress-bar">
+      <div class="progress-step active">1 · SSH In</div>
+      <div class="progress-step">2 · Install</div>
+      <div class="progress-step">3 · Configure</div>
+      <div class="progress-step">4 · Tailscale</div>
+      <div class="progress-step">5 · Start &amp; Verify</div>
+      <div class="progress-step">6 · Share</div>
+    </div>
+
+    <!-- ADMIN STEP 1 -->
+    <div class="section-header">
+      <div class="section-badge">1</div>
+      <div class="section-title-text">
+        <h2>SSH into your server <span class="time-chip">⏱ 1 min</span></h2>
+        <p>Open a terminal on your Mac/Linux/Windows machine and connect to the VPS.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Connect to your server</h3>
+      <p>Replace <code>your-server-ip</code> with your VPS's public IP address.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Your local terminal</div><button class="copy-btn" onclick="copyCode(this,'admin-ssh')">Copy</button></div>
+        <div class="code-body" id="admin-ssh">ssh root@your-server-ip</div>
+      </div>
+      <div class="callout tip">
+        <div class="callout-icon">ℹ️</div>
+        <div>All remaining commands in this section run <strong>on the server</strong>, not your own computer.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ADMIN STEP 2 -->
+    <div class="section-header">
+      <div class="section-badge teal">2</div>
+      <div class="section-title-text">
+        <h2>Install system prerequisites <span class="time-chip">⏱ 3 min</span></h2>
+        <p>Install Python, git, and system packages. Run as root.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Update and install packages</h3>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-apt')">Copy</button></div>
+        <div class="code-body" id="admin-apt">apt update && apt upgrade -y
+apt install -y python3.12 python3.12-venv python3-pip git curl</div>
+      </div>
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>On Ubuntu 22.04, Python 3.12 may not be in the default repos. If <code>apt install python3.12</code> fails, run: <code>apt install -y python3 python3-venv python3-pip</code> instead — Python 3.11+ is required.</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Install uv (fast Python package manager)</h3>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-uv')">Copy</button></div>
+        <div class="code-body" id="admin-uv">curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ADMIN STEP 3 -->
+    <div class="section-header">
+      <div class="section-badge">3</div>
+      <div class="section-title-text">
+        <h2>Clone DepthFusion and configure it <span class="time-chip">⏱ 5 min</span></h2>
+        <p>Create a dedicated user, clone the repo, install the package.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Create a service user</h3>
+      <p>Running DepthFusion as a dedicated non-root user is safer. If you prefer to use an existing user, skip to the next card.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-user')">Copy</button></div>
+        <div class="code-body" id="admin-user">adduser --disabled-password --gecos "" depthfusion
+# Or use your own username instead of "depthfusion"</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Clone the repository and install</h3>
+      <p>Switch to the service user first. Replace <code>depthfusion</code> with your username if you chose a different one.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-clone')">Copy</button></div>
+        <div class="code-body" id="admin-clone">su - depthfusion
+cd ~
+git clone https://github.com/gregdigittal/depthfusion.git projects/depthfusion
+cd projects/depthfusion
+
+# Create the virtual environment and install
+python3 -m venv .venv
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -e ".[vps]"</div>
+      </div>
+      <div class="callout tip">
+        <div class="callout-icon">ℹ️</div>
+        <div>The <code>[vps]</code> extras install the HTTP server and all server-side dependencies. No MLX or GPU libraries are installed — VPS mode uses CPU-only BM25 recall with an optional remote LLM backend.</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Create the configuration file</h3>
+      <p>Still as the depthfusion user. Replace <code>your-api-key-here</code> with your Anthropic API key.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-env')">Copy</button></div>
+        <div class="code-body" id="admin-env">mkdir -p ~/.claude
+cat > ~/.claude/depthfusion.env &lt;&lt;'EOF'
+DEPTHFUSION_API_KEY=your-api-key-here
+DEPTHFUSION_MODE=vps-cpu
+DEPTHFUSION_HNSW_ENABLED=false
+DEPTHFUSION_GRAPH_ENABLED=true
+DEPTHFUSION_RERANKER_ENABLED=true
+DEPTHFUSION_TIER_AUTOPROMOTE=true
+DEPTHFUSION_REST_API=true
+EOF
+chmod 600 ~/.claude/depthfusion.env</div>
+      </div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div>The <code>chmod 600</code> command makes this file readable only by you — not by other users on the server. Don't skip it.</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Optional: Enable the multi-provider bridge (OpenRouter)</h3>
+      <p>If you want the bridge tools (delegate to GPT-4o, Gemini, DeepSeek), add your OpenRouter API key. Skip this if you don't need it.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-openrouter')">Copy</button></div>
+        <div class="code-body" id="admin-openrouter">echo "OPENROUTER_API_KEY=your-openrouter-key-here" >> ~/.claude/depthfusion.env</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ADMIN STEP 4 -->
+    <div class="section-header">
+      <div class="section-badge amber">4</div>
+      <div class="section-title-text">
+        <h2>Set up Tailscale on the server <span class="time-chip">⏱ 5 min</span></h2>
+        <p>Tailscale creates a private network so team members can reach the server without exposing port 7301 to the public internet.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Install Tailscale on the server</h3>
+      <p>Run this as root (type <code>exit</code> to leave the depthfusion user shell first).</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-ts-install')">Copy</button></div>
+        <div class="code-body" id="admin-ts-install">exit   # back to root if you were in the depthfusion user shell
+
+curl -fsSL https://tailscale.com/install.sh | sh</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Connect the server to Tailscale</h3>
+      <p>Replace <code>your-tailscale-auth-key</code> with an auth key from your Tailscale admin panel (<a href="https://login.tailscale.com/admin/settings/keys" target="_blank" style="color:var(--teal);">login.tailscale.com/admin/settings/keys</a>).</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-ts-up')">Copy</button></div>
+        <div class="code-body" id="admin-ts-up">tailscale up --authkey=your-tailscale-auth-key --advertise-tags=tag:server</div>
+      </div>
+      <div class="callout tip">
+        <div class="callout-icon">ℹ️</div>
+        <div>Once connected, get the server's Tailscale IP by running: <code>tailscale ip -4</code>. This is the IP you'll give to team members — it looks like <code>100.x.x.x</code>.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-ts-ip')">Copy</button></div>
+        <div class="code-body" id="admin-ts-ip">tailscale ip -4
+# Copy this IP — you'll put it in the connection command you send to team members</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Lock down port 7301 to Tailscale only</h3>
+      <p>This prevents DepthFusion from being reachable from the public internet. Only Tailscale-connected devices can reach it.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-ufw')">Copy</button></div>
+        <div class="code-body" id="admin-ufw"># Install ufw if not present
+apt install -y ufw
+
+# Allow SSH from anywhere (critical — don't remove this)
+ufw allow 22/tcp
+
+# Block port 7301 from the public internet
+ufw deny 7301
+
+# Enable the firewall
+ufw --force enable
+ufw status</div>
+      </div>
+      <div class="callout critical">
+        <div class="callout-icon">🔒</div>
+        <div><strong>Tailscale traffic bypasses ufw by design</strong> — the <code>tailscale0</code> interface routes traffic before ufw sees it. So blocking port 7301 in ufw blocks the public internet while still allowing Tailscale connections. This is the correct and intended behaviour.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ADMIN STEP 5 -->
+    <div class="section-header">
+      <div class="section-badge">5</div>
+      <div class="section-title-text">
+        <h2>Create and start the systemd service <span class="time-chip">⏱ 5 min</span></h2>
+        <p>This makes DepthFusion start automatically on boot and restart if it crashes.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Create the service file</h3>
+      <p>Run as root. Replace <code>depthfusion</code> with your chosen username throughout.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-service')">Copy</button></div>
+        <div class="code-body" id="admin-service">cat > /etc/systemd/system/depthfusion-mcp.service &lt;&lt;'EOF'
+[Unit]
+Description=DepthFusion MCP HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+User=depthfusion
+WorkingDirectory=/home/depthfusion/projects/depthfusion
+EnvironmentFile=/home/depthfusion/.claude/depthfusion.env
+ExecStart=/home/depthfusion/projects/depthfusion/.venv/bin/python3 -m depthfusion.mcp.http_server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable depthfusion-mcp
+systemctl start depthfusion-mcp</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Verify the service started</h3>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-verify-svc')">Copy</button></div>
+        <div class="code-body" id="admin-verify-svc">systemctl status depthfusion-mcp --no-pager
+curl http://localhost:7301/health</div>
+      </div>
+      <div class="callout success">
+        <div class="callout-icon">✅</div>
+        <div>The service status should say <strong>active (running)</strong>. The health check should return <code>{"status":"ok"}</code>.</div>
+      </div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div>If the status shows <code>activating (auto-restart)</code>, check the logs: <code>journalctl -u depthfusion-mcp -n 30 --no-pager</code>. Look for any import errors or missing env vars.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ADMIN STEP 6 -->
+    <div class="section-header">
+      <div class="section-badge green">6</div>
+      <div class="section-title-text">
+        <h2>Share with your team</h2>
+        <p>Send each team member the connection command with your Tailscale IP filled in.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>What to send team members</h3>
+      <p>Copy this message, replace <code>100.X.X.X</code> with your server's Tailscale IP (from <code>tailscale ip -4</code>), and send it to each person on your team.</p>
+      <div class="code-block" style="border-color:var(--teal);">
+        <div class="code-header" style="border-color:var(--teal);"><div class="code-lang" style="color:var(--teal);">Message to team members</div><button class="copy-btn" onclick="copyCode(this,'admin-team-msg')">Copy</button></div>
+        <div class="code-body" id="admin-team-msg">Hi! Follow these steps to connect to the team AI memory (DepthFusion):
+
+1. Install Claude Desktop: https://claude.ai/download
+   Sign in with your Anthropic account.
+
+2. Install Tailscale: https://tailscale.com/download
+   Sign in with Google or create a free account.
+   Tell me your Tailscale email so I can approve you.
+
+3. Once I've approved you, open Terminal (Mac) or PowerShell (Windows) and run:
+   claude mcp add depthfusion http://100.X.X.X:7301/sse
+
+4. Restart Claude Desktop, open a new chat, and type: depthfusion_status
+   You should see a confirmation that it's connected.
+
+Full guide: https://github.com/gregdigittal/depthfusion/blob/main/docs/install/ceo-quickstart.html</div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Approving team members in Tailscale</h3>
+      <p>When a team member sets up Tailscale, they appear in your Tailscale admin panel as a pending device. You need to approve them before they can reach the server.</p>
+      <ol style="margin:.5rem 0 0 1.2rem;display:flex;flex-direction:column;gap:.5rem;font-size:.9rem;color:var(--muted);">
+        <li>Go to <a href="https://login.tailscale.com/admin/machines" target="_blank" style="color:var(--teal);">login.tailscale.com/admin/machines</a></li>
+        <li>Find the team member's device (they'll tell you their device name or email)</li>
+        <li>Click the three-dot menu → <strong>Approve</strong></li>
+      </ol>
+      <div class="callout tip">
+        <div class="callout-icon">💡</div>
+        <div>You can also enable auto-approval for your Tailscale network to skip manual approval. Go to <strong>Access Controls</strong> in the Tailscale admin panel and set auto-approval for your email domain.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Updating the server -->
+    <div class="section-header">
+      <div class="section-badge teal">↑</div>
+      <div class="section-title-text">
+        <h2>Updating DepthFusion on the server</h2>
+        <p>Run these commands as the service user when a new version is available.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as service user)</div><button class="copy-btn" onclick="copyCode(this,'admin-update')">Copy</button></div>
+        <div class="code-body" id="admin-update">cd ~/projects/depthfusion
+git pull
+.venv/bin/pip install -e ".[vps]" -q</div>
+      </div>
+      <p style="margin-top:.5rem;">Then as root:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">VPS shell (as root)</div><button class="copy-btn" onclick="copyCode(this,'admin-restart')">Copy</button></div>
+        <div class="code-body" id="admin-restart">systemctl restart depthfusion-mcp
+systemctl status depthfusion-mcp --no-pager</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Admin troubleshooting -->
+    <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Admin troubleshooting</p>
+
+    <details>
+      <summary>Port 7301 address already in use</summary>
+      <div class="detail-body">
+        <p>A previous instance is still running. Find and stop it:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-port')">Copy</button></div>
+          <div class="code-body" id="admin-port">fuser 7301/tcp          # shows the PID holding the port
+kill &lt;PID&gt;              # kill it
+systemctl restart depthfusion-mcp</div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>ModuleNotFoundError on startup</summary>
+      <div class="detail-body">
+        <p>The package isn't installed in the venv. Run as the service user:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">VPS shell (as service user)</div><button class="copy-btn" onclick="copyCode(this,'admin-module')">Copy</button></div>
+          <div class="code-body" id="admin-module">cd ~/projects/depthfusion
+.venv/bin/pip install -e ".[vps]" -q
+systemctl restart depthfusion-mcp</div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Team member can connect on Tailscale but depthfusion_status fails</summary>
+      <div class="detail-body">
+        <ol>
+          <li>Confirm the service is running: <code>systemctl status depthfusion-mcp</code></li>
+          <li>From the team member's machine, try: <code>curl http://100.X.X.X:7301/health</code> (use the Tailscale IP). If it responds, the server is reachable.</li>
+          <li>If it doesn't respond, check that ufw is not blocking Tailscale traffic: <code>ufw status</code>. The tailscale0 interface should be unrestricted.</li>
+          <li>Make sure the team member restarted Claude Desktop and started a <strong>brand new chat</strong>.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>How do I check who has connected and what they've stored?</summary>
+      <div class="detail-body">
+        <p>Connect to your server with SSH and run:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">VPS shell</div><button class="copy-btn" onclick="copyCode(this,'admin-inspect')">Copy</button></div>
+          <div class="code-body" id="admin-inspect"># Check the journal for recent connections
+journalctl -u depthfusion-mcp --since "24 hours ago" --no-pager | grep -i "recall\|publish"
+
+# Check memory store size
+du -sh ~/projects/depthfusion/data/ 2>/dev/null || echo "No data directory yet"</div>
+        </div>
+      </div>
+    </details>
+
+  </div><!-- /role-admin -->
+
+
+  <!-- ═══════════════════════════════════════════ MEMBER GUIDE -->
+  <div id="role-member" style="display:none;">
+
+    <div class="callout info">
+      <div class="callout-icon">💡</div>
+      <div><strong>Team member guide.</strong> The server is already set up — you just need to (1) install Tailscale to join the private network, (2) get approved by your admin, and (3) run one command to connect Claude to the server. Takes about 10 minutes.</div>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-step active">1 · Claude Desktop</div>
+      <div class="progress-step">2 · Tailscale</div>
+      <div class="progress-step">3 · Connect</div>
+      <div class="progress-step">4 · Verify</div>
+    </div>
+
+    <!-- MEMBER STEP 1 -->
+    <div class="section-header">
+      <div class="section-badge">1</div>
+      <div class="section-title-text">
+        <h2>Install Claude Desktop <span class="time-chip">⏱ 3 min</span></h2>
+        <p>The app you'll chat with. Skip if you already have it.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <a class="dl-btn" href="https://claude.ai/download" target="_blank">⬇ Download Claude Desktop</a>
+      <p style="margin-top:.75rem;"><strong>Mac:</strong> Open the .dmg and drag Claude into Applications. Open it and sign in.</p>
+      <p><strong>Windows:</strong> Run the installer (Next → Next → Finish). Open from the Start menu and sign in.</p>
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div>Sign in with any Anthropic account — free or paid. You don't need a subscription to connect to the team server.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- MEMBER STEP 2 -->
+    <div class="section-header">
+      <div class="section-badge teal">2</div>
+      <div class="section-title-text">
+        <h2>Install Tailscale and get approved <span class="time-chip">⏱ 5 min</span></h2>
+        <p>Tailscale is a private VPN app. Without it, you can't reach the team server.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Download and install Tailscale</h3>
+      <a class="dl-btn teal" href="https://tailscale.com/download" target="_blank">⬇ Download Tailscale</a>
+      <p style="margin-top:.75rem;"><strong>Mac:</strong> Drag Tailscale to Applications. <strong>Windows:</strong> Run the .exe installer.</p>
+    </div>
+
+    <div class="step-card">
+      <h3>Sign in to Tailscale</h3>
+
+      <div class="platform-toggle">
+        <div class="ptab active" id="mtab-mac" onclick="switchMemberPlatform('mac')">🍎 Mac</div>
+        <div class="ptab" id="mtab-win" onclick="switchMemberPlatform('win')">🪟 Windows</div>
+      </div>
+
+      <div class="pblock active" id="mp-mac">
+        <p>After installing, look for the <strong>Tailscale icon in your menu bar</strong> — the row of small icons at the very top-right of your screen.</p>
+        <p>Click the icon → <strong>Log in</strong>. Your browser opens — sign in with Google or create a free account.</p>
+        <div class="callout tip">
+          <div class="callout-icon">✅</div>
+          <div>When signed in, the icon turns from grey to a solid colour. That means Tailscale is running.</div>
+        </div>
+      </div>
+
+      <div class="pblock" id="mp-win">
+        <p>After installing, look for the <strong>Tailscale icon in the system tray</strong> — bottom-right corner near the clock. Click the ∧ arrow to show hidden icons if needed.</p>
+        <p>Right-click the Tailscale icon → <strong>Log in</strong>. Your browser opens — sign in with Google or create a free account.</p>
+        <div class="callout tip">
+          <div class="callout-icon">✅</div>
+          <div>When signed in, the icon turns from grey to a solid colour.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card" style="border-color:rgba(245,158,11,.35);">
+      <h3>📧 Tell your admin the email you used for Tailscale</h3>
+      <p>Send your admin the email address you signed in with. They need to approve your device in the Tailscale admin panel. This usually takes a minute or two.</p>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>Don't continue to Step 3 until your admin confirms you're approved.</strong> The connection command will fail with "cannot connect" if your device isn't approved yet.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- MEMBER STEP 3 -->
+    <div class="section-header">
+      <div class="section-badge">3</div>
+      <div class="section-title-text">
+        <h2>Connect Claude to the team server <span class="time-chip">⏱ 2 min</span></h2>
+        <p>One command links Claude Desktop to the team memory. Your admin will give you the server IP.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Open Terminal (Mac) or PowerShell (Windows)</h3>
+
+      <div class="platform-toggle">
+        <div class="ptab active" id="mtab2-mac" onclick="switchMemberPlatform2('mac')">🍎 Mac</div>
+        <div class="ptab" id="mtab2-win" onclick="switchMemberPlatform2('win')">🪟 Windows</div>
+      </div>
+
+      <div class="pblock active" id="mp2-mac">
+        <div class="callout info">
+          <div class="callout-icon">💡</div>
+          <div>Press <strong>⌘ Command + Space</strong>, type <strong>Terminal</strong>, press <strong>Enter</strong>.</div>
+        </div>
+      </div>
+      <div class="pblock" id="mp2-win">
+        <div class="callout info">
+          <div class="callout-icon">💡</div>
+          <div>Press the <strong>Windows key</strong>, type <strong>PowerShell</strong>, press <strong>Enter</strong>.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <h3>Run the connection command</h3>
+      <p>Your admin will give you a command that looks like this — with the server's Tailscale IP already filled in. Replace <code>100.X.X.X</code> with the IP your admin gave you.</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Terminal / PowerShell</div><button class="copy-btn" onclick="copyCode(this,'member-connect')">Copy</button></div>
+        <div class="code-body" id="member-connect">claude mcp add depthfusion http://100.X.X.X:7301/sse</div>
+      </div>
+      <p style="margin-top:.6rem;font-size:.85rem;color:var(--muted);">You should see: <code style="color:var(--teal);">Added MCP server depthfusion</code></p>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>If you see "command not found: claude"</strong> — the Claude Code CLI isn't installed. Use the manual method below instead.</div>
+      </div>
+    </div>
+
+    <!-- Manual fallback -->
+    <details>
+      <summary>📋 Manual method — if "command not found" appeared</summary>
+      <div class="detail-body">
+        <p style="margin-bottom:.75rem;">Edit a config file directly. This works just as well.</p>
+
+        <p><strong>Mac — Step 1.</strong> In Finder, press <strong>⌘ Command + Shift + G</strong> and paste this, then press Enter:</p>
+        <div class="code-block" style="margin:.5rem 0 .75rem;">
+          <div class="code-header"><div class="code-lang">Finder path</div><button class="copy-btn" onclick="copyCode(this,'man-mac')">Copy</button></div>
+          <div class="code-body" id="man-mac">~/Library/Application Support/Claude/</div>
+        </div>
+
+        <p><strong>Windows — Step 1.</strong> Press <strong>Windows key + R</strong>, paste this, press Enter:</p>
+        <div class="code-block" style="margin:.5rem 0 .75rem;">
+          <div class="code-header"><div class="code-lang">Run dialog</div><button class="copy-btn" onclick="copyCode(this,'man-win')">Copy</button></div>
+          <div class="code-body" id="man-win">%APPDATA%\Claude\</div>
+        </div>
+
+        <p style="margin-bottom:.5rem;"><strong>Step 2.</strong> Open <code>claude_desktop_config.json</code> with TextEdit (Mac) or Notepad (Windows). Create the file if it doesn't exist.</p>
+        <p style="margin-bottom:.5rem;"><strong>Step 3.</strong> Replace the file contents with this — swap in the server IP your admin gave you:</p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">JSON config</div><button class="copy-btn" onclick="copyCode(this,'man-json')">Copy</button></div>
+          <div class="code-body" id="man-json">{
+  "mcpServers": {
+    "depthfusion": {
+      "url": "http://100.X.X.X:7301/sse"
+    }
+  }
+}</div>
+        </div>
+        <p>Save the file. Restart Claude Desktop.</p>
+      </div>
+    </details>
+
+    <div class="step-card" style="margin-top:1rem;">
+      <h3>Restart Claude Desktop</h3>
+
+      <div class="platform-toggle">
+        <div class="ptab active" id="mtab3-mac" onclick="switchMemberPlatform3('mac')">🍎 Mac</div>
+        <div class="ptab" id="mtab3-win" onclick="switchMemberPlatform3('win')">🪟 Windows</div>
+      </div>
+      <div class="pblock active" id="mp3-mac">
+        <p>Click the Claude icon in your <strong>menu bar</strong> → <strong>Quit Claude</strong>. Then reopen from Applications or Dock.</p>
+      </div>
+      <div class="pblock" id="mp3-win">
+        <p>Find Claude in the <strong>system tray</strong> (bottom-right). Right-click → <strong>Quit</strong>. Then reopen from the Start menu.</p>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- MEMBER STEP 4 -->
+    <div class="section-header">
+      <div class="section-badge green">4</div>
+      <div class="section-title-text">
+        <h2>Verify the connection <span class="time-chip">⏱ 1 min</span></h2>
+        <p>One message confirms everything is working.</p>
+      </div>
+    </div>
+
+    <div class="verify-box">
+      <div class="verify-title">✅ Test the connection</div>
+      <p style="font-size:.9rem;color:var(--muted);margin-bottom:.9rem;">Open a <strong>new chat</strong> in Claude Desktop and type exactly this:</p>
+      <div class="code-block">
+        <div class="code-header"><div class="code-lang">Claude Desktop — new chat</div><button class="copy-btn" onclick="copyCode(this,'member-verify')">Copy</button></div>
+        <div class="code-body" id="member-verify">depthfusion_status</div>
+      </div>
+      <div class="callout success" style="margin-top:1rem;">
+        <div class="callout-icon">🎉</div>
+        <div><strong>Success:</strong> Claude responds with version info and a list of 29 available tools. You're now sharing memory with the team.</div>
+      </div>
+      <div class="callout warn" style="margin-top:.5rem;">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>If nothing happens:</strong> Make sure Tailscale is running (icon should be solid, not grey) and your admin has approved your device. Quit and reopen Claude Desktop, start a fresh chat, and try again.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Member troubleshooting -->
+    <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">Team member troubleshooting</p>
+
+    <details>
+      <summary>Tailscale is grey or says "Not connected"</summary>
+      <div class="detail-body">
+        <p><strong>Mac:</strong> Click the Tailscale menu bar icon → <strong>Connect</strong>. If the icon isn't visible, search for Tailscale in Spotlight (⌘ Space) and open it.</p>
+        <p style="margin-top:.5rem;"><strong>Windows:</strong> Check the system tray (click ∧ near the clock). Right-click Tailscale → <strong>Connect</strong>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>"command not found: claude" or "claude is not recognized"</summary>
+      <div class="detail-body">
+        <p>Claude Code CLI isn't installed. Use the <strong>Manual method</strong> expandable section in Step 3 above — it takes 3 extra steps but works just as well.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>depthfusion_status gives no response or an error</summary>
+      <div class="detail-body">
+        <ol>
+          <li>Confirm Tailscale is connected (solid icon, not grey).</li>
+          <li>Message your admin to confirm the server is running and your device is approved.</li>
+          <li>Fully quit Claude Desktop (don't just close the window — use Quit from menu bar or tray).</li>
+          <li>Reopen Claude Desktop and start a <strong>brand new chat</strong>.</li>
+          <li>Type <code>depthfusion_status</code> again.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>I need to remove DepthFusion from Claude</summary>
+      <div class="detail-body">
+        <p><strong>If you used the command method:</strong></p>
+        <div class="code-block" style="margin:.5rem 0;">
+          <div class="code-header"><div class="code-lang">Terminal / PowerShell</div><button class="copy-btn" onclick="copyCode(this,'member-remove')">Copy</button></div>
+          <div class="code-body" id="member-remove">claude mcp remove depthfusion -s user</div>
+        </div>
+        <p style="margin-top:.5rem;"><strong>If you used the manual method:</strong> Open <code>claude_desktop_config.json</code> and delete the <code>"depthfusion"</code> block. Save and restart Claude Desktop.</p>
+      </div>
+    </details>
+
+  </div><!-- /role-member -->
+
+  <div class="footer">
+    DepthFusion v1.2.1 · <a href="https://github.com/gregdigittal/depthfusion" style="color:var(--muted);">GitHub</a>
+  </div>
+</div><!-- /container -->
+
+<script>
+  var currentRole = null;
+
+  function showRole(r) {
+    currentRole = r;
+    var adminCard = document.getElementById('rolecard-admin');
+    var memberCard = document.getElementById('rolecard-member');
+    adminCard.style.borderColor = r === 'admin' ? 'var(--accent)' : 'var(--border)';
+    adminCard.style.background = r === 'admin' ? 'rgba(108,99,255,.08)' : 'var(--card)';
+    memberCard.style.borderColor = r === 'member' ? 'var(--teal)' : 'var(--border)';
+    memberCard.style.background = r === 'member' ? 'rgba(78,205,196,.08)' : 'var(--card)';
+    document.getElementById('role-admin').style.display = r === 'admin' ? 'block' : 'none';
+    document.getElementById('role-member').style.display = r === 'member' ? 'block' : 'none';
+  }
+
+  function switchMemberPlatform(p) {
+    ['mtab-mac','mtab-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    ['mp-mac','mp-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    document.getElementById('mtab-'+p).classList.add('active');
+    document.getElementById('mp-'+p).classList.add('active');
+  }
+  function switchMemberPlatform2(p) {
+    ['mtab2-mac','mtab2-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    ['mp2-mac','mp2-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    document.getElementById('mtab2-'+p).classList.add('active');
+    document.getElementById('mp2-'+p).classList.add('active');
+  }
+  function switchMemberPlatform3(p) {
+    ['mtab3-mac','mtab3-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    ['mp3-mac','mp3-win'].forEach(function(id){ document.getElementById(id).classList.remove('active'); });
+    document.getElementById('mtab3-'+p).classList.add('active');
+    document.getElementById('mp3-'+p).classList.add('active');
+  }
+
+  // Auto-detect platform for member tabs
+  var isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+  if (!isMac) {
+    switchMemberPlatform('win');
+    switchMemberPlatform2('win');
+    switchMemberPlatform3('win');
+  }
+
+  function copyCode(btn, id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText((el.innerText || el.textContent).trim()).then(function() {
+      btn.textContent = 'Copied!'; btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }).catch(function() { btn.textContent = 'Failed'; });
+  }
+</script>
+</body>
+</html>

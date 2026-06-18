@@ -1,0 +1,16 @@
+<!-- @dsCard group="Colors" viewport="700x130" name="Status" subtitle="Warm-shifted; one cold accent for 'lost'" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><link rel="stylesheet" href="../styles.css">
+<style>
+ html,body{margin:0;background:var(--bg)}
+ .grid{padding:22px 24px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+ .cell{display:flex;align-items:center;gap:10px}
+ .sw{width:36px;height:36px;border-radius:5px;border:1px solid rgba(239,230,214,.08);flex-shrink:0}
+ .n{font:500 12px var(--font-mono);color:var(--text);display:block}
+ .h{font:11px var(--font-mono);color:var(--faint)}
+</style></head>
+<body class="df"><div class="grid">
+ <div class="cell"><div class="sw" style="background:var(--ok)"></div><div><span class="n">--ok</span><span class="h">#c2701f · synced</span></div></div>
+ <div class="cell"><div class="sw" style="background:var(--warn)"></div><div><span class="n">--warn</span><span class="h">#d8934a</span></div></div>
+ <div class="cell"><div class="sw" style="background:var(--danger)"></div><div><span class="n">--danger</span><span class="h">#c2410c</span></div></div>
+ <div class="cell"><div class="sw" style="background:var(--cold)"></div><div><span class="n">--cold</span><span class="h">#3e5b5e · lost</span></div></div>
+</div></body></html>
