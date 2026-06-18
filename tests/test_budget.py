@@ -390,7 +390,9 @@ class TestBudgetSummary:
 
         c = TestClient(app, raise_server_exceptions=False)
         resp = c.get("/api/budget-summary")
-        assert resp.status_code in (401, 403, 422)
+        # 503 is returned when auth is not configured (CI has no OIDC/token env vars);
+        # _UnconfiguredPrincipalDep intentionally returns 503 "auth_not_configured".
+        assert resp.status_code in (401, 403, 422, 503)
 
 
 # ---------------------------------------------------------------------------
