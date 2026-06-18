@@ -41,6 +41,10 @@ dmypy.json
 # Allow checked-in fixture files
 !tests/fixtures/*.jsonl
 
+# Telemetry runtime DB (model_telemetry.db) — root-level only
+/telemetry/
+*.db
+
 # IDE
 .vscode/
 .idea/
