@@ -58,7 +58,20 @@ class CacheManager:
         eviction_policy: EvictionPolicy = EvictionPolicy.ML_SCORE,
     ) -> None:
         self._db_path = str(db_path)
-        self._fernet = Fernet(key if key is not None else Fernet.generate_key())
+        if key is None:
+            # F-006: an ephemeral key means all cached data is lost on process
+            # restart. Production deployments must set DEPTHFUSION_CACHE_KEY
+            # (a URL-safe base64-encoded 32-byte Fernet key) and pass it here.
+            logger.warning(
+                "CacheManager: no encryption key supplied; using an ephemeral "
+                "Fernet key. All cached data will be unrecoverable after process "
+                "restart. Set DEPTHFUSION_CACHE_KEY and pass the key at "
+                "construction time to persist the cache across restarts."
+            )
+            _key = Fernet.generate_key()
+        else:
+            _key = key
+        self._fernet = Fernet(_key)
         self._max_bytes = max_bytes
         self._eviction_policy = eviction_policy
 
