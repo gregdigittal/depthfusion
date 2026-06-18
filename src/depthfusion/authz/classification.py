@@ -22,11 +22,16 @@ class Role(str, Enum):
 
     Roles are expressed as strings so they can be compared directly against
     group/role claims carried in ``Principal.groups``.
+
+    ``MEMBER`` aligns with the ``rbac.Role.MEMBER`` vocabulary so that standard
+    team-member principals (``groups=["member"]``) are not denied INTERNAL-classified
+    records they are explicitly listed in the ACL for (F-002).
     """
 
     ADMIN = "admin"
     DATA_ENGINEER = "data_engineer"
     ANALYST = "analyst"
+    MEMBER = "member"
     VIEWER = "viewer"
     EXTERNAL = "external"
 
@@ -99,6 +104,7 @@ CLASSIFICATION_POLICY: dict[ClassificationLevel, HandlingRules] = {
             Role.ADMIN,
             Role.DATA_ENGINEER,
             Role.ANALYST,
+            Role.MEMBER,
             Role.VIEWER,
         ],
     ),
