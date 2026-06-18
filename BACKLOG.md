@@ -3221,11 +3221,11 @@
 
 **Acceptance criteria:**
 - [x] AC-1: `pip-audit` / `npm audit` in CI; high-severity findings block merge
-- [ ] AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release
+- [x] AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release
 
 **Tasks:**
 - [x] T-680: Audit + secret-scan CI jobs — `.github/workflows/security.yml` (pip-audit, npm audit, gitleaks)
-- [ ] T-681: SBOM generation in release pipeline — Ollama dev, Sonnet rev
+- [x] T-681: SBOM generation in release pipeline — `.github/workflows/sbom.yml` (CycloneDX JSON for Python + Node, attached as release assets)
 
 ### S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing `P0` `M`
 

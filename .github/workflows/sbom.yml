@@ -1,0 +1,117 @@
+name: SBOM
+
+on:
+  release:
+    types: [published]
+  # Allow manual generation for pre-release validation
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to generate SBOM for (default: HEAD)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write   # needed to attach SBOM as a release asset
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  sbom-python:
+    name: "SBOM — Python (CycloneDX)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Generate Python SBOM (CycloneDX JSON)
+        # pip-audit can emit a CycloneDX SBOM for all installed packages.
+        # We install the project first so all transitive deps are resolved.
+        run: |
+          pip install -e .
+          pip-audit --format cyclonedx-json --output python-sbom.cdx.json || true
+          # pip-audit exits non-zero when vulnerabilities are found; we still
+          # want the SBOM even if there are findings. The security.yml job
+          # is the gate — this job only captures the artifact.
+
+      - name: Upload Python SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-sbom-${{ github.run_id }}
+          path: python-sbom.cdx.json
+          retention-days: 365
+
+      - name: Attach Python SBOM to release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: python-sbom.cdx.json
+          asset_name: depthfusion-${{ github.event.release.tag_name }}-python.cdx.json
+          asset_content_type: application/json
+
+  sbom-node:
+    name: "SBOM — Node.js (CycloneDX)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies (frozen)
+        run: pnpm --dir app install --frozen-lockfile
+
+      - name: Install CycloneDX Node.js tool
+        run: npm install -g @cyclonedx/cyclonedx-npm
+
+      - name: Generate Node.js SBOM (CycloneDX JSON)
+        # cyclonedx-npm reads package-lock.json / pnpm-lock.yaml and emits CycloneDX.
+        run: |
+          cd app
+          cyclonedx-npm --output-format JSON --output-file ../node-sbom.cdx.json
+
+      - name: Upload Node.js SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-sbom-${{ github.run_id }}
+          path: node-sbom.cdx.json
+          retention-days: 365
+
+      - name: Attach Node.js SBOM to release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: node-sbom.cdx.json
+          asset_name: depthfusion-${{ github.event.release.tag_name }}-node.cdx.json
+          asset_content_type: application/json
