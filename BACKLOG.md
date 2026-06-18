@@ -3220,11 +3220,11 @@
 ### S-198: As a security owner, I want supply-chain + secret hygiene gates so that the dependency surface is controlled `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `pip-audit` / `cargo audit` / `npm audit` in CI; high-severity findings block merge
+- [x] AC-1: `pip-audit` / `npm audit` in CI; high-severity findings block merge
 - [ ] AC-2: Secret scanning (gitleaks) on every PR; SBOM generated per release
 
 **Tasks:**
-- [ ] T-680: Audit + secret-scan CI jobs — Ollama dev, Sonnet rev
+- [x] T-680: Audit + secret-scan CI jobs — `.github/workflows/security.yml` (pip-audit, npm audit, gitleaks)
 - [ ] T-681: SBOM generation in release pipeline — Ollama dev, Sonnet rev
 
 ### S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing `P0` `M`

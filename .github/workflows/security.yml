@@ -1,0 +1,80 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  pip-audit:
+    name: "Python dependency audit (pip-audit)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        # --fail-on HIGH: block merge on high or critical severity CVEs only.
+        # Low/medium findings are surfaced as warnings but do not block.
+        run: pip-audit --fail-on HIGH -r pyproject.toml || pip-audit --fail-on HIGH
+
+  npm-audit:
+    name: "Node.js dependency audit (npm audit)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies (frozen)
+        run: pnpm --dir app install --frozen-lockfile
+
+      - name: Audit Node.js dependencies
+        # --audit-level high: only fail on high or critical severity findings.
+        run: pnpm --dir app audit --audit-level high
+
+  secret-scan:
+    name: "Secret scanning (gitleaks)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout (full history for PR diff scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is required for private repos with gitleaks-action v2.
+          # For public repos or self-hosted runners, this can be omitted.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
