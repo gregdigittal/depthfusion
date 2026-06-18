@@ -67,7 +67,6 @@ class TestF001NonceReplayBypass:
     async def test_token_with_nonce_claim_and_no_nonce_arg_raises(self):
         """Regression: validate() must raise when token has nonce but caller omits nonce=."""
         from depthfusion.identity.errors import TokenInvalidError
-        import depthfusion.identity.token_validator as _mod
 
         future_exp = time.time() + 3600
         claims = {
@@ -78,18 +77,19 @@ class TestF001NonceReplayBypass:
             "nonce": "abc123",  # token carries a nonce
         }
         validator = self._make_validator(claims)
-        original = _mod._jwk_to_public_key
+        # _make_validator stores the TRUE original in _jwk_to_public_key_patch[1].
+        # Capturing _mod._jwk_to_public_key AFTER the call would snapshot the mock, not
+        # the real function, leaving the module polluted after teardown.
+        _restore_mod, _restore_fn = validator._jwk_to_public_key_patch
         try:
             with pytest.raises(TokenInvalidError, match="nonce"):
                 await validator.validate("fake.jwt.token")  # nonce= omitted (default None)
         finally:
-            _mod._jwk_to_public_key = original
+            _restore_mod._jwk_to_public_key = _restore_fn
 
     @pytest.mark.asyncio
     async def test_token_with_nonce_claim_and_correct_nonce_passes(self):
         """validate() must succeed when the correct nonce is supplied."""
-        import depthfusion.identity.token_validator as _mod
-
         future_exp = time.time() + 3600
         claims = {
             "sub": "user-1",
@@ -99,18 +99,16 @@ class TestF001NonceReplayBypass:
             "nonce": "abc123",
         }
         validator = self._make_validator(claims)
-        original = _mod._jwk_to_public_key
+        _restore_mod, _restore_fn = validator._jwk_to_public_key_patch
         try:
             result = await validator.validate("fake.jwt.token", nonce="abc123")
             assert result["nonce"] == "abc123"
         finally:
-            _mod._jwk_to_public_key = original
+            _restore_mod._jwk_to_public_key = _restore_fn
 
     @pytest.mark.asyncio
     async def test_token_without_nonce_claim_and_no_nonce_arg_passes(self):
         """validate() must succeed for nonce-free tokens when nonce= is omitted."""
-        import depthfusion.identity.token_validator as _mod
-
         future_exp = time.time() + 3600
         claims = {
             "sub": "user-1",
@@ -120,12 +118,12 @@ class TestF001NonceReplayBypass:
             # No 'nonce' key
         }
         validator = self._make_validator(claims)
-        original = _mod._jwk_to_public_key
+        _restore_mod, _restore_fn = validator._jwk_to_public_key_patch
         try:
             result = await validator.validate("fake.jwt.token")
             assert result["sub"] == "user-1"
         finally:
-            _mod._jwk_to_public_key = original
+            _restore_mod._jwk_to_public_key = _restore_fn
 
 
 # ---------------------------------------------------------------------------

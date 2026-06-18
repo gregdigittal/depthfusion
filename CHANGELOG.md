@@ -27,6 +27,16 @@ Conventions:
 
 - **REST `/context` endpoint wiring bug** — `POST /context` now wraps the request body into the `arguments["item"]` shape expected by `_tool_publish_context`. Previously all REST publish calls returned `{"error": "publish_context: 'item' must be an object"}`. The endpoint now generates an `item_id` (UUID), uses `"rest-api"` as `source_agent`, and folds `project`/`session_id` into `item.metadata`. MCP tool (`depthfusion_publish_context`) was unaffected.
 
+### Security
+
+E-61 / T-684 — pentest remediation (all 4 High/Medium findings from AV-01–AV-05):
+
+- **F-001 (High)** — `token_validator.py`: `validate(token, nonce=None)` now raises `TokenInvalidError` when the token carries a `nonce` claim but the caller omitted `nonce=`. Previously a replay-eligible token was silently accepted; callers that don't use nonces must explicitly opt out.
+- **F-002 (High)** — `authz/classification.py` + `roles.py`: dual `Role` enum vocabulary mismatch blocked `MEMBER`-role principals from `INTERNAL`-classified records they explicitly owned. `classification.Role.MEMBER` added and mapped into `CLASSIFICATION_POLICY[INTERNAL].allowed_roles`. Role hierarchy inversion is resolved.
+- **F-006 (Medium)** — `cache/manager.py`: `CacheManager(key=None)` now emits a `WARNING` log and the server startup path loads `DEPTHFUSION_CACHE_KEY` (base64-encoded 32-byte Fernet key) from the environment. Ephemeral auto-generated key behaviour is preserved for test environments only.
+- **F-008 (High)** — `cache/lease_lifecycle.py`: `PurgeEngine._high_water_mark` is now persisted to and reloaded from the lease store metadata on construction, closing the restart+clock-rollback attack window. A process restart no longer resets HWM to `0.0`.
+- **Test regression guard** — `tests/test_security_t684.py`: `TestF001NonceReplayBypass` teardown used a "late capture" pattern that left `token_validator._jwk_to_public_key` pointing at a `MagicMock` after each test, polluting later test runs. All three async tests now restore the original function via `validator._jwk_to_public_key_patch` (the stash written by `_make_validator()`). Full suite: 3448 passed, 36 skipped.
+
 ---
 
 ## [v0.6.0-alpha] — 2026-05-23
