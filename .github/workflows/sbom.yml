@@ -25,12 +25,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -48,7 +48,7 @@ jobs:
           # is the gate — this job only captures the artifact.
 
       - name: Upload Python SBOM as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-sbom-${{ github.run_id }}
           path: python-sbom.cdx.json
@@ -72,17 +72,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
@@ -99,7 +99,7 @@ jobs:
           cyclonedx-npm --output-format JSON --output-file ../node-sbom.cdx.json
 
       - name: Upload Node.js SBOM as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-sbom-${{ github.run_id }}
           path: node-sbom.cdx.json
