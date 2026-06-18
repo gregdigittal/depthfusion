@@ -1,0 +1,157 @@
+# Prometheus alerting rules for DepthFusion
+#
+# Active alerts (metrics exported by /metrics today):
+#   - DepthFusionHighErrorRate       — depthfusion_error_rate
+#   - DepthFusionHighSearchLatency   — depthfusion_search_latency_p95_seconds
+#
+# Planned alerts (fire once the future metrics land in /metrics):
+#   - DepthFusionIngestionStalled    — depthfusion_ingestion_lag_seconds
+#   - DepthFusionAuthzDenialSpike    — depthfusion_authz_denial_rate
+#   - DepthFusionTokenValidationFail — depthfusion_token_validation_failure_total
+#
+# Load with:
+#   prometheus --config.flag.rule_files="infra/grafana/alerts.yaml"
+# or reference from prometheus.yml:
+#   rule_files:
+#     - "infra/grafana/alerts.yaml"
+
+groups:
+  - name: depthfusion_active
+    # Alerts on metrics currently exported by GET /metrics
+    interval: 30s
+    rules:
+      - alert: DepthFusionHighErrorRate
+        expr: depthfusion_error_rate > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "DepthFusion error rate above 5%"
+          description: >
+            DepthFusion /metrics reports an error_rate of {{ $value | humanizePercentage }}
+            for the last 5 minutes. Investigate recent requests for 5xx patterns.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/high-error-rate.md"
+
+      - alert: DepthFusionHighErrorRateCritical
+        expr: depthfusion_error_rate > 0.20
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "DepthFusion error rate above 20% — critical"
+          description: >
+            DepthFusion /metrics reports an error_rate of {{ $value | humanizePercentage }}.
+            More than 1 in 5 requests are failing. Immediate attention required.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/high-error-rate.md"
+
+      - alert: DepthFusionHighSearchLatency
+        expr: depthfusion_search_latency_p95_seconds > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "DepthFusion P95 search latency above 2 seconds"
+          description: >
+            DepthFusion search P95 latency is {{ $value | humanizeDuration }} for the
+            last 5 minutes. Users are experiencing slow recall responses.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/high-search-latency.md"
+
+      - alert: DepthFusionSearchLatencyCritical
+        expr: depthfusion_search_latency_p95_seconds > 5.0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "DepthFusion P95 search latency above 5 seconds — critical"
+          description: >
+            DepthFusion search P95 latency is {{ $value | humanizeDuration }}.
+            Recall is effectively stalled. Check backend connectivity and index health.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/high-search-latency.md"
+
+      - alert: DepthFusionProcessRestarted
+        # Fires when the request counter resets (process restart detected)
+        expr: resets(depthfusion_request_count[10m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "DepthFusion process restarted"
+          description: >
+            The depthfusion_request_count counter reset in the last 10 minutes,
+            indicating a process restart. Verify the service came back healthy.
+
+  - name: depthfusion_planned
+    # Alerts for metrics not yet exported — these will be inactive until the
+    # corresponding metrics are added to GET /metrics. Add metric names to the
+    # _MetricsState class in api/admin_console.py to activate.
+    interval: 60s
+    rules:
+      - alert: DepthFusionIngestionStalled
+        # Fires when no ingestion has completed for more than 1 hour.
+        # Metric: depthfusion_ingestion_lag_seconds
+        # Export path: _MetricsState.ingestion_lag_seconds → GET /metrics
+        expr: depthfusion_ingestion_lag_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          status: planned
+        annotations:
+          summary: "DepthFusion ingestion stalled for >1 hour"
+          description: >
+            No successful ingestion in {{ $value | humanizeDuration }}.
+            Check the ingestion pipeline for connectivity or quota errors.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/ingestion-stalled.md"
+
+      - alert: DepthFusionAuthzDenialSpike
+        # Fires when the authz denial rate spikes above 10% — could indicate a
+        # misconfigured principal ACL or an attack pattern.
+        # Metric: depthfusion_authz_denial_rate
+        expr: depthfusion_authz_denial_rate > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          status: planned
+        annotations:
+          summary: "DepthFusion authz denial rate above 10%"
+          description: >
+            {{ $value | humanizePercentage }} of authorization checks are being denied.
+            Investigate recent principal ACL changes or unusual access patterns.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/authz-denial-spike.md"
+
+      - alert: DepthFusionTokenValidationFailures
+        # Fires when token validation failures exceed 10 per minute over 5 minutes.
+        # Metric: depthfusion_token_validation_failure_total (counter)
+        expr: rate(depthfusion_token_validation_failure_total[5m]) * 60 > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          status: planned
+        annotations:
+          summary: "DepthFusion token validation failures >10/min"
+          description: >
+            Token validation is failing at {{ $value | humanize }} failures/min.
+            Could indicate expired credentials, OIDC provider issues, or an attack.
+          runbook: "https://github.com/depthfusion/depthfusion/blob/main/docs/runbooks/token-validation-failures.md"
+
+      - alert: DepthFusionSyncBacklogHigh
+        # Fires when the sync backlog exceeds 500 items for 10 minutes.
+        # Metric: depthfusion_sync_backlog_items (gauge)
+        expr: depthfusion_sync_backlog_items > 500
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          status: planned
+        annotations:
+          summary: "DepthFusion sync backlog above 500 items"
+          description: >
+            The sync backlog has {{ $value }} items. The consumer is not keeping up
+            with writes. Check worker thread count and upstream throughput.

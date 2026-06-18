@@ -3161,16 +3161,16 @@
 
 ---
 
-## E-60: Audit, Observability & Admin Console [backlog]
+## E-60: Audit, Observability & Admin Console [done]
 
 > Enterprise operability: a tamper-evident audit log spanning auth, authz, ingestion, sync, and export; metrics that tell you the system is healthy; and an admin surface to manage users, roles, devices, and policies without SSH. **Lane D, Phase 4.**
 
 ### S-194: As a compliance owner, I want a unified tamper-evident audit log so that every security-relevant event is provable `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Append-only audit store with hash chaining (each entry includes hash of predecessor); verification CLI detects truncation/mutation
-- [ ] AC-2: Event taxonomy covers: sign-in/out, token issuance, authz denials, ACL changes, role changes, ingestion runs, sync sessions, exports, admin actions
-- [ ] AC-3: Retention policy + export-to-file for compliance review; audit reads are admin-only and themselves audited
+- [x] AC-1: Append-only audit store with hash chaining (each entry includes hash of predecessor); verification CLI detects truncation/mutation
+- [x] AC-2: Event taxonomy covers: sign-in/out, token issuance, authz denials, ACL changes, role changes, ingestion runs, sync sessions, exports, admin actions
+- [x] AC-3: Retention policy + export-to-file for compliance review; audit reads are admin-only and themselves audited
 
 **Tasks:**
 - [x] T-669: Hash-chained audit store + verification CLI — Opus dev, DS rev
@@ -3180,19 +3180,19 @@
 ### S-195: As an operator, I want service health metrics + alerts so that ingestion lag or auth failures surface before users complain `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `/metrics` (Prometheus format) on the API: request rates/latency, authz denial rate, ingestion lag, sync backlog, cache-lease renewals
-- [ ] AC-2: Grafana dashboard JSON committed; alert rules for: ingestion stalled > 1h, authz denial spike, token-validation failures
+- [x] AC-1: `/metrics` (Prometheus format) on the API: request rates/latency, authz denial rate, ingestion lag, sync backlog, cache-lease renewals
+- [x] AC-2: Grafana dashboard JSON committed; alert rules for: ingestion stalled > 1h, authz denial spike, token-validation failures
 
 **Tasks:**
 - [x] T-672: Prometheus metrics endpoint + instrumentation — Sonnet dev, DS rev
-- [ ] T-673: Grafana dashboard + alert rules — Ollama dev, Sonnet rev
+- [x] T-673: Grafana dashboard + alert rules — Ollama dev, Sonnet rev
 
 ### S-196: As an admin, I want an admin console in the desktop app so that users, roles, devices, and policies are manageable without SSH `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Admin-role-gated screens: user/role assignment, device list + revoke, classification mapping table, export policy editor, ingestion scope + status
-- [ ] AC-2: All mutations confirm + audit; destructive actions (revoke, role downgrade) require typed confirmation
-- [ ] AC-3: Audit log viewer with filter by principal/action/date
+- [x] AC-1: Admin-role-gated screens: user/role assignment, device list + revoke, classification mapping table, export policy editor, ingestion scope + status
+- [x] AC-2: All mutations confirm + audit; destructive actions (revoke, role downgrade) require typed confirmation
+- [x] AC-3: Audit log viewer with filter by principal/action/date
 
 **Tasks:**
 - [x] T-674: Admin screens: users/roles/devices — Sonnet dev, Gemini rev
