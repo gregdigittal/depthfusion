@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Automatically pin GitHub Actions to commit SHAs and keep them updated.
+  # Dependabot will open PRs replacing @vN tags with @<sha> # vN.x.y comments.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    # Group all Actions updates into one PR per week to reduce noise.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # Node.js / pnpm dependencies in app/
+  - package-ecosystem: "npm"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "javascript"
