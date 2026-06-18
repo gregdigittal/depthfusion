@@ -3235,7 +3235,7 @@
 - [ ] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
 
 **Tasks:**
-- [ ] T-682: Attack plan + tooling — DS dev, Gemini rev
+- [x] T-682: Attack plan + tooling — `docs/decisions/ADR-S199-internal-pentest-plan.md` (7 vectors: token forgery/replay, IDOR, ACL/MCP bypass, cache extraction, lease clock-rollback, export bypass, sync impersonation)
 - [ ] T-683: Execute attacks, file findings — DS+GM dev, Opus triage
 - [ ] T-684: Fix criticals + regression tests — Opus dev, DS rev
 
