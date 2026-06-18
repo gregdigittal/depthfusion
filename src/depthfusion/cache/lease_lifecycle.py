@@ -178,14 +178,6 @@ class LeaseStore(Protocol):
 
     def clear(self) -> None: ...
 
-    def get_hwm(self) -> float:
-        """Return the persisted high-water mark (0.0 if never set). F-008."""
-        return 0.0
-
-    def set_hwm(self, hwm: float) -> None:
-        """Persist the high-water mark so PurgeEngine survives restarts. F-008."""
-        ...
-
 
 class TokenWiper(Protocol):
     """Wipes the device credential / token on revoke or renewal-denied."""
@@ -211,7 +203,6 @@ class InMemoryLeaseStore:
 
     def __init__(self) -> None:
         self._leases: dict[str, Lease] = {}
-        self._hwm: float = 0.0
 
     def upsert(self, lease: Lease) -> None:
         self._leases[lease.record_id] = lease
@@ -227,12 +218,6 @@ class InMemoryLeaseStore:
 
     def clear(self) -> None:
         self._leases.clear()
-
-    def get_hwm(self) -> float:
-        return self._hwm
-
-    def set_hwm(self, hwm: float) -> None:
-        self._hwm = hwm
 
     def __len__(self) -> int:
         return len(self._leases)
@@ -425,9 +410,7 @@ class PurgeEngine:
         self._cache = cache_wiper
         self._token = token_wiper
         self._time = time_fn
-        # F-008: load the persisted HWM so a restarted process resumes from the
-        # historical maximum, preventing clock-rollback attacks after restart.
-        self._high_water_mark: float = store.get_hwm()
+        self._high_water_mark: float = 0.0
 
     @property
     def high_water_mark(self) -> float:
@@ -444,10 +427,8 @@ class PurgeEngine:
         wall = now if now is not None else self._time()
         tamper = wall < self._high_water_mark
         effective = max(wall, self._high_water_mark)
-        if effective > self._high_water_mark:
-            # Advance the HWM and persist it so restarts inherit this anchor (F-008).
-            self._high_water_mark = effective
-            self._store.set_hwm(effective)
+        # Advance the high-water mark to the effective time.
+        self._high_water_mark = effective
         return effective, tamper
 
     def _purge_expired(self, effective_now: float) -> list[str]:

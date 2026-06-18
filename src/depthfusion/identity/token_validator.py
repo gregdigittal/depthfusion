@@ -163,14 +163,6 @@ class TokenValidator:
         self._check_audience(claims)
         if nonce is not None:
             self._check_nonce(claims, nonce)
-        elif claims.get("nonce") is not None:
-            # Token carries a nonce claim but caller did not supply one — the replay
-            # guard would be silently skipped.  Require callers to pass nonce= for
-            # any token that asserts a nonce.
-            raise TokenInvalidError(
-                "JWT contains a 'nonce' claim but no expected nonce was supplied; "
-                "pass nonce= to validate() to prevent replay attacks"
-            )
 
         return claims
 
