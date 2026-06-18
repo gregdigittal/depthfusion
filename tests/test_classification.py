@@ -74,7 +74,7 @@ class TestPublicLevel:
 
     def test_all_roles_allowed(self):
         rules = get_handling_rules(ClassificationLevel.PUBLIC)
-        expected = {Role.ADMIN, Role.DATA_ENGINEER, Role.ANALYST, Role.VIEWER, Role.EXTERNAL}
+        expected = {Role.ADMIN, Role.DATA_ENGINEER, Role.ANALYST, Role.MEMBER, Role.VIEWER, Role.EXTERNAL}
         assert set(rules["allowed_roles"]) == expected
 
 

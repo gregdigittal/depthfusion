@@ -92,6 +92,7 @@ CLASSIFICATION_POLICY: dict[ClassificationLevel, HandlingRules] = {
             Role.ADMIN,
             Role.DATA_ENGINEER,
             Role.ANALYST,
+            Role.MEMBER,
             Role.VIEWER,
             Role.EXTERNAL,
         ],

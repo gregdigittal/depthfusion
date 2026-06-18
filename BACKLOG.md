@@ -2909,7 +2909,7 @@
 
 ---
 
-## E-54: SharePoint Connector — Microsoft Graph [active]
+## E-54: SharePoint Connector — Microsoft Graph [done]
 
 > Continuous, incremental, permission-faithful ingestion of SharePoint sites via Microsoft Graph. Depends on G1 (ACL schema from E-50) + E-53 (parsers). **Lane B, Phase 2.**
 
@@ -3230,14 +3230,14 @@
 ### S-199: As a security owner, I want an internal penetration pass so that authz and export controls survive adversarial testing `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation
-- [ ] AC-2: All criticals fixed + regression-tested; findings report archived in `docs/decisions/`
+- [x] AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation
+- [x] AC-2: All criticals fixed + regression-tested; findings report archived in `docs/decisions/`
 - [ ] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
 
 **Tasks:**
 - [x] T-682: Attack plan + tooling — `docs/decisions/ADR-S199-internal-pentest-plan.md` (7 vectors: token forgery/replay, IDOR, ACL/MCP bypass, cache extraction, lease clock-rollback, export bypass, sync impersonation)
 - [x] T-683: Execute attacks, file findings — DS+GM dev, Opus triage
-- [ ] T-684: Fix criticals + regression tests — Opus dev, DS rev
+- [x] T-684: Fix criticals + regression tests — Opus dev, DS rev
 
 ---
 
@@ -3281,15 +3281,15 @@
 
 **Tasks:**
 - [x] T-690: Staging stack compose (API + ingestion + two app instances) — scripts/integration_smoke_test.sh + .env.example delivered (E-63 integration, 2026-06-11)
-- [ ] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
+- [x] T-691: E2E scenario suite (UI driven via tauri-driver/playwright) — Sonnet dev, DS rev
 - [x] T-692: Nightly run + triage automation — Haiku dev, Sonnet rev
 
 ### S-203: As a V1 operator, I want migration tooling so that existing instances upgrade without data loss `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion migrate v2`: schema migration (ACL columns via S-160 backfill), config translation, token → identity bootstrap
-- [ ] AC-2: Dry-run mode reports planned changes; rollback restores pre-migration snapshot
-- [ ] AC-3: Verified on a copy of the production VPS dataset
+- [x] AC-1: `depthfusion migrate v2`: schema migration (ACL columns via S-160 backfill), config translation, token → identity bootstrap
+- [x] AC-2: Dry-run mode reports planned changes; rollback restores pre-migration snapshot
+- [x] AC-3: Verified on a copy of the production VPS dataset
 
 **Tasks:**
 - [x] T-693: Migration CLI + dry-run/rollback — Opus dev, DS rev
@@ -3314,19 +3314,19 @@
 
 **Tasks:**
 - [x] T-697: Merge-gate checklist execution — docs/v2/merge-plan.md + G1-gate.md all criteria marked [x] (E-63 integration, 2026-06-11)
-- [ ] T-698: Merge, tag, release notes, rollback plan — Sonnet dev, Opus rev
+- [x] T-698: Merge, tag, release notes, rollback plan — docs/decisions/v2-merge-gate-checklist.md (E-63 integration, 2026-06-18)
 
 ### S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill is proven before legacy memories and SharePoint data coexist `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: S-160 backfill executed on a copy of the production VPS dataset with `acl_allow=[owner]`, `classification=internal`; record counts reconciled per store (all six)
-- [ ] AC-2: Post-migration verification: a second (non-owner) test principal retrieves zero legacy records across REST, MCP tools, and fabric SSE; owner retrieval is lossless vs pre-migration baseline
-- [ ] AC-3: Bulk per-project grant command widens one test project to a test group; revocation removes access within one lease period
-- [ ] AC-4: Rehearsal report (timings, anomalies, rollback drill) archived in docs/decisions/ — pilot (S-204) is blocked until this passes
+- [x] AC-1: S-160 backfill executed on a copy of the production VPS dataset with `acl_allow=[owner]`, `classification=internal`; record counts reconciled per store (all six)
+- [x] AC-2: Post-migration verification: a second (non-owner) test principal retrieves zero legacy records across REST, MCP tools, and fabric SSE; owner retrieval is lossless vs pre-migration baseline
+- [x] AC-3: Bulk per-project grant command widens one test project to a test group; revocation removes access within one lease period
+- [x] AC-4: Rehearsal report (timings, anomalies, rollback drill) archived in docs/decisions/ — pilot (S-204) is blocked until this passes
 
 **Tasks:**
-- [ ] T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — Opus dev, DS rev
-- [ ] T-700: Bulk grant/revoke drill + rehearsal report — Sonnet dev, Opus rev
+- [x] T-699: Migration rehearsal on VPS dataset copy + leak verification with second principal — Opus dev, DS rev
+- [x] T-700: Bulk grant/revoke drill + rehearsal report — Sonnet dev, Opus rev
 
 ---
 
