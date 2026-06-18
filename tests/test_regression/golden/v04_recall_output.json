@@ -24,5 +24,7 @@
   "engaged_layers": [
     "bm25"
   ],
-  "message": "Retrieved 3 relevant blocks (BM25+RRF)"
+  "message": "Retrieved 3 relevant blocks (BM25+RRF)",
+  "strategy": "bm25-only",
+  "hnsw_available": false
 }

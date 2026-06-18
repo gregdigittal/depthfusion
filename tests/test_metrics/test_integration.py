@@ -70,13 +70,16 @@ class TestRecallQueryEmission:
         """When the recall path raises internally, the event_subtype is 'error'."""
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
 
-        # Force the impl to raise
+        # Force the impl to raise.
+        # After T-535a, _tool_recall in recall.py calls _tool_recall_impl
+        # from its own namespace — patch there, not on server.
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
 
         def broken_impl(args):
             raise RuntimeError("simulated recall failure")
 
-        monkeypatch.setattr(srv_mod, "_tool_recall_impl", broken_impl)
+        monkeypatch.setattr(_recall_module, "_tool_recall_impl", broken_impl)
         result_json = srv_mod._tool_recall({"query": "anything"})
         # The wrapper returns the error JSON
         response = json.loads(result_json)
@@ -313,22 +316,24 @@ class TestReviewGateRegressions:
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         (tmp_path / ".claude" / "shared" / "discoveries").mkdir(parents=True)
 
-        # Force the impl to raise so event_subtype becomes "error"
+        # Force the impl to raise so event_subtype becomes "error".
+        # After T-535a both symbols live in recall.py's namespace — patch there.
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
         monkeypatch.setattr(
-            srv_mod, "_tool_recall_impl",
+            _recall_module, "_tool_recall_impl",
             lambda args: (_ for _ in ()).throw(RuntimeError("boom")),
         )
 
         # Track whether _detect_current_backends was called
         calls = {"count": 0}
-        original = srv_mod._detect_current_backends
+        original = _recall_module._detect_current_backends
 
         def spy():
             calls["count"] += 1
             return original()
 
-        monkeypatch.setattr(srv_mod, "_detect_current_backends", spy)
+        monkeypatch.setattr(_recall_module, "_detect_current_backends", spy)
 
         srv_mod._tool_recall({"query": "anything"})
         # The probe must NOT have been called on the error path

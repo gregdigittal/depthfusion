@@ -15,6 +15,7 @@ Acceptance criteria coverage map:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -345,14 +346,16 @@ class TestPublishContextScalar:
         bypasses.
         """
         from depthfusion.mcp import server as mcp_server
+        from depthfusion.mcp.tools import _state as _mcp_state
+        from depthfusion.mcp.tools import capture as _mcp_capture
         from depthfusion.router.bus import FileBus
 
         # Force a fresh bus pointing at the temp dir.
-        mcp_server._BUS_INSTANCE = None  # type: ignore[attr-defined]
+        # After the server.py split, _BUS_INSTANCE lives in _state, and
+        # _tool_publish_context uses _get_context_bus from capture's namespace.
+        _mcp_state._BUS_INSTANCE = None  # type: ignore[attr-defined]
         bus = FileBus(bus_dir=tmp_path)
-        monkeypatch.setattr(
-            mcp_server, "_get_context_bus", lambda config=None: bus,
-        )
+        monkeypatch.setattr(_mcp_capture, "_get_context_bus", lambda config=None: bus)
 
         result_text = mcp_server._tool_publish_context(
             {
@@ -622,6 +625,7 @@ class TestSetMemoryScoreTool:
         assert "error" in result
         assert not ghost.exists()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="fcntl file locking not available on Windows")
     def test_set_memory_score_concurrent_partial_updates_serialize(self, tmp_path):
         """AC-4 (consensus Round 1 / Codex finding, Commit 3): two callers
         each supplying ONLY ONE of (importance, salience) must serialize

@@ -14,13 +14,16 @@ def _make_memory(
     summary: str = "",
     extra: dict | None = None,
 ) -> MemoryObject:
+    base_extra = {"acl_allow": [project]}
+    if extra:
+        base_extra.update(extra)
     return MemoryObject(
         id=id,
         project_id=project,
         type=MemoryType.SEMANTIC,
         content=content,
         summary=summary,
-        extra=extra or {},
+        extra=base_extra,
     )
 
 

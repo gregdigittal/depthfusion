@@ -302,12 +302,14 @@ class TestInteractiveModeSelect:
         fake_home = tmp_path / "home"
         (fake_home / ".claude").mkdir(parents=True)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
-        from depthfusion.install.gpu_probe import GPUInfo
+        from depthfusion.install.gpu_probe import AppleSiliconInfo, GPUInfo
         good_gpu = GPUInfo(True, "RTX 4090", 24.0, 1, "ok")
-        with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
-            with patch("depthfusion.install.install.install_vps_gpu",
-                       return_value=0) as mock_install:
-                rc = install_mod.main(["--yes"])
+        no_apple = AppleSiliconInfo(has_apple_silicon=False, chip_name="", memory_gb=0.0, reason="not Apple Silicon")
+        with patch("depthfusion.install.install.detect_apple_silicon", return_value=no_apple):
+            with patch("depthfusion.install.install.detect_gpu", return_value=good_gpu):
+                with patch("depthfusion.install.install.install_vps_gpu",
+                           return_value=0) as mock_install:
+                    rc = install_mod.main(["--yes"])
         assert rc == 0
         captured = capsys.readouterr()
         assert "NVIDIA GPU detected" in captured.out
@@ -322,10 +324,12 @@ class TestInteractiveModeSelect:
         (fake_home / ".claude").mkdir(parents=True)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
         monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-test")
-        from depthfusion.install.gpu_probe import GPUInfo
-        with patch("depthfusion.install.install.detect_gpu",
-                   return_value=GPUInfo(False, "", 0.0, 0, "no gpu")):
-            rc = install_mod.main(["--yes", "--dry-run"])
+        from depthfusion.install.gpu_probe import AppleSiliconInfo, GPUInfo
+        no_apple = AppleSiliconInfo(has_apple_silicon=False, chip_name="", memory_gb=0.0, reason="not Apple Silicon")
+        with patch("depthfusion.install.install.detect_apple_silicon", return_value=no_apple):
+            with patch("depthfusion.install.install.detect_gpu",
+                       return_value=GPUInfo(False, "", 0.0, 0, "no gpu")):
+                rc = install_mod.main(["--yes", "--dry-run"])
         assert rc == 0
         captured = capsys.readouterr()
         assert "DEPTHFUSION_API_KEY is set" in captured.out
@@ -430,8 +434,11 @@ class TestPlaceholderKeyGuard:
         that triggered this guard)."""
         monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-your-real-key-here")
         no_gpu = GPUInfo(False, "", 0.0, 0, "no gpu")
-        with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
-            mode, reason = install_mod._recommend_mode_from_gpu()
+        from depthfusion.install.gpu_probe import AppleSiliconInfo
+        no_apple = AppleSiliconInfo(has_apple_silicon=False, chip_name="", memory_gb=0.0, reason="not Apple Silicon")
+        with patch("depthfusion.install.install.detect_apple_silicon", return_value=no_apple):
+            with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
+                mode, reason = install_mod._recommend_mode_from_gpu()
         assert mode == "local"
         assert "placeholder" in reason.lower()
 
@@ -440,6 +447,9 @@ class TestPlaceholderKeyGuard:
         unchanged by the guard)."""
         monkeypatch.setenv("DEPTHFUSION_API_KEY", "sk-ant-api03-realvalue")
         no_gpu = GPUInfo(False, "", 0.0, 0, "no gpu")
-        with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
-            mode, _ = install_mod._recommend_mode_from_gpu()
+        from depthfusion.install.gpu_probe import AppleSiliconInfo
+        no_apple = AppleSiliconInfo(has_apple_silicon=False, chip_name="", memory_gb=0.0, reason="not Apple Silicon")
+        with patch("depthfusion.install.install.detect_apple_silicon", return_value=no_apple):
+            with patch("depthfusion.install.install.detect_gpu", return_value=no_gpu):
+                mode, _ = install_mod._recommend_mode_from_gpu()
         assert mode == "vps-cpu"

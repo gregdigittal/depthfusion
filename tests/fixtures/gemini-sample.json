@@ -1,0 +1,14 @@
+[
+  {
+    "human": "What is the capital of France?",
+    "model": "The capital of France is Paris."
+  },
+  {
+    "human": "How far is Paris from London?",
+    "model": "Paris is approximately 340 kilometres from London by straight line, or about 450 km by road via the Channel Tunnel."
+  },
+  {
+    "human": "What language do they speak in Paris?",
+    "model": "The primary language spoken in Paris is French."
+  }
+]

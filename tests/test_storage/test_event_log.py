@@ -11,7 +11,7 @@ def make_event(event_id: str, memory_id: str = "mem-001") -> MemoryEvent:
         memory_id=memory_id,
         event_type=MemoryEventType.CREATED,
         project_id="proj-test",
-        payload={"content": f"content for {event_id}"},
+        payload={"content": f"content for {event_id}", "extra": {"acl_allow": ["proj-test"]}},
         actor="test",
         timestamp=datetime.now(timezone.utc),
     )
@@ -40,9 +40,9 @@ def test_event_log_idempotent(tmp_path):
 def test_event_log_replay_by_project(tmp_path):
     log = EventLog(tmp_path / "events.jsonl")
     e1 = MemoryEvent("evt-001", "m1", MemoryEventType.CREATED, "proj-a",
-                     {}, "a", datetime.now(timezone.utc))
+                     {"extra": {"acl_allow": ["proj-a"]}}, "a", datetime.now(timezone.utc))
     e2 = MemoryEvent("evt-002", "m2", MemoryEventType.CREATED, "proj-b",
-                     {}, "a", datetime.now(timezone.utc))
+                     {"extra": {"acl_allow": ["proj-b"]}}, "a", datetime.now(timezone.utc))
     log.append(e1)
     log.append(e2)
     proj_a = list(log.replay(project_id="proj-a"))

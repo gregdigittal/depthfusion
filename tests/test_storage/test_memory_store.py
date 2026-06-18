@@ -18,6 +18,7 @@ def make_memory(
         summary="",
         status=status,
         pinned=pinned,
+        extra={"acl_allow": [project]},
     )
 
 

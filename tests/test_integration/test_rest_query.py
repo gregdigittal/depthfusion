@@ -7,6 +7,25 @@ from pathlib import Path
 import pytest
 
 
+def _install_fake_principal(app):
+    """Override _require_principal_dep with a no-op that returns a test principal.
+
+    Without this, _UnconfiguredPrincipalDep raises 503 for every protected route
+    when DEPTHFUSION_JWKS_URI / OIDC_ISSUER / OIDC_AUDIENCE are absent (always
+    true in the test environment).  Returns (app, original_overrides) so callers
+    can restore state.
+    """
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.identity.models import Principal
+
+    # Use "greg" to match the default acl_allow=["greg"] in discovery files
+    # that lack explicit frontmatter (fail-closed default in parse_acl).
+    fake = Principal(principal_id="greg", upn="greg@test.local")
+    original = dict(app.dependency_overrides)
+    app.dependency_overrides[_require_principal_dep] = lambda: fake
+    return original
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DEPTHFUSION_REST_API", "1")
@@ -17,8 +36,12 @@ def client(tmp_path, monkeypatch):
 
     import depthfusion.api.rest as rest_module
     reload(rest_module)
+
+    original = _install_fake_principal(rest_module.app)
     from fastapi.testclient import TestClient
-    return TestClient(rest_module.app)
+    yield TestClient(rest_module.app)
+    rest_module.app.dependency_overrides.clear()
+    rest_module.app.dependency_overrides.update(original)
 
 
 @pytest.fixture
@@ -226,6 +249,16 @@ def test_aggregate_empty_range(client, monkeypatch, metrics_dir):
 # ---------------------------------------------------------------------------
 
 def test_query_auth_enforced_when_key_set(tmp_path, monkeypatch, discoveries_dir):
+    """V2 auth model: /query/* routes require a valid OIDC principal via require_principal.
+
+    When OIDC env vars are absent, _UnconfiguredPrincipalDep raises 503 on every
+    protected route (loudly signals misconfiguration rather than granting open
+    access).  In V2, DEPTHFUSION_QUERY_API_KEY is a startup-validation guard only
+    — per-request auth is handled by OIDC (require_principal), not an API key header.
+
+    This test documents that behaviour and verifies that the auth override pattern
+    (used by all other tests here) correctly bypasses the 503 sentinel.
+    """
     monkeypatch.setenv("DEPTHFUSION_QUERY_API_KEY", "test-key-abc")
     monkeypatch.setenv("DEPTHFUSION_REST_API", "1")
     monkeypatch.setenv("DEPTHFUSION_EVENT_LOG", str(tmp_path / "events.jsonl"))
@@ -238,19 +271,23 @@ def test_query_auth_enforced_when_key_set(tmp_path, monkeypatch, discoveries_dir
 
     from depthfusion.api import query as q
     monkeypatch.setattr(q, "_DISCOVERIES_DIR", discoveries_dir)
-    c = TestClient(rest_module.app)
 
-    # No key → 401
-    resp = c.get("/query/discoveries")
-    assert resp.status_code == 401
+    # Without auth override, unauthenticated requests return 503 (OIDC not configured).
+    c_no_override = TestClient(rest_module.app, raise_server_exceptions=False)
+    resp = c_no_override.get("/query/discoveries")
+    assert resp.status_code == 503, (
+        "Expected 503 from _UnconfiguredPrincipalDep when OIDC vars absent"
+    )
 
-    # Wrong key → 401
-    resp = c.get("/query/discoveries", headers={"X-DepthFusion-Key": "wrong"})
-    assert resp.status_code == 401
-
-    # Correct key → 200
-    resp = c.get("/query/discoveries", headers={"X-DepthFusion-Key": "test-key-abc"})
-    assert resp.status_code == 200
+    # With auth override, authenticated requests succeed.
+    original = _install_fake_principal(rest_module.app)
+    try:
+        c = TestClient(rest_module.app)
+        resp = c.get("/query/discoveries")
+        assert resp.status_code == 200
+    finally:
+        rest_module.app.dependency_overrides.clear()
+        rest_module.app.dependency_overrides.update(original)
 
 
 def test_query_auth_not_enforced_without_key(client, monkeypatch, discoveries_dir):
@@ -323,17 +360,22 @@ def test_sessions_include_telemetry_summary(tmp_path, monkeypatch):
 
     import depthfusion.api.rest as rest_module
     reload(rest_module)
-    c = TestClient(rest_module.app)
 
-    resp = c.get(
-        "/query/sessions",
-        params={"project": "df", "include_telemetry_summary": "true"},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "telemetry_summary" in data
-    # May be None if no matching telemetry (session dir is empty), but key must exist
-    assert data["telemetry_summary"] is not None or data["telemetry_summary"] is None
+    original = _install_fake_principal(rest_module.app)
+    try:
+        c = TestClient(rest_module.app)
+        resp = c.get(
+            "/query/sessions",
+            params={"project": "df", "include_telemetry_summary": "true"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "telemetry_summary" in data
+        # May be None if no matching telemetry (session dir is empty), but key must exist
+        assert data["telemetry_summary"] is not None or data["telemetry_summary"] is None
+    finally:
+        rest_module.app.dependency_overrides.clear()
+        rest_module.app.dependency_overrides.update(original)
 
 
 def test_sessions_telemetry_summary_off_by_default(client):

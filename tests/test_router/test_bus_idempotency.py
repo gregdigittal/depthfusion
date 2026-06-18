@@ -375,9 +375,12 @@ class TestMcpPublishContextToolShape:
 
     def test_tool_returns_published_item_id_deduped_keys(self, tmp_path):
         from depthfusion.mcp import server as mcp_server
+        import depthfusion.mcp.tools.capture as _capture_module
 
         bus = FileBus(bus_dir=tmp_path)
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus):
+        # _tool_publish_context lives in capture.py and calls _get_context_bus
+        # from that module's namespace — patch there.
+        with patch.object(_capture_module, "_get_context_bus", return_value=bus):
             payload = {
                 "item": {
                     "item_id": "mcp1",
@@ -398,9 +401,10 @@ class TestMcpPublishContextToolShape:
 
     def test_tool_dedup_response_returns_original_item_id(self, tmp_path):
         from depthfusion.mcp import server as mcp_server
+        import depthfusion.mcp.tools.capture as _capture_module
 
         bus = FileBus(bus_dir=tmp_path)
-        with patch.object(mcp_server, "_get_context_bus", return_value=bus):
+        with patch.object(_capture_module, "_get_context_bus", return_value=bus):
             first_payload = {
                 "item": {
                     "item_id": "first",
@@ -422,6 +426,12 @@ class TestMcpPublishContextToolShape:
             raw = mcp_server._tool_publish_context(retry_payload)
 
         result = json.loads(raw)
-        assert result == {"published": True, "item_id": "first", "deduped": True}, (
+        # E-45 added the `indexed_in_hnsw` field — always present, defaults False
+        # when the HNSW feature flag is off. Strip it for the v0.5.x dedup
+        # contract assertion below.
+        result_core = {
+            k: v for k, v in result.items() if k != "indexed_in_hnsw"
+        }
+        assert result_core == {"published": True, "item_id": "first", "deduped": True}, (
             f"AC-4: dedup response must return original item_id — got {result}"
         )

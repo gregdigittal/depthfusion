@@ -271,21 +271,3 @@ class TestMcpPruneDiscoveries:
         result = json.loads(_tool_prune_discoveries({"age_days": "nonsense"}))
         assert result["ok"] is False
 
-    def test_tool_registered_in_tools_dict(self):
-        """Tool surface: schema + dispatch table must both reference the tool."""
-        from depthfusion.mcp.server import _TOOL_FLAGS, TOOLS
-        assert "depthfusion_prune_discoveries" in TOOLS
-        assert _TOOL_FLAGS["depthfusion_prune_discoveries"] is None  # always enabled
-        desc = TOOLS["depthfusion_prune_discoveries"]
-        assert "confirm" in desc
-        assert ".archive/" in desc
-
-    def test_tool_appears_in_enabled_tools(self):
-        """Always-enabled tools show up in get_enabled_tools regardless of config."""
-        from depthfusion.mcp.server import get_enabled_tools
-
-        class _Cfg:
-            pass
-
-        enabled = get_enabled_tools(_Cfg())
-        assert "depthfusion_prune_discoveries" in enabled

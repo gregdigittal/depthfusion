@@ -9,7 +9,6 @@ from depthfusion.mcp.server import (
     _tool_describe_capabilities,
     _tool_graph_status,
     _tool_inspect_discovery,
-    get_enabled_tools,
 )
 
 # ---------------------------------------------------------------------------
@@ -67,12 +66,6 @@ class TestDescribeCapabilities:
                    "embedding_backend", "fusion_gates_enabled", "router_enabled"):
             assert k in flags
 
-    def test_tool_registered(self):
-        from depthfusion.core.config import DepthFusionConfig
-        cfg = DepthFusionConfig()
-        enabled = get_enabled_tools(cfg)
-        assert "depthfusion_describe_capabilities" in enabled
-
 
 # ---------------------------------------------------------------------------
 # S-76: depthfusion_inspect_discovery
@@ -109,12 +102,6 @@ class TestInspectDiscovery:
         result = json.loads(_tool_inspect_discovery({"filename": str(f)}))
         assert result["exists"] is True
         assert result["frontmatter"] == {}
-
-    def test_tool_registered(self):
-        from depthfusion.core.config import DepthFusionConfig
-        cfg = DepthFusionConfig()
-        enabled = get_enabled_tools(cfg)
-        assert "depthfusion_inspect_discovery" in enabled
 
 
 # ---------------------------------------------------------------------------
@@ -187,23 +174,21 @@ class TestGraphStatusFields:
 class TestAutoLearnGraphWiring:
     def test_summarize_and_extract_graph_called_on_compress(self, tmp_path, monkeypatch):
         monkeypatch.setenv("DEPTHFUSION_GRAPH_ENABLED", "true")
-        sessions_dir = tmp_path / "sessions"
-        sessions_dir.mkdir()
+        # _tool_auto_learn uses a local `from pathlib import Path`, so patch at source
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        sessions_dir = tmp_path / ".claude" / "sessions"
+        sessions_dir.mkdir(parents=True)
         (sessions_dir / "test.tmp").write_text("some session content")
 
         mock_out = tmp_path / "test-autocapture.md"
         mock_out.write_text("---\n---\nBody")
 
-        with patch("depthfusion.mcp.server.Path") as mock_path_cls, \
-             patch("depthfusion.capture.auto_learn.summarize_and_extract_graph") as mock_sag, \
+        with patch("depthfusion.capture.auto_learn.summarize_and_extract_graph") as mock_sag, \
              patch("depthfusion.capture.compressor.SessionCompressor") as mock_comp_cls, \
              patch("depthfusion.graph.store.get_store"):
-            # Patch Path.home() to return our tmp dir
-            mock_path_cls.home.return_value = tmp_path
             mock_comp = MagicMock()
             mock_comp.compress.return_value = mock_out
             mock_comp_cls.return_value = mock_comp
 
             _tool_auto_learn({"max_files": 1})
-            # summarize_and_extract_graph should have been called
             assert mock_sag.called

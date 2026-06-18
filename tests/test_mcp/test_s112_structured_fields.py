@@ -70,6 +70,7 @@ def _write_memory_with_structured_fields(store_path: Path) -> str:
             "concepts": ["authentication", "deployment"],
             "files_read": ["src/auth/config.py"],
             "files_modified": ["src/auth/service.py"],
+            "acl_allow": ["test-proj"],
         },
         created_at=now,
         updated_at=now,
@@ -125,7 +126,7 @@ def test_retrieve_context_omits_empty_structured_fields(tmp_path):
         content="Plain observation with no structured fields",
         summary="plain observation",
         confidence=MemoryConfidence(score=0.8),
-        extra={},
+        extra={"acl_allow": ["plain-proj"]},
         created_at=now,
         updated_at=now,
     )

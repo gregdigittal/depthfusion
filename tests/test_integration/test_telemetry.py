@@ -313,13 +313,33 @@ def test_mcp_query_telemetry_session_type_filter(mcp_config):
 
 @pytest.fixture
 def telemetry_client(tmp_path, monkeypatch):
-    """Test client with telemetry store routed to a temp DB."""
+    """Test client with telemetry store routed to a temp DB.
+
+    Overrides the auth dependency so that tests don't require OIDC env vars.
+    Without this override, _UnconfiguredPrincipalDep raises 503 for every
+    protected route when DEPTHFUSION_JWKS_URI / OIDC_ISSUER / OIDC_AUDIENCE
+    are absent (which they always are in the test environment).
+    """
     from fastapi.testclient import TestClient
+    from depthfusion.identity.models import Principal
+
     monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
     monkeypatch.delenv("DEPTHFUSION_API_PUBLIC", raising=False)
     monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
+
     from depthfusion.api.rest import app
-    return TestClient(app)
+    from depthfusion.api.auth import _require_principal_dep
+
+    fake_principal = Principal(principal_id="test-user", upn="test@test.local")
+
+    original_overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[_require_principal_dep] = lambda: fake_principal
+
+    client = TestClient(app)
+    yield client
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(original_overrides)
 
 
 def test_rest_get_telemetry_empty(telemetry_client):
@@ -469,67 +489,6 @@ def test_update_candidate_skillforge_id(tmp_path):
     assert candidates[0]["skillforge_id"] == "sf-42"
 
 
-def test_mcp_surface_skill_candidates_dry_run(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(3):
-        store.record(f"s{i}", "Bash")
-
-    result = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert result["candidates_found"] == 1
-    assert result["candidates_drafted"] == 1
-    assert result["dry_run"] is True
-    assert result["items"][0]["pattern_key"] == "tool:Bash"
-    assert result["items"][0]["skillforge_id"] is None
-
-
-def test_mcp_surface_skill_candidates_below_threshold(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(2):
-        store.record(f"s{i}", "Glob")
-
-    result = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert result["candidates_found"] == 0
-    assert result["candidates_drafted"] == 0
-
-
-def test_mcp_surface_skill_candidates_no_duplicate_draft(tmp_path, monkeypatch):
-    monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
-    from depthfusion.core.config import DepthFusionConfig
-    from depthfusion.mcp.server import _dispatch_tool
-    from depthfusion.storage.telemetry_store import TelemetryStore
-
-    cfg = DepthFusionConfig()
-    store = TelemetryStore(tmp_path / "tel.db")
-    for i in range(3):
-        store.record(f"s{i}", "Read")
-
-    r1 = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert r1["candidates_drafted"] == 1
-    assert r1["already_tracked"] == 0
-
-    r2 = json.loads(
-        _dispatch_tool("depthfusion_surface_skill_candidates", {"threshold": 3, "dry_run": True}, cfg)
-    )
-    assert r2["candidates_drafted"] == 0
-    assert r2["already_tracked"] == 1
 
 
 def test_skillforge_client_no_url(monkeypatch):

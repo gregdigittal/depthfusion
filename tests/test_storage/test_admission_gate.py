@@ -95,7 +95,7 @@ class TestAddDocumentGate:
         store = _make_store()
         content = "Implemented feature X. Decision: use async/await. Updated tests.\n" * 5
         with patch.object(store, "_get_embedding", return_value=None):
-            store.add_document("doc1", content, {"source": "session"})
+            store.add_document("doc1", content, {"source": "session", "acl_allow": ["proj-test"]})
         store._collection.upsert.assert_called_once()
 
     def test_boilerplate_content_is_skipped_when_threshold_above_penalty(self, monkeypatch):
@@ -109,7 +109,7 @@ class TestAddDocumentGate:
             "Project: depthfusion\n"
         )
         with patch.object(store, "_get_embedding", return_value=None):
-            store.add_document("doc2", content, {"source": "session"})
+            store.add_document("doc2", content, {"source": "session", "acl_allow": ["proj-test"]})
         store._collection.upsert.assert_not_called()
 
     def test_doc_id_logged_on_skip(self, monkeypatch, caplog):
@@ -120,7 +120,7 @@ class TestAddDocumentGate:
         content = "--- SESSION START at 01:00:00 ---\nProject: x\n"
         with patch.object(store, "_get_embedding", return_value=None):
             with caplog.at_level(logging.DEBUG, logger="depthfusion.storage.vector_store"):
-                store.add_document("my-doc-id", content, {})
+                store.add_document("my-doc-id", content, {"acl_allow": ["proj-test"]})
         assert "my-doc-id" in caplog.text
 
     def test_threshold_in_log_message(self, monkeypatch, caplog):
@@ -131,7 +131,7 @@ class TestAddDocumentGate:
         content = "--- SESSION END at 23:59:00 ---\nProject: depthfusion\n"
         with patch.object(store, "_get_embedding", return_value=None):
             with caplog.at_level(logging.DEBUG, logger="depthfusion.storage.vector_store"):
-                store.add_document("skipped-doc", content, {})
+                store.add_document("skipped-doc", content, {"acl_allow": ["proj-test"]})
         # Log message should contain both score and threshold
         assert "admission score" in caplog.text.lower() or "skipping" in caplog.text.lower()
 
@@ -144,7 +144,7 @@ class TestAddDocumentGate:
         content = "--- SESSION END at 07:14:20 ---\nProject: depthfusion\n"
         mock_embed = MagicMock(return_value=None)
         with patch.object(store, "_get_embedding", mock_embed):
-            store.add_document("doc3", content, {})
+            store.add_document("doc3", content, {"acl_allow": ["proj-test"]})
         mock_embed.assert_not_called()
 
 
@@ -166,7 +166,7 @@ class TestAdmissionThresholdEnvVar:
 
         content = "--- SESSION END at 07:14:20 ---\nProject: depthfusion\n"
         with patch.object(store, "_get_embedding", return_value=None):
-            store.add_document("should-index", content, {})
+            store.add_document("should-index", content, {"acl_allow": ["proj-test"]})
         store._collection.upsert.assert_called_once()
 
     def test_high_threshold_blocks_normal_content(self, monkeypatch):
@@ -178,7 +178,7 @@ class TestAdmissionThresholdEnvVar:
 
         content = "Implemented OAuth2 PKCE flow. Updated user table migrations.\n" * 3
         with patch.object(store, "_get_embedding", return_value=None):
-            store.add_document("blocked-doc", content, {})
+            store.add_document("blocked-doc", content, {"acl_allow": ["proj-test"]})
         store._collection.upsert.assert_not_called()
 
 
