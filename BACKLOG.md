@@ -3343,13 +3343,13 @@
 ### S-207: As a Claude Code session, I want to call DepthFusion tools over HTTP MCP so that all sessions share one server and tool calls work mid-conversation without subprocess overhead `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `curl --max-time 5 -H "Authorization: Bearer $DEPTHFUSION_API_TOKEN" http://127.0.0.1:7301/sse` returns HTTP 200 with `event: endpoint` within 3s after service restart
-- [ ] AC-2: All existing DepthFusion MCP tools (`depthfusion_publish_context`, `depthfusion_recall`, `depthfusion_list_sessions`, `depthfusion_delete_context`) are callable via HTTP MCP with identical semantics to the current Python-import path
-- [ ] AC-3: The systemd unit `depthfusion-mcp.service` includes `StartLimitBurst=5` and `StartLimitIntervalSec=30` to prevent infinite crash-loops; if the service fails 5 times in 30s it stays down and emits a journal entry
-- [ ] AC-4: `~/.claude/mcp.json` (or the equivalent settings file used by Claude Code) registers the DepthFusion HTTP MCP server so tool calls work natively in any session without manual configuration
-- [ ] AC-5: The `/health` endpoint returns `{"status":"ok","auth":"legacy_token","version":"<version>"}` — callers can verify auth mode without attempting a full SSE connection
-- [ ] AC-6: Session-start hooks (`session-start.sh`) updated to verify HTTP MCP health rather than attempting a Python subprocess import; if the HTTP server is unreachable they log a warning and fall back to subprocess gracefully
-- [ ] AC-7: Documentation in `docs/mcp-http-server.md` covers: startup, auth env vars, curl verification, Claude Code MCP registration, and the benefit summary (shared server, mid-conversation tool calls, multi-client support)
+- [x] AC-1: `curl --max-time 5 -H "Authorization: Bearer $DEPTHFUSION_API_TOKEN" http://127.0.0.1:7301/sse` returns HTTP 200 with `event: endpoint` within 3s after service restart
+- [x] AC-2: All existing DepthFusion MCP tools (`depthfusion_publish_context`, `depthfusion_recall`, `depthfusion_list_sessions`, `depthfusion_delete_context`) are callable via HTTP MCP with identical semantics to the current Python-import path
+- [x] AC-3: The systemd unit `depthfusion-mcp.service` includes `StartLimitBurst=5` and `StartLimitIntervalSec=30` to prevent infinite crash-loops; if the service fails 5 times in 30s it stays down and emits a journal entry
+- [x] AC-4: `~/.claude/mcp.json` (or the equivalent settings file used by Claude Code) registers the DepthFusion HTTP MCP server so tool calls work natively in any session without manual configuration
+- [x] AC-5: The `/health` endpoint returns `{"status":"ok","auth":"legacy_token","version":"<version>"}` — callers can verify auth mode without attempting a full SSE connection
+- [x] AC-6: Session-start hooks (`session-start.sh`) updated to verify HTTP MCP health rather than attempting a Python subprocess import; if the HTTP server is unreachable they log a warning and fall back to subprocess gracefully
+- [x] AC-7: Documentation in `docs/mcp-http-server.md` covers: startup, auth env vars, curl verification, Claude Code MCP registration, and the benefit summary (shared server, mid-conversation tool calls, multi-client support)
 
 **Tasks:**
 - [x] T-701: Verify auth fix in production — restart depthfusion-mcp, confirm `curl --max-time 5` returns 200 SSE, commit auth fix as a documented change in `docs/decisions/` — Sonnet dev, Haiku rev
@@ -3364,8 +3364,8 @@
 ### S-208: As any agent or orchestrator, I want to record model telemetry so that observed performance data accumulates over time as learned experience `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: A `record_model_telemetry` MCP tool accepts a structured event and persists it; callable from any Claude Code session via the HTTP MCP server (S-207)
-- [ ] AC-2: The telemetry event schema captures every signal needed for quality-per-dollar analysis:
+- [x] AC-1: A `record_model_telemetry` MCP tool accepts a structured event and persists it; callable from any Claude Code session via the HTTP MCP server (S-207)
+- [x] AC-2: The telemetry event schema captures every signal needed for quality-per-dollar analysis:
   ```
   model_id: str          # e.g. "claude-sonnet-4-6", "claude-opus-4-8", "deepseek-v4-pro"
   provider: str          # anthropic | openai | deepseek | google | cursor | openrouter
@@ -3381,13 +3381,13 @@
   gate_tier: str | null  # which gate caught a failure: dod|regression|security|grade|none
   notes: str | null      # free-text context
   ```
-- [ ] AC-3: Task category taxonomy enforced as an enum (invalid categories rejected with 422):
+- [x] AC-3: Task category taxonomy enforced as an enum (invalid categories rejected with 422):
   `architecture`, `implementation`, `code-review`, `test-writing`, `security-audit`,
   `debugging`, `refactor`, `data-migration`, `documentation`, `analysis`, `planning`,
   `mechanical` (boilerplate/scaffolding)
-- [ ] AC-4: Events stored in `telemetry/model_telemetry.db` (SQLite, separate from the main DepthFusion store to avoid schema lock contention); schema versioned with Alembic or a hand-rolled migration file
-- [ ] AC-5: Duplicate prevention: events with identical `(session_id, model_id, task_category, tokens_in, tokens_out)` within 60s are silently deduplicated (idempotent ingest)
-- [ ] AC-6: `GET /api/telemetry/recent?limit=50` returns the last N events — useful for debugging and confirming ingest is working
+- [x] AC-4: Events stored in `telemetry/model_telemetry.db` (SQLite, separate from the main DepthFusion store to avoid schema lock contention); schema versioned with Alembic or a hand-rolled migration file
+- [x] AC-5: Duplicate prevention: events with identical `(session_id, model_id, task_category, tokens_in, tokens_out)` within 60s are silently deduplicated (idempotent ingest)
+- [x] AC-6: `GET /api/telemetry/recent?limit=50` returns the last N events — useful for debugging and confirming ingest is working
 
 **Tasks:**
 - [x] T-707: Design `model_telemetry` SQLite schema + Alembic migration; schema includes `id`, `recorded_at`, and all fields from AC-2 — Sonnet dev, Codex rev
@@ -3401,8 +3401,8 @@
 ### S-209: As an agent-ops orchestrator, I want to query learned model performance statistics so that routing decisions are based on empirical data rather than hard-coded assumptions `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `query_model_performance` MCP tool accepts `{task_category, model_id?, window_days?}` and returns per-(model, task_category) statistics
-- [ ] AC-2: Statistics returned per model include:
+- [x] AC-1: `query_model_performance` MCP tool accepts `{task_category, model_id?, window_days?}` and returns per-(model, task_category) statistics
+- [x] AC-2: Statistics returned per model include:
   ```
   model_id: str
   task_category: str
@@ -3417,10 +3417,10 @@
   last_seen: str               # ISO timestamp of most recent event
   confidence: str              # low (n<10) | medium (10≤n<50) | high (n≥50)
   ```
-- [ ] AC-3: Window defaults to last 30 days; `window_days=0` means all-time
-- [ ] AC-4: Results cached in-process for 60 minutes (cache invalidated on new telemetry write)
-- [ ] AC-5: REST endpoint `GET /api/model-stats?task_category=<cat>&model_id=<model>&window_days=<n>` returns the same payload as the MCP tool — usable by dashboards and scripts without MCP overhead
-- [ ] AC-6: When `sample_count < 10`, `confidence = "low"` and the statistics are supplemented with hard-coded prior values (see T-713) clearly labelled as `source: "prior"` vs `source: "observed"`
+- [x] AC-3: Window defaults to last 30 days; `window_days=0` means all-time
+- [x] AC-4: Results cached in-process for 60 minutes (cache invalidated on new telemetry write)
+- [x] AC-5: REST endpoint `GET /api/model-stats?task_category=<cat>&model_id=<model>&window_days=<n>` returns the same payload as the MCP tool — usable by dashboards and scripts without MCP overhead
+- [x] AC-6: When `sample_count < 10`, `confidence = "low"` and the statistics are supplemented with hard-coded prior values (see T-713) clearly labelled as `source: "prior"` vs `source: "observed"`
 
 **Tasks:**
 - [x] T-712: Implement `analytics/model_stats.py` — SQL aggregation query + in-memory LRU cache (60min TTL); compute all AC-2 fields — Sonnet dev, Codex rev
@@ -3433,7 +3433,7 @@
 ### S-210: As agent-ops auto mode, I want DepthFusion to recommend the best model for a task given vendor isolation constraints so that orchestration decisions are grounded in evidence `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `recommend_model` MCP tool accepts:
+- [x] AC-1: `recommend_model` MCP tool accepts:
   ```
   task_category: str
   context: str                     # brief description of the specific task
@@ -3441,7 +3441,7 @@
   available_models: list[str]?     # restrict candidates; default = all known models
   min_confidence: str?             # "low"|"medium"|"high" — filter out models below threshold
   ```
-- [ ] AC-2: Returns a ranked list of up to 5 recommendations:
+- [x] AC-2: Returns a ranked list of up to 5 recommendations:
   ```
   [
     {
@@ -3457,11 +3457,11 @@
     ...
   ]
   ```
-- [ ] AC-3: `exclude_vendors` enforces Fable-5 vendor isolation — if `"anthropic"` is excluded, no Anthropic models appear in results regardless of quality score
-- [ ] AC-4: Ranking uses `quality_rate / cost_per_pass` as the primary signal (maximise quality per dollar spent); ties broken by `avg_cost_usd` ascending (prefer cheaper when quality is equal)
-- [ ] AC-5: Hard-coded priors are used for any model with `confidence = "low"` — the recommendation does not reject low-confidence models but surfaces confidence clearly
-- [ ] AC-6: Recommendations are NOT cached (they depend on current `exclude_vendors` which changes per call)
-- [ ] AC-7: REST endpoint `POST /api/recommend-model` accepts the same payload — usable by scripts and dashboards
+- [x] AC-3: `exclude_vendors` enforces Fable-5 vendor isolation — if `"anthropic"` is excluded, no Anthropic models appear in results regardless of quality score
+- [x] AC-4: Ranking uses `quality_rate / cost_per_pass` as the primary signal (maximise quality per dollar spent); ties broken by `avg_cost_usd` ascending (prefer cheaper when quality is equal)
+- [x] AC-5: Hard-coded priors are used for any model with `confidence = "low"` — the recommendation does not reject low-confidence models but surfaces confidence clearly
+- [x] AC-6: Recommendations are NOT cached (they depend on current `exclude_vendors` which changes per call)
+- [x] AC-7: REST endpoint `POST /api/recommend-model` accepts the same payload — usable by scripts and dashboards
 
 **Tasks:**
 - [x] T-716: Implement `analytics/recommender.py` — ranking engine using quality_rate / cost_per_pass; Fable-5 vendor filter; prior blending; rationale generation — Opus dev, Codex rev
