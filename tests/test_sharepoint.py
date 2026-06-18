@@ -7,20 +7,16 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-import responses as responses_lib
 
 from depthfusion.connectors.sharepoint import (
     ConfigurationError,
     SharePointConnector,
 )
 from depthfusion.ingest.models import ParsedDocument
-from depthfusion.ingest.pipeline import IngestPipeline
-
 
 # ---------------------------------------------------------------------------
 # Constants

@@ -1,0 +1,269 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: /home/gregmorris/projects/depthfusion
+configfile: pyproject.toml
+plugins: timeout-2.4.0, cov-7.1.0, asyncio-1.4.0, respx-0.23.1, anyio-4.13.0, hypothesis-6.155.2, langsmith-0.8.14
+timeout: 120.0s
+timeout method: signal
+timeout func_only: False
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 3488 items
+
+tests/test_acl_frontmatter.py ........................                   [  0%]
+tests/test_acl_property.py ............................................. [  1%]
+...................................................sss.ssssssssss..s...s [  4%]
+ss.s...ss..ss..ss..ss..s...s........                                     [  5%]
+tests/test_acl_retrieval.py ...........................                  [  5%]
+tests/test_acl_verifier.py ................                              [  6%]
+tests/test_acl_write_enforcement.py ....................                 [  6%]
+tests/test_admin_console_policy.py .....................                 [  7%]
+tests/test_admin_retention.py ............                               [  7%]
+tests/test_aggregate_leak.py ................                            [  8%]
+tests/test_analytics.py ............................                     [  9%]
+tests/test_analyzer/test_compatibility.py ...................            [  9%]
+tests/test_analyzer/test_introspection.py ..................             [ 10%]
+tests/test_analyzer/test_mcp_server.py ......................            [ 10%]
+tests/test_analyzer/test_metrics.py ...........                          [ 11%]
+tests/test_analyzer/test_recommender_installer.py ...................... [ 11%]
+....                                                                     [ 11%]
+tests/test_analyzer/test_scanner.py ..........                           [ 12%]
+tests/test_atomic_replace.py ..................                          [ 12%]
+tests/test_audit.py .......................................              [ 13%]
+tests/test_backends/test_base.py ...........                             [ 14%]
+tests/test_backends/test_chain.py ...........................            [ 14%]
+tests/test_backends/test_factory.py ......................               [ 15%]
+tests/test_backends/test_fallback_log.py ................                [ 15%]
+tests/test_backends/test_fallback_order.py .........................     [ 16%]
+tests/test_backends/test_gemma.py .....................................  [ 17%]
+tests/test_backends/test_haiku.py ...............................        [ 18%]
+tests/test_backends/test_local_embedding.py .......................      [ 19%]
+tests/test_backends/test_null.py ..........                              [ 19%]
+tests/test_backends/test_openrouter.py ..............                    [ 19%]
+tests/test_cache.py .................................................... [ 21%]
+.........                                                                [ 21%]
+tests/test_cache_activity_prefetch.py .................................. [ 22%]
+................                                                         [ 23%]
+tests/test_capability_check.py ......................................... [ 24%]
+.....................................................                    [ 25%]
+tests/test_capture/test_auto_compress.py ................                [ 26%]
+tests/test_capture/test_auto_learn.py ...................                [ 26%]
+tests/test_capture/test_compressor.py .............                      [ 27%]
+tests/test_capture/test_decay.py .........                               [ 27%]
+tests/test_capture/test_decision_extractor.py .......................... [ 28%]
+                                                                         [ 28%]
+tests/test_capture/test_dedup.py ..........................              [ 28%]
+tests/test_capture/test_event_hook.py .................                  [ 29%]
+tests/test_capture/test_negative_extractor.py .........................  [ 30%]
+tests/test_capture/test_pin.py ........................                  [ 30%]
+tests/test_capture/test_recall_feedback.py .....................         [ 31%]
+tests/test_capture/test_scoring.py ..................................... [ 32%]
+....                                                                     [ 32%]
+tests/test_classification.py ........................................... [ 33%]
+.......................................                                  [ 34%]
+tests/test_cli_migrate.py ...............                                [ 35%]
+tests/test_cognitive/test_consolidator.py ......                         [ 35%]
+tests/test_cognitive/test_contradiction.py ....                          [ 35%]
+tests/test_cognitive/test_scorer.py .....                                [ 35%]
+tests/test_core/test_config.py ...............                           [ 36%]
+tests/test_core/test_event_store.py ...............                      [ 36%]
+tests/test_core/test_feedback.py ............                            [ 37%]
+tests/test_core/test_hit_tracker.py .....................                [ 37%]
+tests/test_core/test_memory_event.py ....                                [ 37%]
+tests/test_core/test_memory_object.py .....                              [ 37%]
+tests/test_core/test_project_registry.py .......                         [ 38%]
+tests/test_core/test_scoring.py ..................                       [ 38%]
+tests/test_core/test_types.py ....................                       [ 39%]
+tests/test_device_keychain.py ...........................                [ 39%]
+tests/test_device_lease.py .................................             [ 40%]
+tests/test_device_login.py ......                                        [ 41%]
+tests/test_device_registry.py .....................                      [ 41%]
+tests/test_document_parser_base.py .........                             [ 41%]
+tests/test_document_parsers.py .....................                     [ 42%]
+tests/test_export_controls.py .......................................... [ 43%]
+..............                                                           [ 44%]
+tests/test_expression_eval.py .........................                  [ 44%]
+tests/test_fastapi_deps.py ......                                        [ 45%]
+tests/test_fusion/test_block_retrieval.py ........                       [ 45%]
+tests/test_fusion/test_gate_config_version.py .............              [ 45%]
+tests/test_fusion/test_gates.py ........................................ [ 46%]
+.................                                                        [ 47%]
+tests/test_fusion/test_materialisation_policy.py ....................... [ 47%]
+.......                                                                  [ 48%]
+tests/test_fusion/test_reranker.py ..........                            [ 48%]
+tests/test_fusion/test_rrf.py .............                              [ 48%]
+tests/test_fusion/test_selective_fusion_weighter.py .................    [ 49%]
+tests/test_fusion/test_weighted.py ............                          [ 49%]
+tests/test_generic_parser.py .................                           [ 50%]
+tests/test_graph/test_acl_inheritance.py ..........                      [ 50%]
+tests/test_graph/test_builder.py ............                            [ 50%]
+tests/test_graph/test_dedup.py .......................                   [ 51%]
+tests/test_graph/test_extractor.py ....................                  [ 51%]
+tests/test_graph/test_linker.py ................                         [ 52%]
+tests/test_graph/test_scope.py ..........                                [ 52%]
+tests/test_graph/test_store.py ......................................... [ 53%]
+..................                                                       [ 54%]
+tests/test_graph/test_temporal_session_linker.py ....................... [ 55%]
+....                                                                     [ 55%]
+tests/test_graph/test_traverser.py ..............                        [ 55%]
+tests/test_graph/test_types.py ....                                      [ 55%]
+tests/test_hooks/test_git_post_commit.py ..................              [ 56%]
+tests/test_hooks/test_post_tool_use.py .........................         [ 56%]
+tests/test_hooks/test_s262_perturn_review.py ....................        [ 57%]
+tests/test_hooks/test_session_start.py ...................               [ 58%]
+tests/test_identity_token_validator.py .......................           [ 58%]
+tests/test_ingest.py ......................................              [ 59%]
+tests/test_install/test_env_merge.py ...............                     [ 60%]
+tests/test_install/test_gpu_probe.py .........                           [ 60%]
+tests/test_install/test_install.py ..................................    [ 61%]
+tests/test_install/test_mcp_registration.py .......                      [ 61%]
+tests/test_install/test_smoke.py .............                           [ 62%]
+tests/test_install/test_ui_server.py ........                            [ 62%]
+tests/test_install/test_windows_compat.py .....                          [ 62%]
+tests/test_legacy_shim.py ..................................             [ 63%]
+tests/test_mcp_authz.py .......................................sssssss.. [ 64%]
+...............s....................................                     [ 66%]
+tests/test_metrics/test_collector_reliability.py .+++++++++++++++++++++++++++++++++++ Timeout ++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~ Stack of tqdm_monitor (140698925323840) ~~~~~~~~~~~~~~~~~~~~
+  File "/usr/lib/python3.12/threading.py", line 1032, in _bootstrap
+    self._bootstrap_inner()
+  File "/usr/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/gregmorris/projects/depthfusion/.venv/lib/python3.12/site-packages/tqdm/_monitor.py", line 69, in run
+    self.was_killed.wait(self.sleep_interval)
+  File "/usr/lib/python3.12/threading.py", line 655, in wait
+    signaled = self._cond.wait(timeout)
+  File "/usr/lib/python3.12/threading.py", line 359, in wait
+    gotit = waiter.acquire(True, timeout)
+~~~~~~~~~~~~~~~~~~~ Stack of tqdm_monitor (140698890704448) ~~~~~~~~~~~~~~~~~~~~
+  File "/usr/lib/python3.12/threading.py", line 1032, in _bootstrap
+    self._bootstrap_inner()
+  File "/usr/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/gregmorris/projects/depthfusion/.venv/lib/python3.12/site-packages/tqdm/_monitor.py", line 69, in run
+    self.was_killed.wait(self.sleep_interval)
+  File "/usr/lib/python3.12/threading.py", line 655, in wait
+    signaled = self._cond.wait(timeout)
+  File "/usr/lib/python3.12/threading.py", line 359, in wait
+    gotit = waiter.acquire(True, timeout)
++++++++++++++++++++++++++++++++++++ Timeout ++++++++++++++++++++++++++++++++++++
+F........                                                                [ 66%]
+tests/test_metrics/test_collector_v05.py ..........................      [ 67%]
+tests/test_metrics/test_config_version_id.py .................           [ 67%]
+tests/test_metrics/test_fallback_canonical.py ....                       [ 67%]
+tests/test_metrics/test_integration.py .....................             [ 68%]
+tests/test_metrics/test_path_isolation.py .......                        [ 68%]
+tests/test_metrics/test_per_capability_latency.py .....                  [ 68%]
+tests/test_metrics/test_startup_check.py ...                             [ 68%]
+tests/test_migration_rehearsal.py ............................           [ 69%]
+tests/test_ocr_parser.py ...................                             [ 70%]
+tests/test_parse_budget.py .........                                     [ 70%]
+tests/test_parsers/test_chatgpt_parser.py ............                   [ 70%]
+tests/test_parsers/test_deepseek_parser.py ...........                   [ 71%]
+tests/test_parsers/test_document_parser_base.py ........                 [ 71%]
+tests/test_parsers/test_gemini_parser.py ............                    [ 71%]
+tests/test_parsers/test_generic_parser.py .............                  [ 72%]
+tests/test_parsers/test_ocr.py ...................                       [ 72%]
+tests/test_parsers/test_parse_conversation.py ..........                 [ 72%]
+tests/test_performance.py ......                                         [ 73%]
+tests/test_policy_engine.py ............................................ [ 74%]
+..................................................................       [ 76%]
+tests/test_principal_store.py .......                                    [ 76%]
+tests/test_recursive/test_client.py ...........                          [ 76%]
+tests/test_recursive/test_sandbox.py .........                           [ 77%]
+tests/test_recursive/test_sidecar.py ........                            [ 77%]
+tests/test_recursive/test_skillforge_client.py .........                 [ 77%]
+tests/test_recursive/test_strategies.py ............                     [ 77%]
+tests/test_recursive/test_task_budget.py ...................             [ 78%]
+tests/test_recursive/test_trajectory.py .......                          [ 78%]
+tests/test_regression/test_v04_output_identity.py .....                  [ 78%]
+tests/test_retrieval/test_bm25.py .............                          [ 79%]
+tests/test_retrieval/test_ciqs_a_regression.py ......................... [ 79%]
+.....................                                                    [ 80%]
+tests/test_retrieval/test_hnsw_store.py ...........                      [ 80%]
+tests/test_retrieval/test_hybrid.py .................................... [ 81%]
+................                                                         [ 82%]
+tests/test_retrieval/test_hybrid_with_embeddings.py .................    [ 82%]
+tests/test_retrieval/test_mode_resolution.py .....                       [ 82%]
+tests/test_retrieval/test_project_filter.py ........................     [ 83%]
+tests/test_retrieval/test_reranker.py ............                       [ 83%]
+tests/test_retrieval/test_snippet_trimming.py ..............             [ 84%]
+tests/test_role_admin.py ....................................            [ 85%]
+tests/test_role_matrix.py ...........................                    [ 86%]
+tests/test_roles.py ...........................................          [ 87%]
+tests/test_route_walker.py .                                             [ 87%]
+tests/test_router/test_bus.py ..................                         [ 87%]
+tests/test_router/test_bus_idempotency.py ......................         [ 88%]
+tests/test_router/test_cost_estimator.py ............                    [ 88%]
+tests/test_router/test_dispatcher.py ...........                         [ 89%]
+tests/test_router/test_publisher_subscriber.py ...........               [ 89%]
+tests/test_scripts/test_benchmark.py ...........................         [ 90%]
+tests/test_scripts/test_ciqs_compare.py .......................          [ 90%]
+tests/test_scripts/test_ciqs_harness_parse.py ...............            [ 91%]
+tests/test_scripts/test_ciqs_summarise.py ........................       [ 92%]
+tests/test_scripts/test_ciqs_weekly.py ...................               [ 92%]
+tests/test_scripts/test_install_research_tools.py .......                [ 92%]
+tests/test_scripts/test_mine_session_prompts.py ........................ [ 93%]
+........                                                                 [ 93%]
+tests/test_service_account.py ....................                       [ 94%]
+tests/test_session/test_compactor.py ........                            [ 94%]
+tests/test_session/test_loader.py ...........                            [ 94%]
+tests/test_session/test_scorer.py .......                                [ 95%]
+tests/test_session/test_tagger.py ................                       [ 95%]
+tests/test_sharepoint.py .................                               [ 96%]
+tests/test_sharepoint_connector.py ...                                   [ 96%]
+tests/test_sharepoint_delta_e2e.py .......                               [ 96%]
+tests/test_storage/test_admission_gate.py ..................             [ 96%]
+tests/test_storage/test_event_log.py ....                                [ 96%]
+tests/test_storage/test_event_log_edges.py .....                         [ 97%]
+tests/test_storage/test_file_index.py ...........                        [ 97%]
+tests/test_storage/test_memory_store.py .....                            [ 97%]
+tests/test_storage/test_memory_store_fts.py ..................           [ 98%]
+tests/test_storage/test_tier_manager.py ......                           [ 98%]
+tests/test_storage/test_vector_store.py .............                    [ 98%]
+tests/test_sync_engine.py ................................               [ 99%]
+tests/test_token_validator_negative.py ..........                        [ 99%]
+tests/test_utils/test_mode.py .......                                    [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/gregmorris/projects/depthfusion/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_admin_console_policy.py::TestComplianceExport::test_export_invalid_since_returns_422
+tests/test_analytics.py::TestAnalyticsFacets::test_get_facets_unsupported_facet_returns_422
+  /home/gregmorris/projects/depthfusion/.venv/lib/python3.12/site-packages/fastapi/routing.py:337: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+tests/test_audit.py::TestAdminAuditEndpoint::test_since_filter
+  /home/gregmorris/projects/depthfusion/tests/test_audit.py:428: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    since_str = dt.datetime.utcfromtimestamp(now - 1).strftime("%Y-%m-%dT%H:%M:%S")
+
+tests/test_metrics/test_collector_reliability.py::TestRecordFlockGuard::test_concurrent_writers_do_not_interleave
+tests/test_metrics/test_collector_reliability.py::TestRecordFlockGuard::test_concurrent_writers_do_not_interleave
+tests/test_metrics/test_collector_reliability.py::TestRecordFlockGuard::test_concurrent_writers_do_not_interleave
+tests/test_metrics/test_collector_reliability.py::TestRecordFlockGuard::test_concurrent_writers_do_not_interleave
+tests/test_router/test_bus_idempotency.py::TestFileBusCrossProcess::test_cross_process_concurrent_publish_no_double_insert
+tests/test_router/test_bus_idempotency.py::TestFileBusCrossProcess::test_cross_process_concurrent_publish_no_double_insert
+tests/test_router/test_bus_idempotency.py::TestFileBusCrossProcess::test_cross_process_concurrent_publish_no_double_insert
+  /usr/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=2750980) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+tests/test_metrics/test_fallback_canonical.py: 4 warnings
+tests/test_metrics/test_integration.py: 4 warnings
+tests/test_metrics/test_per_capability_latency.py: 2 warnings
+tests/test_retrieval/test_project_filter.py: 5 warnings
+  /home/gregmorris/projects/depthfusion/src/depthfusion/mcp/tools/_shared.py:557: DeprecationWarning: DEPTHFUSION_MODE='vps' is deprecated; use 'vps-cpu' instead.
+    pipeline = RecallPipeline.from_env()
+
+tests/test_metrics/test_integration.py::TestLatencyPerCapability::test_reranker_phase_timed_in_non_local_mode
+  /home/gregmorris/projects/depthfusion/tests/test_metrics/test_integration.py:481: DeprecationWarning: DEPTHFUSION_MODE='vps' is deprecated; use 'vps-cpu' instead.
+    pipeline = original_from_env.__func__(cls)
+
+tests/test_retrieval/test_hybrid.py::test_pipeline_from_env_vps_uses_tier_manager
+  /home/gregmorris/projects/depthfusion/tests/test_retrieval/test_hybrid.py:87: DeprecationWarning: DEPTHFUSION_MODE='vps' is deprecated; use 'vps-cpu' instead.
+    p = RecallPipeline.from_env()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_metrics/test_collector_reliability.py::TestRecordFlockGuard::test_concurrent_writers_do_not_interleave
+===== 1 failed, 3451 passed, 36 skipped, 28 warnings in 387.30s (0:06:27) ======

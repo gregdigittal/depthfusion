@@ -9,12 +9,9 @@ maintainers have a single place to update when the matrix changes.
 """
 from __future__ import annotations
 
-from typing import Set
-
 import pytest
 
-from depthfusion.authz.roles import Capability, Role, ROLE_CAPABILITIES
-
+from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
 
 # ---------------------------------------------------------------------------
 # Expected capability sets (canonical definition for test assertions)
@@ -193,7 +190,7 @@ class TestMatrixCompleteness:
         all_caps = set(Capability)
         orphans = all_caps - owner_caps
         assert not orphans, (
-            f"The following capabilities are not granted by any role: "
+            "The following capabilities are not granted by any role: "
             + ", ".join(c.value for c in sorted(orphans, key=lambda c: c.value))
         )
 

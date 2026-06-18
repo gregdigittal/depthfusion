@@ -940,3 +940,89 @@ async def get_telemetry_aggregate(
         from_dt=from_dt.isoformat() if from_dt else None,
         to_dt=to_dt.isoformat() if to_dt else None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Model telemetry — E-64 (S-207..S-211)
+# ---------------------------------------------------------------------------
+
+class RecommendModelBody(BaseModel):
+    task_category: str
+    exclude_vendors: Optional[list[str]] = None
+    available_models: Optional[list[str]] = None
+    budget_usd: Optional[float] = None
+    context: str = ""
+    min_confidence: Optional[float] = None
+
+
+@app.post("/api/recommend-model")
+async def recommend_model_endpoint(
+    body: RecommendModelBody,
+    principal: Principal = Depends(require_principal),
+):
+    from depthfusion.mcp.tools.recommender_tools import recommend_model
+    result = recommend_model(body.model_dump(exclude_none=True))
+    if isinstance(result, dict) and result.get("error"):
+        raise HTTPException(status_code=422, detail=result["error"])
+    return result
+
+
+@app.get("/api/budget-summary")
+async def get_budget_summary(
+    project_slug: Optional[str] = Query(default=None),
+    session_id: Optional[str] = Query(default=None),
+    cap_usd: Optional[float] = Query(default=None),
+    principal: Principal = Depends(require_principal),
+):
+    from depthfusion.analytics.budget import build_budget_summary
+    return build_budget_summary(
+        cap_usd=cap_usd,
+        project_slug=project_slug,
+        session_id=session_id,
+    )
+
+
+async def get_recent_model_telemetry(
+    *,
+    limit: int = 100,
+    project_slug: Optional[str] = None,
+    model_id: Optional[str] = None,
+    principal: Principal,
+) -> list[dict]:
+    """Query recent model_telemetry rows — used directly in tests and by the REST endpoint."""
+    from contextlib import closing
+
+    from depthfusion.telemetry import schema
+
+    schema.migrate()
+    conditions: list[str] = []
+    params: list = []
+    if project_slug is not None:
+        conditions.append("project_slug = ?")
+        params.append(project_slug)
+    if model_id is not None:
+        conditions.append("model_id = ?")
+        params.append(model_id)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    query = f"SELECT * FROM model_telemetry {where} ORDER BY recorded_at DESC LIMIT ?"
+    params.append(min(limit, 10_000))
+
+    with closing(schema.connect()) as conn:
+        rows = conn.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/model-telemetry")
+async def get_model_telemetry_endpoint(
+    limit: int = Query(default=100, ge=1, le=10_000),
+    project_slug: Optional[str] = Query(default=None),
+    model_id: Optional[str] = Query(default=None),
+    principal: Principal = Depends(require_principal),
+):
+    return await get_recent_model_telemetry(
+        limit=limit,
+        project_slug=project_slug,
+        model_id=model_id,
+        principal=principal,
+    )

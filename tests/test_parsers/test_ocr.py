@@ -219,7 +219,7 @@ class TestOcrParserProtocol:
         assert OcrParser.name
 
     def test_has_supported_mime_types(self) -> None:
-        from depthfusion.parsers.documents.ocr import OcrParser, _IMAGE_MIME_TYPES
+        from depthfusion.parsers.documents.ocr import _IMAGE_MIME_TYPES, OcrParser
         assert "image/png" in OcrParser.supported_mime_types
         assert "image/jpeg" in OcrParser.supported_mime_types
         assert set(OcrParser.supported_mime_types) == set(_IMAGE_MIME_TYPES)

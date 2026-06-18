@@ -139,4 +139,4 @@ def record_event(event: dict) -> dict:
         from depthfusion.analytics.model_stats import invalidate_model_stats_cache
 
         invalidate_model_stats_cache()
-        return {"id": int(cursor.lastrowid), "deduplicated": False}
+        return {"id": int(cursor.lastrowid or 0), "deduplicated": False}

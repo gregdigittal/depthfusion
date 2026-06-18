@@ -8,14 +8,12 @@ Verifies:
 """
 from __future__ import annotations
 
-import os
 import pathlib
 
 import pytest
 
-from depthfusion.ingest.parser import DocumentParser, _DEFAULT_PARSE_MAX_BYTES
+from depthfusion.ingest.parser import DocumentParser
 from depthfusion.parsers.documents.base import QuarantineStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers

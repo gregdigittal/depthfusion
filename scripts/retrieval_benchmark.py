@@ -39,8 +39,8 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 # Imports from depthfusion — imported after sys.path fixup
 # ---------------------------------------------------------------------------
 
-from depthfusion.retrieval.bm25 import BM25, tokenize  # noqa: E402
 from depthfusion.retrieval.acl_verifier import verify_acl  # noqa: E402
+from depthfusion.retrieval.bm25 import BM25, tokenize  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Minimal principal stub (avoids importing the full identity / OIDC stack)
@@ -313,8 +313,8 @@ def build_report(results: dict[str, Any], *, git_hash: str) -> str:
         "",
         "## Overhead (ACL trimming vs raw retrieval)",
         "",
-        f"| Metric | Absolute overhead |",
-        f"|--------|-------------------|",
+        "| Metric | Absolute overhead |",
+        "|--------|-------------------|",
         f"| p50    | {_fmt_ms(p50_overhead)} |",
         f"| p95    | {_fmt_ms(p95_overhead)} |",
         f"| p99    | {_fmt_ms(p99_overhead)} |",

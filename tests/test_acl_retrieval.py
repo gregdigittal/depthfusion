@@ -13,15 +13,12 @@ so that these tests run without requiring the full identity stack.
 from __future__ import annotations
 
 import json
-import math
 import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Minimal Principal stub (no OIDC / token dependencies)
@@ -47,8 +44,8 @@ def _uid() -> str:
 # T-571 / T-572: MemoryStore.search() ACL filter
 # ---------------------------------------------------------------------------
 
-from depthfusion.storage.memory_store import MemoryStore
 from depthfusion.core.memory_object import MemoryObject, MemoryType
+from depthfusion.storage.memory_store import MemoryStore
 
 
 def _make_memory(acl_allow: list[str]) -> MemoryObject:
@@ -223,7 +220,6 @@ class TestHNSWStoreACLFilter:
             store.register_acl("doc-bob", ["bob"])
 
             # Simulate hnsw_ready=True and a knn response returning both docs.
-            import numpy as np
 
             store.hnsw_ready = True
             store._index = MagicMock()
@@ -440,10 +436,11 @@ class TestChromaDBStoreACLFilter:
 # T-571: GraphStore traverse() ACL filter
 # ---------------------------------------------------------------------------
 
-from depthfusion.graph.store import JSONGraphStore, SQLiteGraphStore
-from depthfusion.graph.traverser import traverse
-from depthfusion.graph.types import Entity, Edge
 from datetime import datetime, timezone
+
+from depthfusion.graph.store import JSONGraphStore
+from depthfusion.graph.traverser import traverse
+from depthfusion.graph.types import Edge, Entity
 
 
 def _make_entity(

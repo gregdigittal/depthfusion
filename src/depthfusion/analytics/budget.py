@@ -238,7 +238,7 @@ def log_dispatch_outcome(
         event["project_slug"] = project_slug
 
     try:
-        result = recorder(event)
+        result = recorder(event)  # type: ignore[misc]
     except Exception as exc:  # pragma: no cover - defensive
         result = {"error": f"telemetry record failed: {exc}"}
 

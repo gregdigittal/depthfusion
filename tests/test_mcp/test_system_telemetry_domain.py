@@ -3,11 +3,8 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
-import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from depthfusion.mcp.tools.system import (
     _tool_research_topic,
@@ -22,7 +19,6 @@ from depthfusion.mcp.tools.telemetry import (
     _tool_tier_status,
     register_telemetry,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -158,7 +154,6 @@ def test_tool_describe_capabilities_local_defaults():
 
 def test_tool_describe_capabilities_vps_tier_fallback(monkeypatch):
     """Lines 93-99: vps mode + TierManager failure → tier = 'vps-tier1'."""
-    import os
 
     def _bad_tier_manager(*a, **kw):
         raise RuntimeError("db unavailable")

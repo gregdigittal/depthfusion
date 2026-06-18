@@ -82,6 +82,12 @@ class AuditEventType(str, Enum):
 
     # Export
     EXPORT_STARTED = "export_started"
+    EXPORT_ALLOWED = "export_allowed"
+    EXPORT_DENIED = "export_denied"
+    EXPORT_RATE_LIMITED = "export_rate_limited"
+
+    # Anomaly detection
+    ANOMALY_DETECTED = "anomaly_detected"
 
     # Admin
     ADMIN_ACTION = "admin_action"
@@ -123,6 +129,8 @@ class AuditEvent:
     timestamp: float = field(default_factory=time.time)
     ip_addr: str = ""
     success: bool = True
+    device_id: str = ""
+    project_id: str = ""
 
 
 # ---------------------------------------------------------------------------

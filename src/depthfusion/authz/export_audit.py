@@ -36,7 +36,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
 from depthfusion.authz.export_controls import (
@@ -443,7 +443,7 @@ def audit_export_action(
         approval_token=approval_token,
     )
 
-    base_kwargs = dict(
+    base_kwargs: dict[str, Any] = dict(
         actor_principal_id=principal_id,
         resource_id=resource_id,
         classification=classification.value,

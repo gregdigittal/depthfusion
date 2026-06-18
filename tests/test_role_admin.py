@@ -18,10 +18,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from depthfusion.authz.roles import Capability, Role, RoleStore
-from depthfusion.cli.roles import cmd_assign, cmd_revoke, cmd_list, main
+from depthfusion.authz.roles import Role, RoleStore
+from depthfusion.cli.roles import cmd_assign, cmd_list, cmd_revoke, main
 from depthfusion.identity.models import Principal
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -46,11 +45,11 @@ def role_store(db_path: Path) -> RoleStore:
 @pytest.fixture()
 def api_client(tmp_path: Path):
     """FastAPI TestClient with mocked principal dependency."""
-    from depthfusion.api.rest import app
-    from depthfusion.api.auth import _require_principal_dep
-
     # Override the DB path for the test
     import os
+
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.api.rest import app
     os.environ["DEPTHFUSION_DATA_DIR"] = str(tmp_path)
 
     # Owner principal — has ASSIGN_ROLES + VIEW_AUDIT_LOG
@@ -72,10 +71,10 @@ def api_client(tmp_path: Path):
 @pytest.fixture()
 def api_client_admin(tmp_path: Path):
     """FastAPI TestClient with admin principal (has VIEW_AUDIT_LOG, no ASSIGN_ROLES)."""
-    from depthfusion.api.rest import app
-    from depthfusion.api.auth import _require_principal_dep
-
     import os
+
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.api.rest import app
     os.environ["DEPTHFUSION_DATA_DIR"] = str(tmp_path)
 
     admin = Principal(
@@ -96,10 +95,10 @@ def api_client_admin(tmp_path: Path):
 @pytest.fixture()
 def api_client_viewer(tmp_path: Path):
     """FastAPI TestClient with viewer principal (no ASSIGN_ROLES, no VIEW_AUDIT_LOG)."""
-    from depthfusion.api.rest import app
-    from depthfusion.api.auth import _require_principal_dep
-
     import os
+
+    from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.api.rest import app
     os.environ["DEPTHFUSION_DATA_DIR"] = str(tmp_path)
 
     viewer = Principal(
@@ -273,7 +272,6 @@ class TestMain:
     def test_main_assign_dispatches(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import os
         monkeypatch.setenv("DEPTHFUSION_DATA_DIR", str(tmp_path))
         rc = main(["assign", "main-test-user", "viewer"])
         assert rc == 0
@@ -281,7 +279,6 @@ class TestMain:
     def test_main_list_dispatches(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import os
         monkeypatch.setenv("DEPTHFUSION_DATA_DIR", str(tmp_path))
         rc = main(["list"])
         # Returns 1 when no assignments — that is correct behaviour

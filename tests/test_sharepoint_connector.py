@@ -7,9 +7,8 @@ These tests verify that ACL resolution is always fail-closed:
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 import requests
 
 

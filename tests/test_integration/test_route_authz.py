@@ -12,14 +12,11 @@ NOTE: This module deliberately does NOT use ``from __future__ import annotations
 so that FastAPI can resolve ``Annotated[Principal, Depends(...)]`` at route
 registration time (PEP 563 string-ification breaks embedded Depends).
 """
-from typing import Annotated
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from depthfusion.identity.models import Principal
-
 
 # ---------------------------------------------------------------------------
 # Shared fixture helpers

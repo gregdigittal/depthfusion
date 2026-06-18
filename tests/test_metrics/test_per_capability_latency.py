@@ -288,7 +288,6 @@ class TestDictShapeContract:
 
         import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.mcp import server as srv_mod
-        import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.retrieval.hybrid import RecallPipeline
 
         PROBE_STUB = 999.0  # deliberately large so the merge is visible
