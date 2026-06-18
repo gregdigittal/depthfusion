@@ -182,6 +182,128 @@ class FileMetadataIndex:
             self._conn.commit()
         return len(missing)
 
+    def content_hash_changed(self, file_path: Path, data: bytes) -> bool:
+        """Return True when *data* has a different SHA-256 hash from the stored one.
+
+        Used by the atomic replace-on-change ingestion path (T-602): callers
+        compute the hash of new data and compare it against the persisted
+        ``content_hash`` column.  A ``True`` return means the document has
+        changed and should be re-ingested; ``False`` means it is identical and
+        the caller should skip re-ingestion (no-op).
+
+        Returns ``True`` when no stored entry exists (treat as "changed"), so
+        the document is ingested for the first time.
+
+        Args:
+            file_path: Path key to look up in the index.
+            data:      Raw bytes of the document to compare.
+
+        Returns:
+            ``True`` if the document should be (re-)ingested, ``False`` if it
+            is identical to the previously stored version.
+        """
+        new_hash = hashlib.sha256(data).hexdigest()
+        with self._lock:
+            assert self._conn is not None
+            cur = self._conn.execute(
+                "SELECT content_hash FROM file_metadata WHERE file_path = ?",
+                (str(file_path),),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return True  # no entry → treat as changed
+        stored_hash = row[0]
+        if stored_hash is None:
+            return True  # hash never computed → treat as changed
+        return stored_hash != new_hash
+
+    def upsert_with_hash(self, file_path: Path, data: bytes, **kwargs) -> bool:
+        """Atomically replace the index entry only when *data* differs.
+
+        Computes the SHA-256 of *data*, compares it with the stored
+        ``content_hash`` for *file_path*.  If they match, this is a no-op and
+        returns ``False``.  If they differ (or no entry exists), the record is
+        updated and ``True`` is returned.
+
+        This is the primary entry-point for the atomic replace-on-change
+        pattern (T-602): callers pass raw document bytes and additional metadata
+        keyword arguments (``project``, ``importance``, ``salience``,
+        ``pinned``).  The ``content_hash`` and file stat values are computed
+        and stored automatically.
+
+        **No TOCTOU window**: the hash comparison and the conditional DB write
+        are performed under the same lock acquisition.  A second thread calling
+        this method concurrently with the same *data* will either: (a) read the
+        already-updated row and short-circuit as a no-op, or (b) write the same
+        hash value (idempotent INSERT OR REPLACE), so the final state is
+        always consistent.
+
+        Args:
+            file_path: Path key for the index entry.
+            data:      Raw bytes whose hash determines whether to update.
+            **kwargs:  Forwarded to :meth:`update` (``project``, ``importance``,
+                       ``salience``, ``pinned``).
+
+        Returns:
+            ``True`` when the record was updated (data changed); ``False``
+            when the data was identical and no update was performed.
+        """
+        new_hash = hashlib.sha256(data).hexdigest()
+
+        try:
+            stat = file_path.stat()
+            mtime = stat.st_mtime
+            size = stat.st_size
+        except FileNotFoundError:
+            # Caller supplied bytes but file is not on disk (e.g. in-memory
+            # test): derive size from data, use 0 for mtime.
+            mtime = 0.0
+            size = len(data)
+
+        project = kwargs.get("project")
+        importance = kwargs.get("importance")
+        salience = kwargs.get("salience")
+        pinned = bool(kwargs.get("pinned", False))
+
+        # Hold the lock for the entire check-then-write sequence so that no
+        # other thread can interleave a read between the hash comparison and
+        # the INSERT OR REPLACE (eliminates the TOCTOU window).
+        with self._lock:
+            assert self._conn is not None
+
+            cur = self._conn.execute(
+                "SELECT content_hash FROM file_metadata WHERE file_path = ?",
+                (str(file_path),),
+            )
+            row = cur.fetchone()
+            stored_hash: str | None = row[0] if row is not None else None
+
+            if stored_hash is not None and stored_hash == new_hash:
+                return False  # identical — no-op
+
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO file_metadata
+                    (file_path, mtime, size, content_hash, project,
+                     importance, salience, pinned, indexed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(file_path),
+                    mtime,
+                    size,
+                    new_hash,
+                    project,
+                    importance,
+                    salience,
+                    1 if pinned else 0,
+                    time.time(),
+                ),
+            )
+            self._conn.commit()
+
+        return True  # updated
+
     def close(self) -> None:
         """Close the database connection."""
         with self._lock:

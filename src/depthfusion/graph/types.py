@@ -13,8 +13,11 @@ class Entity:
     """A named entity extracted from memory files.
 
     `type` is one of:
-      class | function | file | concept | project | decision | error_pattern | session
-    (`session` was added in v0.5 / S-50 for session-level PRECEDED_BY edges.)
+      class | function | file | concept | project | decision | error_pattern | session | event
+    (`session` was added in v0.5 / S-50 for session-level PRECEDED_BY edges.
+     `event` was added in v0.6 / S-141 for Event Graph Fabric agent-provenance nodes.
+     Event entities carry event-specific fields in metadata: event_type, agent_id,
+     project_slug, memory_refs, session_id.)
     """
     entity_id: str           # sha256(name + type + project)[:12]
     name: str                # e.g. "BM25", "TierManager", "PostCompact hook"
@@ -37,10 +40,16 @@ class Edge:
       * DEPENDS_ON      — A depends on B (semantic; Haiku-inferred)
       * REPLACES        — A replaces B (semantic; Haiku-inferred)
       * CONFLICTS_WITH  — A conflicts with B (semantic; Haiku-inferred)
-      * CO_WORKED_ON    — two ENTITIES appeared across sessions in a time window (TemporalLinker)
-      * PRECEDED_BY     — B PRECEDED_BY A: session A came before session B in
-                          wall-clock time, and shared vocabulary suggests
-                          continuity. Directed, session-level. v0.5 CM-4 / S-50.
+      * CO_WORKED_ON      — two ENTITIES appeared across sessions in a time window (TemporalLinker)
+      * PRECEDED_BY       — B PRECEDED_BY A: session A came before session B in
+                            wall-clock time, and shared vocabulary suggests
+                            continuity. Directed, session-level. v0.5 CM-4 / S-50.
+      * AGENT_PUBLISHED   — an agent published a memory (event → memory). v0.6 S-141.
+      * AGENT_RECEIVED    — an agent received/recalled a memory via the fabric
+                            (event → memory). v0.6 S-141.
+      * SAME_SESSION_AS   — two event entities share the same session_id. v0.6 S-141.
+      * DERIVED_FROM      — a memory was derived from (is downstream of) another
+                            memory via the fabric. v0.6 S-141.
     """
     edge_id: str
     source_id: str

@@ -64,6 +64,27 @@ class BM25:
         scores = [(i, self.score(query_terms, i)) for i in range(self.N)]
         return sorted(scores, key=lambda x: -x[1])
 
+    def rank_with_mask(
+        self,
+        query_terms: list[str],
+        doc_mask: "set[int] | frozenset[int]",
+    ) -> list[tuple[int, float]]:
+        """Return (doc_idx, bm25_score) for allowed indices only, sorted descending.
+
+        T-572: ACL pre-filter for BM25 retrieval.  *doc_mask* is the set of
+        document indices that the requesting principal is authorized to see.
+        Indices NOT in doc_mask are excluded before scoring.
+
+        This is semantically equivalent to rank_all() followed by filtering,
+        but avoids computing BM25 scores for unauthorized documents.
+        """
+        scores = [
+            (i, self.score(query_terms, i))
+            for i in range(self.N)
+            if i in doc_mask
+        ]
+        return sorted(scores, key=lambda x: -x[1])
+
     def score_with_field_boost(
         self,
         query_terms: list[str],
