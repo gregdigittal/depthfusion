@@ -1,0 +1,37 @@
+/* DepthFusion · Color tokens — "Darkroom Amber" */
+:root {
+  --bg:            #09070a;
+  --surface:       #120e0b;
+  --surface-2:     #1a140f;
+  --surface-3:     #251c14;
+  --border:        #3a2a1e;
+  --border-strong: #4a3527;
+
+  --text:      #efe6d6;
+  --text-2:    #c7b89a;
+  --muted:     #8a7a5f;
+  --faint:     #6f6047;
+  --faintest:  #5a4e3e;
+
+  --accent:        #ff8e3a;
+  --accent-hover:  #ffa45c;
+  --accent-soft:   #c2701f;
+  --accent-bright: #ffb877;
+  --on-accent:     #1a0d04;
+  --accent-wash:   rgba(255,142,58,.14);
+  --ember:         #c2410c;
+
+  --ok:        #c2701f;  --ok-soft:     #e0a35a;
+  --warn:      #d8934a;  --warn-soft:   #e8b272;
+  --danger:    #c2410c;  --danger-soft: #e8743f;
+  --cold:      #3e5b5e;  --cold-soft:   #6f9396;
+
+  --node-doc:      #ff8e3a;
+  --node-concept:  #c2701f;
+  --node-decision: #d8934a;
+
+  --cls-public:       #8a9a52;
+  --cls-internal:     #6f9396;
+  --cls-confidential: #d8934a;
+  --cls-restricted:   #c2410c;
+}

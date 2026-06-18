@@ -142,6 +142,7 @@ class TestSingleBackendResolution:
 
         import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
 
         # Patch _detect_current_backends to simulate the new S-83 hook:
         # when a fallback_chain dict is passed, populate it with [name]
@@ -325,6 +326,7 @@ class TestAggregatorReadsStructuredField:
 
         import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.mcp import server as srv_mod
+        import depthfusion.mcp.tools.recall as _recall_module
         from depthfusion.metrics.aggregator import MetricsAggregator
         from depthfusion.metrics.collector import MetricsCollector
 

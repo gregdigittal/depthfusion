@@ -1,0 +1,14 @@
+[Unit]
+Description=DepthFusion REST API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/gregmorris/projects/depthfusion
+EnvironmentFile=/home/gregmorris/.claude/depthfusion.env
+ExecStart=/home/gregmorris/projects/depthfusion/.venv/bin/python3.12 -m uvicorn depthfusion.api.rest:app --host 127.0.0.1 --port 7300 --log-level warning
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

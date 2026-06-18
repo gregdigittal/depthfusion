@@ -27,6 +27,7 @@ import pytest
 from depthfusion.ingest.pipeline import IngestPipeline
 from depthfusion.storage.file_index import FileMetadataIndex
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

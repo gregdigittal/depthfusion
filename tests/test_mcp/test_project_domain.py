@@ -21,6 +21,7 @@ from depthfusion.mcp.tools.project import (
     register_project,
 )
 
+
 # ── _tool_register_project ────────────────────────────────────────────────────
 
 def test_register_project_all_missing():

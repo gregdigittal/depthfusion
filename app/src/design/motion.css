@@ -1,0 +1,95 @@
+/* DepthFusion · Motion system — all animations gated behind prefers-reduced-motion */
+
+/* ── Keyframes ── */
+@keyframes df-breathe {
+  0%,100% { filter: drop-shadow(0 0 8px rgba(255,142,58,.35)); }
+  50%      { filter: drop-shadow(0 0 20px rgba(255,142,58,.7)) drop-shadow(0 0 40px rgba(255,142,58,.25)); }
+}
+
+@keyframes df-develop {
+  0%   { filter: blur(8px) brightness(.4) sepia(.8); opacity: .35; }
+  40%  { filter: blur(3px) brightness(.7) sepia(.4); opacity: .7; }
+  100% { filter: none; opacity: 1; }
+}
+
+@keyframes df-node-breath {
+  0%,100% { opacity: .7; r: 30; }
+  50%      { opacity: 1;  r: 33; }
+}
+
+@keyframes df-hub-breath {
+  0%,100% { opacity: .8; r: 7; }
+  50%      { opacity: 1;  r: 9; }
+}
+
+@keyframes df-spoke-draw {
+  from { stroke-dashoffset: 40; opacity: 0; }
+  to   { stroke-dashoffset: 0;  opacity: 1; }
+}
+
+@keyframes df-emerge {
+  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0);   filter: none; }
+}
+
+@keyframes df-pip {
+  0%,100% { opacity: .4; transform: scale(1); }
+  50%     { opacity: 1;  transform: scale(1.3); box-shadow: 0 0 8px var(--accent); }
+}
+
+@keyframes df-ripple {
+  from { transform: scale(1);   opacity: .7; }
+  to   { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes df-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+/* ── Logo animation vocabulary ── */
+@media (prefers-reduced-motion: no-preference) {
+  .df-logo--breathe .df-logo__mark {
+    animation: df-breathe var(--dur-breathe) ease-in-out infinite;
+  }
+  .df-logo--develop .df-logo__mark {
+    animation: df-develop var(--dur-develop) var(--ease-develop) forwards;
+  }
+  .df-logo--pulse .df-logo__node {
+    animation: df-node-breath var(--dur-node) ease-in-out infinite;
+  }
+  .df-logo--pulse .df-logo__hub {
+    animation: df-hub-breath var(--dur-node) ease-in-out infinite .5s;
+  }
+  .df-logo--draw .df-logo__spoke {
+    stroke-dasharray: 40;
+    stroke-dashoffset: 40;
+    animation: df-spoke-draw var(--dur-medium) var(--ease) forwards;
+  }
+
+  /* ── Content entrance ── */
+  .df-emerge {
+    animation: df-emerge var(--dur-medium) var(--ease) forwards;
+  }
+  .df-emerge-1 { animation-delay: 100ms; }
+  .df-emerge-2 { animation-delay: 200ms; }
+  .df-emerge-3 { animation-delay: 320ms; }
+
+  /* ── Skeleton shimmer ── */
+  .df-skel {
+    background: linear-gradient(
+      90deg,
+      var(--surface-2) 25%,
+      var(--surface-3) 50%,
+      var(--surface-2) 75%
+    );
+    background-size: 200% 100%;
+    animation: df-shimmer 1.6s linear infinite;
+  }
+}
+
+/* Reduced-motion: render resolved end-state, no animation */
+@media (prefers-reduced-motion: reduce) {
+  .df-emerge { opacity: 1; transform: none; filter: none; }
+  .df-skel   { background: var(--surface-2); }
+}

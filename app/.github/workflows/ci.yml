@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'v2-lane-*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  api-client-gen:
+    name: Generate and verify TypeScript API client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Python dependencies
+        working-directory: ${{ github.workspace }}
+        run: uv sync
+
+      - name: Start FastAPI server
+        working-directory: ${{ github.workspace }}
+        run: |
+          uv run python -m depthfusion.server &
+          # Wait for the server to be ready
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/openapi.json > /dev/null 2>&1; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server... attempt $i"
+            sleep 2
+          done
+          curl -sf http://localhost:8000/openapi.json > /dev/null || (echo "Server failed to start" && exit 1)
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Generate TypeScript API client
+        working-directory: app
+        run: npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-client.ts
+
+      - name: Verify generated client compiles
+        working-directory: app
+        run: npx tsc --noEmit
+
+      - name: Upload generated client as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-client-ts
+          path: app/src/lib/api-client.ts
+          retention-days: 7

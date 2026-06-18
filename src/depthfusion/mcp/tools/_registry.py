@@ -123,35 +123,6 @@ TOOLS: dict[str, str] = {
         "total_duration_ms, avg_duration_ms, total_tokens_in, total_tokens_out, "
         "total_cost_usd}], row_count: int}."
     ),
-    "query_model_performance": (
-        "Query learned model performance statistics (S-209). "
-        "Args: model_id (str, optional), task_category (str, optional), "
-        "window_days (int, optional, default 30; 0 means all-time). "
-        "Response: {stats: [{model_id, task_category, sample_count, quality_rate, "
-        "avg_cost_usd, avg_tokens_out, avg_duration_ms, cost_per_pass, "
-        "p50_duration_ms, p95_duration_ms, last_seen, confidence, source}]}."
-    ),
-    "record_model_telemetry": (
-        "Record a model telemetry event. Args: session_id, model_id, task_category "
-        "('code'|'review'|'planning'|'search'|'summarise'|'other'), tokens_in, tokens_out, "
-        "latency_ms, cost_usd, optional quality_verdict, project_slug, recorded_at. "
-        "Response: {id, deduplicated}."
-    ),
-    "recommend_model": (
-        "Recommend models ranked by quality-per-dollar with Fable-5 vendor isolation (S-210). "
-        "Args: task_category (str, required), context (str, optional), "
-        "exclude_vendors (str[], optional — Fable-5 isolation, validated against the known "
-        "provider enum: anthropic|openai|deepseek|google|cursor), "
-        "available_models (str[], optional — restrict candidates), "
-        "min_confidence (str, optional — 'low'|'medium'|'high'), "
-        "budget_usd (number, optional — per-task spend cap; only models with "
-        "avg_cost_usd <= budget_usd are considered, else the cheapest model is "
-        "returned with budget_warning=true). "
-        "Response: list of {model_id, provider, rank, quality_rate, avg_cost_usd, "
-        "cost_per_pass, confidence, rationale, source, sample_count, "
-        "budget_warning} (up to 5). "
-        "Unknown vendors are rejected with an error."
-    ),
     # E-35 S-111 session-start auto-recall seed; E-46 S-143 fabric_seed extension
     "depthfusion_session_seed": (
         "Run a seed recall query at session start and publish results as high-priority "
@@ -245,9 +216,6 @@ _TOOL_FLAGS: dict[str, str | None] = {
     # E-33 telemetry tools
     "depthfusion_record_telemetry": None,         # always enabled (E-33 S-106)
     "depthfusion_query_telemetry": None,          # always enabled (E-33 S-106)
-    "query_model_performance": None,
-    "record_model_telemetry": None,
-    "recommend_model": None,
     # E-35 S-111 session-start auto-recall seed
     "depthfusion_session_seed": None,             # always enabled (E-35 S-111)
     # S-147 project registry tools
@@ -544,72 +512,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         "required": [],
     },
-    "query_model_performance": {
-        "properties": {
-            "model_id": {"type": "string", "description": "Optional model ID filter"},
-            "task_category": {"type": "string", "description": "Optional task category filter"},
-            "window_days": {
-                "type": "integer",
-                "default": 30,
-                "description": "Window in days; 0 means all-time",
-            },
-        },
-        "required": [],
-    },
-    "record_model_telemetry": {
-        "properties": {
-            "session_id": {"type": "string"},
-            "model_id": {"type": "string"},
-            "task_category": {
-                "type": "string",
-                "enum": ["code", "review", "planning", "search", "summarise", "other"],
-            },
-            "tokens_in": {"type": "integer"},
-            "tokens_out": {"type": "integer"},
-            "latency_ms": {"type": "integer"},
-            "cost_usd": {"type": "number"},
-            "quality_verdict": {"type": "string", "enum": ["pass", "fail", "retry"]},
-            "project_slug": {"type": "string"},
-            "recorded_at": {"type": "string"},
-        },
-        "required": [
-            "session_id",
-            "model_id",
-            "task_category",
-            "tokens_in",
-            "tokens_out",
-            "latency_ms",
-            "cost_usd",
-        ],
-    },
-    "recommend_model": {
-        "properties": {
-            "task_category": {"type": "string"},
-            "context": {"type": "string"},
-            "exclude_vendors": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": ["anthropic", "openai", "deepseek", "google", "cursor"],
-                },
-                "description": "Fable-5 vendor isolation — providers to exclude",
-            },
-            "available_models": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "min_confidence": {
-                "type": "string",
-                "enum": ["low", "medium", "high"],
-            },
-            "budget_usd": {
-                "type": "number",
-                "minimum": 0,
-                "description": "Per-task spend cap; models with avg_cost_usd above this are excluded (S-211)",
-            },
-        },
-        "required": ["task_category"],
-    },
     # E-35 S-111 session-start auto-recall seed; E-46 S-143 fabric_seed extension
     "depthfusion_session_seed": {
         "properties": {
@@ -684,3 +586,5 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "required": [],
     },
 }
+
+

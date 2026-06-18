@@ -1,0 +1,24 @@
+/* DepthFusion · Spacing tokens — 4px grid, sharp radii */
+:root {
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  --shell-pad:   44px;
+  --section-pad: 110px;
+
+  --r-sm:     2px;
+  --r-md:     3px;
+  --r-lg:     5px;
+  --r-xl:     6px;
+  --r-btn:    2px;
+  --r-input:  3px;
+  --r-window: 7px;
+}

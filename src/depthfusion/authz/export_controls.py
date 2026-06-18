@@ -16,7 +16,6 @@ Design notes
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -24,39 +23,11 @@ from pydantic import BaseModel, Field
 
 
 class ClassificationLevel(str, Enum):
-    """Data classification ladder — maps directly to E-59 policy tiers.
-
-    The members are ordered from least- to most-sensitive. Use
-    :func:`classification_rank` to compare two levels; never compare the
-    string values directly (they are not lexicographically ordered).
-    """
+    """Data classification ladder — maps directly to E-59 policy tiers."""
     PUBLIC = "public"
     INTERNAL = "internal"
     CONFIDENTIAL = "confidential"
     RESTRICTED = "restricted"
-
-
-# Ordered ladder (ascending sensitivity). Index = rank.
-_CLASSIFICATION_ORDER: tuple[ClassificationLevel, ...] = (
-    ClassificationLevel.PUBLIC,
-    ClassificationLevel.INTERNAL,
-    ClassificationLevel.CONFIDENTIAL,
-    ClassificationLevel.RESTRICTED,
-)
-
-
-def classification_rank(level: ClassificationLevel) -> int:
-    """Return the ordinal rank of *level* on the sensitivity ladder.
-
-    PUBLIC=0, INTERNAL=1, CONFIDENTIAL=2, RESTRICTED=3. Higher = more
-    sensitive. Used for ``>=`` style threshold comparisons.
-    """
-    return _CLASSIFICATION_ORDER.index(level)
-
-
-# Threshold at/above which a per-principal provenance footer is appended to
-# copy-text payloads (T-665 / S-192).
-CONFIDENTIAL_FOOTER_THRESHOLD: ClassificationLevel = ClassificationLevel.CONFIDENTIAL
 
 
 class ExportFormat(str, Enum):
@@ -243,146 +214,4 @@ def check_export_allowed(
         reason="Export permitted under current policy.",
         watermark_required=policy.watermark_required,
         approval_required=False,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Provenance footer + watermark policy hooks (T-665 / S-192)
-#
-# When copy-text is allowed and a record's classification is at or above the
-# CONFIDENTIAL threshold, a per-principal provenance footer is appended to the
-# delivered text so any leaked copy can be traced back to the principal that
-# exported it. Below the threshold no footer is added (avoids noise on
-# public/internal copy operations).
-#
-# The watermark policy hook (``get_watermark_policy``) is consumed by the view
-# layer to decide how to render an on-screen / overlay watermark for a given
-# classification and principal.
-# ---------------------------------------------------------------------------
-
-
-class WatermarkPolicy(BaseModel):
-    """Active watermark policy for a (classification, principal) pair.
-
-    Returned by :func:`get_watermark_policy` and consumed by the view layer.
-
-    Attributes
-    ----------
-    enabled:
-        Whether a watermark should be rendered at all. True iff the underlying
-        :class:`ExportPolicy` requires a watermark for this classification.
-    principal_id:
-        The principal the watermark is scoped to (per-principal traceability).
-    classification:
-        The classification level this policy applies to.
-    label:
-        Short human-readable label rendered in the watermark overlay, e.g.
-        ``"CONFIDENTIAL — alice"``.
-    """
-    enabled: bool
-    principal_id: str
-    classification: ClassificationLevel
-    label: str
-
-    model_config = {"frozen": True}
-
-
-def get_watermark_policy(
-    classification: ClassificationLevel,
-    principal_id: str,
-    *,
-    matrix: Optional[ExportPolicyMatrix] = None,
-) -> WatermarkPolicy:
-    """Return the active watermark policy for a classification/principal.
-
-    This is the hook the view layer calls to decide whether (and how) to render
-    an overlay watermark. ``enabled`` mirrors the ``watermark_required`` flag of
-    the active :class:`ExportPolicy` for *classification*.
-
-    Parameters
-    ----------
-    classification:
-        Classification level of the record being viewed/exported.
-    principal_id:
-        Identifier of the principal the watermark is scoped to.
-    matrix:
-        Active policy matrix. Defaults to the canonical E-59 baseline.
-    """
-    if matrix is None:
-        matrix = ExportPolicyMatrix()
-    policy = matrix.get_policy(classification)
-    label = f"{classification.value.upper()} — {principal_id}"
-    return WatermarkPolicy(
-        enabled=policy.watermark_required,
-        principal_id=principal_id,
-        classification=classification,
-        label=label,
-    )
-
-
-def build_provenance_footer(
-    principal_id: str,
-    classification: ClassificationLevel,
-    *,
-    timestamp: Optional[datetime] = None,
-) -> str:
-    """Construct the per-principal provenance footer string.
-
-    Always returns a non-empty footer — the caller is responsible for deciding
-    whether to append it (use :func:`apply_provenance_footer`, which enforces
-    the classification threshold).
-    """
-    ts = (timestamp or datetime.now(timezone.utc)).isoformat()
-    return (
-        "\n\n-- "
-        f"Copied by {principal_id} | classification: {classification.value} "
-        f"| at {ts}"
-    )
-
-
-def apply_provenance_footer(
-    text: str,
-    principal_id: str,
-    classification: ClassificationLevel,
-    *,
-    copy_allowed: bool = True,
-    timestamp: Optional[datetime] = None,
-) -> str:
-    """Append a per-principal provenance footer to *text* when warranted.
-
-    The footer is appended ONLY when BOTH conditions hold:
-
-    1. ``copy_allowed`` is True (the copy-text action is permitted), and
-    2. ``classification`` is at or above the CONFIDENTIAL threshold.
-
-    Below the CONFIDENTIAL threshold (PUBLIC, INTERNAL) the text is returned
-    unchanged. If copy is not allowed the text is also returned unchanged
-    (no footer leaks onto a payload that should not have been copied).
-
-    Parameters
-    ----------
-    text:
-        The copy-text payload about to be delivered to the principal.
-    principal_id:
-        Identifier of the principal performing the copy.
-    classification:
-        Classification level of the source record.
-    copy_allowed:
-        Whether the copy-text action itself was permitted by policy.
-    timestamp:
-        Optional fixed timestamp (UTC). Defaults to ``datetime.now(timezone.utc)``.
-
-    Returns
-    -------
-    str
-        ``text`` with the provenance footer appended, or ``text`` unchanged.
-    """
-    if not copy_allowed:
-        return text
-    if classification_rank(classification) < classification_rank(
-        CONFIDENTIAL_FOOTER_THRESHOLD
-    ):
-        return text
-    return text + build_provenance_footer(
-        principal_id, classification, timestamp=timestamp
     )

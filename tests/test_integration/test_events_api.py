@@ -40,7 +40,6 @@ def client(tmp_path, monkeypatch):
     ev_mod._event_store = None
 
     from importlib import reload
-
     import depthfusion.api.rest as rest_module
     reload(rest_module)
     original = _install_fake_principal(rest_module.app)
@@ -182,7 +181,6 @@ def test_stream_with_mocked_backend(tmp_path, monkeypatch):
     ev_mod._event_store = EventStore(graph=graph, stream=stream)
 
     from importlib import reload
-
     import depthfusion.api.rest as rest_module
     reload(rest_module)
     _install_fake_principal(rest_module.app)
@@ -275,7 +273,6 @@ def _fabric_client(tmp_path, monkeypatch):
     ev_mod._event_store = None
 
     from importlib import reload
-
     import depthfusion.api.rest as rest_module
     reload(rest_module)
     _install_fake_principal(rest_module.app)
@@ -369,7 +366,6 @@ class TestAgentTrail:
         ev_mod._event_store = None
 
         from importlib import reload
-
         import depthfusion.api.rest as rest_module
         reload(rest_module)
 
@@ -451,7 +447,6 @@ class TestMemoryObservers:
         ev_mod._event_store = store
 
         from importlib import reload
-
         import depthfusion.api.rest as rest_module
         reload(rest_module)
         _install_fake_principal(rest_module.app)
@@ -499,7 +494,6 @@ class TestMemoryObservers:
         memory_id = r["memory_id"]
 
         from importlib import reload
-
         import depthfusion.api.rest as rest_module
         reload(rest_module)
 
@@ -560,7 +554,6 @@ class TestMemoryObservers:
 
         # Verify the /observers endpoint finds the memory entity
         from importlib import reload
-
         import depthfusion.api.rest as rest_module
         reload(rest_module)
         _install_fake_principal(rest_module.app)

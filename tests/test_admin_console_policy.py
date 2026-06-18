@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
 from depthfusion.identity.models import Principal
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

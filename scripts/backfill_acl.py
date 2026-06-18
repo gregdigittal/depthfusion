@@ -40,8 +40,10 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import os
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 

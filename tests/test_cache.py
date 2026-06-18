@@ -26,6 +26,7 @@ from depthfusion.cache import (
     CacheableRecord,
     CacheEntry,
     CacheManager,
+    EvictionPolicy,
     LeaseRow,
     TamperResult,
     compute_integrity_hmac,
@@ -33,6 +34,7 @@ from depthfusion.cache import (
     is_admissible,
     verify_on_open,
 )
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -198,7 +200,7 @@ class TestEncryption:
         mgr_a.put("secret.txt", "u", b"top secret")
 
         # Write a*'s encrypted blob into b's database directly
-        import contextlib
+        import sqlite3, contextlib
         with contextlib.closing(mgr_a._conn.cursor()) as cur:
             row = cur.execute(
                 "SELECT payload FROM cache_entries WHERE path='secret.txt'"

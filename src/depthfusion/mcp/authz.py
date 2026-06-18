@@ -54,7 +54,7 @@ def _open_acl_for(principal_id: str) -> list[str]:
 # Per-tool capability annotations (T-579)
 # ---------------------------------------------------------------------------
 
-# Capability required for each MCP tool.
+# Capability required for each of the 29 MCP tools.
 # Mapping: tool_name → Capability
 # Read tools use READ_OWN_RECORDS (minimum read privilege).
 # Write/capture tools use WRITE_OWN_RECORDS.
@@ -91,9 +91,6 @@ TOOL_CAPABILITIES: dict[str, Capability] = {
     # ── Telemetry ────────────────────────────────────────────────────────
     "depthfusion_record_telemetry": Capability.WRITE_OWN_RECORDS,
     "depthfusion_query_telemetry": Capability.VIEW_AUDIT_LOG,
-    "query_model_performance": Capability.READ_OWN_RECORDS,
-    "record_model_telemetry": Capability.WRITE_OWN_RECORDS,
-    "recommend_model": Capability.READ_OWN_RECORDS,
     # ── Project management ───────────────────────────────────────────────
     "depthfusion_register_project": Capability.MANAGE_SETTINGS,
     "depthfusion_list_projects": Capability.READ_OWN_RECORDS,

@@ -13,12 +13,18 @@ Test coverage:
 """
 from __future__ import annotations
 
+import asyncio
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 
 import depthfusion.mcp.http_server as _mod
+from depthfusion.identity.errors import TokenExpiredError
 from depthfusion.identity.models import Principal
 from depthfusion.mcp.http_server import app
+
 
 # ---------------------------------------------------------------------------
 # Helpers

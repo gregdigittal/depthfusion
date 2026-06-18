@@ -23,6 +23,7 @@ MANIFEST
 .coverage
 .coverage.*
 coverage.xml
+coverage.json
 htmlcov/
 .tox/
 
@@ -38,8 +39,12 @@ dmypy.json
 *.tmp
 *.log
 *.jsonl
-# Allow checked-in fixture files
+
+# Ingestion quarantine — runtime artifacts, not source
+data/quarantine/
+# Allow checked-in fixture files (top-level and subdirectories)
 !tests/fixtures/*.jsonl
+!tests/fixtures/ciqs_cat_d/*.jsonl
 
 # Telemetry runtime DB (model_telemetry.db) — root-level only
 /telemetry/
@@ -52,3 +57,21 @@ dmypy.json
 *.swo
 .DS_Store
 .worktrees/
+
+# Local tooling — Claude Code, agent-hub, Codex
+.claude/*
+!.claude/workflows/
+!.claude/v2-routing.yaml
+.pm/
+.rollback/
+.codex
+text.txt
+.remember/
+
+# Private VPS connect scripts (contain credentials — never commit)
+scripts/connect-vps.sh
+scripts/connect-vps.ps1
+
+# Test tenant environment files (contain secrets — never commit)
+tests/fixtures/entra/test-tenant.env
+!tests/fixtures/entra/test-tenant.env.example

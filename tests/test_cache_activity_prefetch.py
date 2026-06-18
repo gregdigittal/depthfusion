@@ -8,7 +8,10 @@ Covers:
 
 from __future__ import annotations
 
+import importlib
 import inspect
+import pkgutil
+import sys
 import time
 from pathlib import Path
 
@@ -16,6 +19,7 @@ import pytest
 
 from depthfusion.cache.activity_signals import (
     _PRIVACY_GUARD,
+    ActivitySignal,
     ActivitySignalStore,
     SignalKind,
 )
@@ -25,8 +29,10 @@ from depthfusion.cache.hit_rate import (
 )
 from depthfusion.cache.prefetch_scheduler import (
     PrefetchCandidate,
+    PrefetchPlan,
     PrefetchScheduler,
 )
+
 
 # ===========================================================================
 # T-652 — Local activity signal store + privacy guard

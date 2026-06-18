@@ -33,10 +33,12 @@ from depthfusion.authz.policy_engine import (
     PolicyDecision,
     PolicyEngine,
     _DecisionCache,
+    _make_cache_key,
     _resolve_capability,
 )
-from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
+from depthfusion.authz.roles import Capability, Role, ROLE_CAPABILITIES
 from depthfusion.identity.models import Principal
+
 
 # ---------------------------------------------------------------------------
 # Helpers

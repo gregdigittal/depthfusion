@@ -58,6 +58,7 @@ from depthfusion.identity.errors import TokenExpiredError, TokenInvalidError
 from depthfusion.identity.fastapi_deps import PrincipalDep
 from depthfusion.identity.models import Principal
 
+
 # ---------------------------------------------------------------------------
 # Stub validator — no network / JWKS / Azure dependency.
 # ---------------------------------------------------------------------------

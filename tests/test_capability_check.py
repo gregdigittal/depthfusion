@@ -16,8 +16,9 @@ from __future__ import annotations
 import pytest
 
 from depthfusion.authz.capability_check import AuthorizationError, require_capability
-from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
+from depthfusion.authz.roles import Capability, Role, ROLE_CAPABILITIES
 from depthfusion.identity.models import Principal
+
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from depthfusion.parsers import parse_conversation
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"

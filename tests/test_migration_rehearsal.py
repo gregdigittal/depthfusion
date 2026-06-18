@@ -7,9 +7,11 @@ All tests use fixture DBs — never the real production databases.
 from __future__ import annotations
 
 import contextlib
+import json
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -28,6 +30,7 @@ from rehearse_migration import (  # noqa: E402  (import after sys.path update)
     _table_has_column,
     run_rehearsal,
 )
+
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -300,6 +303,8 @@ class TestRunMigrations:
         self, rehearsal_dir: Path, tmp_path: Path
     ) -> None:
         """A non-benign OperationalError must cause _run_migrations to return False."""
+        import shutil as _shutil
+        from unittest.mock import patch
 
         # Inject a bad SQL file with a syntax error (message contains neither
         # "no such table", "duplicate column", nor "table already exists", so it

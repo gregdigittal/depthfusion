@@ -16,6 +16,7 @@ import pytest
 
 from depthfusion.authz.frontmatter import ACLFrontmatter, parse_acl, write_acl
 
+
 # ---------------------------------------------------------------------------
 # parse_acl tests
 # ---------------------------------------------------------------------------

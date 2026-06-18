@@ -20,12 +20,13 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -282,7 +283,6 @@ class TestAuditStoreQuery:
         expected_keys = {
             "id", "event_type", "actor_principal_id", "resource_id",
             "classification", "timestamp", "ip_addr", "success",
-            "device_id", "project_id",
         }
         assert set(row.keys()) == expected_keys
 
@@ -330,10 +330,10 @@ def _make_test_app(
 ) -> Any:
     """Build a minimal FastAPI app with the admin_console router for testing."""
     from fastapi import FastAPI
-
     from depthfusion.api.admin_console import router as admin_router
     from depthfusion.api.auth import _require_principal_dep
     from depthfusion.identity.models import Principal
+    from depthfusion.identity.device_registry import DeviceRegistry
 
     test_principal = Principal(
         principal_id="test-admin",
@@ -388,7 +388,7 @@ class TestAdminAuditEndpoint:
             patch.object(ac_mod, "_default_identity_db", return_value=identity_db),
         ):
             client = TestClient(app)
-            client.get("/v2/admin/audit")
+            resp = client.get("/v2/admin/audit")
 
         # viewer has VIEW_AUDIT_LOG per the capability matrix — check admin role
         # Actually let's test with no groups at all
@@ -404,6 +404,7 @@ class TestAdminAuditEndpoint:
     def test_since_filter(self, tmp_path: Path) -> None:
         """since= param filters by timestamp."""
         import datetime as dt
+        from urllib.parse import urlencode
 
         audit_db = tmp_path / "audit.db"
         identity_db = tmp_path / "identity.db"
@@ -530,7 +531,6 @@ class TestAdminDevicesEndpoint:
 class TestMetricsEndpoint:
     def test_metrics_returns_prometheus_format(self, tmp_path: Path) -> None:
         from fastapi import FastAPI
-
         from depthfusion.api.admin_console import router as admin_router
         from depthfusion.api.auth import _require_principal_dep
         from depthfusion.identity.models import Principal
@@ -557,7 +557,6 @@ class TestMetricsEndpoint:
 
     def test_metrics_content_type(self, tmp_path: Path) -> None:
         from fastapi import FastAPI
-
         from depthfusion.api.admin_console import router as admin_router
 
         app = FastAPI()
@@ -567,40 +566,3 @@ class TestMetricsEndpoint:
         resp = client.get("/metrics")
         assert resp.status_code == 200
         assert "text/plain" in resp.headers["content-type"]
-
-
-# ---------------------------------------------------------------------------
-# S-193 — export-class event types + device/project columns (T-667)
-# ---------------------------------------------------------------------------
-
-class TestExportAuditColumns:
-    def test_export_event_types_exist(self) -> None:
-        assert AuditEventType.EXPORT_ALLOWED.value == "export_allowed"
-        assert AuditEventType.EXPORT_DENIED.value == "export_denied"
-        assert AuditEventType.EXPORT_RATE_LIMITED.value == "export_rate_limited"
-        assert AuditEventType.ANOMALY_DETECTED.value == "anomaly_detected"
-
-    def test_device_and_project_persisted(self, store: AuditStore) -> None:
-        store.log(
-            AuditEvent(
-                event_type=AuditEventType.EXPORT_ALLOWED,
-                actor_principal_id="p-1",
-                resource_id="rec-1",
-                device_id="device-99",
-                project_id="proj-z",
-                success=True,
-            )
-        )
-        rows = store.query(actor="p-1")
-        assert len(rows) == 1
-        assert rows[0]["device_id"] == "device-99"
-        assert rows[0]["project_id"] == "proj-z"
-        assert rows[0]["event_type"] == "export_allowed"
-
-    def test_event_defaults_for_new_columns(self) -> None:
-        ev = AuditEvent(
-            event_type=AuditEventType.EXPORT_DENIED,
-            actor_principal_id="p-2",
-        )
-        assert ev.device_id == ""
-        assert ev.project_id == ""

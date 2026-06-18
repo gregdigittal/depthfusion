@@ -39,6 +39,7 @@ from depthfusion.ingest.pipeline import IngestPipeline
 from depthfusion.parsers.documents import get_registry
 from depthfusion.storage.file_index import FileMetadataIndex
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

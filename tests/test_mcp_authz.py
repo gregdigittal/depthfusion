@@ -2,7 +2,7 @@
 
 Tests
 -----
-For every one of the 32 MCP tools:
+For every one of the 29 MCP tools:
 
 * **allow** — a principal whose role grants the required capability calls the
   tool via ``_handle_tools_call`` and receives ``isError: False``.
@@ -15,7 +15,7 @@ Additional unit tests:
 
 * ``check_tool_access`` raises ``AuthorizationError`` for ``None`` principal.
 * ``check_tool_access`` raises ``ValueError`` for unknown tool names.
-* ``TOOL_CAPABILITIES`` covers all 32 tools registered in ``TOOLS``.
+* ``TOOL_CAPABILITIES`` covers all 29 tools registered in ``TOOLS``.
 * ``_process_request`` propagates the principal to ``_handle_tools_call``.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from depthfusion.authz.capability_check import AuthorizationError
-from depthfusion.authz.roles import ROLE_CAPABILITIES, Capability, Role
+from depthfusion.authz.roles import Capability, Role, ROLE_CAPABILITIES
 from depthfusion.identity.models import Principal
 from depthfusion.mcp.authz import (
     TOOL_CAPABILITIES,
@@ -34,10 +34,12 @@ from depthfusion.mcp.authz import (
     requires_capability,
 )
 from depthfusion.mcp.server import (
+    _dispatch_tool,
     _handle_tools_call,
     _process_request,
 )
 from depthfusion.mcp.tools._registry import TOOLS
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -111,10 +113,10 @@ class TestToolCapabilitiesCoverage:
             f"TOOL_CAPABILITIES references unknown tools: {extra}"
         )
 
-    def test_count_is_32(self) -> None:
-        """There must be exactly 32 tools annotated (+recommend_model, S-210)."""
-        assert len(TOOL_CAPABILITIES) == 32, (
-            f"Expected 32 annotated tools, got {len(TOOL_CAPABILITIES)}. "
+    def test_count_is_29(self) -> None:
+        """There must be exactly 29 tools annotated (spec from T-579)."""
+        assert len(TOOL_CAPABILITIES) == 29, (
+            f"Expected 29 annotated tools, got {len(TOOL_CAPABILITIES)}. "
             f"TOOL_CAPABILITIES keys: {list(TOOL_CAPABILITIES.keys())}"
         )
 

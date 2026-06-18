@@ -18,7 +18,6 @@ import logging
 import os
 import subprocess
 import threading
-from contextlib import closing
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -345,110 +344,9 @@ def _encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(str(offset).encode()).decode()
 
 
-@app.get("/api/telemetry/recent")
-async def get_recent_model_telemetry(
-    limit: int = Query(default=100, ge=1, le=1000),
-    project_slug: Optional[str] = Query(default=None),
-    model_id: Optional[str] = Query(default=None),
-    principal: Principal = Depends(require_principal),
-):
-    from depthfusion.telemetry import schema
-
-    schema.migrate()
-    where: list[str] = []
-    params: list[object] = []
-    if project_slug is not None:
-        where.append("project_slug = ?")
-        params.append(project_slug)
-    if model_id is not None:
-        where.append("model_id = ?")
-        params.append(model_id)
-
-    query = "SELECT * FROM model_telemetry"
-    if where:
-        query += " WHERE " + " AND ".join(where)
-    query += " ORDER BY recorded_at DESC LIMIT ?"
-    params.append(limit)
-
-    with closing(schema.connect()) as conn:
-        rows = conn.execute(query, params).fetchall()
-    return [dict(row) for row in rows]
-
-
 # ---------------------------------------------------------------------------
 # Telemetry query endpoints — /query/telemetry, /query/telemetry/aggregate
 # ---------------------------------------------------------------------------
-
-
-
-@app.get("/api/model-stats")
-async def get_model_stats_endpoint(
-    model_id: Optional[str] = Query(default=None, description="Filter to a specific model"),
-    task_category: Optional[str] = Query(default=None, description="Filter to a task category"),
-    window_days: int = Query(default=30, ge=0, description="Window in days; 0 means all-time"),
-    principal: Principal = Depends(require_principal),
-):
-    """Return learned per-model performance statistics (S-209)."""
-    from depthfusion.analytics.model_stats import get_model_stats
-    return {
-        "stats": get_model_stats(
-            model_id=model_id,
-            task_category=task_category,
-            window_days=window_days,
-        )
-    }
-
-
-class RecommendModelBody(BaseModel):
-    task_category: str
-    context: str = ""
-    exclude_vendors: list[str] = []
-    available_models: Optional[list[str]] = None
-    min_confidence: Optional[str] = None
-    budget_usd: Optional[float] = None
-
-
-@app.post("/api/recommend-model")
-async def recommend_model_endpoint(
-    body: RecommendModelBody,
-    principal: Principal = Depends(require_principal),
-):
-    """Return a ranked model recommendation with Fable-5 vendor isolation (S-210).
-
-    Mirrors the recommend_model MCP tool payload. Unknown vendors in
-    ``exclude_vendors`` are rejected with HTTP 400.
-    """
-    from depthfusion.mcp.tools.recommender_tools import recommend_model
-
-    result = recommend_model(body.model_dump())
-    if isinstance(result, dict) and "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.get("/api/budget-summary")
-async def get_budget_summary(
-    project_slug: Optional[str] = Query(default=None),
-    session_id: Optional[str] = Query(default=None),
-    cap_usd: Optional[float] = Query(default=None, ge=0),
-    baseline_model: str = Query(default="claude-sonnet-4"),
-    principal: Principal = Depends(require_principal),
-):
-    """Human-readable budget summary: actual spend vs recommendations (S-211, AC-6).
-
-    Returns total spend, remaining budget (when ``cap_usd`` is supplied), and a
-    per-model breakdown showing how each choice saved or cost versus the Sonnet
-    baseline.
-    """
-    from depthfusion.analytics.budget import build_budget_summary
-
-    return build_budget_summary(
-        cap_usd=cap_usd,
-        project_slug=project_slug,
-        session_id=session_id,
-        baseline_model=baseline_model,
-    )
-
 
 @app.get("/query/telemetry")
 async def get_telemetry(

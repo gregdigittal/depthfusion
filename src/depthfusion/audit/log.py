@@ -82,12 +82,6 @@ class AuditEventType(str, Enum):
 
     # Export
     EXPORT_STARTED = "export_started"
-    EXPORT_ALLOWED = "export_allowed"
-    EXPORT_DENIED = "export_denied"
-    EXPORT_RATE_LIMITED = "export_rate_limited"
-
-    # Anomaly detection
-    ANOMALY_DETECTED = "anomaly_detected"
 
     # Admin
     ADMIN_ACTION = "admin_action"
@@ -119,15 +113,7 @@ class AuditEvent:
         IP address of the request origin.  Empty string when unknown.
     success:
         ``True`` if the operation succeeded; ``False`` for denied/failed
-        attempts.  For export-class events this doubles as the *decision*:
-        ``True`` = allow, ``False`` = deny.
-    device_id:
-        Identifier of the device the action originated from.  Empty string
-        when unknown.  Required for export-class audit events (S-193 AC-1).
-    project_id:
-        Identifier of the project/scope the resource belongs to.  Used by the
-        cross-project-sweep anomaly heuristic (S-193 AC-2).  Empty when not
-        applicable.
+        attempts.
     """
 
     event_type: AuditEventType
@@ -137,8 +123,6 @@ class AuditEvent:
     timestamp: float = field(default_factory=time.time)
     ip_addr: str = ""
     success: bool = True
-    device_id: str = ""
-    project_id: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -154,9 +138,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
     classification     TEXT    NOT NULL DEFAULT "",
     timestamp          REAL    NOT NULL,
     ip_addr            TEXT    NOT NULL DEFAULT "",
-    success            INTEGER NOT NULL DEFAULT 1,
-    device_id          TEXT    NOT NULL DEFAULT "",
-    project_id         TEXT    NOT NULL DEFAULT ""
+    success            INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_audit_actor
     ON audit_events (actor_principal_id);
@@ -165,14 +147,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_event_type
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp
     ON audit_events (timestamp);
 """
-
-# Columns added after the original release.  ``_init_db`` applies these
-# idempotently via ALTER TABLE so databases created by older versions are
-# migrated forward without losing data.
-_MIGRATION_COLUMNS = (
-    ("device_id", 'TEXT NOT NULL DEFAULT ""'),
-    ("project_id", 'TEXT NOT NULL DEFAULT ""'),
-)
 
 
 # ---------------------------------------------------------------------------
@@ -212,17 +186,6 @@ class AuditStore:
         with self._lock:
             with closing(self._connect()) as conn:
                 conn.executescript(_DDL)
-                # Forward-migrate older databases that predate the
-                # device_id / project_id columns.
-                existing = {
-                    row["name"]
-                    for row in conn.execute("PRAGMA table_info(audit_events)").fetchall()
-                }
-                for col_name, col_def in _MIGRATION_COLUMNS:
-                    if col_name not in existing:
-                        conn.execute(
-                            f"ALTER TABLE audit_events ADD COLUMN {col_name} {col_def}"
-                        )
                 conn.commit()
 
     # ------------------------------------------------------------------
@@ -248,9 +211,8 @@ class AuditStore:
                     """
                     INSERT INTO audit_events
                         (event_type, actor_principal_id, resource_id,
-                         classification, timestamp, ip_addr, success,
-                         device_id, project_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         classification, timestamp, ip_addr, success)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(event.event_type.value),
@@ -260,8 +222,6 @@ class AuditStore:
                         event.timestamp,
                         event.ip_addr,
                         1 if event.success else 0,
-                        event.device_id,
-                        event.project_id,
                     ),
                 )
                 conn.commit()
@@ -316,8 +276,7 @@ class AuditStore:
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         sql = f"""
             SELECT id, event_type, actor_principal_id, resource_id,
-                   classification, timestamp, ip_addr, success,
-                   device_id, project_id
+                   classification, timestamp, ip_addr, success
             FROM   audit_events
             {where_clause}
             ORDER  BY timestamp ASC
@@ -339,8 +298,6 @@ class AuditStore:
                 "timestamp": row["timestamp"],
                 "ip_addr": row["ip_addr"],
                 "success": bool(row["success"]),
-                "device_id": row["device_id"],
-                "project_id": row["project_id"],
             }
             for row in rows
         ]

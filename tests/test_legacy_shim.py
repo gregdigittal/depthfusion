@@ -12,6 +12,7 @@ Covers:
 """
 from __future__ import annotations
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -19,6 +20,7 @@ import structlog.testing
 
 from depthfusion.identity.legacy_shim import LegacyPrincipal, LegacyTokenShim
 from depthfusion.identity.models import Principal
+
 
 # ---------------------------------------------------------------------------
 # Fixtures

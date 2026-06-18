@@ -27,14 +27,15 @@ so that FastAPI can resolve ``Annotated[Principal, Depends(...)]`` at route
 registration time.
 """
 import re
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
 
 from depthfusion.identity.fastapi_deps import PrincipalDep
 from depthfusion.identity.token_validator import TokenValidator
+
 
 # ---------------------------------------------------------------------------
 # Intentionally public routes — excluded from the auth-enforcement assertion
@@ -122,8 +123,8 @@ def test_every_protected_route_returns_401_without_auth(tmp_path, monkeypatch):
     # Set minimal env so the app can be imported without side-effects
     monkeypatch.setenv("DEPTHFUSION_MODE", "local")
 
-    from depthfusion.api.auth import _require_principal_dep
     from depthfusion.api.rest import app
+    from depthfusion.api.auth import _require_principal_dep
 
     stub = _stub_principal_dep()
 

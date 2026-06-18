@@ -31,9 +31,6 @@ from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
     _tool_recall_impl,
     _trim_to_sentence,
 )
-from depthfusion.mcp.tools.analytics_tools import (  # noqa: E402,F401
-    _tool_query_model_performance,
-)
 
 # Tool implementations — bridge domain
 from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
@@ -90,9 +87,6 @@ from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
     _tool_recall_feedback,
     _tool_retrieve_context,
 )
-from depthfusion.mcp.tools.recommender_tools import (  # noqa: E402,F401
-    _tool_recommend_model,
-)
 
 # Tool implementations — system domain
 from depthfusion.mcp.tools.system import (  # noqa: E402,F401
@@ -111,9 +105,6 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _tool_record_telemetry,
     _tool_surface_skill_candidates,
     _tool_tier_status,
-)
-from depthfusion.mcp.tools.telemetry_tools import (  # noqa: E402,F401
-    _tool_record_model_telemetry,
 )
 
 
@@ -253,12 +244,6 @@ def _dispatch_tool(
         return _tool_record_telemetry(arguments, config)
     elif tool_name == "depthfusion_query_telemetry":
         return _tool_query_telemetry(arguments, config)
-    elif tool_name == "query_model_performance":
-        return _tool_query_model_performance(arguments)
-    elif tool_name == "record_model_telemetry":
-        return _tool_record_model_telemetry(arguments)
-    elif tool_name == "recommend_model":
-        return _tool_recommend_model(arguments)
     elif tool_name == "depthfusion_session_seed":
         return _tool_session_seed(arguments)
     elif tool_name == "depthfusion_register_project":
@@ -430,3 +415,4 @@ def main() -> None:
             print(json.dumps(error_response), flush=True)
         except Exception as exc:
             logger.error(f"Unhandled error: {exc}")
+

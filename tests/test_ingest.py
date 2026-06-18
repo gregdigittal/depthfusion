@@ -29,6 +29,7 @@ from depthfusion.ingest import (
 )
 from depthfusion.ingest.parser import DocumentParser
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

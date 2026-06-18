@@ -1,0 +1,52 @@
+# V2 model-routing table — canonical source of truth for the consensus pipeline
+# Embedded by reference in .claude/workflows/v2-consensus-ticket.js (ROUTING const)
+# and scripts/v2/route.sh (--work-class lookup).
+#
+# Fields per work-class:
+#   dev:       model id (or alias) for the implementing agent
+#   reviewers: ordered list of reviewer agent ids (deepseek / gemini / codex-spot)
+#   tiebreak:  model id passed to mcp__depthfusion__depthfusion_bridge on split
+#
+# Model aliases resolve at runtime:
+#   opus      -> claude-opus-4-8
+#   codex     -> codex:codex-rescue (OpenAI Codex via agent registry)
+#   haiku     -> claude-haiku-4-5-20251001
+#   codex-spot -> codex:codex-rescue  (single-pass, no rebuttal round)
+
+work_classes:
+  security-critical:
+    dev: opus
+    reviewers:
+      - deepseek
+      - gemini
+    tiebreak: openai/gpt-4o
+
+  core-backend:
+    dev: codex
+    reviewers:
+      - deepseek
+    tiebreak: openai/gpt-4o
+
+  frontend:
+    dev: codex
+    reviewers:
+      - gemini
+    tiebreak: openai/gpt-4o
+
+  rust-core:
+    dev: codex
+    reviewers:
+      - deepseek
+      - gemini
+    tiebreak: openai/gpt-4o
+
+  tests-docs:
+    dev: haiku
+    reviewers:
+      - codex-spot
+    tiebreak: openai/gpt-4o
+
+defaults:
+  tiebreak: openai/gpt-4o
+  # Fallback if workClass is not in the table above.
+  fallback_work_class: core-backend

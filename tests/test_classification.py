@@ -14,9 +14,10 @@ from pathlib import Path
 import pytest
 
 from depthfusion.authz.classification import (
-    CLASSIFICATION_POLICY,
     ClassificationLevel,
+    HandlingRules,
     Role,
+    CLASSIFICATION_POLICY,
     get_handling_rules,
 )
 from depthfusion.authz.label_mapping import (
@@ -24,6 +25,7 @@ from depthfusion.authz.label_mapping import (
     LabelMappingConfigError,
     map_label,
 )
+
 
 # ===========================================================================
 # Classification taxonomy + handling rules (T-565 coverage / T-567 gate)

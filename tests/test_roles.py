@@ -17,12 +17,13 @@ from pathlib import Path
 import pytest
 
 from depthfusion.authz.roles import (
-    ROLE_CAPABILITIES,
     Capability,
     Role,
+    ROLE_CAPABILITIES,
     RoleStore,
     has_capability,
 )
+
 
 # ---------------------------------------------------------------------------
 # Capability enum
@@ -369,9 +370,9 @@ class TestMigrationFile:
 class TestModuleExports:
     def test_all_symbols_exported_from_authz(self) -> None:
         from depthfusion.authz import (  # noqa: F401
-            ROLE_CAPABILITIES,
             Capability,
             Role,
+            ROLE_CAPABILITIES,
             RoleStore,
             has_capability,
         )

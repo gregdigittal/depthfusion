@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -34,6 +35,7 @@ from cryptography.hazmat.primitives import hashes, serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import padding  # noqa: E402
 
 from depthfusion.identity import (  # noqa: E402
+    JwksCache,
     TokenValidator,
 )
 from depthfusion.identity.errors import (  # noqa: E402

@@ -4,12 +4,14 @@ from __future__ import annotations
 import json
 import socket
 import urllib.error
+from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from depthfusion.backends.base import BackendOverloadError, BackendTimeoutError, RateLimitError
 from depthfusion.backends.openrouter import OpenRouterBackend
+
 
 # ---------------------------------------------------------------------------
 # healthy() — construction-time gate
