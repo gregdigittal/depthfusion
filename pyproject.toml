@@ -118,6 +118,7 @@ dev = [
     "chromadb>=1.0,<2.0",   # graph/vector store tests (T-534 CI 80% floor)
     "hnswlib>=0.7",          # HNSW index tests (T-534 CI 80% floor)
     "pypdf>=3.0",            # optional PDF parser — imported by test_ingest_throughput.py
+    "cryptography>=48.0.1",  # token_validator.py direct import; not installed transitively by pip
 ]
 
 [project.scripts]
