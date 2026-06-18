@@ -3210,12 +3210,12 @@
 **Acceptance criteria:**
 - [x] AC-1: Synthetic corpus: 250k chunks, 50k documents, 500 principals, realistic ACL skew; load generator hits search/query/aggregate concurrently
 - [x] AC-2: SLOs verified: search P95 < 500ms on 10k records (Python layer); CI regression test in tests/test_performance.py
-- [ ] AC-3: Regression: benchmark runs in CI weekly; > 20% latency regression fails the build
+- [x] AC-3: Regression: benchmark runs in CI weekly; > 20% latency regression fails the build
 
 **Tasks:**
 - [x] T-677: Synthetic corpus + principal/ACL generator — Sonnet dev, DS rev
 - [x] T-678: Load harness + SLO assertions — tests/test_performance.py (p95<500ms on 10k records, median<100ms, index build<2s)
-- [ ] T-679: Weekly CI benchmark job + regression gate — Haiku dev, Sonnet rev
+- [x] T-679: Weekly CI benchmark job + regression gate — Haiku dev, Sonnet rev
 
 ### S-198: As a security owner, I want supply-chain + secret hygiene gates so that the dependency surface is controlled `P1` `S`
 

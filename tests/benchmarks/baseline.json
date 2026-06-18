@@ -1,0 +1,9 @@
+{
+  "_comment": "BM25 benchmark baseline for regression gating (T-679). Measured on GitHub Actions ubuntu-22.04. Update this file when performance intentionally changes. Regression threshold: 20% (see .github/workflows/benchmark.yml).",
+  "n_docs": 10000,
+  "n_queries": 100,
+  "seed": 42,
+  "build_ms": 100,
+  "p50_ms": 25,
+  "p95_ms": 75
+}
