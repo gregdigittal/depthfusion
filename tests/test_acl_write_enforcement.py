@@ -11,7 +11,6 @@ Stores covered:
 """
 from __future__ import annotations
 
-import json
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -19,11 +18,12 @@ from pathlib import Path
 
 import pytest
 
+from depthfusion.core.memory_object import MemoryObject, MemoryType
+
 # ---------------------------------------------------------------------------
 # MemoryStore
 # ---------------------------------------------------------------------------
 from depthfusion.storage.memory_store import MemoryStore
-from depthfusion.core.memory_object import MemoryObject, MemoryType
 
 
 def _make_memory(acl_allow=None, include_acl=True) -> MemoryObject:
@@ -79,8 +79,8 @@ class TestMemoryStoreACL:
 # ---------------------------------------------------------------------------
 # EventLog
 # ---------------------------------------------------------------------------
-from depthfusion.storage.event_log import EventLog
 from depthfusion.core.memory import MemoryEvent, MemoryEventType
+from depthfusion.storage.event_log import EventLog
 
 
 def _make_event(acl_allow=None, include_acl=True) -> MemoryEvent:
@@ -128,7 +128,7 @@ class TestEventLogACL:
 # GraphStore (JSONGraphStore and SQLiteGraphStore)
 # ---------------------------------------------------------------------------
 from depthfusion.graph.store import JSONGraphStore, SQLiteGraphStore
-from depthfusion.graph.types import Entity, Edge
+from depthfusion.graph.types import Edge, Entity
 
 
 def _make_entity(acl_allow=None, include_acl=True) -> Entity:

@@ -19,7 +19,6 @@ from depthfusion.analytics.aggregation import AggregationService
 from depthfusion.analytics.collector import AnalyticsCollector
 from depthfusion.analytics.router import analytics_router
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

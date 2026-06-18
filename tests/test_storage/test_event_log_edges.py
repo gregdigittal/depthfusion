@@ -1,8 +1,7 @@
 """EventLog edge cases — covers lines 24-32, 55, 62, 69, 71-72 in event_log.py."""
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from depthfusion.core.memory import MemoryEvent, MemoryEventType
 from depthfusion.storage.event_log import EventLog

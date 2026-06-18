@@ -107,6 +107,7 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",  # async test support for EventStore tests (E-46)
     "pytest-cov>=5.0",
+    "pytest-timeout>=2.3",   # --timeout flag used in nightly.yml and addopts
     "mypy>=1.0",
     "ruff>=0.4",
     "types-PyYAML>=6.0.0",  # mypy stubs for yaml (S-59 T-181)
@@ -116,6 +117,7 @@ dev = [
     "starlette>=1.3.1",      # CVE-2026-54282/54283: Host header + form DoS (Dependabot #35)
     "chromadb>=1.0,<2.0",   # graph/vector store tests (T-534 CI 80% floor)
     "hnswlib>=0.7",          # HNSW index tests (T-534 CI 80% floor)
+    "pypdf>=3.0",            # optional PDF parser — imported by test_ingest_throughput.py
 ]
 
 [project.scripts]
@@ -155,7 +157,13 @@ exclude = [
 select = ["E", "F", "W", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["E501"]   # test assertions and names are often verbose
+"tests/**" = ["E501"]                 # test assertions and names are often verbose
+"tests/test_acl_*.py" = ["E402"]      # conditional ACL imports must follow role-setup code
+"tests/test_role_admin.py" = ["E741"] # single-letter loop vars acceptable in test helpers
+"scripts/mlx-serve-direct.py" = ["E402"]        # socket import follows lazy-import guard
+"scripts/retrieval_benchmark.py" = ["E501"]     # benchmark markdown table rows are intentionally wide
+"src/depthfusion/analytics/model_stats.py" = ["E501"]   # _PRIOR_ROWS data table rows
+"src/depthfusion/mcp/tools/_registry.py" = ["E501"]     # JSON schema strings in registry
 
 [tool.uv]
 # Security floor pins — transitive deps with known CVEs; patched versions already

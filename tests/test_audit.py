@@ -20,13 +20,12 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from depthfusion.audit.log import AuditEvent, AuditEventType, AuditStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -331,10 +330,10 @@ def _make_test_app(
 ) -> Any:
     """Build a minimal FastAPI app with the admin_console router for testing."""
     from fastapi import FastAPI
+
     from depthfusion.api.admin_console import router as admin_router
     from depthfusion.api.auth import _require_principal_dep
     from depthfusion.identity.models import Principal
-    from depthfusion.identity.device_registry import DeviceRegistry
 
     test_principal = Principal(
         principal_id="test-admin",
@@ -389,7 +388,7 @@ class TestAdminAuditEndpoint:
             patch.object(ac_mod, "_default_identity_db", return_value=identity_db),
         ):
             client = TestClient(app)
-            resp = client.get("/v2/admin/audit")
+            client.get("/v2/admin/audit")
 
         # viewer has VIEW_AUDIT_LOG per the capability matrix — check admin role
         # Actually let's test with no groups at all
@@ -405,7 +404,6 @@ class TestAdminAuditEndpoint:
     def test_since_filter(self, tmp_path: Path) -> None:
         """since= param filters by timestamp."""
         import datetime as dt
-        from urllib.parse import urlencode
 
         audit_db = tmp_path / "audit.db"
         identity_db = tmp_path / "identity.db"
@@ -532,6 +530,7 @@ class TestAdminDevicesEndpoint:
 class TestMetricsEndpoint:
     def test_metrics_returns_prometheus_format(self, tmp_path: Path) -> None:
         from fastapi import FastAPI
+
         from depthfusion.api.admin_console import router as admin_router
         from depthfusion.api.auth import _require_principal_dep
         from depthfusion.identity.models import Principal
@@ -558,6 +557,7 @@ class TestMetricsEndpoint:
 
     def test_metrics_content_type(self, tmp_path: Path) -> None:
         from fastapi import FastAPI
+
         from depthfusion.api.admin_console import router as admin_router
 
         app = FastAPI()

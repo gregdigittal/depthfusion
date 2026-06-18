@@ -30,7 +30,6 @@ from depthfusion.analytics.model_stats import invalidate_stats_cache
 from depthfusion.analytics.recommender import recommend
 from depthfusion.mcp.tools.recommender_tools import recommend_model
 
-
 # ---------------------------------------------------------------------------
 # Helpers — isolated telemetry DB
 # ---------------------------------------------------------------------------

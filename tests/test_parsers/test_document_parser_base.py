@@ -10,8 +10,6 @@ Covers:
 """
 from __future__ import annotations
 
-import pytest
-
 from depthfusion.parsers.documents.base import (
     QuarantineEntry,
     QuarantineStore,
@@ -19,7 +17,6 @@ from depthfusion.parsers.documents.base import (
     get_quarantine_store,
     quarantine,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -1,8 +1,6 @@
 """Tests for the DocumentParser protocol and registry (T-590 / S-169 AC-1)."""
 from __future__ import annotations
 
-import pytest
-
 from depthfusion.parsers.documents import (
     DocumentParser,
     DocumentParserRegistry,
@@ -11,8 +9,6 @@ from depthfusion.parsers.documents import (
     get_quarantine,
     quarantine,
 )
-from depthfusion.parsers.documents.base import _quarantine_store
-
 
 # ---------------------------------------------------------------------------
 # Helpers

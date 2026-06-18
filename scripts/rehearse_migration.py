@@ -332,7 +332,7 @@ def run_rehearsal(
 
     # ── Step 4: Write report ─────────────────────────────────────────────────
     if not skip_report:
-        print(f"\n[4/4] Writing rehearsal report …")
+        print("\n[4/4] Writing rehearsal report …")
         output_dir.mkdir(parents=True, exist_ok=True)
         report_path = output_dir / f"migration-rehearsal-{date_stamp}.md"
 

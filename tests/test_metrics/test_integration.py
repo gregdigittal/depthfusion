@@ -73,8 +73,8 @@ class TestRecallQueryEmission:
         # Force the impl to raise.
         # After T-535a, _tool_recall in recall.py calls _tool_recall_impl
         # from its own namespace — patch there, not on server.
-        from depthfusion.mcp import server as srv_mod
         import depthfusion.mcp.tools.recall as _recall_module
+        from depthfusion.mcp import server as srv_mod
 
         def broken_impl(args):
             raise RuntimeError("simulated recall failure")
@@ -318,8 +318,8 @@ class TestReviewGateRegressions:
 
         # Force the impl to raise so event_subtype becomes "error".
         # After T-535a both symbols live in recall.py's namespace — patch there.
-        from depthfusion.mcp import server as srv_mod
         import depthfusion.mcp.tools.recall as _recall_module
+        from depthfusion.mcp import server as srv_mod
         monkeypatch.setattr(
             _recall_module, "_tool_recall_impl",
             lambda args: (_ for _ in ()).throw(RuntimeError("boom")),

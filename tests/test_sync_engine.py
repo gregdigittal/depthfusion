@@ -17,11 +17,16 @@ Key assertions:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
-from depthfusion.sync.engine import Record, SyncEngine, SyncResult, _classification_rank, _server_wins_on_acl
+from depthfusion.sync.engine import (
+    Record,
+    SyncEngine,
+    _classification_rank,
+    _server_wins_on_acl,
+)
 
 # ---------------------------------------------------------------------------
 # Minimal Principal stub (no OIDC / token stack)

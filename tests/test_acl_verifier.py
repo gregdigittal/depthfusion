@@ -21,7 +21,6 @@ import pytest
 
 from depthfusion.retrieval.acl_verifier import verify_acl
 
-
 # ---------------------------------------------------------------------------
 # Minimal Principal stub
 # ---------------------------------------------------------------------------

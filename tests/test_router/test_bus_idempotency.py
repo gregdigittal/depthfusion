@@ -374,8 +374,8 @@ class TestMcpPublishContextToolShape:
     """
 
     def test_tool_returns_published_item_id_deduped_keys(self, tmp_path):
-        from depthfusion.mcp import server as mcp_server
         import depthfusion.mcp.tools.capture as _capture_module
+        from depthfusion.mcp import server as mcp_server
 
         bus = FileBus(bus_dir=tmp_path)
         # _tool_publish_context lives in capture.py and calls _get_context_bus
@@ -400,8 +400,8 @@ class TestMcpPublishContextToolShape:
         assert result["deduped"] is False
 
     def test_tool_dedup_response_returns_original_item_id(self, tmp_path):
-        from depthfusion.mcp import server as mcp_server
         import depthfusion.mcp.tools.capture as _capture_module
+        from depthfusion.mcp import server as mcp_server
 
         bus = FileBus(bus_dir=tmp_path)
         with patch.object(_capture_module, "_get_context_bus", return_value=bus):

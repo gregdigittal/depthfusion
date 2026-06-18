@@ -1,4 +1,13 @@
 """DepthFusion V2 Authorization — ACL enforcement, frontmatter parsing, RBAC, export controls."""
+from depthfusion.authz.export_audit import (
+    AlertChannel,
+    AnomalyAlert,
+    AnomalyKind,
+    ExportAnomalyDetector,
+    ExportAuditResult,
+    ExportRateLimiter,
+    audit_export_action,
+)
 from depthfusion.authz.export_controls import (
     CONFIDENTIAL_FOOTER_THRESHOLD,
     ClassificationLevel,
@@ -12,16 +21,6 @@ from depthfusion.authz.export_controls import (
     check_export_allowed,
     classification_rank,
     get_watermark_policy,
-)
-
-from depthfusion.authz.export_audit import (
-    AlertChannel,
-    AnomalyAlert,
-    AnomalyKind,
-    ExportAnomalyDetector,
-    ExportAuditResult,
-    ExportRateLimiter,
-    audit_export_action,
 )
 
 from .capability_check import AuthorizationError, require_capability

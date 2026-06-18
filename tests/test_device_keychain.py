@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -42,7 +41,6 @@ from depthfusion.identity.device_keychain import (  # noqa: E402
     KeychainNotAvailableError,
     _KeychainBackend,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

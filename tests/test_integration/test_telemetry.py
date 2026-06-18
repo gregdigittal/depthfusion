@@ -321,14 +321,15 @@ def telemetry_client(tmp_path, monkeypatch):
     are absent (which they always are in the test environment).
     """
     from fastapi.testclient import TestClient
+
     from depthfusion.identity.models import Principal
 
     monkeypatch.setenv("DEPTHFUSION_TELEMETRY_DB", str(tmp_path / "tel.db"))
     monkeypatch.delenv("DEPTHFUSION_API_PUBLIC", raising=False)
     monkeypatch.delenv("DEPTHFUSION_QUERY_API_KEY", raising=False)
 
-    from depthfusion.api.rest import app
     from depthfusion.api.auth import _require_principal_dep
+    from depthfusion.api.rest import app
 
     fake_principal = Principal(principal_id="test-user", upn="test@test.local")
 

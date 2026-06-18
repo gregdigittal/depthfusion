@@ -28,12 +28,10 @@ from fastapi.testclient import TestClient
 from depthfusion.analytics.budget import (
     Budget,
     budget_alert,
-    build_budget_summary,
     log_dispatch_outcome,
     select_model_for_task,
 )
 from depthfusion.analytics.model_stats import get_model_stats, invalidate_stats_cache
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

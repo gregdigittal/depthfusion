@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
-from depthfusion.mcp import server as mcp_server
 import depthfusion.mcp.tools._state as _state
+from depthfusion.mcp import server as mcp_server
 
 
 @pytest.fixture(autouse=True)

@@ -31,6 +31,9 @@ from depthfusion.mcp.tools._shared import (  # noqa: E402,F401
     _tool_recall_impl,
     _trim_to_sentence,
 )
+from depthfusion.mcp.tools.analytics_tools import (  # noqa: E402,F401
+    _tool_query_model_performance,
+)
 
 # Tool implementations — bridge domain
 from depthfusion.mcp.tools.bridge import (  # noqa: E402,F401
@@ -87,6 +90,9 @@ from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
     _tool_recall_feedback,
     _tool_retrieve_context,
 )
+from depthfusion.mcp.tools.recommender_tools import (  # noqa: E402,F401
+    _tool_recommend_model,
+)
 
 # Tool implementations — system domain
 from depthfusion.mcp.tools.system import (  # noqa: E402,F401
@@ -106,14 +112,8 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _tool_surface_skill_candidates,
     _tool_tier_status,
 )
-from depthfusion.mcp.tools.analytics_tools import (  # noqa: E402,F401
-    _tool_query_model_performance,
-)
 from depthfusion.mcp.tools.telemetry_tools import (  # noqa: E402,F401
     _tool_record_model_telemetry,
-)
-from depthfusion.mcp.tools.recommender_tools import (  # noqa: E402,F401
-    _tool_recommend_model,
 )
 
 

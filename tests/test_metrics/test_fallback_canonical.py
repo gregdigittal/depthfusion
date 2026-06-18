@@ -140,8 +140,8 @@ class TestSingleBackendResolution:
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         _minimal_corpus(tmp_path)
 
-        from depthfusion.mcp import server as srv_mod
         import depthfusion.mcp.tools.recall as _recall_module
+        from depthfusion.mcp import server as srv_mod
 
         # Patch _detect_current_backends to simulate the new S-83 hook:
         # when a fallback_chain dict is passed, populate it with [name]
@@ -323,8 +323,8 @@ class TestAggregatorReadsStructuredField:
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         _minimal_corpus(tmp_path)
 
-        from depthfusion.mcp import server as srv_mod
         import depthfusion.mcp.tools.recall as _recall_module
+        from depthfusion.mcp import server as srv_mod
         from depthfusion.metrics.aggregator import MetricsAggregator
         from depthfusion.metrics.collector import MetricsCollector
 

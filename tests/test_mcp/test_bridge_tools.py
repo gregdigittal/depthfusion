@@ -4,11 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 import depthfusion.mcp.server as server
 import depthfusion.mcp.tools.bridge as _bridge_module
-
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "chatgpt-sample.json"
 

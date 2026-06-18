@@ -32,12 +32,9 @@ variables are absent.
 """
 from __future__ import annotations
 
-import asyncio
-import json
 import os
-import uuid
 from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest

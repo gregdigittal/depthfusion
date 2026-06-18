@@ -43,7 +43,6 @@ import json
 import os
 import uuid
 from typing import Generator
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -64,7 +63,6 @@ from depthfusion.core.config import DepthFusionConfig  # noqa: E402
 from depthfusion.identity.models import Principal  # noqa: E402
 from depthfusion.mcp.http_server import _MCP_SESSIONS, app  # noqa: E402
 from depthfusion.mcp.server import _process_request  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
