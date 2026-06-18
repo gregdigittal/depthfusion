@@ -2945,7 +2945,7 @@
 
 ---
 
-## E-55: Business Intelligence Layer [backlog]
+## E-55: Business Intelligence Layer [done]
 
 > Document entities in the knowledge graph; aggregate + faceted endpoints over documents. Depends on E-53 + E-54. **Lane B, Phase 3.**
 
@@ -3070,17 +3070,17 @@
 
 ---
 
-## E-58: Intelligent Offline Cache — ML-Driven, Encrypted [backlog]
+## E-58: Intelligent Offline Cache — ML-Driven, Encrypted [done]
 
 > An encrypted local cache (SQLCipher, key in OS keychain) that holds a *relevant subset* of the corpus — selected by a lightweight relevance model trained on the user's local work patterns — never the whole database. Cache contents are bounded by the user's rights and a classification ceiling, and leases expire so a revoked user's cache dies on schedule. **Lane C, Phase 3.**
 
 ### S-188: As the app, I want an encrypted local cache store so that offline data is unreadable outside the signed-in session `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: SQLCipher database in Rust core; key generated per device, wrapped by OS keychain (Keychain/DPAPI), never written to disk in plaintext
-- [ ] AC-2: Cache schema mirrors record + chunk + embedding subset with ACL + classification + lease columns
-- [ ] AC-3: Tamper check on open (HMAC over schema + lease table); failure → cache wipe + re-sync
-- [ ] AC-4: Only records where the principal is in `acl_allow` AND classification ≤ user's offline ceiling are ever cached
+- [x] AC-1: SQLCipher database in Rust core; key generated per device, wrapped by OS keychain (Keychain/DPAPI), never written to disk in plaintext
+- [x] AC-2: Cache schema mirrors record + chunk + embedding subset with ACL + classification + lease columns
+- [x] AC-3: Tamper check on open (HMAC over schema + lease table); failure → cache wipe + re-sync
+- [x] AC-4: Only records where the principal is in `acl_allow` AND classification ≤ user's offline ceiling are ever cached
 
 **Tasks:**
 - [x] T-649: SQLCipher integration in Rust core + key wrap via keychain — Opus dev, DS+GM rev
@@ -3090,11 +3090,11 @@
 ### S-189: As a user, I want the cache to learn what I work on so that offline mode has what I need without holding everything `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Local signal collection (queries, opened docs, projects, entities, recency) stored on-device only — never uploaded
-- [ ] AC-2: Relevance scorer ranks candidate records: embedding similarity to the user's activity centroid + recency + access frequency (logistic blend); runs on-device (Ollama/MLX embeddings or cached server embeddings)
-- [ ] AC-3: Cache fill respects a configurable size budget (default 2 GB) with score-ordered eviction; hit-rate telemetry (local) shows ≥ 80% offline hit rate in dogfood
-- [ ] AC-4: Pre-fetch runs opportunistically when online + idle; user can pin projects/folders to force-include
-- [ ] AC-5: Cold-start: first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure
+- [x] AC-1: Local signal collection (queries, opened docs, projects, entities, recency) stored on-device only — never uploaded
+- [x] AC-2: Relevance scorer ranks candidate records: embedding similarity to the user's activity centroid + recency + access frequency (logistic blend); runs on-device (Ollama/MLX embeddings or cached server embeddings)
+- [x] AC-3: Cache fill respects a configurable size budget (default 2 GB) with score-ordered eviction; hit-rate telemetry (local) shows ≥ 80% offline hit rate in dogfood
+- [x] AC-4: Pre-fetch runs opportunistically when online + idle; user can pin projects/folders to force-include
+- [x] AC-5: Cold-start: first fill is deterministic — pinned items + recency-ordered records within budget; relevance scorer activates after ~50 activity signals; deterministic fill remains the permanent fallback on scorer failure
 
 **Tasks:**
 - [x] T-652: Local activity signal store + privacy guard (on-device only) — Sonnet dev, DS rev
@@ -3106,10 +3106,10 @@
 ### S-190: As a security owner, I want cache leases + remote revocation so that a departed employee's offline data expires `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Every cached record carries a lease (default 7 days, classification-scaled: confidential = 48h); expired leases purge on app start and on a background timer — online or offline
-- [ ] AC-2: Lease renewal piggybacks on any authenticated server contact; renewal denied → purge
-- [ ] AC-3: Admin device-revoke (S-158) → next contact returns revoke signal → full cache + token wipe; offline devices die at lease expiry regardless
-- [ ] AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator
+- [x] AC-1: Every cached record carries a lease (default 7 days, classification-scaled: confidential = 48h); expired leases purge on app start and on a background timer — online or offline
+- [x] AC-2: Lease renewal piggybacks on any authenticated server contact; renewal denied → purge
+- [x] AC-3: Admin device-revoke (S-158) → next contact returns revoke signal → full cache + token wipe; offline devices die at lease expiry regardless
+- [x] AC-4: Offline search transparently runs over cache (BM25 + vector over cached embeddings) with a visible "offline subset" indicator
 
 **Tasks:**
 - [x] T-657: Lease issuance/renewal protocol + classification scaling — Opus dev, DS rev
@@ -3119,7 +3119,7 @@
 
 ---
 
-## E-59: Export Controls & IP Protection [backlog]
+## E-59: Export Controls & IP Protection [done]
 
 > Rights-based limits on what leaves the app: copy, export, download, and print are policy decisions, not UI conveniences. Enforced in the Rust core (webview never holds exportable originals), fully audited, with sensible friction — protect IP without making daily work miserable. **Lane C, Phase 3.**
 
@@ -3128,7 +3128,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Policy matrix (role × classification → view / copy-text / export-extract / download-original / print) stored server-side, versioned, admin-editable
 - [x] AC-2: Defaults: viewer = view only; analyst = +copy/export ≤ internal; contributor = +download ≤ confidential; admin = all (still audited)
-- [ ] AC-3: Policy evaluated via E-50 decision point; offline evaluation uses the signed policy snapshot in the cache
+- [x] AC-3: Policy evaluated via E-50 decision point; offline evaluation uses the signed policy snapshot in the cache
 
 **Tasks:**
 - [x] T-661: Export policy schema + admin CRUD + versioning — Sonnet dev, DS rev
@@ -3137,16 +3137,16 @@
 ### S-192: As the app, I want enforcement in the Rust core so that export limits can't be bypassed from the webview `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Clipboard, file-save, and print actions are Rust-mediated IPC commands that consult policy; denied actions return a typed denial the UI explains
-- [ ] AC-2: Original files stream through the Rust core to disk only on allow — no blob URLs of originals in the webview
-- [ ] AC-3: Copy-text allowed content gets per-principal provenance footer appended when classification ≥ confidential
-- [ ] AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)
+- [x] AC-1: Clipboard, file-save, and print actions are Rust-mediated IPC commands that consult policy; denied actions return a typed denial the UI explains
+- [x] AC-2: Original files stream through the Rust core to disk only on allow — no blob URLs of originals in the webview
+- [x] AC-3: Copy-text allowed content gets per-principal provenance footer appended when classification ≥ confidential
+- [x] AC-4: Red-team checklist passes: devtools, drag-out, print-to-PDF, screenshot of watermarked view (accepted residual risk, documented)
 
 **Tasks:**
 - [x] T-663: Policy-gated clipboard/save/print IPC commands — Opus dev, DS+GM rev
 - [x] T-664: Original-file streaming gate in Rust core — Opus dev, DS rev
 - [x] T-665: Provenance footer + watermark policy hooks — Sonnet dev, Gemini rev
-- [ ] T-666: Red-team bypass checklist execution + residual-risk doc — Opus dev, DS rev
+- [x] T-666: Red-team bypass checklist execution + residual-risk doc — Opus dev, DS rev
 
 ### S-193: As a security owner, I want export auditing + anomaly flags so that bulk extraction attempts are visible `P1` `M`
 
@@ -3241,7 +3241,7 @@
 
 ---
 
-## E-62: Documentation Refresh & V2 Enablement [backlog]
+## E-62: Documentation Refresh & V2 Enablement [done]
 
 > Close the documentation gap found in the V1 review and ship V2-grade docs: accurate capability reference, security model, admin runbooks, UI user guide, and updated API/BI docs. Docs are merge-gating, not an afterthought. **Lane D, Phase 4.**
 
@@ -3330,7 +3330,7 @@
 
 ---
 
-## E-64: HTTP MCP Server GA + Model Performance Intelligence [backlog]
+## E-64: HTTP MCP Server GA + Model Performance Intelligence [done]
 
 > Two tightly coupled capabilities that together turn DepthFusion into the intelligent routing layer for the entire agent-hub. First: make the HTTP MCP server the canonical integration point for all Claude Code sessions (replacing the current Python subprocess hooks). Second: build model performance telemetry and a budget-aware recommendation API so that agent-ops auto mode can propose the best model for each task given learned experience and a spend budget.
 >
