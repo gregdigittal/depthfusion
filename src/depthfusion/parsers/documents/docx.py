@@ -9,10 +9,18 @@ returns an empty list for every call rather than raising.
 from __future__ import annotations
 
 import io
+import logging
 import re
 from datetime import datetime, timezone
 
 from depthfusion.parsers.documents.base import DocumentParser, DocumentRecord  # noqa: F401
+
+_log = logging.getLogger(__name__)
+
+# python-docx deserialises the entire ZIP into memory.  Files above this limit
+# are rejected early rather than blocking the event loop for tens of seconds.
+# Pilot feedback: a 48 MB deck caused a 12 s parse stall (FBM-2, 2026-06-19).
+_MAX_DOCX_BYTES = 10 * 1024 * 1024  # 10 MB
 
 try:
     from docx import Document
@@ -38,6 +46,16 @@ class DocxParser:
         list if python-docx is unavailable, *data* is empty, or any error occurs.
         """
         if not _docx_available or not data:
+            return []
+
+        if len(data) > _MAX_DOCX_BYTES:
+            _log.warning(
+                "docx parser: %s exceeds %d bytes (%d); skipping to avoid blocking parse "
+                "(raise depthfusion.parsers.documents.docx._MAX_DOCX_BYTES to increase limit)",
+                source_id,
+                _MAX_DOCX_BYTES,
+                len(data),
+            )
             return []
 
         try:

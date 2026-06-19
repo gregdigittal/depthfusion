@@ -15,6 +15,7 @@
   - For GPU-accelerated embedding (optional): RTX 3090 / A4000 or equivalent; 24 GB VRAM for Gemma 7B
 - [ ] **Mac client:** macOS 13 (Ventura) or later; Apple Silicon (M1/M2/M3) or Intel
 - [ ] **Windows client:** Windows 10 22H2 or later (x64)
+  - **Windows Defender Firewall:** Before first launch, allow `DepthFusion.exe` through Windows Defender Firewall, or add an inbound rule for TCP port 8400 on `127.0.0.1`. The PKCE authorization-code flow redirects to `http://localhost:8400/callback`; Windows Firewall blocks this by default. Without the exception the sign-in callback silently fails.
 - [ ] **Network:** Clients reach VPS over Tailscale (recommended) or a TLS-terminated reverse proxy
 - [ ] **Disk:** ≥ 50 GB free on VPS for corpus storage + ChromaDB indices
 

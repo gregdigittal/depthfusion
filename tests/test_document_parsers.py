@@ -357,6 +357,17 @@ class TestDocxParser:
         assert len(records) >= 1
         assert any(r.content and "plain paragraph" in r.content for r in records)
 
+    def test_oversized_docx_returns_empty_and_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging
+
+        from depthfusion.parsers.documents.docx import _MAX_DOCX_BYTES
+
+        oversized = b"x" * (_MAX_DOCX_BYTES + 1)
+        with caplog.at_level(logging.WARNING, logger="depthfusion.parsers.documents.docx"):
+            result = DocxParser().parse("huge.docx", oversized)
+        assert result == []
+        assert any("huge.docx" in r.message for r in caplog.records)
+
 
 class TestPdfParser:
     def test_empty_bytes_returns_empty_list(self) -> None:
