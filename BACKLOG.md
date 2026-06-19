@@ -2821,9 +2821,9 @@
 ### S-166: As the platform, I want a sync protocol design agreed before build so that lanes A and D don't diverge `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Design doc covers: change-log cursor model, record envelopes (payload + ACL + classification), tombstones, conflict policy, transport (HTTPS via VPS hub)
-- [ ] AC-2: Reviewed by both review models; consensus or DECISION record
-- [ ] AC-3: Explicit non-goals stated (no peer-to-peer in V2; hub-and-spoke only)
+- [x] AC-1: Design doc covers: change-log cursor model, record envelopes (payload + ACL + classification), tombstones, conflict policy, transport (HTTPS via VPS hub)
+- [x] AC-2: Reviewed by both review models; consensus or DECISION record
+- [x] AC-3: Explicit non-goals stated (no peer-to-peer in V2; hub-and-spoke only)
 
 **Tasks:**
 - [x] T-581: Sync v2 design doc + sequence diagrams — Opus dev, DS+GM rev
@@ -2832,10 +2832,10 @@
 ### S-167: As an enrolled device, I want delta sync trimmed to my principal so that I never receive records I cannot see `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `/v2/sync/pull?cursor=` returns only principal-visible deltas; server-side trim via PolicyEngine
-- [ ] AC-2: `/v2/sync/push` validates ACL stamps + capability to write; rejects unlabeled records
-- [ ] AC-3: ACL changes propagate: records a principal loses access to are tombstoned on that device at next sync
-- [ ] AC-4: Resumable after interruption; idempotent batches
+- [x] AC-1: `/v2/sync/pull?cursor=` returns only principal-visible deltas; server-side trim via PolicyEngine
+- [x] AC-2: `/v2/sync/push` validates ACL stamps + capability to write; rejects unlabeled records
+- [x] AC-3: ACL changes propagate: records a principal loses access to are tombstoned on that device at next sync
+- [x] AC-4: Resumable after interruption; idempotent batches
 
 **Tasks:**
 - [x] T-583: Change-log table + cursor API on the hub — Sonnet dev, DS rev
@@ -2847,7 +2847,7 @@
 ### S-168: As an operator, I want `sync.sh` retired gracefully so that no machine silently keeps wholesale replication alive `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `sync.sh` prints a deprecation error and exits non-zero in V2; gated at G1
+- [x] AC-1: `sync.sh` prints a deprecation error and exits non-zero in V2; gated at G1
 
 **Tasks:**
 - [x] T-588: Deprecation gate in `sync.sh` + audited override — Ollama dev, Sonnet rev
@@ -3026,7 +3026,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Search-as-you-type with debounce; facets: source, type, classification, project, date; keyboard-first navigation
 - [x] AC-2: Results show snippet, source badge, classification chip, and citation locator (page/slide/heading)
-- [ ] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
+- [x] AC-3: P95 round-trip < 400ms online against VPS over Tailscale; offline falls back to cache (E-58)
 
 **Tasks:**
 - [x] T-637: Search screen + facet components — Sonnet dev, Gemini rev

@@ -256,6 +256,24 @@ class TestSyncPush:
         result = engine.sync_push(alice, [r])
         assert r.record_id in result.accepted
 
+    def test_push_rejects_unlabeled_record(
+        self, engine: SyncEngine, alice: _Principal
+    ) -> None:
+        """AC-2: a record with an empty acl_allow (unlabeled) must be rejected.
+
+        An unlabeled record has no principal listed, so the pushing principal
+        is — by definition — not in acl_allow. The push must be denied and the
+        record must NOT be persisted.
+        """
+        r = _record("alice", acl_allow=[])  # no label at all
+        result = engine.sync_push(alice, [r])
+        assert r.record_id in result.rejected
+        assert r.record_id not in result.accepted
+
+        # And it must not leak into any later pull.
+        pulled = engine.sync_pull(alice, since=datetime.min)
+        assert not any(rec.record_id == r.record_id for rec in pulled)
+
 
 # ===========================================================================
 # T-584: pull endpoint — ACL trim
@@ -368,6 +386,43 @@ class TestSyncPull:
         # bob should see the updated record in the delta
         pulled_bob = engine.sync_pull(bob, since=since_dt)
         assert any(rec.record_id == r.record_id for rec in pulled_bob)
+
+    def test_loss_of_access_full_resync_excludes_record(
+        self, engine: SyncEngine, alice: _Principal, bob: _Principal
+    ) -> None:
+        """AC-3: after losing access, the record is absent even on a full resync.
+
+        A device that re-syncs from scratch (since=datetime.min) after the
+        principal lost access must NOT receive the record at all. This proves
+        the loss-of-access is authoritative server-side, not merely a delta
+        cursor artefact — the device's local copy is therefore safe to tombstone.
+        """
+        r = _record("bob", acl_allow=["alice", "bob"])
+        engine.sync_push(bob, [r])
+
+        # alice initially sees it on a full sync.
+        assert any(
+            rec.record_id == r.record_id
+            for rec in engine.sync_pull(alice, since=datetime.min)
+        )
+
+        # bob revokes alice's access.
+        engine.sync_push(
+            bob,
+            [
+                Record(
+                    record_id=r.record_id,
+                    principal_id="bob",
+                    acl_allow=["bob"],
+                    classification="internal",
+                    payload={"data": "revoked"},
+                )
+            ],
+        )
+
+        # Full resync from scratch — alice must NOT receive it (negative).
+        pulled_full = engine.sync_pull(alice, since=datetime.min)
+        assert not any(rec.record_id == r.record_id for rec in pulled_full)
 
 
 # ===========================================================================
