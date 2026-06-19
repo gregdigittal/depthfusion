@@ -2567,7 +2567,7 @@
 
 ---
 
-## E-48: Desktop App Production Readiness [active]
+## E-48: Desktop App Production Readiness [done]
 
 > Harden the DepthFusion Tauri desktop app for the v2.0 release: wire OIDC auth end-to-end, integrate identity/ JWT validation into the MCP HTTP server, fix version metadata drift, add auth unit tests, tighten CI triggers, and move setup artifacts into docs/.
 
@@ -2640,7 +2640,7 @@
 
 **Acceptance criteria:**
 - [x] AC-1: `.github/workflows/ci.yml` `on:` block includes `push: branches: [main]` and `pull_request: branches: [main]`
-- [ ] AC-2: CI passes on a test push to main after this change
+- [x] AC-2: CI passes on a test push to main after this change
 
 **Tasks:**
 - [x] T-550: Edit `.github/workflows/ci.yml` to add `main` branch to `push` and `pull_request` triggers
