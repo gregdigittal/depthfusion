@@ -45,6 +45,7 @@ from depthfusion.cache.lease_lifecycle import (
     RenewalDeniedError,
     RenewalOutcome,
     RevokedError,
+    SqliteLeaseStore,
     TokenWiper,
     ttl_for_classification,
 )
@@ -95,6 +96,7 @@ __all__ = [
     "RevokedError",
     "LeaseStore",
     "InMemoryLeaseStore",
+    "SqliteLeaseStore",
     "TokenWiper",
     "CacheWiper",
     "LeaseManager",

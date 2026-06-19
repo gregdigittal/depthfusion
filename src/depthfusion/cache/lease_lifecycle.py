@@ -42,6 +42,8 @@ Security rules
 from __future__ import annotations
 
 import logging
+import sqlite3
+import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -62,6 +64,7 @@ __all__ = [
     "RevokedError",
     "LeaseStore",
     "InMemoryLeaseStore",
+    "SqliteLeaseStore",
     "TokenWiper",
     "CacheWiper",
     "LeaseManager",
@@ -236,6 +239,141 @@ class InMemoryLeaseStore:
 
     def __len__(self) -> int:
         return len(self._leases)
+
+
+# ---------------------------------------------------------------------------
+# SQLite-backed durable lease store (F-008 complete fix — T-726)
+# ---------------------------------------------------------------------------
+
+
+class SqliteLeaseStore:
+    """SQLite-backed durable :class:`LeaseStore` for production use.
+
+    Persists leases and the high-water mark to a SQLite database file so that
+    :class:`PurgeEngine`'s clock-rollback anchor survives process restarts.
+
+    This is the complete fix for F-008: :class:`InMemoryLeaseStore` resets
+    HWM to ``0.0`` on every restart, recreating the original clock-rollback
+    vulnerability.  :class:`SqliteLeaseStore` persists the HWM to a ``kv``
+    table row that survives process exit and is loaded back by the next
+    :class:`PurgeEngine` instance.
+
+    Uses Python's standard-library ``sqlite3`` — no extra dependencies.
+    Thread-safe via a :class:`threading.Lock`.
+
+    Parameters
+    ----------
+    db_path:
+        Filesystem path to the SQLite database file. Created if absent.
+        Pass ``":memory:"`` only for tests that do **not** need restart-
+        survival (in-memory connections do not persist between interpreter
+        sessions).
+    """
+
+    def __init__(self, db_path: str) -> None:
+        self._lock = threading.Lock()
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._init_schema()
+
+    def _init_schema(self) -> None:
+        with self._lock, self._conn:
+            self._conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS leases (
+                    record_id      TEXT PRIMARY KEY,
+                    classification TEXT NOT NULL,
+                    issued_at      REAL NOT NULL,
+                    expires_at     REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS kv (
+                    key   TEXT PRIMARY KEY,
+                    value REAL NOT NULL
+                );
+                """
+            )
+
+    def upsert(self, lease: Lease) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO leases (record_id, classification, issued_at, expires_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(record_id) DO UPDATE SET
+                    classification = excluded.classification,
+                    issued_at      = excluded.issued_at,
+                    expires_at     = excluded.expires_at
+                """,
+                (
+                    lease.record_id,
+                    lease.classification.value,
+                    lease.issued_at,
+                    lease.expires_at,
+                ),
+            )
+
+    def get(self, record_id: str) -> Optional[Lease]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT record_id, classification, issued_at, expires_at"
+                " FROM leases WHERE record_id = ?",
+                (record_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Lease(
+            record_id=row[0],
+            classification=ClassificationLevel(row[1]),
+            issued_at=row[2],
+            expires_at=row[3],
+        )
+
+    def all_leases(self) -> list[Lease]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT record_id, classification, issued_at, expires_at FROM leases"
+            ).fetchall()
+        return [
+            Lease(
+                record_id=r[0],
+                classification=ClassificationLevel(r[1]),
+                issued_at=r[2],
+                expires_at=r[3],
+            )
+            for r in rows
+        ]
+
+    def delete(self, record_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM leases WHERE record_id = ?", (record_id,))
+
+    def clear(self) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM leases")
+
+    def get_hwm(self) -> float:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM kv WHERE key = 'hwm'"
+            ).fetchone()
+        return row[0] if row is not None else 0.0
+
+    def set_hwm(self, hwm: float) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO kv (key, value) VALUES ('hwm', ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (hwm,),
+            )
+
+    def close(self) -> None:
+        """Close the SQLite connection; call when the store is no longer needed."""
+        with self._lock:
+            self._conn.close()
+
+    def __len__(self) -> int:
+        with self._lock:
+            row = self._conn.execute("SELECT COUNT(*) FROM leases").fetchone()
+        return row[0] if row is not None else 0
 
 
 # ---------------------------------------------------------------------------

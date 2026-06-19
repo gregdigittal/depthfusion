@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import time
+from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet
@@ -498,6 +499,7 @@ from depthfusion.cache import (  # noqa: E402
     PurgeEngine,
     PurgeTrigger,
     RenewalDeniedError,
+    SqliteLeaseStore,
     ttl_for_classification,
 )
 
@@ -841,3 +843,109 @@ class TestRevocationMatrix:
         result = engine.run_on_timer(now=1 * 3600)
         assert result.clock_tamper_detected is True
         assert store.get("d2") is None
+
+
+# ---------------------------------------------------------------------------
+# SqliteLeaseStore — durable HWM persistence (F-008 T-726)
+# ---------------------------------------------------------------------------
+
+
+class TestSqliteLeaseStore:
+    """SqliteLeaseStore persists leases and the HWM across process restarts.
+
+    This is the critical test for F-008 — the HWM must survive a simulated
+    restart (destroy the first store object and open a fresh one on the same
+    file) so PurgeEngine cannot be tricked by clock rollback after restart.
+    """
+
+    def test_hwm_survives_restart(self, tmp_path: Path) -> None:
+        """HWM written by one PurgeEngine is read back by a new one on the same DB."""
+        db_path = str(tmp_path / "lease.db")
+
+        # --- First "process": issue a lease and run the timer to advance HWM ---
+        store1 = SqliteLeaseStore(db_path)
+        cache1 = _FakeCacheWiper()
+        token1 = _FakeTokenWiper()
+        engine1 = PurgeEngine(store1, cache1, token1)
+
+        store1.upsert(
+            Lease(
+                "doc1",
+                ClassificationLevel.PUBLIC,
+                issued_at=0.0,
+                expires_at=8 * 24 * 3600,  # 8 days — won't expire
+            )
+        )
+        # Advance PurgeEngine so HWM is written (any run_on_* that observes
+        # a positive clock writes the HWM via _effective_now).
+        engine1.run_on_timer(now=25 * 3600)
+        persisted_hwm = store1.get_hwm()
+        assert persisted_hwm > 0.0, "HWM should have advanced from 0.0"
+        store1.close()
+
+        # --- Simulated process restart: fresh store + engine on the same file ---
+        store2 = SqliteLeaseStore(db_path)
+        cache2 = _FakeCacheWiper()
+        token2 = _FakeTokenWiper()
+        engine2 = PurgeEngine(store2, cache2, token2)
+
+        # PurgeEngine.__init__ loads HWM from store.get_hwm() — must match.
+        assert engine2._high_water_mark == persisted_hwm, (
+            f"HWM after restart ({engine2._high_water_mark}) != "
+            f"persisted HWM ({persisted_hwm})"
+        )
+        store2.close()
+
+    def test_lease_round_trip(self, tmp_path: Path) -> None:
+        """Leases written to the DB are retrievable by record_id."""
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        lease = Lease(
+            "r1",
+            ClassificationLevel.CONFIDENTIAL,
+            issued_at=1000.0,
+            expires_at=1000.0 + 48 * 3600,
+        )
+        store.upsert(lease)
+        result = store.get("r1")
+        assert result == lease
+        store.close()
+
+    def test_all_leases_empty_initially(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        assert store.all_leases() == []
+        store.close()
+
+    def test_delete_removes_lease(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        store.upsert(Lease("r2", ClassificationLevel.INTERNAL, 0.0, 3600.0))
+        store.delete("r2")
+        assert store.get("r2") is None
+        store.close()
+
+    def test_clear_removes_all_leases(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        for i in range(3):
+            store.upsert(Lease(f"r{i}", ClassificationLevel.PUBLIC, 0.0, 3600.0))
+        store.clear()
+        assert store.all_leases() == []
+        store.close()
+
+    def test_hwm_default_is_zero(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        assert store.get_hwm() == 0.0
+        store.close()
+
+    def test_set_and_get_hwm(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        store.set_hwm(12345.678)
+        assert store.get_hwm() == 12345.678
+        store.close()
+
+    def test_upsert_overwrites_existing_lease(self, tmp_path: Path) -> None:
+        store = SqliteLeaseStore(str(tmp_path / "lease.db"))
+        store.upsert(Lease("r3", ClassificationLevel.PUBLIC, 0.0, 3600.0))
+        updated = Lease("r3", ClassificationLevel.CONFIDENTIAL, 500.0, 10000.0)
+        store.upsert(updated)
+        result = store.get("r3")
+        assert result == updated
+        store.close()

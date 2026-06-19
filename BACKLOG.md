@@ -3308,13 +3308,14 @@
 ### S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Checklist verified: G1–G4 gates green, pen-test criticals closed, pilot success metrics met, docs complete, migration rehearsed, CI fully green
-- [ ] AC-2: Final consensus review of the merge diff by Deepseek + Gemini; unresolved disagreements surfaced with pros/cons before merge
-- [ ] AC-3: Tagged release + rollback plan documented
+- [x] AC-1: Checklist verified: G1–G4 gates green, pen-test criticals closed, pilot success metrics met, docs complete, migration rehearsed, CI fully green
+- [x] AC-2: Final consensus review of the merge diff by Deepseek + Codex (Gemini unavailable; Codex substituted per Fable-5); consensus APPROVE — F-008 resolved via T-726 `SqliteLeaseStore`; see docs/decisions/v2-merge-gate-consensus-review.md
+- [x] AC-3: Tagged release `v2.0.0` + rollback plan documented
 
 **Tasks:**
 - [x] T-697: Merge-gate checklist execution — docs/v2/merge-plan.md + G1-gate.md all criteria marked [x] (E-63 integration, 2026-06-11)
 - [x] T-698: Merge, tag, release notes, rollback plan — docs/decisions/v2-merge-gate-checklist.md (E-63 integration, 2026-06-18)
+- [x] T-726: Implement durable `SqliteLeaseStore` in `src/depthfusion/cache/lease_lifecycle.py` — persists `get_hwm`/`set_hwm` to a SQLite row across restarts; wire into `PurgeEngine` production init path; add restart-simulation test; re-run AC-2 consensus review on `lease_lifecycle.py` alone — F-008 complete fix
 
 ### S-206: As a V1 owner, I want the legacy-data ACL migration rehearsed before the pilot so that owner-only backfill is proven before legacy memories and SharePoint data coexist `P0` `M`
 
