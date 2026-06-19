@@ -3276,8 +3276,8 @@
 ### S-202: As the program, I want cross-lane integration test suites so that the four lanes compose into one system `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: E2E scenarios automated: sign-in → SharePoint doc search → cited view → policy-gated export; offline flight-mode round trip; admin revoke → device wipe; sync between two instances with divergent ACLs
-- [ ] AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels
+- [x] AC-1: E2E scenarios automated: sign-in → SharePoint doc search → cited view → policy-gated export; offline flight-mode round trip; admin revoke → device wipe; sync between two instances with divergent ACLs
+- [x] AC-2: Scenarios run nightly against a seeded staging stack on the VPS; failures page the backlog with triage labels
 
 **Tasks:**
 - [x] T-690: Staging stack compose (API + ingestion + two app instances) — scripts/integration_smoke_test.sh + .env.example delivered (E-63 integration, 2026-06-11)
