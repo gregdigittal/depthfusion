@@ -8,6 +8,10 @@ use super::logout;
 use super::oidc::{self, OidcConfig, OidcError, TokenSet};
 use super::vault;
 
+/// Skew margin (seconds) so a token about to lapse is treated as already
+/// expired rather than handed out and rejected one network hop later.
+const SKEW: u64 = 30;
+
 fn default_config() -> OidcConfig {
     OidcConfig {
         issuer: std::env::var("OIDC_ISSUER")
@@ -103,36 +107,43 @@ fn oidc_to_vault(oidc_tokens: &TokenSet) -> vault::TokenSet {
 /// `None` (frontend should then trigger `startLogin()`).
 #[tauri::command]
 pub async fn poll_auth_state() -> Option<TokenSet> {
-    /// Skew margin (seconds) so a token about to lapse is treated as already
-    /// expired rather than handed out and rejected one network hop later.
-    const SKEW: u64 = 30;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
 
     // T-630: check the vault for a cached session.
-    match vault::load_tokens() {
-        Ok(Some(vt)) => {
-            // Reject expired (or legacy/unanchored) sessions so the frontend
-            // re-triggers `start_login` instead of using a stale access token.
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            if vt.is_expired(now, SKEW) {
-                return None;
-            }
+    poll_auth_state_from(vault::load_tokens(), now)
+}
 
-            // Re-export vault::TokenSet as the canonical oidc::TokenSet shape.
-            // `stored_at` is internal vault bookkeeping and is deliberately
-            // dropped at the IPC boundary (oidc::TokenSet has no such field).
-            Some(TokenSet {
-                access_token: vt.access_token,
-                id_token: vt.id_token,
-                refresh_token: vt.refresh_token,
-                expires_in: vt.expires_in,
-                token_type: vt.token_type,
-            })
-        }
-        _ => None,
+/// Map a vault load result onto the frontend OIDC token shape when the cached
+/// session is usable. Legacy/unanchored blobs, expired tokens, absent tokens,
+/// and vault read failures all resolve to `None` so startup recovery can fall
+/// back to login without crashing.
+///
+/// Credential safety: token contents are never logged at any level.
+fn poll_auth_state_from(
+    loaded: Result<Option<vault::TokenSet>, vault::VaultError>,
+    now: u64,
+) -> Option<oidc::TokenSet> {
+    let vt = loaded.ok().flatten()?;
+
+    // Reject expired (or legacy/unanchored) sessions so the frontend
+    // re-triggers `start_login` instead of using a stale access token.
+    if vt.is_expired(now, SKEW) {
+        return None;
     }
+
+    // Re-export vault::TokenSet as the canonical oidc::TokenSet shape.
+    // `stored_at` is internal vault bookkeeping and is deliberately dropped at
+    // the IPC boundary (oidc::TokenSet has no such field).
+    Some(oidc::TokenSet {
+        access_token: vt.access_token,
+        id_token: vt.id_token,
+        refresh_token: vt.refresh_token,
+        expires_in: vt.expires_in,
+        token_type: vt.token_type,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +225,65 @@ mod tests {
             expires_in: Some(3600),
             token_type: "Bearer".to_string(),
         }
+    }
+
+    fn sample_vault(expires_in: Option<u64>, stored_at: Option<u64>) -> vault::TokenSet {
+        vault::TokenSet {
+            access_token: "vault-access-token".to_string(),
+            id_token: Some("vault-id-token".to_string()),
+            refresh_token: Some("vault-refresh-token".to_string()),
+            expires_in,
+            token_type: "Bearer".to_string(),
+            stored_at,
+        }
+    }
+
+    #[test]
+    fn poll_auth_state_valid_token() {
+        let loaded = Ok(Some(sample_vault(Some(3600), Some(1000))));
+
+        let token = poll_auth_state_from(loaded, 1200).expect("token should be valid");
+
+        assert_eq!(token.access_token, "vault-access-token");
+        assert_eq!(token.id_token, Some("vault-id-token".to_string()));
+        assert_eq!(token.refresh_token, Some("vault-refresh-token".to_string()));
+        assert_eq!(token.expires_in, Some(3600));
+        assert_eq!(token.token_type, "Bearer");
+
+        let serialized = serde_json::to_value(&token).expect("serialize oidc token");
+        assert!(
+            serialized.get("stored_at").is_none(),
+            "oidc token shape must not expose vault stored_at"
+        );
+    }
+
+    #[test]
+    fn poll_auth_state_expired_token() {
+        let loaded = Ok(Some(sample_vault(Some(3600), Some(1000))));
+
+        assert!(poll_auth_state_from(loaded, 4570).is_none());
+    }
+
+    #[test]
+    fn poll_auth_state_legacy_no_stored_at() {
+        let loaded = Ok(Some(sample_vault(Some(3600), None)));
+
+        assert!(poll_auth_state_from(loaded, 1200).is_none());
+    }
+
+    #[test]
+    fn poll_auth_state_ok_none() {
+        assert!(poll_auth_state_from(Ok(None), 1200).is_none());
+    }
+
+    #[test]
+    fn poll_auth_state_vault_error() {
+        let err = vault::VaultError {
+            code: "VAULT_READ".to_string(),
+            message: "read failed".to_string(),
+        };
+
+        assert!(poll_auth_state_from(Err(err), 1200).is_none());
     }
 
     /// The oidc→vault converter maps all five shared fields and leaves
