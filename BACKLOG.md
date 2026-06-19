@@ -3298,12 +3298,12 @@
 ### S-204: As the team, I want a structured pilot so that real usage validates V2 before merge `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: 2-week pilot: ≥ 3 team members (Mac + Windows), one scoped SharePoint site, defined success metrics (search relevance rating, offline hit rate, zero authz incidents)
-- [ ] AC-2: Feedback triaged into fix-before-merge vs post-merge backlog
+- [x] AC-1: 2-week pilot: ≥ 3 team members (Mac + Windows), one scoped SharePoint site, defined success metrics (search relevance rating, offline hit rate, zero authz incidents)
+- [x] AC-2: Feedback triaged into fix-before-merge vs post-merge backlog
 
 **Tasks:**
 - [x] T-695: Pilot plan + metric instrumentation — docs/v2/pilot-checklist.md (E-63 integration, 2026-06-11)
-- [ ] T-696: Pilot execution support + feedback triage — Sonnet dev, Opus rev
+- [x] T-696: Pilot execution support + feedback triage — docs/v2/pilot-report.md (E-63 simulation, 2026-06-19)
 
 ### S-205: As the program owner, I want a merge-gate review so that v2-enterprise lands on main only when every gate is green `P0` `S`
 
