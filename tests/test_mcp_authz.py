@@ -2,7 +2,7 @@
 
 Tests
 -----
-For every one of the 29 MCP tools:
+For every one of the 30 MCP tools:
 
 * **allow** — a principal whose role grants the required capability calls the
   tool via ``_handle_tools_call`` and receives ``isError: False``.
@@ -15,7 +15,7 @@ Additional unit tests:
 
 * ``check_tool_access`` raises ``AuthorizationError`` for ``None`` principal.
 * ``check_tool_access`` raises ``ValueError`` for unknown tool names.
-* ``TOOL_CAPABILITIES`` covers all 29 tools registered in ``TOOLS``.
+* ``TOOL_CAPABILITIES`` covers all 30 tools registered in ``TOOLS``.
 * ``_process_request`` propagates the principal to ``_handle_tools_call``.
 """
 from __future__ import annotations
@@ -112,9 +112,9 @@ class TestToolCapabilitiesCoverage:
         )
 
     def test_count_is_29(self) -> None:
-        """There must be exactly 29 tools annotated (spec from T-579)."""
-        assert len(TOOL_CAPABILITIES) == 29, (
-            f"Expected 29 annotated tools, got {len(TOOL_CAPABILITIES)}. "
+        """There must be exactly 30 tools annotated (29 original + recommend_model E-64 S-210)."""
+        assert len(TOOL_CAPABILITIES) == 30, (
+            f"Expected 30 annotated tools, got {len(TOOL_CAPABILITIES)}. "
             f"TOOL_CAPABILITIES keys: {list(TOOL_CAPABILITIES.keys())}"
         )
 

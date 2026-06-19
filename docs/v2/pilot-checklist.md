@@ -182,6 +182,25 @@ The 2-week pilot is considered successful when all of the following are met:
 | Pilot participant count | ≥ 3 team members | Attendance log |
 | Platform coverage | Mac + Windows both tested | Sign-off from both platform users |
 
+### 5.1 CI Test Evidence (Verification Pass — 2026-06-19)
+
+> The real 2-week pilot with live Microsoft 365 infrastructure has not been run (pre-production project, no external pilot users). The table below maps each metric to automated test coverage that provides evidence for the underlying capability.
+
+| Metric | CI Coverage | Test File | Notes |
+|--------|-------------|-----------|-------|
+| Search relevance | ingest → recall round-trip asserted | `scripts/integration_smoke_test.sh` lines 159–200; `tests/integration/test_e2e_scenarios.py` | Smoke test POSTs a known document, runs `/recall` query, asserts document appears in ranked results |
+| Offline hit rate | delta-ingest zero-delta path (cache hit) | `tests/integration/test_delta_e2e.py::TestDeltaIngest::test_unchanged_txt_produces_zero_delta` (line 117); `test_multiple_re_ingests_all_produce_zero_delta` (line 249) | Unchanged files produce `delta=0` on re-ingest, confirming local cache path is exercised |
+| Authorization incidents | expired/missing/wrong token all → 401 | `tests/integration/test_oidc_e2e.py` lines 129, 164, 195, 284 | `test_unauthenticated_call_returns_401`, `test_no_auth_header_on_sse_returns_401`, `test_authenticated_status_call_returns_200`, `test_wrong_token_returns_401` |
+| App crash rate | server startup + endpoint health | `scripts/integration_smoke_test.sh` — server must start on `:7399` and pass 5-step health sequence | No crash path in CI; Sentry integration required for real telemetry |
+| Pilot participant count | N/A — operational metric | (none) | Requires live pilot; not automatable |
+| Platform coverage | N/A — operational metric | (none) | Requires Mac + Windows binary builds; CI produces artifacts only |
+
+**Test run status (2026-06-19):**
+- `pytest tests/integration/ -v --timeout=120` → all 14 integration tests PASS
+- `bash scripts/integration_smoke_test.sh` → exit 0 (5/5 steps PASS)
+- `python src/depthfusion/cli/migrate.py v2 --dry-run --db-dir /tmp/test` → exit 0
+- `python src/depthfusion/cli/migrate.py v2 --db-dir /tmp/test` → exit 0 ("Nothing to migrate — already up to date")
+
 ---
 
 ## 6. Feedback Triage

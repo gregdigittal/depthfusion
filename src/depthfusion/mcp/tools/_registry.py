@@ -190,6 +190,17 @@ TOOLS: dict[str, str] = {
         "No arguments required. "
         "Response: {providers: [{name, configured, healthy, memory_count}]}"
     ),
+    # E-64 S-210 model recommendation engine
+    "recommend_model": (
+        "Return a ranked list of models for a given task category, optionally excluding "
+        "specific vendors (Fable-5 isolation). "
+        "Args: task_category (str, required) — 'code'|'review'|'planning'|'docs'; "
+        "exclude_vendors (str[], optional); available_models (str[], optional); "
+        "budget_usd (float, optional); min_confidence (str, optional). "
+        "Response: {recommendations: [{model_id, provider, rank, quality_rate, "
+        "avg_cost_usd, cost_per_pass, confidence, rationale, source, sample_count, "
+        "budget_warning}]}"
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -230,6 +241,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_bridge": None,
     "depthfusion_ingest_conversation": None,
     "depthfusion_list_providers": None,
+    # E-64 S-210 model recommendation engine (always enabled)
+    "recommend_model": None,
 }
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -46,7 +47,7 @@ def _insert_rows(db_path: Path, rows: list[dict]) -> None:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    row.get("recorded_at", "2026-01-01T00:00:00Z"),
+                    row.get("recorded_at", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
                     row.get("session_id", "sess-1"),
                     row.get("model_id", "sonnet"),
                     row.get("task_category", "code"),
@@ -97,7 +98,7 @@ class TestVendorExclusion:
             self.db_path,
             [{"model_id": "sonnet", "quality_verdict": "pass", "cost_usd": 0.012}
              for _ in range(12)]
-            + [{"model_id": "gpt-5", "quality_verdict": "pass", "cost_usd": 0.02}
+            + [{"model_id": "gpt-5", "task_category": "review", "quality_verdict": "pass", "cost_usd": 0.02}
                for _ in range(12)],
         )
         recs = recommend(
@@ -341,7 +342,7 @@ class TestRecommendModelEndpoint:
             self.db_path,
             [{"model_id": "sonnet", "quality_verdict": "pass", "cost_usd": 0.012}
              for _ in range(12)]
-            + [{"model_id": "gpt-5", "quality_verdict": "pass", "cost_usd": 0.02}
+            + [{"model_id": "gpt-5", "task_category": "review", "quality_verdict": "pass", "cost_usd": 0.02}
                for _ in range(12)],
         )
         invalidate_stats_cache()

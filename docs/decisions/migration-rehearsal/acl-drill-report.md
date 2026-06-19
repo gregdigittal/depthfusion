@@ -1,6 +1,6 @@
 # ACL Drill Report — T-700 Bulk Grant/Revoke
 
-**Generated:** 2026-06-18T22:21:37.045100+00:00
+**Generated:** 2026-06-19T21:35:24.011924+00:00
 
 ## Drill Summary
 
@@ -36,4 +36,4 @@ Post-revoke readable count: **0** (expected: 0)
 
 ## Timestamp
 
-`2026-06-18T22:21:37.045100+00:00`
+`2026-06-19T21:35:24.011924+00:00`

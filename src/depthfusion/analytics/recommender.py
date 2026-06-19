@@ -88,7 +88,7 @@ def _observed_stat_for(stats: list[dict[str, Any]], model_id: str) -> Optional[d
     Prefers the ``observed`` row (which already blends priors at low n); falls
     back to a ``prior`` row when no observed data exists.
     """
-    observed = [s for s in stats if s["model_id"] == model_id and s["source"] == "observed"]
+    observed = [s for s in stats if s["model_id"] == model_id and s["source"] in ("observed", "blended")]
     if observed:
         return observed[0]
     prior = [s for s in stats if s["model_id"] == model_id and s["source"] == "prior"]
@@ -187,7 +187,7 @@ def recommend(
     excluded = {v.lower() for v in (exclude_vendors or [])}
 
     # Pull all observed/prior stats once (no model_id filter so we can merge).
-    all_stats = get_model_stats()
+    all_stats = get_model_stats(task_category=task_category)
 
     # Determine the candidate model set.
     if available_models:

@@ -10,8 +10,8 @@ from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
 def test_tools_dict_has_twenty_six_entries():
-    """29-tool set after E-48 multi-provider bridge (adds 3 bridge tools)."""
-    assert len(TOOLS) == 29
+    """30-tool set after E-64 model recommendation engine (adds recommend_model)."""
+    assert len(TOOLS) == 30
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
@@ -42,6 +42,7 @@ def test_tools_dict_has_twenty_six_entries():
         "depthfusion_bridge",                     # E-48 multi-provider bridge
         "depthfusion_ingest_conversation",        # E-48 multi-provider bridge
         "depthfusion_list_providers",             # E-48 multi-provider bridge
+        "recommend_model",                        # E-64 / S-210
     }
     assert set(TOOLS.keys()) == expected
 
@@ -53,7 +54,7 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 29
+    assert len(enabled) == 30
 
 
 def test_get_enabled_tools_rlm_flag_is_orphaned():
@@ -61,24 +62,24 @@ def test_get_enabled_tools_rlm_flag_is_orphaned():
     config_on = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
     config_off = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     assert set(get_enabled_tools(config_on)) == set(get_enabled_tools(config_off))
-    # 20 always-on + 1 router = 21 (3 bridge tools added in E-48)
-    assert len(get_enabled_tools(config_off)) == 21
+    # 21 always-on + 1 router = 22 (recommend_model added in E-64 S-210)
+    assert len(get_enabled_tools(config_off)) == 22
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 20 always-on tools (includes 5 E-47 + 3 E-48 bridge); rlm_enabled orphaned, adds nothing
-    assert len(enabled) == 20
+    # 21 always-on tools (includes 5 E-47 + 3 E-48 bridge + recommend_model E-64); rlm_enabled orphaned, adds nothing
+    assert len(enabled) == 21
 
 
 def test_get_enabled_tools_both_disabled():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 20 always-on tools only (includes 5 E-47 + 3 E-48 bridge tools)
-    assert len(enabled) == 20
+    # 21 always-on tools only (includes 5 E-47 + 3 E-48 bridge + recommend_model E-64)
+    assert len(enabled) == 21
 
 
 def test_core_tools_always_enabled():

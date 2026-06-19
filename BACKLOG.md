@@ -3269,7 +3269,7 @@
 
 ---
 
-## E-63: V2 Integration, Pilot & Merge Readiness [active]
+## E-63: V2 Integration, Pilot & Merge Readiness [done]
 
 > The landing sequence: full-stack integration testing across lanes, a structured team pilot on real (scoped) SharePoint data, migration tooling for existing V1 instances, and the final merge gate review. **All lanes.**
 

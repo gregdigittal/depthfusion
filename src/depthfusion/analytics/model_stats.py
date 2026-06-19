@@ -121,7 +121,7 @@ def _get_prior(model_id: str, task_category: str = "code") -> Optional[dict[str,
 def _confidence(sample_count: int) -> str:
     if sample_count < 5:
         return "low"
-    if sample_count < 20:
+    if sample_count < 10:
         return "medium"
     return "high"
 

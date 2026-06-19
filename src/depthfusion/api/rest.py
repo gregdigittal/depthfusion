@@ -963,7 +963,7 @@ async def recommend_model_endpoint(
     from depthfusion.mcp.tools.recommender_tools import recommend_model
     result = recommend_model(body.model_dump(exclude_none=True))
     if isinstance(result, dict) and result.get("error"):
-        raise HTTPException(status_code=422, detail=result["error"])
+        raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
