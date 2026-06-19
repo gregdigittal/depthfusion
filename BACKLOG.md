@@ -3201,7 +3201,7 @@
 
 ---
 
-## E-61: Performance, Scale & Security Hardening [backlog]
+## E-61: Performance, Scale & Security Hardening [done]
 
 > Prove the system holds at enterprise corpus sizes and survives adversarial review: load benchmarks with ACL filtering on, dependency + secret hygiene, and an internal penetration pass before any merge to main. **Lane D, Phase 4.**
 
@@ -3232,7 +3232,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Attack plan covers: token forgery/replay, IDOR across records, ACL bypass via MCP tools, cache extraction from disk, lease clock-rollback, export bypass, sync impersonation
 - [x] AC-2: All criticals fixed + regression-tested; findings report archived in `docs/decisions/`
-- [ ] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
+- [x] AC-3: Performed by a model lane that did *not* build the defenses (Deepseek + Gemini drive attacks; Claude fixes)
 
 **Tasks:**
 - [x] T-682: Attack plan + tooling — `docs/decisions/ADR-S199-internal-pentest-plan.md` (7 vectors: token forgery/replay, IDOR, ACL/MCP bypass, cache extraction, lease clock-rollback, export bypass, sync impersonation)
