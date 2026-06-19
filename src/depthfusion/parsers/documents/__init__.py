@@ -36,7 +36,9 @@ from depthfusion.parsers.documents.base import (
     quarantine,
 )
 from depthfusion.parsers.documents.generic import GenericParser
+from depthfusion.parsers.documents.docx import DocxParser
 from depthfusion.parsers.documents.ocr import OcrParser, _ocr_enabled
+from depthfusion.parsers.documents.pdf import PdfParser
 from depthfusion.parsers.documents.pptx import PptxParser
 from depthfusion.parsers.documents.xlsx import XlsxParser
 
@@ -68,8 +70,10 @@ class DocumentParserRegistry:
 # Module-level default registry singleton
 _default_registry = DocumentParserRegistry()
 _default_registry.register(GenericParser())
+_default_registry.register(DocxParser())
 _default_registry.register(XlsxParser())
 _default_registry.register(PptxParser())
+_default_registry.register(PdfParser())
 
 # Register OcrParser only when the feature flag is active (T-598).
 if _ocr_enabled():
@@ -87,8 +91,10 @@ __all__ = [
     "DocumentParserRegistry",
     "DocumentRecord",
     # Parsers
+    "DocxParser",
     "GenericParser",
     "OcrParser",
+    "PdfParser",
     "PptxParser",
     "XlsxParser",
     "get_registry",

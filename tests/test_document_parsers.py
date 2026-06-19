@@ -6,12 +6,25 @@ no real fixture files are needed.  All test classes are self-contained.
 from __future__ import annotations
 
 import io
+from datetime import datetime
 
+import docx as python_docx
 import openpyxl
+import pytest
 from pptx import Presentation
 from pptx.util import Inches
 
-from depthfusion.parsers.documents import PptxParser, XlsxParser, get_registry
+from depthfusion.parsers.documents import (
+    DocxParser,
+    OcrParser,
+    PdfParser,
+    PptxParser,
+    XlsxParser,
+    get_registry,
+)
+from depthfusion.parsers.documents.docx import _MIME_DOCX
+from depthfusion.parsers.documents.ocr import _MIME_PNG
+from depthfusion.parsers.documents.pdf import _MIME_PDF
 from depthfusion.parsers.documents.pptx import _MIME_PPTX
 from depthfusion.parsers.documents.xlsx import _MIME_XLSX
 
@@ -81,6 +94,73 @@ def _make_pptx(*slides: dict) -> bytes:
     buf = io.BytesIO()
     prs.save(buf)
     return buf.getvalue()
+
+
+def _make_docx(*sections: dict) -> bytes:
+    doc = python_docx.Document()
+    for spec in sections:
+        if spec.get("heading"):
+            doc.add_heading(spec["heading"], level=1)
+        if spec.get("subheading"):
+            doc.add_heading(spec["subheading"], level=2)
+        if spec.get("body"):
+            doc.add_paragraph(spec["body"])
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+MINIMAL_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
+    b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n"
+    b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+    b"  /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n"
+    b"4 0 obj << /Length 44 >>\nstream\n"
+    b"BT /F1 12 Tf 100 700 Td (Hello PDF) Tj ET\n"
+    b"endstream\nendobj\n"
+    b"5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n"
+    b"xref\n0 6\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000058 00000 n \n"
+    b"0000000115 00000 n \n"
+    b"0000000266 00000 n \n"
+    b"0000000360 00000 n \n"
+    b"trailer << /Size 6 /Root 1 0 R >>\n"
+    b"startxref\n441\n%%EOF\n"
+)
+
+
+def _make_pdf(num_pages: int = 1) -> bytes:
+    try:
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        for i in range(num_pages):
+            pdf.add_page()
+            pdf.set_font("Helvetica", size=12)
+            pdf.cell(0, 10, f"Hello PDF page {i + 1}")
+        output = pdf.output()
+        return output if isinstance(output, bytes) else bytes(output)
+    except ImportError:
+        pass
+
+    try:
+        from reportlab.pdfgen import canvas
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf)
+        for i in range(num_pages):
+            c.drawString(100, 700, f"Hello PDF page {i + 1}")
+            if i < num_pages - 1:
+                c.showPage()
+        c.save()
+        return buf.getvalue()
+    except ImportError:
+        pass
+
+    return MINIMAL_PDF
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -220,6 +300,130 @@ class TestPptxParser:
         records = self.parser.parse("pptx-hp", data)
 
         assert records[0].heading_path == ["My Slide"]
+
+
+class TestDocxParser:
+    def test_empty_bytes_returns_empty_list(self) -> None:
+        assert DocxParser().parse("x.docx", b"") == []
+
+    def test_single_heading_and_body(self) -> None:
+        data = _make_docx({"heading": "Intro", "body": "Some body text"})
+        records = DocxParser().parse("test.docx", data)
+        assert len(records) >= 1
+        r = records[0]
+        assert r.heading_path
+        assert r.content and len(r.content) > 0
+
+    def test_heading_path_hierarchy(self) -> None:
+        data = _make_docx(
+            {"heading": "Chapter 1", "subheading": "Section 1.1", "body": "Details here"}
+        )
+        records = DocxParser().parse("test.docx", data)
+        assert len(records) >= 1
+        # At least one record should have the hierarchy separator in its heading_path
+        paths = [path for r in records for path in r.heading_path if path]
+        assert any("▸" in path for path in paths)
+
+    def test_multiple_headings_produce_multiple_records(self) -> None:
+        data = _make_docx(
+            {"heading": "Alpha", "body": "First"},
+            {"heading": "Beta", "body": "Second"},
+            {"heading": "Gamma", "body": "Third"},
+        )
+        records = DocxParser().parse("test.docx", data)
+        assert len(records) >= 3
+
+    def test_error_returns_empty_list(self) -> None:
+        assert DocxParser().parse("x.docx", b"not-a-docx-file") == []
+
+    def test_mime_type(self) -> None:
+        mime_types = DocxParser().supported_mime_types
+        assert _MIME_DOCX in mime_types
+
+    def test_parse_timestamp_iso_format(self) -> None:
+        import re
+
+        data = _make_docx({"heading": "TS Test", "body": "body"})
+        records = DocxParser().parse("test.docx", data)
+        assert len(records) >= 1
+        ts = records[0].parse_timestamp
+        assert ts is not None
+        iso_pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
+        assert re.match(iso_pattern, ts), f"timestamp {ts!r} does not match ISO 8601"
+
+    def test_document_with_no_headings(self) -> None:
+        data = _make_docx({"body": "Just a plain paragraph with no heading"})
+        records = DocxParser().parse("test.docx", data)
+        assert len(records) >= 1
+        assert any(r.content and "plain paragraph" in r.content for r in records)
+
+
+class TestPdfParser:
+    def test_empty_bytes_returns_empty_list(self) -> None:
+        assert PdfParser().parse("x", b"") == []
+
+    def test_single_page_produces_record(self) -> None:
+        records = PdfParser().parse("pdf-1", _make_pdf(1))
+
+        assert len(records) >= 1
+
+    def test_page_count_matches_records(self) -> None:
+        records = PdfParser().parse("pdf-2", _make_pdf(2))
+        if not records:
+            pytest.skip("pdfplumber could not parse the generated test PDF")
+
+        assert len(records) == 2
+
+    def test_heading_path_contains_page_number(self) -> None:
+        records = PdfParser().parse("pdf-heading", _make_pdf(1))
+        if not records:
+            pytest.skip("PDF parser dependency could not parse the generated test PDF")
+
+        heading_text = " ".join(records[0].heading_path).lower()
+        assert "page" in heading_text or "1" in heading_text
+
+    def test_document_id_set_correctly(self) -> None:
+        records = PdfParser().parse("pdf-doc-id", _make_pdf(1))
+        if not records:
+            pytest.skip("PDF parser dependency could not parse the generated test PDF")
+
+        assert records[0].source_id == "pdf-doc-id"
+
+    def test_mime_type(self) -> None:
+        assert _MIME_PDF in PdfParser().supported_mime_types
+
+    def test_parse_timestamp_iso_format(self) -> None:
+        records = PdfParser().parse("pdf-ts", _make_pdf(1))
+        if not records:
+            pytest.skip("PDF parser dependency could not parse the generated test PDF")
+
+        ts = records[0].parse_timestamp
+        assert ts.endswith("Z")
+        datetime.fromisoformat(ts.replace("Z", "+00:00"))
+
+    def test_error_returns_empty_list(self) -> None:
+        assert PdfParser().parse("pdf-bad", b"not a pdf") == []
+
+
+class TestOcrParser:
+    def test_disabled_ocr_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("DEPTHFUSION_OCR_ENABLED", raising=False)
+
+        assert OcrParser().parse("x", b"") == []
+
+    def test_mime_type(self) -> None:
+        assert _MIME_PNG in OcrParser().supported_mime_types
+
+    def test_disabled_ocr_returns_empty_for_png_bytes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("DEPTHFUSION_OCR_ENABLED", raising=False)
+
+        assert OcrParser().parse("y", b"\x89PNG\r\n\x1a\n") == []
+
+    def test_ocr_parser_name(self) -> None:
+        assert getattr(OcrParser(), "name") == "ocr"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

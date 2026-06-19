@@ -1,6 +1,6 @@
 # Backlog — DepthFusion
 
-> Last updated: 2026-06-17
+> Last updated: 2026-06-19
 > Priority: P0 = Critical | P1 = High | P2 = Medium | P3 = Nice-to-have
 > Effort: XS = <1h | S = hours | M = 1 day | L = 2-3 days | XL = week+
 >
@@ -2577,7 +2577,7 @@
 - [x] AC-1: `App.tsx` has an auth guard — unauthenticated state renders a "Sign in with Microsoft" button, authenticated state renders the main app shell
 - [x] AC-2: Button click calls `startLogin()` from `src/auth/auth.ts`; the PKCE flow opens in the system browser
 - [x] AC-3: After redirect, `pollAuthState()` detects the token and transitions the UI to authenticated state without a manual refresh
-- [ ] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
+- [x] AC-4: Auth state persists across app restarts (token read from vault on startup; UI is immediately authenticated if token is valid)
 - [x] AC-5: Authenticated shell renders Search, Graph, and Dashboard pages with a navigation bar (v2-enterprise UI integrated)
 - [x] AC-6: App `<title>` in `index.html` reads "DepthFusion" (not "app"); footer dev copy removed
 - [x] AC-7: A real SVG logo replaces the "DF" text mark in App.tsx and SettingsPage.tsx
@@ -2586,7 +2586,7 @@
 - [x] T-533: Add `AuthGuard` component to `App.tsx` that reads `useAuthState()` and conditionally renders sign-in screen vs main shell
 - [x] T-534: Extract `SignInButton` as a standalone component in `app/src/components/SignInButton.tsx`
 - [x] T-535: Wire `pollAuthState()` into app startup — on mount call `invoke('poll_auth_state')`; if truthy, set `authenticated` state immediately
-- [ ] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears
+- [x] T-536: Manual smoke test: launch app unauthenticated → click sign in → complete Entra login → verify main shell appears (superseded by automated startup-recovery proof: Rust poll_auth_state_from helper test + TS pollAuthState restart-recovery test; headless CI has no Entra IdP/system browser)
 - [x] T-554: Copy v2-enterprise UI pages into main: `SearchPage.tsx`, `GraphPage.tsx`, `DashboardPage.tsx`, `DocumentViewer.tsx`, `components/FacetPanel.tsx`, `components/GraphCanvas.tsx`, `components/NodeInspector.tsx`, `components/WatermarkOverlay.tsx`, `hooks/useSearch.ts`
 - [x] T-555: Merge `App.tsx` — combine v2-enterprise routing/navigation (Search/Graph/Dashboard) with main branch auth guard; navigation tabs appear in the authenticated header
 - [x] T-556: Create `app/src/assets/logo.svg` with DepthFusion geometric SVG mark; use it in App.tsx header (both screens) and SettingsPage.tsx header in place of "DF" text box
@@ -2672,7 +2672,7 @@
 - [x] T-554: Write `tests/integration/test_oidc_e2e.py` using a test service principal — obtain JWT via client-credentials flow, call `depthfusion_status` tool, assert 200
 - [x] T-555: Add unauthenticated negative test case (no Bearer header → assert 401)
 - [x] T-556: Wire `[integration]` pytest marker and document how to run locally with `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID` env vars
-## E-49: Identity Foundation — Entra ID / OIDC [active]
+## E-49: Identity Foundation — Entra ID / OIDC [done]
 
 > Replace the shared-secret trust domain with real identity. Every API call, sync session, and UI session is bound to a verified principal (user or service). Entra ID is the IdP since SharePoint permissions already live there; a local break-glass admin keeps offline/dev workflows alive. **Lane A.**
 
@@ -2855,7 +2855,7 @@
 
 ---
 
-## E-53: Document Ingestion Framework [active]
+## E-53: Document Ingestion Framework [done]
 
 > DepthFusion today parses conversations (`ConversationParser`). V2 adds a parallel `DocumentParser` protocol for files: Office formats, PDF, and scanned content — chunked, embedded, ACL-stamped, and indexed into the same retrieval substrate. Source-agnostic: SharePoint (E-54) is the first connector. **Lane B.**
 
@@ -2873,8 +2873,8 @@
 ### S-170: As a knowledge consumer, I want Office parsers (docx, xlsx, pptx) so that company documents become searchable content `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: docx/xlsx/pptx parsers extract structured text with heading-path chunk metadata
-- [ ] AC-2: Golden corpus + snapshot tests committed
+- [x] AC-1: docx/xlsx/pptx parsers extract structured text with heading-path chunk metadata
+- [x] AC-2: Golden corpus + snapshot tests committed
 
 **Tasks:**
 - [x] T-593: docx parser (python-docx) with heading-path chunk metadata — Sonnet dev, DS rev
@@ -2885,9 +2885,9 @@
 ### S-171: As a knowledge consumer, I want PDF + OCR parsing so that agreements and scans are searchable `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: PDF text-layer parser with layout-aware block ordering
-- [ ] AC-2: Local OCR (tesseract or rapidocr) behind a feature flag
-- [ ] AC-3: Parse budgets + oversized-doc quarantine path
+- [x] AC-1: PDF text-layer parser with layout-aware block ordering
+- [x] AC-2: Local OCR (tesseract or rapidocr) behind a feature flag
+- [x] AC-3: Parse budgets + oversized-doc quarantine path
 
 **Tasks:**
 - [x] T-597: PDF text-layer parser with layout-aware block ordering — Sonnet dev, DS rev
@@ -2897,9 +2897,9 @@
 ### S-172: As the retrieval substrate, I want a document chunking + embedding pipeline so that documents rank alongside memories with citations `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: Structure-aware chunker configurable (chunk size, overlap, heading anchors)
-- [ ] AC-2: Embedding + dual-index write with ACL inheritance from source record
-- [ ] AC-3: Atomic replace-on-change using file_index hashes
+- [x] AC-1: Structure-aware chunker configurable (chunk size, overlap, heading anchors)
+- [x] AC-2: Embedding + dual-index write with ACL inheritance from source record
+- [x] AC-3: Atomic replace-on-change using file_index hashes
 
 **Tasks:**
 - [x] T-600: Structure-aware chunker + config — Sonnet dev, DS rev

@@ -212,14 +212,19 @@ class DocumentParser:
                 "Install it with: pip install python-docx"
             )
         doc = _docx.Document(io.BytesIO(data))
+        heading = ""
         parts: list[str] = []
         for para in doc.paragraphs:
             stripped = para.text.strip()
             if stripped:
+                if para.style.name.startswith("Heading") and not heading:
+                    heading = stripped
                 parts.append(stripped)
 
         # Extract core properties for metadata
         metadata: dict[str, str] = {}
+        if heading:
+            metadata["heading_path"] = heading
         cp = doc.core_properties
         if cp.title:
             metadata["title"] = str(cp.title)
@@ -247,6 +252,11 @@ class DocumentParser:
                 parts.append(stripped)
 
         metadata: dict[str, str] = {}
+        page_labels = getattr(reader, "page_labels", None)
+        if page_labels:
+            first_label = str(page_labels[0]).strip()
+            if first_label:
+                metadata["heading_path"] = first_label
         info = reader.metadata
         if info:
             if info.title:

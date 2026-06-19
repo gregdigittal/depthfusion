@@ -32,11 +32,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from depthfusion.ingest.chunking import ChunkingStrategy, FixedSizeChunker
-from depthfusion.ingest.models import ParsedDocument
+from depthfusion.ingest.models import Chunk as _Chunk, ParsedDocument
 from depthfusion.ingest.parser import DocumentParser
 
 if TYPE_CHECKING:
     from depthfusion.storage.file_index import FileMetadataIndex
+
+_MAX_RUN_FROM_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+def _sanitize_acl(acl: list[str] | None) -> list[str] | None:
+    if acl is None:
+        return None
+    return [p.strip() for p in acl if isinstance(p, str) and p.strip()]
 
 
 class IngestPipeline:
@@ -121,6 +129,8 @@ class IngestPipeline:
             FileNotFoundError: If *path* does not exist.
             ValueError:        If the file type is not supported.
         """
+        acl_allow = _sanitize_acl(acl_allow)
+
         # T-602 — Atomic replace-on-change via FileMetadataIndex.
         # Read raw bytes once to (a) compute the hash and (b) avoid a
         # redundant read inside the parser.  If the hash matches the stored
@@ -146,7 +156,11 @@ class IngestPipeline:
         )
 
         # 2. Chunk — ACL stamps inherited automatically via the shared doc
-        doc.chunks = self._chunker.chunk(doc.text)
+        heading_path = doc.metadata.get("heading_path", "")
+        doc.chunks = [
+            _Chunk(text=t, heading_path=heading_path)
+            for t in self._chunker.chunk(doc.text)
+        ]
 
         # 3. Embed (optional)
         if self._embed is not None:
@@ -184,6 +198,17 @@ class IngestPipeline:
         Returns:
             The populated :class:`ParsedDocument`.
         """
+        if len(data) > _MAX_RUN_FROM_BYTES:
+            import logging
+            logging.getLogger(__name__).warning(
+                'run_from_bytes: data size %d bytes exceeds limit %d, skipping',
+                len(data), _MAX_RUN_FROM_BYTES,
+            )
+            raise ValueError(
+                f'Document too large: {len(data)} bytes exceeds maximum {_MAX_RUN_FROM_BYTES} bytes'
+            )
+        acl_allow = _sanitize_acl(acl_allow)
+
         import pathlib
         import tempfile
 

@@ -388,6 +388,30 @@ class TestIngestPipeline:
         assert len(doc.chunks) >= 0  # may be 0 for hand-crafted PDF
 
 
+def test_chunks_carry_heading_path():
+    """Chunks produced by the pipeline inherit heading_path from metadata."""
+    from unittest.mock import MagicMock
+
+    from depthfusion.ingest.models import Chunk
+
+    mock_parser = MagicMock()
+    parsed = ParsedDocument(
+        source_id="test_doc",
+        text="Alpha beta gamma delta epsilon zeta",
+        metadata={"heading_path": "Introduction"},
+    )
+    mock_parser.parse.return_value = parsed
+
+    pipeline = IngestPipeline(
+        parser=mock_parser,
+        chunker=FixedSizeChunker(chunk_tokens=5, overlap_tokens=0),
+    )
+    doc = pipeline.run("/fake/path.txt")
+
+    assert all(isinstance(c, Chunk) for c in doc.chunks)
+    assert all(c.heading_path == "Introduction" for c in doc.chunks)
+
+
 # ---------------------------------------------------------------------------
 # ChunkingStrategy Protocol conformance
 # ---------------------------------------------------------------------------

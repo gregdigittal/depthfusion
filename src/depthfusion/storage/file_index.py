@@ -50,6 +50,7 @@ class FileMetadataIndex:
 
     def is_stale(self, file_path: Path) -> bool:
         """Return True if file_path is not cached or mtime/size has changed."""
+        file_path = Path(file_path).resolve()
         with self._lock:
             assert self._conn is not None
             cur = self._conn.execute(
@@ -77,6 +78,7 @@ class FileMetadataIndex:
         compute_hash: bool = False,
     ) -> None:
         """Upsert the cache entry for file_path with current mtime/size."""
+        file_path = Path(file_path).resolve()
         stat = file_path.stat()
         mtime = stat.st_mtime
         size = stat.st_size
@@ -111,6 +113,7 @@ class FileMetadataIndex:
 
     def get(self, file_path: Path) -> dict | None:
         """Return the cached metadata dict for file_path, or None if missing."""
+        file_path = Path(file_path).resolve()
         with self._lock:
             assert self._conn is not None
             cur = self._conn.execute(
@@ -132,6 +135,7 @@ class FileMetadataIndex:
 
     def remove(self, file_path: Path) -> None:
         """Remove a cache entry (call when a file is deleted)."""
+        file_path = Path(file_path).resolve()
         with self._lock:
             assert self._conn is not None
             self._conn.execute(
@@ -202,6 +206,7 @@ class FileMetadataIndex:
             ``True`` if the document should be (re-)ingested, ``False`` if it
             is identical to the previously stored version.
         """
+        file_path = Path(file_path).resolve()
         new_hash = hashlib.sha256(data).hexdigest()
         with self._lock:
             assert self._conn is not None
@@ -248,6 +253,7 @@ class FileMetadataIndex:
             ``True`` when the record was updated (data changed); ``False``
             when the data was identical and no update was performed.
         """
+        file_path = Path(file_path).resolve()
         new_hash = hashlib.sha256(data).hexdigest()
 
         try:

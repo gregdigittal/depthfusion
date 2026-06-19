@@ -3,6 +3,7 @@
 Public API::
 
     from depthfusion.ingest import (
+        Chunk,
         ParsedDocument,
         DocumentParser,
         ChunkingStrategy,
@@ -17,11 +18,12 @@ Public API::
 from __future__ import annotations
 
 from depthfusion.ingest.chunking import ChunkingStrategy, FixedSizeChunker, SentenceBoundaryChunker
-from depthfusion.ingest.models import ParsedDocument
+from depthfusion.ingest.models import Chunk, ParsedDocument
 from depthfusion.ingest.parser import DocumentParser
 from depthfusion.ingest.pipeline import IngestPipeline
 
 __all__ = [
+    "Chunk",
     "ParsedDocument",
     "DocumentParser",
     "ChunkingStrategy",
