@@ -6,11 +6,11 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
-> **V2 enterprise branch:** This branch (`v2-enterprise`) contains the V2 enterprise build with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, and classification-aware memory handling. V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. If you are looking for the V1 MCP-only deployment, use the `main` branch.
+> **v2.0.0 — now on main:** DepthFusion v2 ships with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, classification-aware memory handling, and model performance intelligence (HTTP MCP server + `recommend_model` tool). V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. For the v1.x release, see the `v1.2.2` git tag.
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v1.2.2 (main) / v2.0.0-dev (v2-enterprise). 2151+ tests passing · 0 ruff · 0 mypy. V2 adds: OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), and offline mode. V1: Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46), **29 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.0.0 (main). 3482+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server (E-64), and model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **30 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -46,7 +46,7 @@ DepthFusion is benchmarked against vanilla Claude Code with the **CIQS** (Claude
 
 The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall latency** — the full MCP path: corpus load from disk, HNSW vector search, RRF fusion, the ~15 ms CognitiveScorer pass, and MCP transport. This is the latency users actually experience. The sub-millisecond figure in the micro-benchmark below is the BM25 ranking kernel **only** and is not comparable.
 
-#### BM25 core micro-benchmark (`scripts/benchmark.py`, n=8 goldset, local — v1.2.2)
+#### BM25 core micro-benchmark (`scripts/benchmark.py`, n=8 goldset, local — v2.0.0)
 
 | Metric | Value | Scope |
 |---|---|---|
@@ -74,11 +74,11 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 - **Token efficiency** — cognitive pre-filtering reduces irrelevant context surfaced per session; estimated 15–25% reduction in context tokens consumed at scale
 - **8-component scoring overhead** — CognitiveScorer adds ~15 ms vs RRF-only; well within the 1500 ms p95 budget
 
-### Benchmark suite health (v1.2.2, current)
+### Benchmark suite health (v2.0.0, current)
 
-The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v1.2.2 (`git 95832cd`):
+The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v2.0.0:
 
-- **2151 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **3482 tests collected**, full suite passing · 0 ruff · 0 mypy.
 - **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
   - **Cat A** — retrieval precision, no-regression sentinel
   - **Cat B** — BM25 score monotonicity + source-weight tier ordering
@@ -158,7 +158,7 @@ These are measured on the harness and goldset; the CIQS *quality* projections ab
       <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
     </tr>
     <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">MCP-native (29 tools)</td>
+      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">MCP-native (30 tools)</td>
       <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
       <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
       <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
@@ -291,7 +291,7 @@ src/depthfusion/
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (29 canonical tools: 17 always-on, 9 feature-flagged, 3 bridge)
+├── mcp/         — server (30 canonical tools: 17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -355,6 +355,8 @@ Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https:
 For team members who need to connect to the shared VPS memory hub without a local install, open **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** in any browser. 4 steps: install Claude Desktop, install Tailscale, run one `claude mcp add` command, verify with `depthfusion_status`. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
 
 For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
+
+**Upgrading to v2.0.0?** `git pull && pip install -e ".[<your-mode>]"` (e.g. `[local]`, `[vps-cpu]`, `[mac-mlx]`). Schema migration is automatic on first startup — run `python -m depthfusion.cli migrate v2 --dry-run` first to preview changes. V2 adds OIDC+PKCE auth (configure `DEPTHFUSION_OIDC_*` env vars), RBAC, ACL records, Fernet cache encryption, OS keychain token vault, Tauri desktop app, offline mode (SqliteLeaseStore), HTTP MCP server (`http://localhost:8765`), and the model recommendation engine (`recommend_model` tool). See **[docs/v2/pilot-checklist.md](docs/v2/pilot-checklist.md)** for the full V2 setup checklist and rollback procedure (includes `pip install depthfusion==1.2.2` one-liner).
 
 **Upgrading to v1.2.2?** Pull + re-run the installer (or just `git pull` on your dev checkout). Patch release only: Gemma 4 26B (`mlx-community/gemma-4-26b-a4b-it-4bit`) is now the recommended MLX model for ≥16 GB unified memory; the installer menu reflects this. MLX server now sets `SO_REUSEADDR` explicitly so launchd restarts no longer hit `EADDRINUSE` on macOS. Fixed `claude mcp add` argument parsing (`--` flag prevents `-m` from being consumed by the Claude CLI). MLX server now handles the mlx_lm 0.21+ API change where `temperature` was replaced by a `sampler` callable — detected at runtime so the server works across mlx_lm versions. Gemma 4 chain-of-thought (`<|channel>thought`) blocks are stripped server-side so callers receive only the final answer. No dep or schema changes.
 
@@ -623,13 +625,13 @@ cp ~/projects/depthfusion/infra/systemd/depthfusion-rest.service ~/.config/syste
 systemctl --user daemon-reload && systemctl --user enable --now depthfusion-rest
 ```
 
-A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) expose all 29 REST endpoints as subcommands and agent tools. See **[docs/cli.md](docs/cli.md)** for install and usage.
+A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) expose all 30 REST endpoints as subcommands and agent tools. See **[docs/cli.md](docs/cli.md)** for install and usage.
 
 ---
 
-## MCP Tools (29 canonical)
+## MCP Tools (30 canonical)
 
-After E-48 (Multi-Provider Context Bridge), the MCP surface is 29 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; their underlying Python functions remain in the codebase. The canonical set:
+After E-48 (Multi-Provider Context Bridge) and E-64 (HTTP MCP server + model recommendation engine), the MCP surface is 30 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; their underlying Python functions remain in the codebase. The canonical set:
 
 ### Core retrieval & capture (17 always-on)
 
@@ -663,6 +665,14 @@ After E-48 (Multi-Provider Context Bridge), the MCP surface is 29 tools across M
 
 Requires `OPENROUTER_API_KEY` in `depthfusion.env` for bridge and ingest tools to be healthy. `list_providers` always works and reports which providers are configured.
 
+### Model intelligence (1 always-on, E-64)
+
+| Tool | Description | Required flag |
+|---|---|---|
+| `recommend_model` | Query DepthFusion for the best model given task category, vendor exclusion (Fable-5 isolation), and per-task budget. Returns ranked candidates with `quality_rate`, `avg_cost_usd`, `confidence`, and `budget_warning`. Companion tool `record_model_telemetry` closes the feedback loop by writing actual outcomes back to the 30-day rolling stats window. Endpoint `GET /api/budget-summary` returns spend-vs-baseline report. | always |
+
+Requires DepthFusion HTTP MCP server running (`http://localhost:8765` or `http://176.9.147.206:8765`). See **[docs/v2/model-intelligence.md](docs/v2/model-intelligence.md)** for setup and the full budget-aware model selection protocol.
+
 ### Feature-flagged (9 tools)
 
 | Tool | Description | Required flag |
@@ -687,7 +697,7 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 
 For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
 
-The generated CLI (`depthfusion-pp-cli`) exposes all 29 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+The generated CLI (`depthfusion-pp-cli`) exposes all 30 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 

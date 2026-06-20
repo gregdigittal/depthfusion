@@ -292,7 +292,7 @@ def _process_request(
         result = {
             "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "depthfusion", "version": "1.2.2"},
+            "serverInfo": {"name": "depthfusion", "version": "2.0.0"},
         }
     elif method == "tools/list":
         result = _handle_tools_list(config)
