@@ -34,7 +34,7 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
 coverage==7.14.1
 croniter==6.2.2
-cryptography==48.0.1
+cryptography==49.0.0
 cuda-bindings==13.3.1
 cuda-pathfinder==1.5.5
 cuda-toolkit==13.0.2
@@ -160,7 +160,7 @@ pyasn1==0.6.3
 pybase64==1.4.3
 pycparser==3.0
 pydantic==2.13.4
-pydantic-settings==2.14.1
+pydantic-settings==2.14.2
 pydantic_core==2.46.4
 Pygments==2.20.0
 pyHanko==0.35.1
