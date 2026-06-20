@@ -312,6 +312,62 @@ def _process_request(
 
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
+def _session_link_loop() -> None:
+    """Background daemon thread: nightly PRECEDED_BY edge backfill at 03:15 UTC.
+
+    Activated when DEPTHFUSION_GRAPH_ENABLED=true.  Derives SessionRecord
+    objects from existing event entities (VPS-safe — no local .tmp files
+    required) and upserts PRECEDED_BY edges via TemporalSessionLinker.
+
+    Idempotent: get_unlinked_sessions() skips sessions that already have
+    outgoing PRECEDED_BY edges.
+
+    S-212 / Closes S-50 AC-3.
+    """
+    import datetime as _dt
+
+    logger.info("[session_linker] nightly session link scheduler started (target 03:15 UTC)")
+    while True:
+        try:
+            now_utc = _dt.datetime.now(_dt.timezone.utc)
+            target = now_utc.replace(hour=3, minute=15, second=0, microsecond=0)
+            seconds_until = (target - now_utc).total_seconds()
+            if seconds_until <= 0:
+                # Already past today's 03:15 UTC — sleep until tomorrow's.
+                seconds_until += 86400
+
+            logger.debug(
+                "[session_linker] sleeping %.0fs until next 03:15 UTC run",
+                seconds_until,
+            )
+            time.sleep(seconds_until)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[session_linker] sleep calculation error: %s — retrying in 1h", exc)
+            time.sleep(3600)
+            continue
+
+        try:
+            from depthfusion.graph.session_entity_linker import (
+                get_unlinked_sessions,
+                link_and_upsert,
+            )
+            from depthfusion.graph.store import get_store
+
+            graph_store = get_store()
+            sessions = get_unlinked_sessions(graph_store)
+            result = link_and_upsert(sessions, graph_store, dry_run=False)
+            logger.info(
+                "[session_linker] nightly run complete — %d sessions, %d edges added",
+                result["sessions"],
+                result["edges_added"],
+            )
+        except Exception as exc:  # noqa: BLE001 — must never crash the server
+            logger.warning("[session_linker] nightly run error (continuing): %s", exc)
+
+        # Sleep 24h before recalculating; the loop recalculates drift-free.
+        time.sleep(86400)
+
+
 def _autonomic_consolidation_loop(config: Any) -> None:
     """Background daemon thread: find near-duplicate and archive candidates.
 
@@ -396,6 +452,14 @@ def main() -> None:
             name="depthfusion-autonomic",
         )
         t.start()
+
+    if os.getenv("DEPTHFUSION_GRAPH_ENABLED", "false").lower() == "true":
+        sl = threading.Thread(
+            target=_session_link_loop,
+            daemon=True,
+            name="depthfusion-session-linker",
+        )
+        sl.start()
 
     for line in sys.stdin:
         line = line.strip()

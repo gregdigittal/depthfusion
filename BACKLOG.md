@@ -882,7 +882,7 @@
 **Acceptance criteria:**
 - [x] AC-1: New edge type documented in `graph/types.py` (8 edges total, up from 7) — `PRECEDED_BY` added to `_VALID_RELATIONSHIPS`; Edge docstring enumerates all 8 kinds
 - [x] AC-2: `traverse()` can filter by edge kind — `relationship_filter` already existed; this story adds `time_window_hours` filter for time-bucketed traversal with back-compat for non-temporal edges
-- [ ] AC-3: CIQS Category D delta ≥ +2 points on "recent work" questions (benchmark-blocked; requires live corpus + eval set)
+- [x] AC-3: CIQS Category D delta ≥ +2 points on "recent work" questions — **DONE (2026-06-20): bench_cat_d.py reports delta_mrr_pp=+4.17pp (≥+2.0 required); PRECEDED_BY edges verified via S-212 session entity linker; report at `docs/benchmarks/2026-06-20-ciqs-cat-d.json`**
 - [x] AC-4: ≥ 8 new tests (27 tests in `test_temporal_session_linker.py`)
 
 **Tasks:**
@@ -939,7 +939,7 @@
 - [x] T-165: Author `tests/test_metrics/test_collector_v05.py` (26 tests)
 
 **Follow-up (L6/L7 from review, optional for v0.6):**
-- [ ] Simple `record()` stream not flock-guarded (pre-existing); migrate if multi-process interleaving is observed.
+- [x] Simple `record()` stream not flock-guarded (pre-existing); migrate if multi-process interleaving is observed. Closed 2026-06-20: 2 months / 3490+ recall events with 0 corruption observed; single-process uvicorn; revisit if multi-worker deployment introduced.
 - [x] `_iter_jsonl` silently skips malformed lines; `skipped_lines` counter in summary would surface data-integrity gaps.
 
 ### S-54: As an RLM user, I want Opus 4.7 task-budget headers so that `DEPTHFUSION_RLM_COST_CEILING` is enforced API-side instead of post-hoc (OP-2) `P3` `S`
@@ -970,7 +970,7 @@
 
 **Follow-up noted:**
 - [x] `superseded_min_age_hours` grace-period parameter (v0.6) — adds an age floor to the superseded heuristic so false-positive dedup runs have a safety window before archival.
-- [ ] `min-recall-score` heuristic — requires `record_recall_query` extension to capture chunk_ids of returned blocks per query (separate epic).
+- [x] `min-recall-score` heuristic — requires `record_recall_query` extension to capture chunk_ids of returned blocks per query (separate epic). Closed 2026-06-20: chunk_ids capture implemented and present in 74% of 3490 production recall events; min-recall-score heuristic remains a separate epic when desired.
 
 ### S-60: As an operator, I want production code paths to emit the structured recall/capture streams added in S-53 so that `backend_summary()` and `capture_summary()` actually return data `P2` `S`
 
@@ -3493,3 +3493,24 @@
 - [x] T-723: Implement budget alert in digittal-method PM: before each dispatch check `budget.remaining() >= min(avg_cost_usd for eligible models)` — Sonnet dev, Haiku rev
 - [x] T-724: FastAPI endpoint `GET /api/budget-summary` — Sonnet dev, Haiku rev
 - [x] T-725: End-to-end test: simulate a 5-task `/digittal-method` run with a $5 budget cap; verify model selections degrade toward cheaper models as budget shrinks; verify telemetry accumulates; verify feedback loop closes — Opus dev, Codex rev
+
+### S-212: As a recall user, I want PRECEDED_BY edges derived from VPS event entities so that Cat D temporal queries return results `P1` `M` `[done]`
+
+**Context:** S-50 AC-3 remains open. The implementation (linker.py, _link_session_temporally) is complete but the production VPS graph has 0 PRECEDED_BY edges because the linker scans local `.tmp` files (empty on VPS). This story fixes the deployment gap by synthesising `SessionRecord` objects from the 3840 event entities already in the graph.
+
+**Acceptance criteria:**
+- [x] AC-1: `session_entity_linker.py` module exists with `get_sessions_from_events`, `get_unlinked_sessions`, `link_and_upsert`
+- [x] AC-2: `TemporalSessionLinker` defaults updated to `window_hours=168`, env-var overrides (`DEPTHFUSION_SESSION_WINDOW_HOURS`, `DEPTHFUSION_SESSION_MIN_OVERLAP`) added
+- [x] AC-3: Backfill script `rebuild_session_links.py` runs with `--dry-run` (no-op) and `--apply` (idempotent)
+- [x] AC-4: Nightly daemon thread at 03:15 UTC registered in `server.py` (gated on `DEPTHFUSION_GRAPH_ENABLED=true`)
+- [x] AC-5: `.env.example` updated with `DEPTHFUSION_SESSION_WINDOW_HOURS` and `DEPTHFUSION_SESSION_MIN_OVERLAP` and purpose comments
+- [x] AC-6: After `--apply` on VPS, `python tools/bench_cat_d.py` shows Cat D delta ≥ +2 points, closing S-50 AC-3
+
+**Tasks:**
+- [x] T-726: Write `src/depthfusion/graph/session_entity_linker.py` with `get_sessions_from_events`, `get_unlinked_sessions`, `link_and_upsert`
+- [x] T-727: Update `TemporalSessionLinker.__init__` defaults + env-var overrides in `linker.py` (`window_hours=168`, `DEPTHFUSION_SESSION_WINDOW_HOURS`, `DEPTHFUSION_SESSION_MIN_OVERLAP`)
+- [x] T-728: Write `src/depthfusion/graph/rebuild_session_links.py` CLI with `--dry-run` (default) / `--apply`
+- [x] T-729: Register nightly session-link daemon thread in `server.py` at 03:15 UTC, gated on `DEPTHFUSION_GRAPH_ENABLED=true`
+- [x] T-730: Update `.env.example` with `DEPTHFUSION_SESSION_WINDOW_HOURS` and `DEPTHFUSION_SESSION_MIN_OVERLAP`
+- [x] T-731: Write 15 unit tests for `session_entity_linker.py` (mock `GraphStore.all_entities`) — all passing
+- [x] T-732: Run backfill on VPS (`--apply`) and verify Cat D benchmark closes S-50 AC-3

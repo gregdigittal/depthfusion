@@ -188,9 +188,22 @@ class TemporalSessionLinker:
 
     def __init__(
         self,
-        window_hours: float = 48.0,
+        window_hours: float = 168.0,
         min_overlap: int = 5,
     ) -> None:
+        import os as _os
+
+        # Allow runtime tuning without code changes.  Constructor arguments
+        # take precedence; env vars provide the default for the VPS nightly
+        # cron path (S-212).
+        if window_hours == 168.0:
+            window_hours = float(
+                _os.getenv("DEPTHFUSION_SESSION_WINDOW_HOURS", "168.0")
+            )
+        if min_overlap == 5:
+            min_overlap = int(
+                _os.getenv("DEPTHFUSION_SESSION_MIN_OVERLAP", "5")
+            )
         self._window_hours = float(window_hours)
         self._min_overlap = int(min_overlap)
 

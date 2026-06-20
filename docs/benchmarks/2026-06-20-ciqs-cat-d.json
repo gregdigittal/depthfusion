@@ -1,0 +1,260 @@
+{
+  "run_date": "2026-06-20",
+  "fixture_count": 12,
+  "edges_off": {
+    "mrr": 0.9583333333333334,
+    "hit_at_1": 0.9166666666666666,
+    "hit_at_3": 1.0,
+    "hit_at_5": 1.0
+  },
+  "edges_on": {
+    "mrr": 1.0,
+    "hit_at_1": 1.0,
+    "hit_at_3": 1.0,
+    "hit_at_5": 1.0
+  },
+  "delta_mrr_pp": 4.1667,
+  "s50_ac3_met": true,
+  "per_fixture": [
+    {
+      "fixture_index": 0,
+      "query": "what was recently implemented in the auth module",
+      "description": "recent work on authentication \u2014 requires PRECEDED_BY traversal to surface prior session",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 1,
+      "query": "what did we work on last session in the payment service",
+      "description": "recent work on payments \u2014 temporal chain between two sessions",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 2,
+      "query": "what changes were made to the database schema recently",
+      "description": "recent schema migration work \u2014 two-session temporal chain",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 3,
+      "query": "what was the last feature shipped in the API",
+      "description": "recent API work \u2014 three-session temporal chain",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 0.5,
+        "hit_at_1": 0,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 50.0
+    },
+    {
+      "fixture_index": 4,
+      "query": "what refactoring was done recently in the services layer",
+      "description": "recent refactor work \u2014 requires walking PRECEDED_BY chain to find prior session",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 5,
+      "query": "what performance improvements were made in the last two sessions",
+      "description": "recent performance work \u2014 multi-session chain",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 6,
+      "query": "what bugs were fixed recently",
+      "description": "recent bug fixes \u2014 temporal chain needed to surface fix from prior session",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 7,
+      "query": "what was implemented in the notification system recently",
+      "description": "recent notification work \u2014 two sessions close in time",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 8,
+      "query": "what infrastructure changes were made this week",
+      "description": "recent infra work \u2014 sessions 36 hours apart",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 9,
+      "query": "what search functionality was added recently",
+      "description": "recent search implementation \u2014 temporal chain surfaces related prior session",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 10,
+      "query": "what was done in the last session on data pipeline work",
+      "description": "recent data engineering work \u2014 requires temporal edge to surface prior session context",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    },
+    {
+      "fixture_index": 11,
+      "query": "what monitoring and observability work was completed recently",
+      "description": "recent observability work \u2014 two sessions on monitoring setup",
+      "corpus_size": 3,
+      "relevant_count": 2,
+      "edges_off": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "edges_on": {
+        "mrr": 1.0,
+        "hit_at_1": 1,
+        "hit_at_3": 1,
+        "hit_at_5": 1
+      },
+      "delta_mrr_pp": 0.0
+    }
+  ]
+}
