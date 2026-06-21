@@ -38,10 +38,14 @@ jobs:
         with:
           workspaces: "./app/src-tauri -> target"
 
-      - name: Set OpenSSL dir (Windows)
+      - name: Install OpenSSL (Windows)
         if: matrix.platform == 'windows-latest'
-        run: echo "OPENSSL_DIR=C:\Program Files\OpenSSL-Win64" >> $env:GITHUB_ENV
         shell: pwsh
+        run: |
+          vcpkg install openssl:x64-windows-static
+          $root = $env:VCPKG_INSTALLATION_ROOT
+          echo "OPENSSL_DIR=$root\installed\x64-windows-static" >> $env:GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
 
       - name: Set up pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
