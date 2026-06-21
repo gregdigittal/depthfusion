@@ -1,0 +1,50 @@
+# vllm-qwen.service — systemd unit for DepthFusion vps-gpu Qwen server.
+#
+# Use this instead of vllm-gemma.service on cards with 16-20 GB VRAM
+# (e.g. RTX 4000 SFF Ada, 19.55 GiB). Gemma 4 26B AWQ (~13 GB weights)
+# OOMs on these cards; Qwen2.5-14B-Instruct-AWQ (~8.5 GB) fits comfortably.
+#
+# Install:
+#   sudo cp scripts/vllm-qwen.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now vllm-qwen
+#
+# Inspect:
+#   systemctl status vllm-qwen
+#   journalctl -u vllm-qwen -f
+
+[Unit]
+Description=DepthFusion vLLM Qwen2.5-14B server (vps-gpu backend, 16-20 GB VRAM)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=gregmorris
+Group=gregmorris
+WorkingDirectory=/home/gregmorris/projects/depthfusion
+
+Environment="PATH=/home/gregmorris/projects/depthfusion/.venv/bin:/usr/bin:/bin"
+Environment="DEPTHFUSION_GEMMA_MODEL=Qwen/Qwen2.5-14B-Instruct-AWQ"
+Environment="DEPTHFUSION_GEMMA_PORT=8000"
+Environment="DEPTHFUSION_GEMMA_HOST=127.0.0.1"
+Environment="DEPTHFUSION_GEMMA_GPU_MEMORY=0.90"
+Environment="DEPTHFUSION_GEMMA_MAX_MODEL_LEN=8192"
+
+ExecStart=/home/gregmorris/projects/depthfusion/scripts/vllm-serve-qwen.sh
+
+Restart=on-failure
+RestartSec=5
+
+# Qwen2.5-14B-AWQ (~8.5 GB weights) loads faster than Gemma 26B but still
+# needs ~60-90s to deserialize and warm the CUDA kernels.
+TimeoutStartSec=300
+
+MemoryMax=48G
+LimitNOFILE=65536
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

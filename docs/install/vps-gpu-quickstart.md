@@ -5,7 +5,7 @@
 > **Target:** Hetzner GEX44 (NVIDIA RTX 4000 SFF Ada) or any CUDA-12+ host
 > **Time:** ~4 hours (mostly GPU-driver + Gemma model download)
 > **Produces:** working DepthFusion in `vps-gpu` mode + weekly regression monitor + initial prompt corpus
-> **Estimated first-run size on disk:** ~36 GB (vLLM + Gemma 4 26B AWQ + sentence-transformers + torch CUDA build). Gemma 4 26B AWQ weights are ~13 GB, up from ~7 GB for Gemma 3 12B AWQ used in earlier versions of this guide.
+> **Estimated first-run size on disk:** ~36 GB (vLLM + Gemma 4 26B AWQ + sentence-transformers + torch CUDA build). Gemma 4 26B AWQ weights are ~13 GB. For cards with < 20 GB VRAM, use Qwen2.5-14B-Instruct-AWQ instead (~8.5 GB weights, ~18 GB total on disk).
 
 This is the GPU-enabled counterpart to
 [`vps-cpu-quickstart.md`](vps-cpu-quickstart.md). At the end you'll
@@ -31,11 +31,12 @@ The recommended model is **Gemma 4 26B MoE** in AWQ 4-bit quantization,
 which is what the rest of this guide assumes. Use the table below to
 pick the right variant if your VRAM differs from the GEX44 reference.
 
-| GPU VRAM | Recommended Gemma 4 variant | Quantization | Notes |
-|----------|-----------------------------|--------------|-------|
-| 12-16 GB | E4B (4B effective)          | BF16 or AWQ  | Smallest competent variant; runs comfortably on consumer cards |
-| **20-24 GB** | **26B MoE (this guide)**     | **AWQ 4-bit** | 3.8B active params per forward pass, but ALL 26B must fit in VRAM (~13 GB AWQ); the GEX44 reference target |
-| 40+ GB   | 31B Dense                   | BF16 or AWQ  | Highest quality; needs a higher-VRAM host than this guide assumes |
+| GPU VRAM | Recommended model | Quantization | Notes |
+|----------|-------------------|--------------|-------|
+| 12-16 GB | Gemma 4 E4B (4B effective) | BF16 or AWQ | Smallest competent variant; runs comfortably on consumer cards |
+| **16-20 GB** | **Qwen2.5-14B-Instruct-AWQ** | **AWQ 4-bit** | ~8.5 GB weights; verified on RTX 4000 SFF Ada (19.55 GiB) at 0.90 util. Use `scripts/vllm-qwen.service`. |
+| **20-24 GB** | **Gemma 4 26B MoE (this guide)** | **AWQ 4-bit** | ~13 GB weights; needs the full 20 GB VRAM; GEX44 reference target. Use `scripts/vllm-gemma.service`. |
+| 40+ GB   | Gemma 4 31B Dense | BF16 or AWQ | Highest quality; needs a higher-VRAM host than this guide assumes |
 
 > **MoE memory note (counter-intuitive):** Gemma 4 26B is a Mixture-of-Experts
 > model with ~3.8B active parameters per forward pass. MoE is a *compute*
@@ -43,6 +44,11 @@ pick the right variant if your VRAM differs from the GEX44 reference.
 > still be resident in VRAM. AWQ 4-bit takes the 26B from ~52 GB (BF16)
 > down to ~13 GB, which is what makes it fit a 20 GB card. If you assume
 > "3.8B active means it'll fit on a 12 GB card" you'll OOM at load.
+
+> **RTX 4000 SFF Ada (19.55 GiB) note:** Gemma 4 26B AWQ (~13 GB weights)
+> leaves < 7 GB for KV cache and OOMs during model load on this card.
+> Use **Qwen2.5-14B-Instruct-AWQ** instead — verified at
+> `--gpu-memory-utilization 0.90`, leaving ~9.1 GB for KV cache.
 
 For the rest of this guide, "Gemma 4" without qualification means the
 26B MoE AWQ variant.
@@ -177,27 +183,42 @@ echo "$VIRTUAL_ENV" # should print /home/$USER/venvs/depthfusion
 
 ## 2. Set up vLLM as a systemd service
 
-A ready-to-use service file ships in the repo. It's pre-configured for
-**Gemma 4 26B AWQ** (`google/gemma-4-26b-it-AWQ`); change the model
-identifier if you picked a different variant from the hardware-fit
-table in §0.
+Two ready-to-use service files ship in the repo — pick the one matching
+your hardware from the table in §0:
 
-> **Verify the model identifier before deploying.** Google's official
-> AWQ release for Gemma 4 26B-IT and any community AWQ quants may use
-> different repo paths. Cross-check with the vLLM Gemma 4 recipe page
+| Card VRAM | Service file | Model |
+|-----------|-------------|-------|
+| 16-20 GB  | `scripts/vllm-qwen.service` | `Qwen/Qwen2.5-14B-Instruct-AWQ` |
+| 20-24 GB  | `scripts/vllm-gemma.service` | `google/gemma-4-26b-it-AWQ` |
+
+> **Verify the Gemma model identifier before deploying.** Google's official
+> AWQ release for Gemma 4 26B-IT and community AWQ quants may use different
+> repo paths. Cross-check with the vLLM Gemma 4 recipe page
 > ([docs.vllm.ai/projects/recipes/.../Gemma4](https://docs.vllm.ai/projects/recipes/en/latest/Google/Gemma4.html))
 > and `huggingface-cli search gemma-4-26b` before committing.
 
 ```bash
-# Review it first — paths and model choice may need adjustment
-less ~/projects/depthfusion/scripts/vllm-gemma.service
+# For 16-20 GB cards (Qwen2.5-14B-Instruct-AWQ):
+less ~/projects/depthfusion/scripts/vllm-qwen.service
+sudo cp ~/projects/depthfusion/scripts/vllm-qwen.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable vllm-qwen
+sudo systemctl start vllm-qwen
 
-# Install (requires root)
+# For 20-24 GB cards (Gemma 4 26B AWQ):
+less ~/projects/depthfusion/scripts/vllm-gemma.service
 sudo cp ~/projects/depthfusion/scripts/vllm-gemma.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable vllm-gemma
 sudo systemctl start vllm-gemma
 ```
+
+> **Writing a service file manually?** Do NOT use a heredoc. Backslash line
+> continuations in `ExecStart=` are silently dropped during terminal paste,
+> breaking the multi-line `docker run` command. Use the Python
+> list-of-strings approach instead: write each flag as a list element,
+> join with `\n`, write to `/tmp/`, then `sudo cp`. See
+> `~/vllm-qwen-setup.md` on the VPS for a worked example.
 
 First start downloads the Gemma 4 26B AWQ weights (~13 GB). Wait for
 the server to be ready:
@@ -222,11 +243,19 @@ sudo journalctl -u vllm-gemma --since="10 minutes ago" | grep -iE "error|loaded"
 ```
 
 If vLLM fails to start, common causes:
-- OOM on load → edit `--gpu-memory-utilization` in the service file
-  (try 0.80 if the GPU is shared with anything else)
-- Port conflict → `sudo lsof -i :8000` to find the squatter
+- OOM on load → if VRAM is 16-20 GB, switch to `vllm-qwen.service`
+  (Qwen2.5-14B-AWQ needs ~8.5 GB vs Gemma's ~13 GB). Otherwise lower
+  `--gpu-memory-utilization` to 0.80 in the service file.
+- Port 8000 conflict → `sudo lsof -i :8000` to find the squatter
 - Model-path issue → check `~/.cache/huggingface/` for partial
   downloads; delete and retry
+
+If `depthfusion-mcp` fails to bind after a restart (port already in use):
+```bash
+# A stale process may be holding the MCP port from the previous run
+sudo fuser -k 7301/tcp
+sudo systemctl start depthfusion-mcp
+```
 
 ---
 
