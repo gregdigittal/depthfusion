@@ -8,7 +8,7 @@ use tauri_plugin_store::StoreExt;
 
 const STORE_PATH: &str = "settings.json";
 const SERVER_URL_KEY: &str = "server_url";
-const DEFAULT_SERVER_URL: &str = "https://localhost:8000";
+const DEFAULT_SERVER_URL: &str = "http://176.9.147.206:7300";
 
 /// Retrieve the configured server URL.
 ///
