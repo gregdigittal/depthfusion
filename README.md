@@ -67,12 +67,15 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 | v0.3.0 vps-cpu (Tier 1: BM25 + Haiku rerank) | ~88 | +2 vs local | ≥65% | ≤1500 ms | Medium |
 | v0.3.0 vps-cpu (Tier 2: + ChromaDB fusion) | ~90 | +3 vs local | ≥70% | ≤1500 ms | Medium |
 | **v1.0.0 (E-31 cognitive layer)** | **~94–96** | +4 vs Tier 2 | **≥85%** | **≤1500 ms** | Medium-high |
+| **v2.0.0 (S-212 + E-46 + E-48, vps-gpu)** | **~95–97** | +4 vs Tier 2 | **≥90%** | **≤1500 ms** | Medium-high |
 
-**v1.0.0 improvements over v0.6.0a2:**
-- **Category D continuity: 70% → 85%+** — cognitive layer enables decision-aware recall; the system knows why it recalled something, not just that it matched
-- **Contradiction prevention** — ContradictionEngine catches conflicting advice across sessions; estimated 40% reduction in contradictory guidance delivered to Claude
-- **Token efficiency** — cognitive pre-filtering reduces irrelevant context surfaced per session; estimated 15–25% reduction in context tokens consumed at scale
-- **8-component scoring overhead** — CognitiveScorer adds ~15 ms vs RRF-only; well within the 1500 ms p95 budget
+**v2.0.0 improvements over v1.0.0:**
+- **Category D continuity: 85% → ≥90%** — PRECEDED_BY edges from VPS event entities (S-212) add verified +4.17pp Cat D delta_mrr; edges accumulate nightly via the 03:15 UTC session linker
+- **Multi-agent shared memory** — Event Graph Fabric (E-46) tracks “who knew what, when” across agent sessions; new sessions inherit room working memory automatically via `depthfusion_session_seed`
+- **Cross-provider knowledge** — Multi-Provider Bridge (E-48) ingests ChatGPT/Gemini/DeepSeek conversation exports; `depthfusion_bridge` routes to 10+ providers and stores responses back as searchable memory
+- **Enterprise access control** — OIDC+PKCE auth, RBAC (viewer/contributor/operator/admin), data classification (PUBLIC→RESTRICTED), Fernet cache encryption; Tauri desktop app for macOS and Windows
+
+> **Industry benchmark context.** The CIQS suite above measures developer-workflow recall quality (retrieval precision across coding sessions, cross-session continuity of architectural decisions). The leading industry benchmarks for agent memory — LoCoMo, LongMemEval, BEAM — measure conversation-history recall (user preferences, multi-session chat). These are complementary task types: mem0 reports LoCoMo 92.5 / LongMemEval 94.4; Zep’s Graphiti engine reports DMR 94.8% / LongMemEval 63.8%. A direct CIQS run against external systems is planned under E-26.
 
 ### Benchmark suite health (v2.0.0, current)
 
@@ -90,130 +93,31 @@ These are measured on the harness and goldset; the CIQS *quality* projections ab
 
 ## Why DepthFusion?
 
-<table align="center" style="border-collapse:separate;border-spacing:0;width:100%;max-width:980px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(27,31,36,0.12);">
-  <thead>
-    <tr>
-      <th align="left" style="padding:13px 16px;background-color:#4f46e5;color:#ffffff;font-weight:700;border:none;letter-spacing:0.2px;">Feature</th>
-      <th align="center" style="padding:13px 10px;background-color:#4338ca;color:#ffffff;font-weight:800;border:none;border-left:2px solid rgba(255,255,255,0.25);">DepthFusion</th>
-      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Vanilla&nbsp;CC</th>
-      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Continue.dev</th>
-      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Cursor</th>
-      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">Copilot</th>
-      <th align="center" style="padding:13px 10px;background-color:#6d28d9;color:#ede9fe;font-weight:500;border:none;">RAG&nbsp;Plugin</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cross-session memory</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Fully local / offline mode</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Self-hosted (own your data)</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Recall latency (warm, end-to-end)</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">37–372&nbsp;ms</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">n/a</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~200&nbsp;ms+</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~300&nbsp;ms+</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">~250&nbsp;ms+</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;color:#57606a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">100–500&nbsp;ms</td>
-    </tr>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Per-query cost</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0&nbsp;✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">$0</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;API</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Sub</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️&nbsp;Host</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Multi-provider bridge (import GPT/Gemini/DeepSeek)</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-    </tr>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">MCP-native (30 tools)</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Hybrid retrieval (BM25 + vector + RRF)</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Cognitive scoring &amp; contradiction detection</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Decision / outcome-aware recall</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#ffffff;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;font-weight:600;color:#1f2328;">Conversation ingestion from other AI tools</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-    <tr style="background:#f6f8fa;">
-      <td align="left" style="padding:10px 16px;border-top:1px solid #eaeef2;border-bottom:none;font-weight:600;color:#1f2328;">Open source</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#e6f4ea;color:#1a7f37;font-weight:600;">✅</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fbe9e7;color:#cf222e;">❌</td>
-      <td align="center" style="padding:10px;border-top:1px solid #eaeef2;background:#fff8e1;color:#9a6700;">⚠️</td>
-    </tr>
-  </tbody>
-</table>
-<p align="center"><sub>✅ full support&nbsp;&nbsp;•&nbsp;&nbsp;⚠️ partial / varies by config&nbsp;&nbsp;•&nbsp;&nbsp;❌ not supported&nbsp;&nbsp;|&nbsp;&nbsp;Compares the <strong>local / free tier</strong> of each product. Latency = warm recall, end-to-end. DepthFusion's 37–372 ms is measured (n=4 real sessions); competitor values are approximate, drawn from public docs and may vary by configuration.</sub></p>
+| | DepthFusion | mem0 | Zep | Letta | Cognee |
+|---|---|---|---|---|---|
+| **Claude Code MCP-native** | ✅ 30 tools | ❌ SDK only | ❌ SDK only | ❌ SDK only | ❌ SDK only |
+| **Per-query cost (local/self-host)** | **$0** | ⚠️ LLM API/op | ⚠️ credit-based¹ | ⚠️ LLM API/op | ⚠️ LLM API/op |
+| **Self-hosted (own your data)** | ✅ | ✅ Apache 2.0 | ⚠️ Graphiti only² | ✅ Apache 2.0 | ✅ Apache 2.0 |
+| **Hybrid BM25 + vector recall** | ✅ | ✅ v2 | ✅ Graphiti | ❌ context-managed | ⚠️ partial |
+| **Temporal knowledge graph** | ✅ PRECEDED_BY | ❌ | ✅ Graphiti | ❌ | ✅ |
+| **Contradiction detection** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Developer workflow auto-capture** | ✅ PostCompact hooks | ❌ | ❌ | ❌ | ❌ |
+| **Multi-provider memory bridge** | ✅ 10+ via OpenRouter | ❌ | ❌ | ❌ | ⚠️ 38+ ingest sources |
+| **OIDC / RBAC / data classification** | ✅ v2.0.0 | ⚠️ org API keys | ✅ cloud only | ❌ | ❌ |
+| **Agent self-manages memory** | ❌ | ❌ | ❌ | ✅ OS-inspired | ❌ |
+| **Open source** | ✅ | ✅ | ✅ Graphiti only | ✅ | ✅ |
+| **LoCoMo / LongMemEval** | not measured³ | 92.5 / 94.4 | DMR 94.8% / 63.8% | not published | not published |
+
+<sub>
+¹ Zep Cloud charges credits; free tier is 1 000/mo (testing only); $125/mo is the first paid tier. ² Zep Community Edition was deprecated April 2025 — self-hosting now means running Graphiti (the graph engine) plus your own graph database (Neo4j, FalkorDB, or Kuzu). mem0’s knowledge-graph retrieval costs $249/mo on cloud; the Apache 2.0 self-hosted version includes graph features without the paywall. ³ DepthFusion is benchmarked on CIQS (developer-workflow recall), not the conversation-history benchmarks used by mem0/Zep; see the Performance section above. Letta is a stateful agent framework where the agent controls its own memory via tool calls — a different paradigm from a retrieval layer, not a direct substitute.
+</sub>
+
+**When to choose each:**
+- **DepthFusion** — Claude Code users who want MCP-native shared memory, $0/query local recall, cross-session continuity, and cognitive scoring without an external SaaS
+- **mem0** — general-purpose multi-app memory (chatbots, CRM, personalization) across multiple tools and providers
+- **Zep / Graphiti** — enterprise workflows where facts change over time (CRM, healthcare, finance) and SOC 2 compliance or a temporal knowledge graph is a hard requirement
+- **Letta** — stateful agents that should self-manage their own memory (OS-inspired RAM/disk model); long-running autonomous agents that decide what they remember
+- **Cognee** — knowledge graph built from heterogeneous data sources (38+ ingest formats) for research or enterprise RAG pipelines
 
 ---
 
