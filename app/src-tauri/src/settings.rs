@@ -8,6 +8,7 @@ use tauri_plugin_store::StoreExt;
 
 const STORE_PATH: &str = "settings.json";
 const SERVER_URL_KEY: &str = "server_url";
+// ponytail: plaintext HTTP — temporary until Caddy TLS vhost is added for this server
 const DEFAULT_SERVER_URL: &str = "http://176.9.147.206:7300";
 
 /// Retrieve the configured server URL.
