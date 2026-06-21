@@ -6,8 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 # Import the script as a module without executing main()
 _SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "generate_synthetic_corpus.py"
 _spec = importlib.util.spec_from_file_location("generate_synthetic_corpus", _SCRIPT)

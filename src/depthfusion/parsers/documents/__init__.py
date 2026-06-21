@@ -35,8 +35,8 @@ from depthfusion.parsers.documents.base import (
     get_quarantine_store,
     quarantine,
 )
-from depthfusion.parsers.documents.generic import GenericParser
 from depthfusion.parsers.documents.docx import DocxParser
+from depthfusion.parsers.documents.generic import GenericParser
 from depthfusion.parsers.documents.ocr import OcrParser, _ocr_enabled
 from depthfusion.parsers.documents.pdf import PdfParser
 from depthfusion.parsers.documents.pptx import PptxParser

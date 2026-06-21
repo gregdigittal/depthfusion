@@ -32,7 +32,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from depthfusion.ingest.chunking import ChunkingStrategy, FixedSizeChunker
-from depthfusion.ingest.models import Chunk as _Chunk, ParsedDocument
+from depthfusion.ingest.models import Chunk as _Chunk
+from depthfusion.ingest.models import ParsedDocument
 from depthfusion.ingest.parser import DocumentParser
 
 if TYPE_CHECKING:

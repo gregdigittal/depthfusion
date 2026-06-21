@@ -59,7 +59,9 @@ def check_regression(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check benchmark regression against baseline.")
-    parser.add_argument("--results", type=Path, required=True, help="Current benchmark results JSON")
+    parser.add_argument(
+        "--results", type=Path, required=True, help="Current benchmark results JSON"
+    )
     parser.add_argument("--baseline", type=Path, required=True, help="Baseline benchmark JSON")
     parser.add_argument(
         "--threshold",

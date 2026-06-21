@@ -187,7 +187,7 @@ realtime==2.31.0
 redis==5.3.1
 referencing==0.37.0
 regex==2026.5.9
-reportlab==4.5.1
+reportlab==5.0.0
 requests==2.34.2
 requests-oauthlib==2.0.0
 requests-toolbelt==1.0.0

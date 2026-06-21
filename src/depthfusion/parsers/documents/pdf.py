@@ -38,27 +38,20 @@ class PdfParser(DocumentParser):
     name: str = "pdf"
     supported_mime_types: list[str] = [_MIME_PDF]
 
-    def parse(
-        self,
-        document_id: str,
-        content_bytes: bytes,
-        **kwargs: object,
-    ) -> list[DocumentRecord]:
-        """Parse *content_bytes* as a PDF document.
+    def parse(self, source_id: str, data: bytes) -> list[DocumentRecord]:
+        """Parse *data* as a PDF document.
 
         Returns one :class:`DocumentRecord` per page via pdfplumber, a single
         record via pdfminer fallback, or an empty list if dependencies are
-        unavailable, *content_bytes* is empty, or any error occurs.
+        unavailable, *data* is empty, or any error occurs.
         """
-        del kwargs
-
-        if not content_bytes or not (_pdfplumber_available or _pdfminer_available):
+        if not data or not (_pdfplumber_available or _pdfminer_available):
             return []
 
         try:
             if _pdfplumber_available:
-                return self._parse_with_pdfplumber(document_id, content_bytes)
-            return self._parse_with_pdfminer(document_id, content_bytes)
+                return self._parse_with_pdfplumber(source_id, data)
+            return self._parse_with_pdfminer(source_id, data)
         except Exception:  # noqa: BLE001
             return []
 

@@ -120,6 +120,7 @@ dev = [
     "pypdf>=3.0",            # optional PDF parser — imported by test_ingest_throughput.py
     "pdfplumber>=0.11",      # PdfParser primary backend — required by test_document_parsers.py
     "pdfminer.six>=20221105",  # PdfParser fallback backend — pdfplumber transitive dep but pinned for CI
+    "reportlab>=4.0",        # test fixture _make_pdf() multi-page PDF generator — without it CI falls back to single-page MINIMAL_PDF and test_page_count_matches_records fails (assert 1 == 2)
     "cryptography>=49.0.0",  # token_validator.py direct import; not installed transitively by pip
     "python-docx>=0.8",     # ingest/parser.py + test_ingest.py direct import; not installed transitively by pip
     "msal>=1.0",            # sharepoint.py lazy import; test_sharepoint.py expects ConfigurationError not ImportError
@@ -157,6 +158,7 @@ target-version = "py310"
 exclude = [
     ".claude/worktrees",  # generated git worktrees — not production code
     ".claire/worktrees",  # generated git worktrees — not production code
+    "docs/decisions",     # ADR artifacts: pentest/migration scripts — not imported, not shipped
 ]
 
 [tool.ruff.lint]
