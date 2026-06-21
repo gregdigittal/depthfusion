@@ -15,7 +15,7 @@ const SKEW: u64 = 30;
 fn default_config() -> OidcConfig {
     OidcConfig {
         issuer: std::env::var("OIDC_ISSUER")
-            .unwrap_or_else(|_| "https://auth.depthfusion.ai".to_string()),
+            .unwrap_or_else(|_| "https://login.tonracein.com/realms/depthfusion".to_string()),
         client_id: std::env::var("OIDC_CLIENT_ID")
             .unwrap_or_else(|_| "depthfusion-desktop".to_string()),
         redirect_uri: "depthfusion://callback".to_string(),
