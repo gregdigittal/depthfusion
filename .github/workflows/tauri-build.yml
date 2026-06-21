@@ -42,6 +42,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9  # stable
         with:
+          toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin,x86_64-pc-windows-msvc
 
       - name: Cache Rust build artifacts
