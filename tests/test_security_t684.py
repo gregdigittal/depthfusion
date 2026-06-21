@@ -38,7 +38,6 @@ class TestF001NonceReplayBypass:
         )
 
         # Patch the internal decode so we control the claims returned.
-        import base64, json
 
         _HEADER_CLAIMS = {"alg": "RS256", "kid": "test-kid"}
 
@@ -52,7 +51,6 @@ class TestF001NonceReplayBypass:
         validator._split = lambda token: ("hdr", "pay", "sig")  # type: ignore[method-assign]
 
         # Patch signature verification to always pass.
-        from cryptography.hazmat.primitives.asymmetric import rsa
         real_key = MagicMock()
         real_key.verify.return_value = None
 
@@ -158,8 +156,8 @@ class TestF002MemberRoleInternalAccess:
         """PolicyEngine must allow a MEMBER principal to read an INTERNAL record they are in."""
         try:
             from depthfusion.authz.policy_engine import get_policy_engine
-            from depthfusion.identity.models import Principal
             from depthfusion.authz.roles import Capability
+            from depthfusion.identity.models import Principal
         except ImportError as exc:
             pytest.skip(f"policy engine unavailable: {exc}")
 
@@ -236,6 +234,7 @@ class TestF006EphemeralKeyWarning:
     def test_explicit_key_no_warning(self, caplog):
         """CacheManager with an explicit key must NOT emit the ephemeral-key warning."""
         from cryptography.fernet import Fernet
+
         from depthfusion.cache.manager import CacheManager
 
         key = Fernet.generate_key()
@@ -255,7 +254,7 @@ class TestF006EphemeralKeyWarning:
         from depthfusion.cache.manager import CacheManager
 
         cm = CacheManager(db_path=":memory:", key=None)
-        entry = cm.put("path/a", "principal-1", b"payload data")
+        cm.put("path/a", "principal-1", b"payload data")
         result = cm.get("path/a", "principal-1")
         # get() returns a CacheEntry on hit, None on miss/decryption failure.
         assert result is not None, "Cache get must return entry on hit"

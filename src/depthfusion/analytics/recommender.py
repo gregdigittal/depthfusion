@@ -88,7 +88,11 @@ def _observed_stat_for(stats: list[dict[str, Any]], model_id: str) -> Optional[d
     Prefers the ``observed`` row (which already blends priors at low n); falls
     back to a ``prior`` row when no observed data exists.
     """
-    observed = [s for s in stats if s["model_id"] == model_id and s["source"] in ("observed", "blended")]
+    observed = [
+        s
+        for s in stats
+        if s["model_id"] == model_id and s["source"] in ("observed", "blended")
+    ]
     if observed:
         return observed[0]
     prior = [s for s in stats if s["model_id"] == model_id and s["source"] == "prior"]

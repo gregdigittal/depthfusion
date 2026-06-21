@@ -45,11 +45,11 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
     )
 
-    from depthfusion.graph.store import get_store
     from depthfusion.graph.session_entity_linker import (
         get_unlinked_sessions,
         link_and_upsert,
     )
+    from depthfusion.graph.store import get_store
 
     graph_store = get_store()
 

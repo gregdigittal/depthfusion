@@ -205,7 +205,7 @@ class SyntheticCorpusGenerator:
           - internal: admin + all senior + ~40% of regular (no external)
           - public: admin + all senior + all regular (no external by default)
         """
-        principals = self.build_principals()
+        self.build_principals()
         tier_groups = self._tier_groups
         assert tier_groups is not None
 
@@ -397,7 +397,10 @@ def _stats_mode(gen: SyntheticCorpusGenerator) -> None:
     print(f"Chunks:              {stats.num_chunks}")
     print(f"Avg chunks/doc:      {stats.avg_chunks_per_doc:.2f}")
     print(f"Avg ACL size:        {stats.avg_acl_size:.1f}")
-    print(f"ACL skew (top-10%):  {stats.acl_skew_p10_coverage:.1%} of docs accessible to top 10% of principals")
+    print(
+        f"ACL skew (top-10%):  {stats.acl_skew_p10_coverage:.1%} "
+        "of docs accessible to top 10% of principals"
+    )
     print("Classification distribution:")
     for cls, count in sorted(stats.classification_dist.items(), key=lambda x: -x[1]):
         pct = count / max(1, stats.num_documents) * 100

@@ -12,9 +12,7 @@ The core invariants tested:
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call
-
-import pytest
+from unittest.mock import MagicMock
 
 from depthfusion.graph.extractor import make_entity_id
 from depthfusion.graph.session_entity_linker import (
@@ -23,7 +21,6 @@ from depthfusion.graph.session_entity_linker import (
     link_and_upsert,
 )
 from depthfusion.graph.types import Entity
-
 
 # ---------------------------------------------------------------------------
 # Helpers

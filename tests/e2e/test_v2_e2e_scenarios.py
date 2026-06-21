@@ -27,24 +27,18 @@ Run with:
 from __future__ import annotations
 
 import json
-import sqlite3
-import time
-from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from cryptography.fernet import Fernet
 
 from depthfusion.authz.classification import ClassificationLevel
-from depthfusion.authz.export_controls import ExportFormat, ExportPolicy
-from depthfusion.authz.policy_engine import PolicyDecision, PolicyEngine
-from depthfusion.authz.roles import Capability
+from depthfusion.authz.export_controls import ExportFormat
+from depthfusion.authz.policy_engine import PolicyEngine
 from depthfusion.cache.manager import CacheManager
-from depthfusion.cache.models import CacheEntry, EvictionPolicy
+from depthfusion.cache.models import EvictionPolicy
 from depthfusion.identity.models import Principal
 from depthfusion.identity.principal_store import PrincipalStore
-
 
 # ============================================================================
 # Fixtures: Shared test infrastructure
@@ -422,11 +416,11 @@ def test_e2e_admin_wipe_principal_records(principal_store, principals_dict):
 def test_e2e_components_importable():
     """Smoke test: all required components are importable."""
     # These imports would fail if the modules do not exist.
+    from depthfusion.authz.export_controls import ExportFormat
     from depthfusion.authz.policy_engine import PolicyEngine
-    from depthfusion.authz.export_controls import ExportFormat, ExportPolicy
     from depthfusion.cache.manager import CacheManager
-    from depthfusion.identity.principal_store import PrincipalStore
     from depthfusion.identity.models import Principal
+    from depthfusion.identity.principal_store import PrincipalStore
 
     # Just importing is the test; no assertions needed.
     assert PolicyEngine is not None

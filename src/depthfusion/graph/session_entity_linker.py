@@ -28,12 +28,12 @@ from depthfusion.graph.linker import (
 from depthfusion.graph.types import Entity
 
 if TYPE_CHECKING:
-    from depthfusion.graph.store import GraphStore
+    from depthfusion.graph.store import GraphBackend
 
 logger = logging.getLogger(__name__)
 
 
-def get_sessions_from_events(graph_store: GraphStore) -> list[SessionRecord]:
+def get_sessions_from_events(graph_store: GraphBackend) -> list[SessionRecord]:
     """Extract SessionRecord objects from event+memory entities in the graph.
 
     One O(n) pass over all entities:
@@ -110,7 +110,7 @@ def get_sessions_from_events(graph_store: GraphStore) -> list[SessionRecord]:
     return records
 
 
-def get_unlinked_sessions(graph_store: GraphStore) -> list[SessionRecord]:
+def get_unlinked_sessions(graph_store: GraphBackend) -> list[SessionRecord]:
     """Return only sessions that have no outgoing PRECEDED_BY edges yet.
 
     Each session's entity_id is derived via `make_entity_id(session_id,
@@ -138,7 +138,7 @@ def get_unlinked_sessions(graph_store: GraphStore) -> list[SessionRecord]:
 
 def link_and_upsert(
     sessions: list[SessionRecord],
-    graph_store: GraphStore,
+    graph_store: GraphBackend,
     *,
     dry_run: bool = False,
 ) -> dict:

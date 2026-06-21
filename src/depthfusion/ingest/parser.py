@@ -217,7 +217,8 @@ class DocumentParser:
         for para in doc.paragraphs:
             stripped = para.text.strip()
             if stripped:
-                if para.style.name.startswith("Heading") and not heading:
+                style_name = para.style.name if para.style is not None else None
+                if style_name and style_name.startswith("Heading") and not heading:
                     heading = stripped
                 parts.append(stripped)
 

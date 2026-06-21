@@ -95,7 +95,9 @@ def main() -> None:
     )
     parser.add_argument("--output", type=Path, required=True, help="Path to write results JSON")
     parser.add_argument("--n-docs", type=int, default=10_000, help="Corpus size (default: 10000)")
-    parser.add_argument("--n-queries", type=int, default=100, help="Number of queries (default: 100)")
+    parser.add_argument(
+        "--n-queries", type=int, default=100, help="Number of queries (default: 100)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed (default: 42)")
     args = parser.parse_args()
 
