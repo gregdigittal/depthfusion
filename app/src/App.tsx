@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAppInfo, type AppInfo } from './lib/ipc'
+import { getAppInfo, getWizardCompleted, setWizardCompleted, type AppInfo } from './lib/ipc'
 import {
   getAuthState,
   onAuthStateChange,
@@ -14,6 +14,7 @@ import { SearchPage } from './SearchPage'
 import { GraphPage } from './GraphPage'
 import { DocumentViewer } from './DocumentViewer'
 import { SettingsPage } from './SettingsPage'
+import { SetupWizardPage } from './wizard/SetupWizardPage'
 import { LayoutDashboard, Search, GitFork, Settings } from 'lucide-react'
 
 type Route = 'dashboard' | 'search' | 'graph' | 'settings'
@@ -29,9 +30,18 @@ function App() {
   const [route, setRoute] = useState<Route>('dashboard')
   const [authState, setAuthState] = useState<AuthState>(getAuthState)
   const [openDocId, setOpenDocId] = useState<string | null>(null)
+  // null = loading, true = show wizard, false = wizard already done
+  const [wizardNeeded, setWizardNeeded] = useState<boolean | null>(null)
 
   useEffect(() => {
     getAppInfo().then(setAppInfo).catch(console.error)
+  }, [])
+
+  // Determine whether the first-run wizard is needed before rendering anything
+  useEffect(() => {
+    getWizardCompleted()
+      .then((completed) => setWizardNeeded(!completed))
+      .catch(() => setWizardNeeded(false)) // on error default to no wizard
   }, [])
 
   // Recover tokens already in vault (e.g. app restart after successful login)
@@ -46,6 +56,27 @@ function App() {
 
   async function handleSignOut() {
     await logout(() => setRoute('dashboard'))
+  }
+
+  // ── Loading gate (wizard check in flight) ───────────────────────────────
+  if (wizardNeeded === null) {
+    return (
+      <div className="df df-auth" style={{ minHeight: '100vh' }}>
+        <LogoMark size={48} animation="breathe pulse" />
+      </div>
+    )
+  }
+
+  // ── First-run setup wizard ───────────────────────────────────────────────
+  if (wizardNeeded) {
+    return (
+      <SetupWizardPage
+        onComplete={async () => {
+          await setWizardCompleted(true).catch(console.error)
+          setWizardNeeded(false)
+        }}
+      />
+    )
   }
 
   // ── Unauthenticated shell ────────────────────────────────────────────────
