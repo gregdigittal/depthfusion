@@ -75,3 +75,6 @@ scripts/connect-vps.ps1
 # Test tenant environment files (contain secrets — never commit)
 tests/fixtures/entra/test-tenant.env
 !tests/fixtures/entra/test-tenant.env.example
+
+# Local env overrides (may contain runtime secrets — never commit)
+.env

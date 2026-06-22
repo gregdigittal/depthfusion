@@ -46,3 +46,45 @@ export async function loadTokens(): Promise<TokenSet | null> {
 export async function logoutUser(): Promise<void> {
   return invoke<void>('logout')
 }
+
+// ---------------------------------------------------------------------------
+// Setup wizard (E-65)
+// ---------------------------------------------------------------------------
+
+/** Whether the first-run setup wizard has been completed. */
+export async function getWizardCompleted(): Promise<boolean> {
+  return invoke<boolean>('get_wizard_completed')
+}
+
+/** Persist the wizard-completed flag. */
+export async function setWizardCompleted(completed: boolean): Promise<void> {
+  return invoke<void>('set_wizard_completed', { completed })
+}
+
+/** Retrieve the stored deployment mode: 'solo' | 'vps' | 'connect' | null. */
+export async function getDeploymentMode(): Promise<string | null> {
+  return invoke<string | null>('get_deployment_mode')
+}
+
+/** Persist the deployment mode. */
+export async function setDeploymentMode(mode: string): Promise<void> {
+  return invoke<void>('set_deployment_mode', { mode })
+}
+
+/**
+ * Check whether a DepthFusion server at `url` is reachable and healthy.
+ * Returns true when the server responds with 2xx on GET {url}/health.
+ * Returns false on non-2xx or any network error — never rejects.
+ */
+export async function checkServerHealth(url: string): Promise<boolean> {
+  return invoke<boolean>('check_server_health', { url })
+}
+
+/**
+ * Validate an Anthropic API key (sk-ant- prefix) and configure solo mode:
+ * stores the key in the OS keychain vault, sets deployment_mode='solo',
+ * and marks the wizard as completed.
+ */
+export async function setupSoloAuth(apiKey: string): Promise<void> {
+  return invoke<void>('setup_solo_auth', { apiKey })
+}

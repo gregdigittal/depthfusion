@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getServerUrl, setServerUrl, loadTokens, logoutUser } from './lib/ipc'
+import { getServerUrl, setServerUrl, loadTokens, logoutUser, setWizardCompleted } from './lib/ipc'
 import { decodeJwtPayload, extractRole } from './lib/jwt'
 
 interface ProfileInfo {
@@ -21,6 +21,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string>('')
   const [signingOut, setSigningOut] = useState(false)
+  const [rerunning, setRerunning] = useState(false)
 
   // Load current settings and profile on mount
   useEffect(() => {
@@ -78,6 +79,17 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       setSigningOut(false)
     }
   }, [onBack])
+
+  const handleRerunWizard = useCallback(async () => {
+    setRerunning(true)
+    try {
+      await setWizardCompleted(false)
+      window.location.reload()
+    } catch (err: unknown) {
+      console.error('Failed to re-trigger setup wizard:', err)
+      setRerunning(false)
+    }
+  }, [])
 
   const isDirty = inputUrl.trim() !== serverUrl
 
@@ -169,6 +181,25 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               className="df-btn df-btn--danger"
             >
               {signingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
+        </div>
+
+        {/* Setup / wizard card */}
+        <div className="df-card">
+          <div className="df-card__head">
+            <span className="df-tile__label">Setup</span>
+          </div>
+          <div className="df-card__body">
+            <p className="df-card__desc">
+              Re-run the first-time setup wizard to change your deployment mode or reconfigure your server.
+            </p>
+            <button
+              onClick={() => void handleRerunWizard()}
+              disabled={rerunning}
+              className="df-btn"
+            >
+              {rerunning ? 'Resetting…' : 'Re-run setup wizard'}
             </button>
           </div>
         </div>
