@@ -3546,13 +3546,13 @@
 - [ ] AC-5: Wizard completion sets `wizard_completed = true`; subsequent launches skip wizard
 
 **Tasks:**
-- [ ] T-738: Add `wizard_completed` + `deployment_mode` keys, and `get/set_wizard_completed`, `get/set_deployment_mode` commands to `settings.rs`
-- [ ] T-739: Add `check_server_health(url) -> Result<bool, String>` to `commands.rs` (reqwest 5 s timeout, never errors)
-- [ ] T-740: Create `auth/local.rs` with `setup_solo_auth(api_key)` — validates `sk-ant-` prefix, stores in vault, sets mode + wizard_completed
-- [ ] T-741: Register all new commands in `lib.rs` `generate_handler![]`
-- [ ] T-742: Add IPC wrappers to `ipc.ts`: `getWizardCompleted`, `setWizardCompleted`, `getDeploymentMode`, `setDeploymentMode`, `checkServerHealth`, `setupSoloAuth`
-- [ ] T-743: Add `wizardNeeded: boolean | null` boot gate to `App.tsx`; insert `<SetupWizardPage>` branch before existing auth check
-- [ ] T-744: Build `app/src/wizard/ModeSelectScreen.tsx` — three mode cards (Solo / Self-hosted VPS / Connect to server)
+- [x] T-738: Add `wizard_completed` + `deployment_mode` keys, and `get/set_wizard_completed`, `get/set_deployment_mode` commands to `settings.rs`
+- [x] T-739: Add `check_server_health(url) -> Result<bool, String>` to `commands.rs` (reqwest 5 s timeout, never errors)
+- [x] T-740: Create `auth/local.rs` with `setup_solo_auth(api_key)` — validates `sk-ant-` prefix, stores in vault, sets mode + wizard_completed
+- [x] T-741: Register all new commands in `lib.rs` `generate_handler![]`
+- [x] T-742: Add IPC wrappers to `ipc.ts`: `getWizardCompleted`, `setWizardCompleted`, `getDeploymentMode`, `setDeploymentMode`, `checkServerHealth`, `setupSoloAuth`
+- [x] T-743: Add `wizardNeeded: boolean | null` boot gate to `App.tsx`; insert `<SetupWizardPage>` branch before existing auth check
+- [x] T-744: Build `app/src/wizard/ModeSelectScreen.tsx` — three mode cards (Solo / Self-hosted VPS / Connect to server)
 
 ### S-215: As a Solo mode user, I want a guided install and API key setup so that my Mac runs DepthFusion without a server `P0` `M`
 
@@ -3563,9 +3563,9 @@
 - [ ] AC-4: Dashboard loads after success screen without triggering OIDC flow
 
 **Tasks:**
-- [ ] T-745: Build `app/src/wizard/SoloInstallScreen.tsx` (curl command + 3 s health poll + spinner + auto-advance)
-- [ ] T-746: Build `app/src/wizard/SoloApiKeyScreen.tsx` (password input, `sk-ant-` validation, calls `setupSoloAuth`)
-- [ ] T-747: Create `scripts/install-mac-solo.sh` (uv install mlx-lm + depthfusion serve; launchd plists for both; prints completion message)
+- [x] T-745: Build `app/src/wizard/SoloInstallScreen.tsx` (curl command + 3 s health poll + spinner + auto-advance)
+- [x] T-746: Build `app/src/wizard/SoloApiKeyScreen.tsx` (password input, `sk-ant-` validation, calls `setupSoloAuth`)
+- [x] T-747: Create `scripts/install-mac-solo.sh` (uv install mlx-lm + depthfusion serve; launchd plists for both; prints completion message)
 
 ### S-216: As a Self-hosted VPS user, I want a guided server install wizard so that I can run DepthFusion on my own Linux server `P0` `L`
 
@@ -3576,11 +3576,11 @@
 - [ ] AC-4: OIDC sign-in completes via browser → `depthfusion://callback` → deep-link → wizard reaches success screen
 
 **Tasks:**
-- [ ] T-748: Build `app/src/wizard/VpsPrereqScreen.tsx` (static checklist, Next button)
-- [ ] T-749: Build `app/src/wizard/VpsInstallScreen.tsx` (curl command, copy button, manual confirm checkbox)
-- [ ] T-750: Build `app/src/wizard/ServerUrlScreen.tsx` (URL input, `checkServerHealth` on submit, inline error + retry — shared with Connect mode)
-- [ ] T-751: Build `app/src/wizard/OidcSignInScreen.tsx` (sign-in button calls `start_login`, subscribes to `onAuthStateChange` — shared with Connect mode)
-- [ ] T-752: Create `scripts/install-vps.sh` (CUDA auto-detect → vLLM or Anthropic mode; Keycloak setup; Caddy vhost; systemd units; prints server URL + credentials)
+- [x] T-748: Build `app/src/wizard/VpsPrereqScreen.tsx` (static checklist, Next button)
+- [x] T-749: Build `app/src/wizard/VpsInstallScreen.tsx` (curl command, copy button, manual confirm checkbox)
+- [x] T-750: Build `app/src/wizard/ServerUrlScreen.tsx` (URL input, `checkServerHealth` on submit, inline error + retry — shared with Connect mode)
+- [x] T-751: Build `app/src/wizard/OidcSignInScreen.tsx` (sign-in button calls `start_login`, subscribes to `onAuthStateChange` — shared with Connect mode)
+- [x] T-752: Create `scripts/install-vps.sh` (CUDA auto-detect → vLLM or Anthropic mode; Keycloak setup; Caddy vhost; systemd units; prints server URL + credentials)
 
 ### S-217: As a Connect-to-server user, I want a minimal connection wizard so that I can link the app to an existing DepthFusion server `P0` `S`
 
@@ -3590,7 +3590,7 @@
 - [ ] AC-3: OIDC sign-in proceeds after health check passes; success screen shown on authentication
 
 **Tasks:**
-- [ ] T-753: Build `app/src/SetupWizardPage.tsx` — state machine (`mode`, `currentScreen`), progress bar, Back/Next wiring, `onComplete` callback
-- [ ] T-754: Build `app/src/wizard/SuccessScreen.tsx` (checkmark, mode-specific summary line, "Go to Dashboard" button)
-- [ ] T-755: Wire Connect mode through `SetupWizardPage.tsx` reusing `ServerUrlScreen` + `OidcSignInScreen`
-- [ ] T-756: Add "Re-run setup wizard" card/button to `SettingsPage.tsx` (`setWizardCompleted(false)` + `window.location.reload()`)
+- [x] T-753: Build `app/src/SetupWizardPage.tsx` — state machine (`mode`, `currentScreen`), progress bar, Back/Next wiring, `onComplete` callback
+- [x] T-754: Build `app/src/wizard/SuccessScreen.tsx` (checkmark, mode-specific summary line, "Go to Dashboard" button)
+- [x] T-755: Wire Connect mode through `SetupWizardPage.tsx` reusing `ServerUrlScreen` + `OidcSignInScreen`
+- [x] T-756: Add "Re-run setup wizard" card/button to `SettingsPage.tsx` (`setWizardCompleted(false)` + `window.location.reload()`)

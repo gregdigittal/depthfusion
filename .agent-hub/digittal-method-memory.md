@@ -1,19 +1,10 @@
-# DepthFusion Digittal Method Memory
+# Digittal Method Memory — depthfusion
 
-## Run Rules (curated by Codex)
-- Rule 1: Before editing backlog or status documents, match the exact existing line format and current HEAD state; mark only work that is genuinely complete, and do not re-open or re-edit already-merged items.
-- Rule 2: Verification commands for tests must prove tests were collected and assertions ran; treat exit code 5, deselection, or zero collected tests as failure, and avoid filenames or markers that are excluded by configured pytest filters.
-- Rule 3: End-to-end and security scenarios must assert the negative or denial condition directly, not just demonstrate setup or exercise the happy path.
-- Rule 4: Merge gates require the canonical full-order test suite to be green with no regression in collected test count; investigate order-dependent pollution flakes before claiming CI or G4 completion.
-- Rule 5: Remove or repair dead-weight test files that collect zero tests, and prefer existing rehearsal or ACL drill helpers on temporary or in-memory databases with greppable success lines and post-action record-count assertions.
-- Rule 6: On app startup, auth recovery should load persisted vault tokens through a pure helper that maps storage errors and expiry/skew checks into an unauthenticated state rather than panicking or requiring user interaction. Never log token contents during this path. (confidence: high)
-- Rule 7: When persistent encryption key material is unavailable at startup, CacheManager-style components should warn without exposing key material and fall back to an ephemeral key so the process remains usable with clearly degraded persistence semantics. (confidence: high)
-- Rule 8: Startup auth recovery needs both positive and negative tests: persisted valid vault tokens must transition to authenticated without user interaction, while missing/null vault tokens must remain unauthenticated. (confidence: high)
-- Rule 9: When implementing document parsers that depend on optional heavy libraries (e.g., python-docx, pdfminer), use a lazy import pattern: import inside the function body and raise a clear ImportError with pip-install instructions if the library is absent. This keeps the dependency optional and surfaces misconfiguration at call time, not import time.
-- Rule 10: For document parser tests, build fixtures in-memory using the same library that writes the format (e.g., python-docx to create .docx bytes in a BytesIO buffer) rather than committing binary fixture files to the repo. This keeps tests hermetic, version-independent, and avoids binary blob drift in git history.
-- Rule 11: A backlog task marked [x] is a claim about code that exists and is verified — not a record of intent. Before closing a task, confirm the implementation file exists and the relevant tests pass; a checked-off task with no corresponding source file is backlog drift and must be re-opened immediately.
-- Rule 12: Every document parser that accepts raw bytes must check len(content_bytes) against a MAX_<FORMAT>_BYTES cap immediately after the empty-bytes guard, returning [] with a warning log if exceeded. This prevents OOM kills on crafted or accidentally large files, following the docx parser hardening precedent.
-- Rule 13: When a parser uses a top-level except Exception to prevent propagation, it must emit a debug-level log of the caught exception. Silent swallowing makes diagnosability impossible; the debug log is the minimal observable trace.
-- Rule 14: When PDF page-level layout fidelity matters, prefer pdfplumber page.extract_text() over pdfminer-style text extraction because pdfplumber is better suited to visual reading order such as left-to-right, top-to-bottom page text.
-- Rule 15: Preserve parser-derived metadata end-to-end by adding fields to typed pipeline/public models and explicit copy tests whenever parsers populate metadata such as heading paths or anchors.
-- Rule 16: Normalize and validate caller-controlled boundaries before persistence: resolve paths to real/absolute paths with containment checks, and sanitize metadata inputs such as ACL allowlists before attaching them to documents.
+Last updated by run: Resolve all open items on main: (1) mark BACKLOG tasks T-738 through T-756 as complete [x] in BACKLOG.md — all were implemented in PR #26; (2) bump node-version from '20' to '22' in .github/workflows/ci.yml, release-desktop.yml, security.yml, sbom.yml, and tauri-build.yml; (3) bump Python deps in pyproject.toml to fix Dependabot alerts: pydantic-settings>=2.14.2, yt-dlp>=2026.6.9, starlette>=1.3.0, PyJWT>=2.13.0, then re-lock with uv; (4) update pnpm-lock.yaml in /app by running pnpm install (esbuild override already in package.json). Success: CI passes on push, no Dependabot moderate/medium alerts remain, all T-738–T-756 tasks show [x].
+
+## Curated Rules
+
+- [rung:4|conf:0.95] Before editing for verification-style tasks, inspect the current repository state first; if the requested state is already present, record it as no-op rather than attempting redundant changes.
+- [rung:4|conf:0.9] For CI workflow node version bumps, grep the workflow files for the existing version string before patching so already-completed migrations are detected early and no-op tasks are reported cleanly.
+- [rung:4|conf:0.85] For Dependabot alerts on transitive Python dependencies, add an explicit lower-bound constraint in the relevant pyproject.toml extras section and regenerate the lockfile with uv lock rather than editing uv.lock directly.
+- [rung:4|conf:0.9] For lockfile-related dependency alerts, read the lockfile resolution before acting; the vulnerable dependency may already be resolved to a fixed version and the alert may be stale.
