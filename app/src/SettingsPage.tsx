@@ -14,8 +14,8 @@ interface SettingsPageProps {
 
 /** Settings page: server URL configuration + user profile + sign-out (T-634). */
 export function SettingsPage({ onBack }: SettingsPageProps) {
-  const [serverUrl, setServerUrlState] = useState<string>('http://176.9.147.206:7301')
-  const [inputUrl, setInputUrl] = useState<string>('http://176.9.147.206:7301')
+  const [serverUrl, setServerUrlState] = useState<string>('https://mcp.tonracein.com')
+  const [inputUrl, setInputUrl] = useState<string>('https://mcp.tonracein.com')
   const [profile, setProfile] = useState<ProfileInfo | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -140,7 +140,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               type="url"
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="http://176.9.147.206:7301"
+              placeholder="https://mcp.tonracein.com"
               className="df-input"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && isDirty) void handleSave()
