@@ -11,7 +11,7 @@ const SERVER_URL_KEY: &str = "server_url";
 const WIZARD_COMPLETED_KEY: &str = "wizard_completed";
 const DEPLOYMENT_MODE_KEY: &str = "deployment_mode";
 // ponytail: plaintext HTTP — temporary until Caddy TLS vhost is added for this server
-const DEFAULT_SERVER_URL: &str = "http://176.9.147.206:7300";
+const DEFAULT_SERVER_URL: &str = "http://176.9.147.206:7301";
 
 /// Retrieve the configured server URL.
 ///
