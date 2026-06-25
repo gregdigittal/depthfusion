@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepthFusion v2.0.0 — Claude Design Handoff</title>
+<style>
+  :root {
+    --bg: #050810;
+    --surface: #0d1220;
+    --surface2: #131929;
+    --border: #1e2d45;
+    --accent-purple: #7c3aed;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); line-height: 1.7; font-size: 15px; }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 48px 32px; }
+
+  h1 { font-size: 2.6rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  h2 { font-size: 1.6rem; font-weight: 700; color: var(--accent-cyan); margin: 56px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  h3 { font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 28px 0 10px; }
+  h4 { font-size: 0.95rem; font-weight: 600; color: var(--accent-amber); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  p { color: var(--text-dim); margin-bottom: 14px; }
+  ul, ol { color: var(--text-dim); padding-left: 22px; margin-bottom: 14px; }
+  li { margin-bottom: 5px; }
+  code { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.85em; color: var(--accent-cyan); }
+  pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; overflow-x: auto; margin: 14px 0; }
+  pre code { background: none; border: none; padding: 0; color: var(--accent-green); font-size: 0.88em; }
+
+  .callout { border-left: 3px solid var(--accent-purple); background: #1a1035; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+  .callout.cyan { border-color: var(--accent-cyan); background: #031a22; }
+  .callout.green { border-color: var(--accent-green); background: #031a10; }
+  .callout.amber { border-color: var(--accent-amber); background: #1a1500; }
+  .callout.red { border-color: var(--accent-red); background: #1a0505; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 0.78em; font-weight: 600; margin: 0 3px; }
+  .badge-purple { background: rgba(124,58,237,0.2); color: var(--accent-purple); border: 1px solid rgba(124,58,237,0.4); }
+  .badge-cyan { background: rgba(6,182,212,0.15); color: var(--accent-cyan); border: 1px solid rgba(6,182,212,0.35); }
+  .badge-green { background: rgba(16,185,129,0.15); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.35); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.35); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.35); }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.88em; }
+  th { background: var(--surface2); color: var(--text); font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px; border-bottom: 1px solid rgba(30,45,69,0.5); color: var(--text-dim); vertical-align: top; }
+  tr:hover td { background: rgba(13,18,32,0.5); }
+
+  .pipeline { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; }
+  .pipe-node { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; text-align: center; min-width: 120px; }
+  .pipe-node .label { font-size: 0.75em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .pipe-node .name { font-size: 0.92em; font-weight: 600; }
+  .pipe-arrow { color: var(--accent-purple); font-size: 1.4em; padding: 0 4px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card h4 { margin-top: 0; }
+
+  .tier-block { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+  .tier-block .tier-num { font-size: 0.75em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .tier-block .tier-name { font-weight: 700; font-size: 1.05em; }
+
+  .tool-row { display: flex; gap: 14px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(30,45,69,0.4); }
+  .tool-name { font-family: monospace; font-size: 0.82em; color: var(--accent-cyan); min-width: 280px; background: var(--surface2); border-radius: 4px; padding: 3px 8px; }
+  .tool-desc { font-size: 0.88em; color: var(--text-dim); }
+
+  .anim-note { background: rgba(124,58,237,0.08); border: 1px dashed rgba(124,58,237,0.4); border-radius: 8px; padding: 14px 18px; margin: 14px 0; }
+  .anim-note::before { content: "🎬 ANIMATION DIRECTIVE  "; font-size: 0.75em; font-weight: 700; color: var(--accent-purple); letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
+
+  .formula { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 22px 28px; margin: 18px 0; text-align: center; }
+  .formula .eq { font-size: 1.35em; font-family: monospace; color: var(--accent-green); letter-spacing: 0.03em; }
+  .formula .annotation { font-size: 0.82em; color: var(--text-muted); margin-top: 10px; }
+
+  .competitor-win { color: var(--accent-green); font-weight: 600; }
+  .competitor-partial { color: var(--accent-amber); }
+  .competitor-no { color: var(--accent-red); }
+
+  .section-intro { font-size: 1.05em; color: var(--text-dim); max-width: 780px; margin-bottom: 28px; border-left: 3px solid var(--accent-cyan); padding-left: 16px; }
+
+  .meta-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 32px; }
+  .meta-block table td:first-child { font-weight: 600; color: var(--text); min-width: 160px; }
+
+  @media (max-width: 720px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .pipeline { flex-direction: column; align-items: flex-start; }
+    .pipe-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════════════════ HEADER -->
+<h1>DepthFusion v2.0.0</h1>
+<p style="font-size:1.1em;color:var(--text-dim);margin-bottom:32px;">Claude Design Handoff — Animated Demo &amp; Technical Explainer</p>
+
+<div class="meta-block">
+  <table>
+    <tr><td>Document purpose</td><td>Complete brief for Claude Design to rebuild the DepthFusion animated demo with deep technical accuracy, full architecture walkthrough, and comprehensive competitor comparison</td></tr>
+    <tr><td>Replaces</td><td><code>docs/depthfusion-animated-demo.html</code> (875 lines, v1.x era)</td></tr>
+    <tr><td>PyPI version</td><td>depthfusion 2.0.0 — <em>live on PyPI, PEP 740 attested</em></td></tr>
+    <tr><td>GitHub</td><td><code>github.com/gregdigittal/depthfusion</code></td></tr>
+    <tr><td>MCP protocol</td><td>2025-03-26 (JSON-RPC 2.0 over stdio + HTTP sidecar)</td></tr>
+    <tr><td>Tools exposed</td><td>30+ across 8 domains (conditionally registered)</td></tr>
+    <tr><td>Design language</td><td>Dark theme: bg <code>#050810</code>, surface <code>#0d1220</code>, purple <code>#7c3aed</code>, cyan <code>#06b6d4</code></td></tr>
+    <tr><td>Target audience</td><td>AI engineers, Claude Code power users, agent framework authors</td></tr>
+  </table>
+</div>
+
+<div class="callout red">
+  <strong>Benchmark caveat for Claude Design:</strong> The existing README benchmarks reference v0.2–v1.0 micro-benchmarks (BM25 p50=0.043ms, CIQS ~94-96 projected). These are outdated. v2.0.0 adds OIDC/RBAC, Event Graph Fabric, Tauri desktop, autonomic consolidation, and budget-aware model selection — none of which have published performance figures yet. The new demo should <em>describe</em> performance characteristics qualitatively and with architecture diagrams, not reproduce the old numbers. Where numbers appear (e.g. 4-tier latency breakdown), label them as <em>architecture-derived estimates</em> pending a full v2 benchmark suite.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 1 -->
+<h2>1. What DepthFusion Is — The 30-Second Mental Model</h2>
+
+<p class="section-intro">Before any animation directive, Claude Design must understand the core insight: DepthFusion is not a vector database, not a RAG plugin, and not a chat history store. It is a <strong>Cognitive Infrastructure Layer</strong> — a shared memory fabric that sits between multiple AI agents and gives them persistent, typed, scored, and contradiction-aware memory across sessions, projects, and time.</p>
+
+<div class="grid3">
+  <div class="card">
+    <h4>The Problem</h4>
+    <p>Claude Code forgets everything between sessions. Teams of agents working in parallel have no shared memory. Context windows fill. Architectural decisions made Tuesday are invisible Wednesday.</p>
+  </div>
+  <div class="card">
+    <h4>The Solution</h4>
+    <p>DepthFusion publishes context as typed MemoryObjects (decisions, code patterns, incidents, discoveries). It recalls them via a 4-tier hybrid search pipeline that ranks by recency, relevance, and how many agents have observed each fact.</p>
+  </div>
+  <div class="card">
+    <h4>The Differentiator</h4>
+    <p>Shared memory for <em>agent teams</em>, not just single-agent sessions. The Event Graph Fabric (Redis Streams) broadcasts each memory event so every agent in the fleet sees it in real time.</p>
+  </div>
+</div>
+
+<div class="anim-note">
+  <strong>3-Act Demo Structure (overarching narrative):</strong>
+  <ul>
+    <li><strong>Act 1 — The Problem (30s):</strong> Show two Claude Code sessions working on the same codebase. Agent A makes a critical architectural decision. Agent B starts work the next day with zero context. Both waste tokens re-deriving the same facts. The context window fills and truncates. Code quality drifts.</li>
+    <li><strong>Act 2 — DepthFusion in Action (90s):</strong> Agent A publishes via <code>depthfusion_publish_context</code>. Show the 4-tier retrieval pipeline lighting up. Agent B calls <code>depthfusion_recall_relevant</code> — the decision surfaces instantly, ranked by the fabric_seed formula. A third agent joins. The Event Graph fans out to all three. Contradiction engine fires when Agent C tries to store a conflicting fact.</li>
+    <li><strong>Act 3 — Architecture Deep Dive (60s):</strong> Walk through each layer (BM25 → Haiku → ChromaDB → HNSW → Redis Streams) with latency numbers. Show the 3 deployment modes. Show the competitor matrix.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 2 -->
+<h2>2. Architecture — Layer-by-Layer Technical Explainer</h2>
+
+<p class="section-intro">DepthFusion's retrieval engine is a 4-tier cascade. Each tier adds precision at the cost of latency. The deployment mode determines which tiers are active. All tiers compose via Reciprocal Rank Fusion (RRF) — weighted fusion outperforms plain RRF on 90% of queries (45/50 in internal benchmark).</p>
+
+<h3>2.1 The 4-Tier Retrieval Pipeline</h3>
+
+<div class="pipeline">
+  <div class="pipe-node">
+    <div class="label">Tier 1 — Always On</div>
+    <div class="name" style="color:var(--accent-cyan)">BM25 Lexical</div>
+    <div class="label" style="margin-top:4px">~0.04ms p50</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">
+    <div class="label">Tier 2 — vps-cpu+</div>
+    <div class="name" style="color:var(--accent-purple)">Haiku LLM Rerank</div>
+    <div class="label" style="margin-top:4px">~80–200ms</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">
+    <div class="label">Tier 2 — vps-cpu+</div>
+    <div class="name" style="color:var(--accent-purple)">ChromaDB Vector</div>
+    <div class="label" style="margin-top:4px">~5–25ms</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">
+    <div class="label">Tier 3 — vps-gpu / mac-mlx</div>
+    <div class="name" style="color:var(--accent-green)">HNSW ANN Index</div>
+    <div class="label" style="margin-top:4px">~1–5ms at scale</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node" style="border-color:var(--accent-amber)">
+    <div class="label">Fusion</div>
+    <div class="name" style="color:var(--accent-amber)">RRF / Weighted</div>
+    <div class="label" style="margin-top:4px">fabric_seed rank</div>
+  </div>
+</div>
+
+<div class="tier-block">
+  <div class="tier-num">Tier 1</div>
+  <div class="tier-name">BM25 — Best Match 25 Lexical Search</div>
+  <p>The baseline tier. BM25 scores documents by term frequency (TF) and inverse document frequency (IDF) with saturation curves that prevent keyword-stuffing from dominating. In DepthFusion, BM25 runs in-process on the MemoryStore (a structured JSON store backed by <code>~/.depthfusion/</code>) with no network round-trip. Sub-millisecond latency even on 10,000+ stored memories. Precision@1 = 1.000 on the internal goldset (n=8 canonical test queries). Active in <em>all</em> deployment modes — this is the only tier available in <code>local</code> mode.</p>
+  <p><strong>What BM25 is good at:</strong> exact term matches, code identifiers, project names, function names. <strong>What it misses:</strong> semantic synonyms ("auth" vs "authentication"), conceptual similarity.</p>
+</div>
+
+<div class="tier-block">
+  <div class="tier-num">Tier 2a</div>
+  <div class="tier-name">Haiku LLM Reranker (vps-cpu mode)</div>
+  <p>A Claude Haiku API call that re-scores BM25 candidates using natural language understanding. Haiku receives the query + top-N candidates and returns confidence scores. This tier catches semantic gaps BM25 misses — e.g. a query about "session persistence" correctly surfaces a memory tagged "cross-session continuity". Cost: ~$0.0005 per rerank call (Haiku pricing). Latency: 80–200ms P50 (network-bound, not compute-bound). Can be disabled if API budget is a concern: set <code>DEPTHFUSION_RERANKER=off</code>.</p>
+</div>
+
+<div class="tier-block">
+  <div class="tier-num">Tier 2b</div>
+  <div class="tier-name">ChromaDB Vector Search (vps-cpu mode)</div>
+  <p>ChromaDB maintains a persistent embedding index of all published memories. Default embedding model: <code>all-MiniLM-L6-v2</code> (via sentence-transformers, loaded only in vps-cpu/vps-gpu/mac-mlx modes). ChromaDB uses HNSW internally for its own index, but DepthFusion also exposes a standalone HNSW index (Tier 3) for higher-performance scenarios. ChromaDB is the persistent vector store; standalone HNSW is the performance index.</p>
+  <p>When vps-cpu mode is active, every <code>depthfusion_publish_context</code> call auto-embeds the content and upserts into ChromaDB. Recall latency: 5–25ms for collections under 50k documents.</p>
+</div>
+
+<div class="tier-block">
+  <div class="tier-num">Tier 3</div>
+  <div class="tier-name">HNSW Approximate Nearest Neighbor (vps-gpu / mac-mlx / hnsw extra)</div>
+  <p>Hierarchical Navigable Small World (HNSW) from <code>hnswlib</code>. HNSW builds a multi-layer proximity graph where high layers are long-range connections and lower layers are local. At query time, it navigates the graph greedily — O(log N) rather than the O(N) of brute-force cosine search. At 1M+ memories, HNSW maintains sub-10ms recall; ChromaDB's brute-force would take seconds. DepthFusion's HNSW index uses sentence-transformers embeddings (768-dimensional vectors for the default model). Also available as standalone via <code>pip install depthfusion[hnsw]</code>.</p>
+  <p><strong>mac-mlx mode:</strong> embedding inference runs via <code>mlx_lm.server</code> on Apple Silicon GPU, delivering ~3× throughput improvement over CPU sentence-transformers. vLLM serves the same role on CUDA GPUs in <code>vps-gpu</code> mode.</p>
+</div>
+
+<div class="anim-note">
+  <strong>Pipeline Animation (Act 2, ~20s):</strong> Query enters from top. Four parallel lanes light up left-to-right. BM25 returns instantly (green pulse). Haiku call shows a spinner then resolves (purple pulse). ChromaDB shows dots clustering (cyan). HNSW shows the graph traversal with edges lighting as paths are explored (green graph). All four streams converge at the RRF fusion node. The formula appears: <code>score = Σ 1/(rank_i + k)</code>. Final ranked list emerges below. Emphasize: faster tiers run first; slower tiers only activate if the mode is configured for them.
+</div>
+
+<h3>2.2 The fabric_seed Ranking Formula</h3>
+
+<p>After RRF fusion, results are re-ranked by the fabric_seed formula — a heuristic that surfaces "hot knowledge": facts that are recent, relevant, and widely observed by the agent fleet.</p>
+
+<div class="formula">
+  <div class="eq">score = recall_relevance × recency_decay × log(1 + observer_count)</div>
+  <div class="annotation">
+    <strong>recall_relevance</strong> = normalized RRF score (0–1) ·
+    <strong>recency_decay</strong> = e<sup>−λt</sup> where t = age in days, λ = 0.1 (configurable) ·
+    <strong>observer_count</strong> = number of distinct agent principals that have retrieved this memory
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="card">
+    <h4>recall_relevance</h4>
+    <p>How well this memory matches the query. Combines BM25 rank + vector similarity + Haiku confidence score. Normalized to [0,1] before multiplication.</p>
+  </div>
+  <div class="card">
+    <h4>recency_decay</h4>
+    <p>Exponential decay. A memory written today scores 1.0. A week-old memory scores ~0.5. A month-old memory scores ~0.05. This prevents stale architectural decisions from burying recent ones.</p>
+  </div>
+  <div class="card">
+    <h4>log(1 + observer_count)</h4>
+    <p>Logarithmic "wisdom of the fleet" term. A memory that 10 different agents have retrieved is more likely to be load-bearing context. Log prevents any single viral fact from dominating.</p>
+  </div>
+</div>
+
+<div class="anim-note">
+  <strong>Formula Animation (Act 3, ~10s):</strong> Show three dials/sliders. One represents relevance (BM25+vector bar). One represents recency (clock face unwinding). One represents observers (agent avatars accumulating). All three multiply together in real time as sliders move. Show a scenario: two equally-relevant memories, but one was observed by 8 agents vs 1 — the 8-observer one rises to the top of the ranked list despite being slightly older.
+</div>
+
+<h3>2.3 Event Graph Fabric (Redis Streams)</h3>
+
+<p>The Event Graph Fabric is DepthFusion's real-time fan-out layer for multi-agent teams. Enabled with <code>pip install depthfusion[fabric]</code> and a local Redis instance. Redis stays loopback-only (<code>127.0.0.1:6379</code>) — it is never exposed on external interfaces.</p>
+
+<div class="callout cyan">
+  <strong>9 Event Types</strong> (each publish/receive creates a graph node with typed edges):
+  <ul>
+    <li><code>AGENT_PUBLISHED</code> — agent stored a new memory</li>
+    <li><code>AGENT_RECEIVED</code> — agent retrieved memories from recall</li>
+    <li><code>DERIVED_FROM</code> — new memory was explicitly derived from a prior one</li>
+    <li><code>CONTRADICTS</code> — contradiction engine fired (new fact conflicts with existing)</li>
+    <li><code>SUPERSEDES</code> — memory explicitly marked as replacing another</li>
+    <li><code>INCIDENT_LOGGED</code> — error/incident captured</li>
+    <li><code>DECISION_RECORDED</code> — architectural decision captured</li>
+    <li><code>OUTCOME_REPORTED</code> — follow-up outcome against a decision</li>
+    <li><code>SCORE_UPDATED</code> — manual cognitive score adjustment</li>
+  </ul>
+  Graph nodes and edges are queryable via <code>depthfusion_graph_traverse</code> and <code>depthfusion_graph_status</code>.
+</div>
+
+<div class="anim-note">
+  <strong>Event Graph Animation (Act 2, ~15s):</strong> Show a canvas with three agent nodes (Agent A, Agent B, Agent C) and a central DepthFusion node. Agent A publishes — a pulsing edge appears: A→DepthFusion labeled "AGENT_PUBLISHED". Redis Streams broadcast to agents B and C — two edges fan out: DepthFusion→B, DepthFusion→C labeled "AGENT_RECEIVED". Agent C tries to store a contradicting fact — edge appears labeled "CONTRADICTS" in red, with a warning icon. The contradiction engine surfaces the conflict without blocking — it annotates rather than rejects. Visualize the directed graph accumulating over time into a knowledge graph showing lineage of every fact.
+</div>
+
+<h3>2.4 Cognitive Scoring Layer</h3>
+
+<p>Every stored MemoryObject is scored by the <strong>CognitiveScorer</strong> (8 components, ~15ms overhead). This is what separates DepthFusion from naive vector stores — stored facts are evaluated for their epistemic weight, not just embedded.</p>
+
+<table>
+  <tr><th>Component</th><th>What it measures</th><th>Effect on ranking</th></tr>
+  <tr><td>Recency</td><td>How recently was this memory written or accessed</td><td>Decays over time; refreshed on access</td></tr>
+  <tr><td>Importance</td><td>Explicit importance tag from the publishing agent</td><td>Boosts rare high-value facts</td></tr>
+  <tr><td>Salience</td><td>How often this memory is retrieved relative to others</td><td>Self-reinforcing for frequently useful facts</td></tr>
+  <tr><td>Contradiction risk</td><td>Is there a conflicting fact in the corpus?</td><td>Flags for human review; doesn't auto-delete</td></tr>
+  <tr><td>Observer count</td><td>How many distinct agents have retrieved this</td><td>log(1+n) factor in fabric_seed formula</td></tr>
+  <tr><td>Session affinity</td><td>Which session/project spawned this memory</td><td>Boosts scope-matched recalls</td></tr>
+  <tr><td>Type weight</td><td>Decisions &gt; Incidents &gt; Code patterns &gt; Notes</td><td>Decisions surface above ephemeral context</td></tr>
+  <tr><td>Novelty</td><td>Cosine distance from existing corpus (materialization gate)</td><td>Below threshold: not stored (near-duplicate)</td></tr>
+</table>
+
+<h3>2.5 ContradictionEngine</h3>
+
+<p>The ContradictionEngine scans incoming memories against the corpus for factual conflicts. It uses a combination of semantic similarity (are these about the same topic?) and logical negation detection (do they assert opposite facts?). When a contradiction is found:</p>
+<ul>
+  <li>Both memories are stored (DepthFusion never silently discards)</li>
+  <li>The newer memory gets a <code>contradiction_risk</code> score component flagged</li>
+  <li>The graph records a <code>CONTRADICTS</code> edge between the two</li>
+  <li>The <code>depthfusion_recall_relevant</code> response surfaces the contradiction warning</li>
+</ul>
+
+<h3>2.6 Autonomic Consolidation Daemon</h3>
+
+<p>Enabled with <code>DEPTHFUSION_AUTONOMIC=1</code>. A background daemon thread (<code>depthfusion-autonomic</code>) wakes every N minutes (default 30, configurable via <code>DEPTHFUSION_CONSOLIDATION_INTERVAL_MINUTES</code>) and runs two passes:</p>
+<ul>
+  <li><strong>Near-duplicate detection:</strong> finds memories with cosine similarity above threshold. Logs merge candidates (does not auto-merge without ACL confirmation).</li>
+  <li><strong>Archive detection:</strong> finds memories that haven't been accessed in X days and have low importance scores. Logs archive candidates.</li>
+</ul>
+<p>The daemon never crashes the MCP server — all exceptions are swallowed and logged. The server remains stable regardless of consolidation failures.</p>
+
+<h3>2.7 Materialisation Policy</h3>
+
+<p>Not every <code>depthfusion_publish_context</code> call results in a stored memory. The materialisation policy enforces a 3-gate pipeline:</p>
+<div class="pipeline" style="margin:14px 0;">
+  <div class="pipe-node"><div class="label">Gate 1</div><div class="name">Score ≥ threshold</div></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node"><div class="label">Gate 2</div><div class="name">Novelty cosine &gt; 0.15</div></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node"><div class="label">Gate 3</div><div class="name">Capacity eviction check</div></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node" style="border-color:var(--accent-green)"><div class="label">Result</div><div class="name" style="color:var(--accent-green)">Stored</div></div>
+</div>
+<p>Gate 2 prevents near-duplicate memories from cluttering the corpus. Gate 3 ensures the store doesn't grow unbounded — least-recently-used low-importance memories are evicted when capacity is reached.</p>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 3 -->
+<h2>3. Deployment Modes — Technical Comparison</h2>
+
+<p class="section-intro">DepthFusion ships in 4 deployment configurations. The mode is set via <code>DEPTHFUSION_MODE</code> environment variable and determines which retrieval tiers activate, which packages are required, and what the performance/cost tradeoff is.</p>
+
+<div class="grid2">
+  <div class="card" style="border-color:var(--accent-cyan)">
+    <h4 style="color:var(--accent-cyan)">local mode</h4>
+    <p><code>pip install depthfusion</code></p>
+    <p><strong>Retrieval:</strong> BM25 only (Tier 1)<br><strong>Storage:</strong> ~/.depthfusion/ JSON files<br><strong>Embedding:</strong> None<br><strong>Extras:</strong> None required<br><strong>Network:</strong> Zero — fully offline</p>
+    <p><strong>Best for:</strong> Individual developers, air-gapped environments, zero-config startup, privacy-sensitive work. No API keys needed.</p>
+    <p><strong>Limitation:</strong> Semantic similarity search unavailable. Recall is exact-match and keyword-based only.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-purple)">
+    <h4 style="color:var(--accent-purple)">vps-cpu mode</h4>
+    <p><code>pip install depthfusion[vps-cpu]</code></p>
+    <p><strong>Retrieval:</strong> BM25 + ChromaDB vector (Tier 1+2b) + Haiku reranker (Tier 2a)<br><strong>Storage:</strong> JSON + ChromaDB persistent collection<br><strong>Embedding:</strong> all-MiniLM-L6-v2 via sentence-transformers<br><strong>Extras:</strong> anthropic, chromadb, fastapi, uvicorn</p>
+    <p><strong>Best for:</strong> Teams on shared Linux VPS (2–4 vCPU). HTTP sidecar serves the embedding API. Cost: Claude Haiku reranking charges (~$0.0005/call).</p>
+    <p><strong>Performance:</strong> Recall latency 37–200ms P50 (network + Haiku RTT)</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-green)">
+    <h4 style="color:var(--accent-green)">vps-gpu mode</h4>
+    <p><code>pip install depthfusion[vps-gpu]</code></p>
+    <p><strong>Retrieval:</strong> BM25 + ChromaDB + HNSW (all tiers)<br><strong>Embedding:</strong> sentence-transformers on CUDA GPU (vLLM serves local LLM if needed)<br><strong>Extras:</strong> sentence-transformers, chromadb, hnswlib, fastapi, uvicorn</p>
+    <p><strong>Best for:</strong> Agent teams doing high-volume recall. No per-call API cost once GPU is provisioned. HNSW scales to millions of memories.</p>
+    <p><strong>vLLM integration:</strong> An OpenAI-compatible local LLM (e.g. Gemma) replaces Haiku for reranking — zero marginal cost per query.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-amber)">
+    <h4 style="color:var(--accent-amber)">mac-mlx mode</h4>
+    <p><code>pip install depthfusion[mac-mlx]</code></p>
+    <p><strong>Retrieval:</strong> BM25 + ChromaDB + HNSW (all tiers)<br><strong>Embedding:</strong> sentence-transformers on CPU + mlx_lm.server on Apple Silicon GPU<br><strong>Extras:</strong> mlx-lm, sentence-transformers, chromadb, hnswlib, fastapi, uvicorn</p>
+    <p><strong>Best for:</strong> MacBook Pro / Mac Studio M-series solo developers who want GPU-accelerated local inference without a cloud GPU. mlx_lm serves an OpenAI-compatible endpoint on :8000.</p>
+    <p><strong>Throughput:</strong> ~3× sentence-transformers CPU for embedding. LLM inference via mlx_lm at 40–80 tok/s on M3 Max.</p>
+  </div>
+</div>
+
+<div class="anim-note">
+  <strong>Mode Selector Animation (Act 3, ~15s):</strong> Show a toggle/tabs component with 4 modes. As the user clicks each mode, the pipeline diagram above updates: inactive tiers grey out, active tiers glow. Show the cost dial: local=free, vps-cpu=low cost, vps-gpu=hardware cost, mac-mlx=hardware cost. Show the latency dial moving accordingly. Show a "features unlocked" checklist appearing/disappearing based on mode selection. The key message: "Start with local, graduate to vps-cpu when you need semantic search, scale to vps-gpu when you have a team."
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 4 -->
+<h2>4. Tool Domains — All 30+ Tools Explained</h2>
+
+<p class="section-intro">DepthFusion exposes tools via the MCP protocol (JSON-RPC 2.0 over stdio). Tools are conditionally registered based on the deployment mode and feature flags. Every tool call passes through principal binding + capability check (<code>check_tool_access</code>) before dispatch — unauthorized calls return an authorization error, not a generic failure.</p>
+
+<h3>Domain 1: Recall <span class="badge badge-cyan">Core</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_recall_relevant</div><div class="tool-desc">Primary recall entrypoint. Runs the full 4-tier cascade (BM25 → vector → reranker → HNSW) and returns ranked results with the fabric_seed score, source attribution, contradiction warnings, and backend provenance. The single most-called tool in production sessions.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_retrieve_context</div><div class="tool-desc">Retrieve a specific memory by ID or project scope. Used when the caller already knows which memory to fetch (e.g. after a graph traversal reveals a specific node).</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_recall_feedback</div><div class="tool-desc">Submit positive/negative feedback on a recall result. Updates the <code>salience</code> score component. Good results score up; irrelevant results score down. Closes the reinforcement loop — DepthFusion gets smarter with use.</div></div>
+
+<h3>Domain 2: Capture <span class="badge badge-purple">Core</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_publish_context</div><div class="tool-desc">Store a typed MemoryObject. The primary write operation. Runs the 3-gate materialisation policy (score threshold → novelty → capacity). Triggers Event Graph Fabric fan-out if Redis is available. Accepts type tags: decision, code_pattern, incident, discovery, note.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_auto_learn</div><div class="tool-desc">Extract and store key learnings from a conversation chunk automatically. Claude Code's CLAUDE.md hook triggers this after significant work sessions. Reduces manual publish burden.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_compress_session</div><div class="tool-desc">Summarize and store a full conversation session as a compressed memory. Useful at context window limits — preserve the essence before /compact fires.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_tag_session</div><div class="tool-desc">Tag the current session with metadata (project slug, agent identity, sprint tag). Used to scope subsequent recall queries. Sub-project scoping via DEPTHFUSION_WING_ID / DEPTHFUSION_ROOM_ID.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_ingest_conversation</div><div class="tool-desc">Import a full conversation transcript (e.g. from a Claude Code .jsonl session file) as a batch of memories. Enables post-hoc learning from completed sessions.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_inspect_discovery</div><div class="tool-desc">View a discovery candidate before confirming it. Inspects the proposed MemoryObject without committing to storage — useful for review gates.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_prune_discoveries</div><div class="tool-desc">Remove low-quality or stale discovery candidates. Manual cleanup before the autonomic daemon runs its archive pass.</div></div>
+
+<h3>Domain 3: Decisions <span class="badge badge-amber">Knowledge</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_record_decision</div><div class="tool-desc">Store an architectural or technical decision with rationale, alternatives considered, and decision date. Creates a searchable decision log. Decisions have the highest type weight in CognitiveScorer — they surface above other memory types.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_record_incident</div><div class="tool-desc">Capture a bug, outage, or failure with severity, timeline, and root cause. Cross-referenced with related decisions so future agents know what went wrong after a specific architectural choice.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_report_outcome</div><div class="tool-desc">Record the outcome of a decision (did the chosen approach work?). Links back to the original decision via graph edge. Enables outcome-aware recall — surface decisions that had good outcomes, warn about ones that didn't.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_mark_superseded</div><div class="tool-desc">Mark a prior decision as superseded by a newer one. Creates a SUPERSEDES graph edge. Prevents outdated architecture docs from polluting recall. The old decision remains searchable (history) but is ranked below its successor.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_get_cognitive_state</div><div class="tool-desc">Return the current cognitive score breakdown for a memory or set of memories. Diagnostic tool for understanding why certain memories rank higher than others.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_run_recursive</div><div class="tool-desc">Trigger a recursive reasoning pass over a subset of memories — used to synthesize higher-level insights from multiple related memories.</div></div>
+
+<h3>Domain 4: Graph <span class="badge badge-cyan">Event Fabric</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_graph_traverse</div><div class="tool-desc">Navigate the Event Graph Fabric. Given a starting memory node, traverse typed edges (DERIVED_FROM, CONTRADICTS, SUPERSEDES, etc.) to find related memories. Returns the subgraph as a structured list with edge types and confidence scores.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_graph_status</div><div class="tool-desc">Return current graph statistics: node count, edge type distribution, most-connected nodes, last event timestamp. Health check for the Event Graph Fabric.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_event_publish</div><div class="tool-desc">Emit a custom event to the Redis Streams backend. Used by agent-hub orchestrators to broadcast state changes (e.g. "sprint started", "PR merged") that should be shared across the agent fleet.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_event_seed</div><div class="tool-desc">Seed the graph with an initial set of events (bootstrap mode). Used when migrating from another memory system or initializing a new project with historical context.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_set_scope</div><div class="tool-desc">Set the current principal's scope (project, wing, room). Subsequent reads and writes are filtered to this scope. Enables multi-tenant memory isolation on a single DepthFusion instance.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_confirm_discovery</div><div class="tool-desc">Promote a discovery candidate to a confirmed memory. Triggers materialisation pipeline. Used by the review gate pattern: an agent discovers something, a senior agent confirms it.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_pin_discovery</div><div class="tool-desc">Pin a memory so the eviction policy never removes it. For load-bearing facts that must persist indefinitely (e.g. "we use PostgreSQL, not MySQL").</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_agent_trail</div><div class="tool-desc">Return the sequence of memory operations performed by a specific agent principal. Used for audit trails and debugging unexpected memory interactions.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_set_memory_score</div><div class="tool-desc">Manually override the cognitive score for a memory. Administrative tool — useful when the automatic scoring diverges from human judgment.</div></div>
+
+<h3>Domain 5: Project <span class="badge badge-green">Workspace</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_register_project</div><div class="tool-desc">Register a new project with its slug, root path, and metadata. Creates the project's memory partition. Required before scoped recall queries will return project-specific results.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_list_projects</div><div class="tool-desc">List all registered projects with their memory counts, last activity timestamps, and health status.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_ingest_project</div><div class="tool-desc">Batch-ingest a project's source files, documentation, and CLAUDE.md as memories. One-time initialization that primes DepthFusion with structural knowledge about the codebase.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_sync_project</div><div class="tool-desc">Incremental sync — re-ingest changed files since the last sync. Keeps DepthFusion current as the codebase evolves without a full reingest.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_session_seed</div><div class="tool-desc">At session start, load the top-N most relevant memories for the current project/scope. Claude Code's session-start hook calls this to pre-warm context before any user message is processed.</div></div>
+
+<h3>Domain 6: System <span class="badge badge-purple">Infrastructure</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_status</div><div class="tool-desc">Return server health: enabled tools count, active mode, backend status, memory store stats, autonomic daemon state, Event Graph Fabric connectivity.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_list_providers</div><div class="tool-desc">List available retrieval backends with their status (active/inactive), tier assignments, and configuration. Shows which of BM25/Haiku/ChromaDB/HNSW are enabled in the current deployment.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_research_topic</div><div class="tool-desc">Synthetic tool that combines recall + graph traversal + cognitive scoring into a research pass on a topic. Returns a synthesized summary of what DepthFusion knows about a subject area.</div></div>
+
+<h3>Domain 7: Telemetry <span class="badge badge-amber">Observability</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_record_telemetry</div><div class="tool-desc">Record model performance telemetry: tokens_in, tokens_out, latency_ms, cost_usd, quality_verdict, model_id. Feeds the budget-aware model selector's learning loop.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_query_telemetry</div><div class="tool-desc">Query the telemetry store — filter by model, project, date range. Returns aggregated quality_rate, avg_cost_usd, pass/fail breakdown. Powers the /api/budget-summary REST endpoint.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_tier_status</div><div class="tool-desc">Return per-tier retrieval latency percentiles (p50/p95), call counts, and error rates. Diagnostic for retrieval performance tuning.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_hnsw_capability</div><div class="tool-desc">Check if the HNSW index is built, its current size (number of vectors), and whether sentence-transformers are loaded. Gateway check before routing queries to Tier 3.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_describe_capabilities</div><div class="tool-desc">Self-describing tool that returns a structured list of all available tools, their domains, and tier requirements. Used by meta-agents to discover what DepthFusion can do in a given deployment.</div></div>
+<div class="tool-row"><div class="tool-name">depthfusion_surface_skill_candidates</div><div class="tool-desc">Suggest which skills/capabilities are most relevant based on current memory corpus and recent activity patterns. Proactive recommendation engine built on top of the telemetry store.</div></div>
+
+<h3>Domain 8: Bridge <span class="badge badge-red">v2.0.0</span></h3>
+<div class="tool-row"><div class="tool-name">depthfusion_bridge</div><div class="tool-desc">Multi-provider bridge: given a recall query, route it to multiple memory backends simultaneously (DepthFusion store + external sources) and merge results. Used by the budget-aware model selector to aggregate context from heterogeneous sources. Enables DepthFusion to act as a federation layer over multiple memory stores.</div></div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 5 -->
+<h2>5. v2.0.0 New Features — What's Changed Since the Old Demo</h2>
+
+<p class="section-intro">The existing demo was built against v1.x. v2.0.0 ships 7 major new capabilities that must be prominently featured in the new demo. These are not incremental — they represent an architectural leap from single-user memory to enterprise-grade multi-agent cognitive infrastructure.</p>
+
+<div class="grid2">
+  <div class="card" style="border-color:var(--accent-red)">
+    <h4 style="color:var(--accent-red)">OIDC Authentication + RBAC</h4>
+    <p>Enterprise identity integration. DepthFusion validates OIDC JWTs (Azure AD, Okta, Auth0) at the HTTP sidecar. Every tool call is bound to a <strong>Principal</strong> object — the authenticated caller identity. RBAC roles (admin, operator, reader) control which tools each principal can call.</p>
+    <p><code>check_tool_access(tool_name, principal)</code> runs before every dispatch. Unauthorized calls return an authorization error, not a generic failure — the error message identifies which role is required.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-red)">
+    <h4 style="color:var(--accent-red)">Device Enrollment</h4>
+    <p>New principals must complete a device enrollment flow before they can write memories. This prevents unauthorized agents from polluting shared memory stores. Enrolled devices receive a signed certificate that identifies them across sessions — enabling the agent trail audit feature.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-amber)">
+    <h4 style="color:var(--accent-amber)">Budget-Aware Model Selection</h4>
+    <p>The <code>recommend_model</code> HTTP endpoint (available at the HTTP sidecar on :8765) returns ranked model candidates based on quality-per-dollar. The ranking uses 30-day rolling telemetry from <code>depthfusion_record_telemetry</code> — real observed quality rates, not vendor-published benchmarks.</p>
+    <p>The <code>record_model_telemetry</code> tool closes the feedback loop: observed outcomes (pass/fail, cost, latency) update the learning model. Each new run gets smarter recommendations.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-amber)">
+    <h4 style="color:var(--accent-amber)">Tauri 2 Desktop App</h4>
+    <p>The <code>app/</code> directory ships a React 19 + Tauri 2 + Tailwind 4 desktop client. Provides a visual memory browser, graph explorer, telemetry dashboard, and recall UI without requiring Claude Code. Built with Vite 8, TypeScript ~6.0, vitest for testing. Available for Mac, Windows, Linux.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-cyan)">
+    <h4 style="color:var(--accent-cyan)">Event Graph Fabric</h4>
+    <p>Redis Streams-backed SSE pub/sub for multi-agent teams (v1.2.0, now GA in v2.0.0). Every publish/receive creates a graph node. 9 typed edge types. Enables causal lineage: which agent published what, what was derived from it, what contradicted it.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-cyan)">
+    <h4 style="color:var(--accent-cyan)">Autonomic Consolidation</h4>
+    <p>Background daemon that runs near-duplicate detection and archive candidate identification every N minutes. Keeps the memory corpus clean without manual intervention. Enabled with <code>DEPTHFUSION_AUTONOMIC=1</code>.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-purple)">
+    <h4 style="color:var(--accent-purple)">ACL / Principal Authorization</h4>
+    <p>Fine-grained access control at the tool level. Each tool has a required capability set. Principals are granted capabilities via the enrollment flow. The <code>depthfusion_agent_trail</code> tool provides full audit trails of who did what, when.</p>
+  </div>
+  <div class="card" style="border-color:var(--accent-green)">
+    <h4 style="color:var(--accent-green)">Classification-Aware Memory</h4>
+    <p>7 typed MemoryObjects: Decision, CodePattern, Incident, Discovery, ProjectContext, Note, Outcome. Each type has a different CognitiveScorer weight and a different retention policy. Decisions are kept longer; Notes are evicted sooner. Type metadata is searchable.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 6 -->
+<h2>6. Competitor Comparison Matrix — Full Landscape</h2>
+
+<p class="section-intro">The existing README table only compares DepthFusion against IDE tools (Continue.dev, Cursor, Copilot). This is the wrong competitive frame. DepthFusion competes primarily in the AI memory and cognitive infrastructure space. The new demo must include the full landscape.</p>
+
+<div class="callout amber">
+  <strong>Note to Claude Design:</strong> This matrix should be animated with the columns appearing in sequence — first the IDE tools (easiest comparison), then the vector DBs (different category), then the dedicated memory platforms (closest competitors). Each row should light up as it appears. The DepthFusion column should always be visible as the reference column.
+</div>
+
+<h3>6.1 vs. Dedicated AI Memory &amp; RAG Platforms</h3>
+
+<table>
+  <tr>
+    <th>Feature</th>
+    <th>DepthFusion v2</th>
+    <th>mem0</th>
+    <th>Letta / MemGPT</th>
+    <th>Zep</th>
+    <th>LangChain Memory</th>
+    <th>OpenAI Memory</th>
+  </tr>
+  <tr>
+    <td>Self-hosted / Open Source</td>
+    <td class="competitor-win">✓ MIT</td>
+    <td class="competitor-partial">OSS core + cloud</td>
+    <td class="competitor-win">✓ Apache 2.0</td>
+    <td class="competitor-partial">OSS + cloud</td>
+    <td class="competitor-win">✓ MIT</td>
+    <td class="competitor-no">✗ Proprietary</td>
+  </tr>
+  <tr>
+    <td>MCP-native (30+ tools)</td>
+    <td class="competitor-win">✓ 30+ tools</td>
+    <td class="competitor-partial">REST API only</td>
+    <td class="competitor-no">✗ Agent SDK only</td>
+    <td class="competitor-partial">REST + SDK</td>
+    <td class="competitor-no">✗ SDK only</td>
+    <td class="competitor-no">✗ ChatGPT-bound</td>
+  </tr>
+  <tr>
+    <td>Multi-agent shared memory</td>
+    <td class="competitor-win">✓ Event Graph Fabric</td>
+    <td class="competitor-partial">Partial (user-scoped)</td>
+    <td class="competitor-win">✓ MemGPT agents</td>
+    <td class="competitor-partial">Session-based</td>
+    <td class="competitor-no">✗ Single agent</td>
+    <td class="competitor-no">✗ Single user</td>
+  </tr>
+  <tr>
+    <td>Contradiction detection</td>
+    <td class="competitor-win">✓ ContradictionEngine</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-partial">Partial</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Typed memory objects</td>
+    <td class="competitor-win">✓ 7 types</td>
+    <td class="competitor-partial">User/agent memory</td>
+    <td class="competitor-partial">Custom archetypes</td>
+    <td class="competitor-partial">Facts + summaries</td>
+    <td class="competitor-partial">Buffer/summary/entity</td>
+    <td class="competitor-partial">Facts only</td>
+  </tr>
+  <tr>
+    <td>Cognitive scoring</td>
+    <td class="competitor-win">✓ 8 components</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-partial">Relevance score only</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>4-tier hybrid retrieval</td>
+    <td class="competitor-win">✓ BM25+Haiku+Chroma+HNSW</td>
+    <td class="competitor-partial">Semantic + keyword</td>
+    <td class="competitor-partial">Archival + in-context</td>
+    <td class="competitor-partial">Semantic only</td>
+    <td class="competitor-partial">Pluggable vectorstore</td>
+    <td class="competitor-no">✗ Opaque</td>
+  </tr>
+  <tr>
+    <td>OIDC / RBAC</td>
+    <td class="competitor-win">✓ v2.0.0</td>
+    <td class="competitor-win">✓ Cloud tier</td>
+    <td class="competitor-partial">Partial</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Decision/outcome tracking</td>
+    <td class="competitor-win">✓ Decision + Outcome types</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Autonomic consolidation</td>
+    <td class="competitor-win">✓ Daemon thread</td>
+    <td class="competitor-partial">Cloud-managed</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-partial">Opaque</td>
+  </tr>
+  <tr>
+    <td>Event causal graph</td>
+    <td class="competitor-win">✓ Redis Streams + 9 edge types</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Desktop app</td>
+    <td class="competitor-win">✓ Tauri 2 + React 19</td>
+    <td class="competitor-partial">Web dashboard</td>
+    <td class="competitor-win">✓ ADE web app</td>
+    <td class="competitor-partial">Web dashboard</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Fully offline / air-gapped</td>
+    <td class="competitor-win">✓ local mode</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗ requires API</td>
+    <td class="competitor-partial">Needs LLM</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Budget-aware model selection</td>
+    <td class="competitor-win">✓ recommend_model MCP</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+</table>
+
+<h3>6.2 vs. Vector Databases (when used as memory backends)</h3>
+
+<table>
+  <tr>
+    <th>Feature</th>
+    <th>DepthFusion v2</th>
+    <th>Cognee</th>
+    <th>Weaviate</th>
+    <th>Qdrant</th>
+    <th>ChromaDB</th>
+    <th>Custom RAG</th>
+  </tr>
+  <tr>
+    <td>Claude Code / MCP native</td>
+    <td class="competitor-win">✓ 30+ MCP tools</td>
+    <td class="competitor-partial">Python SDK</td>
+    <td class="competitor-no">✗ REST/gRPC</td>
+    <td class="competitor-no">✗ REST/gRPC</td>
+    <td class="competitor-no">✗ Python SDK</td>
+    <td class="competitor-no">✗ Custom</td>
+  </tr>
+  <tr>
+    <td>AI-native cognitive layer</td>
+    <td class="competitor-win">✓ CognitiveScorer + ContradictionEngine</td>
+    <td class="competitor-win">✓ Knowledge graphs</td>
+    <td class="competitor-no">✗ Storage only</td>
+    <td class="competitor-no">✗ Storage only</td>
+    <td class="competitor-no">✗ Storage only</td>
+    <td class="competitor-no">✗ Build it yourself</td>
+  </tr>
+  <tr>
+    <td>Zero-config local mode</td>
+    <td class="competitor-win">✓ pip install depthfusion</td>
+    <td class="competitor-partial">Docker required</td>
+    <td class="competitor-no">✗ Docker/SaaS</td>
+    <td class="competitor-partial">Docker or binary</td>
+    <td class="competitor-win">✓ pip install</td>
+    <td class="competitor-no">✗ Custom infra</td>
+  </tr>
+  <tr>
+    <td>Decision/incident tracking</td>
+    <td class="competitor-win">✓ First-class types</td>
+    <td class="competitor-partial">Partial via KG</td>
+    <td class="competitor-no">✗ Generic objects</td>
+    <td class="competitor-no">✗ Generic payloads</td>
+    <td class="competitor-no">✗ Unstructured</td>
+    <td class="competitor-no">✗ Custom schema</td>
+  </tr>
+  <tr>
+    <td>Hybrid BM25+vector retrieval</td>
+    <td class="competitor-win">✓ 4-tier cascade</td>
+    <td class="competitor-partial">Vector primary</td>
+    <td class="competitor-win">✓ BM25+vector</td>
+    <td class="competitor-win">✓ Sparse+dense</td>
+    <td class="competitor-partial">Vector only</td>
+    <td class="competitor-partial">Custom</td>
+  </tr>
+  <tr>
+    <td>Multi-agent event fabric</td>
+    <td class="competitor-win">✓ Redis Streams</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-partial">Subscriptions</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗ Custom</td>
+  </tr>
+  <tr>
+    <td>Autonomic maintenance</td>
+    <td class="competitor-win">✓ Background daemon</td>
+    <td class="competitor-partial">Partial</td>
+    <td class="competitor-win">✓ Auto-compaction</td>
+    <td class="competitor-win">✓ Auto-optimize</td>
+    <td class="competitor-partial">Manual</td>
+    <td class="competitor-no">✗ Manual</td>
+  </tr>
+</table>
+
+<h3>6.3 vs. IDE Code Intelligence Tools</h3>
+
+<table>
+  <tr>
+    <th>Feature</th>
+    <th>DepthFusion v2</th>
+    <th>Continue.dev</th>
+    <th>Cursor</th>
+    <th>GitHub Copilot</th>
+  </tr>
+  <tr>
+    <td>Cross-session memory</td>
+    <td class="competitor-win">✓ Persistent typed memories</td>
+    <td class="competitor-no">✗ In-session only</td>
+    <td class="competitor-partial">Partial (@ symbols)</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Fully local / offline</td>
+    <td class="competitor-win">✓ local mode</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Self-hosted</td>
+    <td class="competitor-win">✓ MIT</td>
+    <td class="competitor-win">✓ Apache 2.0</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Recall latency</td>
+    <td class="competitor-win">0.04ms (BM25) – 200ms (Haiku)</td>
+    <td class="competitor-partial">Context-dependent</td>
+    <td class="competitor-partial">Index-dependent</td>
+    <td class="competitor-partial">Opaque</td>
+  </tr>
+  <tr>
+    <td>Per-query cost</td>
+    <td class="competitor-win">$0 (local) – $0.0005 (Haiku rerank)</td>
+    <td class="competitor-win">$0 (local)</td>
+    <td class="competitor-no">Subscription</td>
+    <td class="competitor-no">Subscription</td>
+  </tr>
+  <tr>
+    <td>Multi-provider bridge</td>
+    <td class="competitor-win">✓ depthfusion_bridge</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>MCP-native (30+ tools)</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-partial">MCP support</td>
+    <td class="competitor-partial">MCP support</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Hybrid retrieval</td>
+    <td class="competitor-win">✓ BM25+vector+Haiku+HNSW</td>
+    <td class="competitor-partial">Pluggable</td>
+    <td class="competitor-partial">Proprietary</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Cognitive scoring + contradiction detection</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Decision / outcome-aware recall</td>
+    <td class="competitor-win">✓</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Event causal graph</td>
+    <td class="competitor-win">✓ Redis Streams</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+    <td class="competitor-no">✗</td>
+  </tr>
+  <tr>
+    <td>Open source</td>
+    <td class="competitor-win">✓ MIT</td>
+    <td class="competitor-win">✓ Apache 2.0</td>
+    <td class="competitor-no">✗ Proprietary</td>
+    <td class="competitor-no">✗ Proprietary</td>
+  </tr>
+</table>
+
+<div class="anim-note">
+  <strong>Competitor Matrix Animation (Act 3, ~20s):</strong> Animate the three tables in sequence. Start with the IDE tools table (Continue/Cursor/Copilot) — most familiar to the audience. Then expand to the dedicated memory platforms (mem0/Letta/Zep). Then show the vector database row. As each table appears, the DepthFusion column is highlighted in purple/cyan. For the green checkmarks, use a sequential reveal left-to-right per row rather than all appearing at once — this gives time for the audience to read each capability before the next row appears. Red ✗ marks for competitors should appear slightly dimmer — the goal is to inform, not to ridicule. The emphasis should be: "Nobody else combines all of these in a single self-hostable MCP server."
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 7 -->
+<h2>7. UI Navigation &amp; Demo Flow — Interaction Design Direction</h2>
+
+<p class="section-intro">The new demo should be a single-page interactive experience with fixed left navigation and a main content area. The design should feel like a product tour, not a slideshow. Users can click any section header to jump directly to it. Auto-advance plays through all sections in order.</p>
+
+<h3>7.1 Navigation Structure</h3>
+
+<div class="grid2">
+  <div class="card">
+    <h4>Left Sidebar (Fixed)</h4>
+    <ul>
+      <li>Logo + "DepthFusion v2.0.0" header</li>
+      <li>── Act 1: The Problem</li>
+      <li>── Act 2: DepthFusion in Action</li>
+      <li>&nbsp;&nbsp;&nbsp;├── Publish &amp; Recall</li>
+      <li>&nbsp;&nbsp;&nbsp;├── Event Graph Fabric</li>
+      <li>&nbsp;&nbsp;&nbsp;└── Contradiction Engine</li>
+      <li>── Act 3: Architecture</li>
+      <li>&nbsp;&nbsp;&nbsp;├── 4-Tier Pipeline</li>
+      <li>&nbsp;&nbsp;&nbsp;├── fabric_seed Formula</li>
+      <li>&nbsp;&nbsp;&nbsp;├── Deployment Modes</li>
+      <li>&nbsp;&nbsp;&nbsp;└── Competitor Matrix</li>
+      <li>── Install &amp; Quickstart</li>
+      <li>── v2.0.0 Features</li>
+      <li>[Auto-play toggle] [Speed: 1×]</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Main Area Zones</h4>
+    <ul>
+      <li><strong>Terminal zone (top):</strong> animated terminal showing real MCP tool calls and responses. Monospace font, dark background, green cursor.</li>
+      <li><strong>Architecture zone (middle):</strong> SVG/canvas animated diagram that responds to the current narrative section. Pipeline nodes highlight as they're mentioned.</li>
+      <li><strong>Code zone (bottom):</strong> syntax-highlighted code snippets showing the Claude Code CLAUDE.md configuration required to enable DepthFusion.</li>
+      <li><strong>Matrix zone:</strong> the full competitor tables appear in sequence during Act 3.</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.2 Terminal Animation — Exact Sequences</h3>
+
+<div class="callout cyan">
+  <strong>Terminal Sequence 1 — Session Seed (Act 2 opening):</strong>
+<pre><code>$ claude code --session-start
+[DepthFusion] Loading session context...
+[depthfusion_session_seed] project=agent-ops scope=main
+  ✓ 12 memories loaded (decisions: 4, incidents: 2, patterns: 6)
+  ✓ Top memory: "Use PostgreSQL not SQLite for production" (score: 0.94)
+  ✓ fabric_seed top-3 ready for context injection
+[DepthFusion] Session initialized in 43ms (BM25 + ChromaDB)</code></pre>
+</div>
+
+<div class="callout cyan">
+  <strong>Terminal Sequence 2 — Publish (Act 2 middle):</strong>
+<pre><code>Agent A: depthfusion_publish_context({
+  "type": "decision",
+  "content": "Migrate auth from JWT to OIDC+RBAC for multi-tenant support",
+  "rationale": "JWT lacks principal binding needed for ACL enforcement",
+  "project": "agent-ops",
+  "importance": 0.95
+})
+→ Materialisation gate 1: score 0.95 ≥ threshold ✓
+→ Materialisation gate 2: novelty cosine 0.83 &gt; 0.15 ✓
+→ Materialisation gate 3: capacity OK ✓
+→ Embedding: all-MiniLM-L6-v2 [768d] stored to ChromaDB
+→ BM25 index updated
+→ Event Graph: AGENT_PUBLISHED edge created
+→ Redis Streams: broadcasting to 2 active agents...
+✓ Memory stored — id: dec_2f8a3b (principal: agent-a)</code></pre>
+</div>
+
+<div class="callout cyan">
+  <strong>Terminal Sequence 3 — Recall (Act 2, Agent B next day):</strong>
+<pre><code>Agent B: depthfusion_recall_relevant({
+  "query": "what auth system should I use",
+  "project": "agent-ops",
+  "limit": 5
+})
+→ Tier 1 BM25: 3 candidates (0.041ms)
+→ Tier 2b ChromaDB: 4 candidates, cosine ≥ 0.72 (18ms)
+→ Tier 2a Haiku reranker: scoring 5 candidates... (143ms)
+→ RRF fusion: weighted (quality_rate=0.89 from telemetry)
+→ fabric_seed re-rank:
+   [1] "Migrate auth from JWT to OIDC+RBAC" score=0.92
+       observer_count=1, age=0d, relevance=0.94
+   [2] "Session tokens must be stateless" score=0.71
+   [3] "Auth endpoints need rate limiting" score=0.58
+✓ Recall complete in 162ms (4-tier cascade)</code></pre>
+</div>
+
+<div class="callout cyan">
+  <strong>Terminal Sequence 4 — Contradiction Detection:</strong>
+<pre><code>Agent C: depthfusion_publish_context({
+  "type": "decision",
+  "content": "Keep using JWT for auth — OIDC is over-engineered",
+  "project": "agent-ops"
+})
+→ ContradictionEngine: scanning corpus...
+⚠ CONTRADICTION DETECTED
+  New: "Keep using JWT for auth"
+  Conflicts with: dec_2f8a3b "Migrate auth to OIDC+RBAC" (score 0.92)
+  Similarity: 0.87 (above threshold 0.75)
+→ Both memories stored with CONTRADICTS edge
+→ contradiction_risk component: +0.40 applied to new memory
+→ Agent B will see both with conflict warning on next recall
+✓ Memory stored with contradiction annotation</code></pre>
+</div>
+
+<h3>7.3 Quickstart Section (Install &amp; Config)</h3>
+
+<div class="grid3">
+  <div class="card">
+    <h4>Local Mode (zero deps)</h4>
+    <pre><code>pip install depthfusion
+# Add to claude_desktop_config.json:
+{
+  "mcpServers": {
+    "depthfusion": {
+      "command": "python",
+      "args": ["-m", "depthfusion.mcp.server"],
+      "env": {
+        "DEPTHFUSION_MODE": "local"
+      }
+    }
+  }
+}</code></pre>
+  </div>
+  <div class="card">
+    <h4>VPS-CPU (semantic search)</h4>
+    <pre><code>pip install depthfusion[vps-cpu]
+# Env vars:
+DEPTHFUSION_MODE=vps-cpu
+ANTHROPIC_API_KEY=sk-ant-...
+# Then start HTTP sidecar:
+depthfusion-server --port 8765
+# Enables: ChromaDB + Haiku reranker</code></pre>
+  </div>
+  <div class="card">
+    <h4>Mac MLX (Apple Silicon GPU)</h4>
+    <pre><code>pip install depthfusion[mac-mlx]
+# Start mlx_lm server first:
+mlx_lm.server --model mlx-community/gemma-3-8b-it-4bit
+# Then:
+DEPTHFUSION_MODE=mac-mlx
+DEPTHFUSION_MLX_URL=http://localhost:8000
+DEPTHFUSION_AUTONOMIC=1</code></pre>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 8 -->
+<h2>8. Animation &amp; Interaction Design Directives</h2>
+
+<p class="section-intro">These are binding directives for the animated demo. They define the visual language, timing, and interaction patterns that Claude Design should use throughout.</p>
+
+<h3>8.1 Visual Language</h3>
+
+<div class="grid2">
+  <div class="card">
+    <h4>Color Semantics (must be consistent)</h4>
+    <ul>
+      <li><span class="badge badge-cyan">Cyan #06b6d4</span> — retrieval operations, BM25, recall</li>
+      <li><span class="badge badge-purple">Purple #7c3aed</span> — write operations, publish, store</li>
+      <li><span class="badge badge-green">Green #10b981</span> — success, PASS, HNSW layer</li>
+      <li><span class="badge badge-amber">Amber #f59e0b</span> — Haiku reranker, AI operations, formula</li>
+      <li><span class="badge badge-red">Red #ef4444</span> — contradictions, warnings, errors</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Typography</h4>
+    <ul>
+      <li><strong>UI text:</strong> Inter, system-ui — clean, legible, not developer-specific</li>
+      <li><strong>Terminal / code:</strong> JetBrains Mono or Fira Code — technical authenticity</li>
+      <li><strong>Formula text:</strong> Larger monospace, with variable parts highlighted in amber</li>
+      <li><strong>Headers:</strong> Gradient text (cyan→purple) for the main title; cyan for section headers</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.2 Animation Timing</h3>
+
+<table>
+  <tr><th>Element</th><th>Duration</th><th>Easing</th><th>Notes</th></tr>
+  <tr><td>Pipeline node highlight</td><td>300ms</td><td>ease-out</td><td>Glow effect, not just color change</td></tr>
+  <tr><td>Terminal line type-in</td><td>30ms/char max</td><td>linear</td><td>Cap at 50 chars/sec for readability</td></tr>
+  <tr><td>Section transition</td><td>400ms</td><td>ease-in-out</td><td>Slide in from right, fade out to left</td></tr>
+  <tr><td>Table row reveal</td><td>200ms/row</td><td>ease-out</td><td>Stagger by 100ms between rows</td></tr>
+  <tr><td>Graph edge draw</td><td>500ms/edge</td><td>ease-in-out</td><td>Draw path animation, not instant appear</td></tr>
+  <tr><td>Formula dial spin</td><td>800ms</td><td>ease-out</td><td>Overshoot slightly (spring feel)</td></tr>
+  <tr><td>Formula multiply animation</td><td>1200ms</td><td>ease-in-out</td><td>Three operands converge → result expands</td></tr>
+  <tr><td>Auto-advance pause</td><td>3000ms</td><td>—</td><td>Hold on each major state before advancing</td></tr>
+</table>
+
+<h3>8.3 Interaction Behaviors</h3>
+
+<ul>
+  <li><strong>Hover on pipeline node:</strong> Expand a tooltip with technical detail (latency, dependencies, which deployment modes activate it)</li>
+  <li><strong>Click on tool name in terminal:</strong> Open a side panel with the full tool schema (JSON Schema for that tool's inputSchema)</li>
+  <li><strong>Click competitor name in matrix:</strong> Show a brief comparison note explaining the key differentiation in 2 sentences</li>
+  <li><strong>Keyboard:</strong> Arrow keys advance/reverse section; Space toggles auto-play; number keys 1–8 jump to sections</li>
+  <li><strong>Copy button</strong> on all code blocks (install commands, config snippets)</li>
+  <li><strong>Dark mode only</strong> — no light mode toggle. The product is for developers; the demo should match the aesthetic of the tool</li>
+</ul>
+
+<h3>8.4 Performance Requirements</h3>
+
+<ul>
+  <li>SVG animations preferred over canvas for the pipeline diagram (accessible, inspectable)</li>
+  <li>No external font CDN calls — bundle Inter + JetBrains Mono as woff2 or use system-ui fallback</li>
+  <li>Total page weight target: under 500KB (no heavy animation libraries — use CSS animations + vanilla JS where possible)</li>
+  <li>First meaningful paint target: under 1.5s on a median connection</li>
+  <li>Framer Motion or GSAP acceptable if needed for the formula animation; keep other animations CSS-only</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 9 -->
+<h2>9. Updated Benchmark Guidance</h2>
+
+<div class="callout red">
+  <strong>Existing benchmarks to RETIRE from the demo:</strong>
+  <ul>
+    <li>BM25 precision@1=1.000 (n=8 goldset) — too small a sample to display prominently</li>
+    <li>BM25 p50=0.043ms, p95=0.135ms — valid but now describes only Tier 1, not the full pipeline</li>
+    <li>Real-session latency 37–372ms (n=4) — too small sample, pre-OIDC/RBAC overhead</li>
+    <li>CIQS ~94-96 "projected for v1.0.0" — projected figures should not appear in a v2.0.0 demo</li>
+  </ul>
+</div>
+
+<div class="callout green">
+  <strong>What to show instead in v2.0.0 demo:</strong>
+  <ul>
+    <li><strong>Architecture-derived latency ranges</strong> (clearly labeled as such):
+      <ul>
+        <li>Tier 1 BM25: &lt;1ms (in-process, no network)</li>
+        <li>Tier 2b ChromaDB: 5–25ms (local IPC or loopback)</li>
+        <li>Tier 2a Haiku rerank: 80–300ms (network-bound, Anthropic API)</li>
+        <li>Tier 3 HNSW: 1–5ms at 100k vectors (hnswlib benchmark figures from library docs)</li>
+        <li>Full cascade (vps-cpu): 100–350ms total</li>
+        <li>Local mode (BM25 only): &lt;1ms</li>
+      </ul>
+    </li>
+    <li><strong>Qualitative RRF advantage:</strong> "Weighted fusion outperforms plain RRF on the majority of recall queries in internal testing" — leave the exact figure out until a proper v2 benchmark suite is run</li>
+    <li><strong>Cost comparisons</strong> (based on published pricing, accurate as of v2.0.0 release):
+      <ul>
+        <li>Local mode: $0/query</li>
+        <li>VPS-CPU with Haiku reranker: ~$0.0005/recall call (Haiku input token cost)</li>
+        <li>VPS-GPU/mac-mlx: $0/query once hardware is provisioned</li>
+      </ul>
+    </li>
+    <li><strong>CognitiveScorer overhead:</strong> ~15ms (stated in codebase comments — attributable)</li>
+    <li><strong>New benchmark suite needed (note in demo as "coming soon"):</strong>
+      <ul>
+        <li>CIQS v2: test with OIDC/RBAC overhead measured</li>
+        <li>Event Graph Fabric throughput: messages/sec through Redis Streams</li>
+        <li>Autonomic consolidation: near-duplicate detection recall@k on a synthetic corpus</li>
+        <li>Budget-aware recommendation accuracy: quality_rate prediction vs actual</li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 10 -->
+<h2>10. Act-by-Act Storyboard Summary</h2>
+
+<div class="callout">
+  <strong>Act 1 — The Problem (~30s)</strong><br>
+  <em>Scene: Split screen. Two Claude Code terminals. Same codebase.</em><br>
+  Agent A (left terminal): Makes architectural decision. Writes 40 lines of reasoning in its context window. Commits code. Session ends. Context wiped.<br>
+  Agent B (right terminal, next day): <code>claude code</code>. Blank context. Starts re-deriving the same decisions. The architecture slowly diverges. A bug appears. Agent B doesn't know it was already fixed by Agent A.<br>
+  <em>Narrator text:</em> "AI agents are amnesiac by design. Every session starts from zero. In a team of agents, this isn't just inefficiency — it's architectural drift."
+</div>
+
+<div class="callout cyan">
+  <strong>Act 2 — DepthFusion in Action (~90s)</strong><br>
+  <em>Scene: Same split screen, but now with a DepthFusion node between them.</em><br>
+  Agent A: <code>depthfusion_publish_context(...)</code> — decision stored. Pipeline animation. Redis fan-out glow.<br>
+  Agent A session ends. Scene: clock advances 18 hours.<br>
+  Agent B starts: <code>depthfusion_session_seed(...)</code> — 12 memories load. The architectural decision appears in context. Agent B builds correctly on the first try.<br>
+  Agent C joins: tries to store contradicting decision. ContradictionEngine fires (red glow). Both memories retained with CONTRADICTS edge. Agent B sees warning on next recall.<br>
+  The Event Graph expands: nodes accumulate. Edges form a knowledge lineage. The graph is queryable. Causal history is preserved.<br>
+  <em>Narrator:</em> "DepthFusion doesn't just remember — it understands the relationships between memories."
+</div>
+
+<div class="callout" style="border-color:var(--accent-green)">
+  <strong>Act 3 — Architecture Deep Dive (~60s)</strong><br>
+  <em>Scene: full-width architecture diagram.</em><br>
+  Walk through each tier of the pipeline. Show the latency breakdown. Show the formula dials.<br>
+  Cut to deployment mode selector: local → vps-cpu → vps-gpu → mac-mlx.<br>
+  Cut to competitor matrix (3 tables, sequential reveal).<br>
+  End on install command: <code>pip install depthfusion</code> with the GitHub star button.<br>
+  <em>CTA:</em> "Shared cognitive infrastructure for AI agent teams. Self-hosted. Open source. MIT licensed."
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ FOOTER -->
+<h2>Appendix: Key Files for Claude Design Reference</h2>
+
+<table>
+  <tr><th>File</th><th>What it contains</th></tr>
+  <tr><td><code>src/depthfusion/mcp/server.py</code></td><td>Full tool dispatch table — all 30+ tools with exact names and implementation references</td></tr>
+  <tr><td><code>src/depthfusion/mcp/tools/_registry.py</code></td><td>TOOL_SCHEMAS — complete JSON Schema for every tool's inputSchema (use for side-panel tooltips)</td></tr>
+  <tr><td><code>pyproject.toml</code></td><td>All extras and their deps — defines exactly what each deployment mode requires</td></tr>
+  <tr><td><code>app/package.json</code></td><td>Tauri 2 + React 19 desktop app — feature list for v2.0.0 callout</td></tr>
+  <tr><td><code>README.md</code></td><td>Existing competitor table (11 features vs 5 IDE tools) — extends with this handoff's full matrix</td></tr>
+  <tr><td><code>docs/depthfusion-animated-demo.html</code></td><td>Previous demo — reference for dark theme CSS variables only; do not copy content</td></tr>
+</table>
+
+<div class="callout amber" style="margin-top:48px">
+  <strong>Final note to Claude Design:</strong> The ideal outcome is a demo that an AI engineer can send to their team with the message "this is why we're switching our agent memory layer to DepthFusion." It should answer three questions before the viewer even has to ask:
+  <ol style="margin-top:10px">
+    <li><em>What does it actually do?</em> (Act 1 + Act 2 answer this)</li>
+    <li><em>How does it work technically?</em> (Act 3 + architecture layers answer this)</li>
+    <li><em>Why not just use [X] instead?</em> (Competitor matrix answers this)</li>
+  </ol>
+  The demo is not a marketing page. It is a technical brief. Trust the audience to appreciate depth.
+</div>
+
+<p style="margin-top:48px;color:var(--text-muted);font-size:0.82em;text-align:center">DepthFusion v2.0.0 — Claude Design Handoff — gregdigittal/depthfusion — MIT License</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add DNS Record: mcp.tonracein.com</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 640px; margin: 48px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.6; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    .subtitle { color: #666; margin-top: 0; font-size: 0.95rem; }
+    .step { display: flex; gap: 16px; margin: 28px 0; }
+    .num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #0051c3; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+    .step-body h3 { margin: 0 0 6px; font-size: 1rem; }
+    .step-body p { margin: 0; color: #444; font-size: 0.93rem; }
+    .record-box { background: #f4f6f8; border: 1px solid #dde1e7; border-radius: 8px; padding: 16px 20px; margin: 20px 0; font-family: monospace; font-size: 0.92rem; }
+    .record-box table { border-collapse: collapse; width: 100%; }
+    .record-box td { padding: 4px 12px 4px 0; vertical-align: top; }
+    .record-box td:first-child { color: #666; font-size: 0.85rem; white-space: nowrap; padding-right: 16px; }
+    .record-box td:last-child { font-weight: 600; color: #0051c3; }
+    .warn { background: #fff8e1; border-left: 4px solid #f59e0b; padding: 10px 14px; border-radius: 4px; font-size: 0.88rem; color: #555; margin: 16px 0; }
+    .done { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; border-radius: 4px; font-size: 0.88rem; color: #15803d; margin: 16px 0; }
+    img.screenshot { display: none; } /* placeholder */
+    a { color: #0051c3; }
+    code { background: #eef; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+
+<h1>Add DNS record: <code>mcp.tonracein.com</code></h1>
+<p class="subtitle">One A record in Cloudflare — takes about 60 seconds.</p>
+
+<div class="record-box">
+  <table>
+    <tr><td>Type</td><td>A</td></tr>
+    <tr><td>Name</td><td>mcp</td></tr>
+    <tr><td>IPv4 address</td><td>176.9.147.206</td></tr>
+    <tr><td>TTL</td><td>Auto</td></tr>
+    <tr><td>Proxy status</td><td>DNS only (grey cloud ☁️)</td></tr>
+  </table>
+</div>
+
+<div class="step">
+  <div class="num">1</div>
+  <div class="step-body">
+    <h3>Open Cloudflare DNS for tonracein.com</h3>
+    <p>Go to <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> → click <strong>tonracein.com</strong> → click <strong>DNS</strong> in the left sidebar → click <strong>Records</strong>.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">2</div>
+  <div class="step-body">
+    <h3>Click "Add record"</h3>
+    <p>Blue button near the top of the DNS records table.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">3</div>
+  <div class="step-body">
+    <h3>Fill in the form exactly as shown above</h3>
+    <p>
+      • <strong>Type:</strong> A<br>
+      • <strong>Name:</strong> <code>mcp</code><br>
+      • <strong>IPv4 address:</strong> <code>176.9.147.206</code><br>
+      • <strong>TTL:</strong> Auto<br>
+      • <strong>Proxy status:</strong> click the orange cloud until it turns <em>grey</em> ("DNS only")
+    </p>
+  </div>
+</div>
+
+<div class="warn">
+  ⚠️ <strong>Keep the cloud grey (DNS only).</strong> Orange/proxied breaks the Let's Encrypt certificate that Caddy auto-provisions — the server can't complete the ACME challenge through Cloudflare's proxy.
+</div>
+
+<div class="step">
+  <div class="num">4</div>
+  <div class="step-body">
+    <h3>Click "Save"</h3>
+    <p>That's it. DNS propagates in under a minute. Caddy will provision the TLS cert automatically on the first HTTPS request to <code>mcp.tonracein.com</code>.</p>
+  </div>
+</div>
+
+<hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+<h2 style="font-size: 1rem;">Verify it worked</h2>
+<p>Run this from your Mac terminal a minute after saving:</p>
+<div class="record-box">dig A mcp.tonracein.com +short<br><span style="color:#888"># should return: 176.9.147.206</span></div>
+
+<p>Then test the HTTPS endpoint (may take 30–60 s for Caddy to get the cert):</p>
+<div class="record-box">curl -s https://mcp.tonracein.com/health<br><span style="color:#888"># should return: {"status":"ok","transport":"sse","version":"2.0.0"}</span></div>
+
+<div class="done">
+  ✅ Once that curl returns 200, update the app's default server URL from <code>http://176.9.147.206:7301</code> to <code>https://mcp.tonracein.com</code> in <code>app/src/SettingsPage.tsx</code> and <code>app/src-tauri/src/settings.rs</code>.
+</div>
+
+</body>
+</html>
