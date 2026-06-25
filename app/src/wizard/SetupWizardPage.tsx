@@ -23,6 +23,7 @@ import { VpsPrereqScreen } from './VpsPrereqScreen'
 import { VpsInstallScreen } from './VpsInstallScreen'
 import { ServerUrlScreen } from './ServerUrlScreen'
 import { OidcSignInScreen } from './OidcSignInScreen'
+import { ConnectTokenScreen } from './ConnectTokenScreen'
 import { SuccessScreen } from './SuccessScreen'
 import type { WizardMode } from './ModeSelectScreen'
 
@@ -34,6 +35,7 @@ type Screen =
   | 'vps-install'
   | 'server-url'
   | 'oidc-signin'
+  | 'connect-token'
   | 'success'
 
 interface SetupWizardPageProps {
@@ -47,7 +49,7 @@ interface SetupWizardPageProps {
 
 const SOLO_SCREENS: Screen[] = ['solo-install', 'solo-api-key', 'success']
 const VPS_SCREENS: Screen[] = ['vps-prereq', 'vps-install', 'server-url', 'oidc-signin', 'success']
-const CONNECT_SCREENS: Screen[] = ['server-url', 'oidc-signin', 'success']
+const CONNECT_SCREENS: Screen[] = ['server-url', 'connect-token', 'success']
 
 function getScreensForMode(mode: WizardMode): Screen[] {
   switch (mode) {
@@ -199,6 +201,9 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
 
       case 'oidc-signin':
         return <OidcSignInScreen onNext={handleNext} />
+
+      case 'connect-token':
+        return <ConnectTokenScreen onNext={handleNext} />
 
       case 'success':
         return (

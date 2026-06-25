@@ -6,6 +6,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: mockInvoke }))
 
 import {
   setupSoloAuth,
+  setupConnectAuth,
   setWizardCompleted,
   checkServerHealth,
 } from '../lib/ipc'
@@ -27,6 +28,23 @@ describe('setupSoloAuth', () => {
   it('propagates invoke errors to the caller', async () => {
     mockInvoke.mockRejectedValue('Keychain locked')
     await expect(setupSoloAuth('sk-ant-api03-test-key')).rejects.toBe('Keychain locked')
+  })
+})
+
+// S-218: setupConnectAuth stores bearer token via setup_connect_auth command.
+describe('setupConnectAuth', () => {
+  it('calls invoke("setup_connect_auth") with the bearer token', async () => {
+    mockInvoke.mockResolvedValue(undefined)
+    await setupConnectAuth('3cea56481975dc53587e8d99cfa989c3ab8b1c3e5e44792443832f4cf8c1f317')
+    expect(mockInvoke).toHaveBeenCalledOnce()
+    expect(mockInvoke).toHaveBeenCalledWith('setup_connect_auth', {
+      bearerToken: '3cea56481975dc53587e8d99cfa989c3ab8b1c3e5e44792443832f4cf8c1f317',
+    })
+  })
+
+  it('propagates invoke errors to the caller', async () => {
+    mockInvoke.mockRejectedValue('Keychain locked')
+    await expect(setupConnectAuth('some-token')).rejects.toBe('Keychain locked')
   })
 })
 

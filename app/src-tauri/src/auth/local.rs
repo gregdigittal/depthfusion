@@ -48,6 +48,44 @@ fn build_solo_token_set(api_key: &str) -> Result<vault::TokenSet, String> {
     })
 }
 
+/// TTL for a static bearer token (10 years). Tokens managed by a VPS admin
+/// don't expire on a schedule, so a very long TTL prevents `is_expired` checks
+/// from treating the token as stale during normal use.
+const CONNECT_TOKEN_TTL_SECS: u64 = 10 * 365 * 24 * 3600;
+
+/// Configure connect mode from a static bearer token.
+///
+/// Steps (in order):
+///   1. Reject empty/whitespace tokens before any write.
+///   2. Store the token in the OS keychain vault with `token_type = "Bearer"`.
+///   3. Persist `deployment_mode = "connect"`.
+///   4. Mark the setup wizard as completed.
+///
+/// Credential safety: the token is never logged.
+#[tauri::command]
+pub fn setup_connect_auth(app: AppHandle, bearer_token: String) -> Result<(), String> {
+    if bearer_token.trim().is_empty() {
+        return Err("Bearer token must not be empty.".to_string());
+    }
+
+    let token_set = vault::TokenSet {
+        access_token: bearer_token,
+        id_token: None,
+        refresh_token: None,
+        expires_in: Some(CONNECT_TOKEN_TTL_SECS),
+        token_type: "Bearer".to_string(),
+        stored_at: None,
+    };
+
+    vault::store_tokens(&token_set)
+        .map_err(|e| format!("Failed to persist bearer token to keychain vault: {e}"))?;
+
+    settings::set_deployment_mode(app.clone(), "connect".to_string())?;
+    settings::set_wizard_completed(app, true)?;
+
+    Ok(())
+}
+
 /// Configure solo mode from an Anthropic API key.
 ///
 /// Steps (in order):

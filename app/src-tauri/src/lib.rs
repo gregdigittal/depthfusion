@@ -35,6 +35,7 @@ pub fn run() {
             auth::commands::clear_tokens,
             auth::commands::logout,
             auth::local::setup_solo_auth,
+            auth::local::setup_connect_auth,
             updater::check_update,
             settings::get_server_url,
             settings::set_server_url,

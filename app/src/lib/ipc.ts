@@ -92,3 +92,12 @@ export async function checkServerHealth(url: string): Promise<boolean> {
 export async function setupSoloAuth(apiKey: string): Promise<void> {
   return invoke<void>('setup_solo_auth', { apiKey })
 }
+
+/**
+ * Store a static bearer token and configure connect mode:
+ * stores the token in the OS keychain vault with token_type='Bearer',
+ * sets deployment_mode='connect', and marks the wizard as completed.
+ */
+export async function setupConnectAuth(bearerToken: string): Promise<void> {
+  return invoke<void>('setup_connect_auth', { bearerToken })
+}
