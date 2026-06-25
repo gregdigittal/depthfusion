@@ -31,8 +31,8 @@ from typing import AsyncGenerator, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
 from depthfusion.core.config import DepthFusionConfig
@@ -255,7 +255,8 @@ async def rest_search(
     results = [
         {
             "id": b.get("chunk_id", ""),
-            "title": b.get("chunk_id", b.get("source", "")).replace("-", " ").replace("_", " ").title(),
+            "title": b.get("chunk_id", b.get("source", ""))
+                .replace("-", " ").replace("_", " ").title(),
             "snippet": b.get("snippet", ""),
             "score": b.get("score", 0.0),
             "source": b.get("source", ""),
@@ -271,6 +272,7 @@ async def rest_stats(
 ):
     import pathlib
     import sqlite3
+
     from depthfusion.core.project_registry import ProjectRegistry  # lazy import
 
     # HNSW index entry count (from the sidecar meta file — cheap, no model load)
