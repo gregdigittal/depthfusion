@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { SearchResult } from '../components/ResultCard'
+import { loadTokens } from '../lib/ipc'
 
 interface SearchResponse {
   results: SearchResult[]
@@ -38,6 +39,11 @@ export function useSearch(serverUrl: string): UseSearchReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latencyMs, setLatencyMs] = useState<number | null>(null)
+  const [token, setToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadTokens().then((ts) => setToken(ts?.access_token ?? null)).catch(console.error)
+  }, [])
 
   const cacheRef = useRef<Map<string, SearchResult[]>>(new Map())
   const abortRef = useRef<AbortController | null>(null)
@@ -74,7 +80,10 @@ export function useSearch(serverUrl: string): UseSearchReturn {
       try {
         const resp = await fetch(`${serverUrl}/api/v1/search`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ q, limit: 20 }),
           signal: controller.signal,
         })
@@ -102,7 +111,7 @@ export function useSearch(serverUrl: string): UseSearchReturn {
         setIsLoading(false)
       }
     },
-    [serverUrl]
+    [serverUrl, token]
   )
 
   useEffect(() => {

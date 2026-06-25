@@ -1,4 +1,6 @@
 import { useDashboard } from './hooks/useDashboard'
+import { useStats } from './hooks/useStats'
+import type { StatsData } from './hooks/useStats'
 import { TileGrid } from './components/TileGrid'
 
 function RecentActivity() {
@@ -20,16 +22,16 @@ function RecentActivity() {
   )
 }
 
-function SearchStats() {
+function SearchStats({ stats }: { stats: StatsData | null }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
       <div>
-        <div className="df-stat-big">247</div>
-        <div className="df-stat-label">Queries this week</div>
+        <div className="df-stat-big">{stats ? stats.context_files.toLocaleString() : '—'}</div>
+        <div className="df-stat-label">Files indexed</div>
       </div>
       <div>
-        <div className="df-stat-med">142ms</div>
-        <div className="df-stat-label">Avg. latency</div>
+        <div className="df-stat-med">{stats ? stats.project_count : '—'}</div>
+        <div className="df-stat-label">Projects tracked</div>
       </div>
     </div>
   )
@@ -55,33 +57,39 @@ function StorageUsage() {
   )
 }
 
-function SyncStatus() {
+function SyncStatus({ stats }: { stats: StatsData | null }) {
+  const lastSync = stats?.last_synced
+    ? new Date(stats.last_synced).toLocaleString()
+    : '—'
+  const docCount = stats ? stats.context_files.toLocaleString() : '—'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
         <span className="df-dot df-dot--ok df-dot--pip" />
         <span style={{ color: 'var(--text)', fontSize: 'var(--fs-body)' }}>Synced</span>
       </div>
-      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>Last sync: 3 min ago</div>
-      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-micro)' }}>1,204 documents indexed</div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>Last sync: {lastSync}</div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-micro)' }}>{docCount} files indexed</div>
     </div>
   )
 }
 
-const TILE_CONTENT: Record<string, React.ReactNode> = {
-  'recent-activity': <RecentActivity />,
-  'search-stats': <SearchStats />,
-  'storage-usage': <StorageUsage />,
-  'sync-status': <SyncStatus />,
-}
-
 export function DashboardPage() {
   const { tiles } = useDashboard()
+  const { data: stats } = useStats()
+
+  const tileContent: Record<string, React.ReactNode> = {
+    'recent-activity': <RecentActivity />,
+    'search-stats': <SearchStats stats={stats} />,
+    'storage-usage': <StorageUsage />,
+    'sync-status': <SyncStatus stats={stats} />,
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
       <TileGrid tiles={tiles}>
-        {tiles.map((t) => TILE_CONTENT[t.id] ?? null)}
+        {tiles.map((t) => tileContent[t.id] ?? null)}
       </TileGrid>
     </div>
   )

@@ -31,6 +31,7 @@ from typing import AsyncGenerator, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from depthfusion.api.auth import require_principal
@@ -228,6 +229,66 @@ async def messages_endpoint(
         await _MCP_SESSIONS[sessionId].put(json.dumps(response))
 
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# REST API — search and stats for the desktop app
+# ---------------------------------------------------------------------------
+
+class _SearchRequest(BaseModel):
+    q: str
+    limit: int = 20
+
+
+@app.post("/api/v1/search")
+async def rest_search(
+    body: _SearchRequest,
+    _: None = Depends(_check_mcp_auth),
+):
+    from depthfusion.mcp.tools._shared import _tool_recall_impl  # lazy import
+
+    loop = asyncio.get_event_loop()
+    raw = await loop.run_in_executor(
+        None, _tool_recall_impl, {"query": body.q, "limit": body.limit}
+    )
+    data = json.loads(raw)
+    results = [
+        {
+            "id": b.get("chunk_id", ""),
+            "title": b.get("chunk_id", b.get("source", "")).replace("-", " ").replace("_", " ").title(),
+            "snippet": b.get("snippet", ""),
+            "score": b.get("score", 0.0),
+            "source": b.get("source", ""),
+        }
+        for b in data.get("blocks", [])
+    ]
+    return {"results": results}
+
+
+@app.get("/api/v1/stats")
+async def rest_stats(
+    _: None = Depends(_check_mcp_auth),
+):
+    import pathlib
+    from depthfusion.core.project_registry import ProjectRegistry  # lazy import
+
+    config = DepthFusionConfig.from_env()
+    bus_dir = pathlib.Path(config.bus_file_dir).expanduser()
+    context_files = len(list(bus_dir.rglob("*.md"))) if bus_dir.exists() else 0
+
+    registry = ProjectRegistry()
+    projects_list = registry.list_projects()
+    last_synced = max(
+        (p.last_synced for p in projects_list if p.last_synced),
+        default=None,
+    )
+
+    return {
+        "context_files": context_files,
+        "projects": [p.slug for p in projects_list],
+        "project_count": len(projects_list),
+        "last_synced": last_synced,
+    }
 
 
 # ---------------------------------------------------------------------------
