@@ -1,0 +1,19 @@
+[Unit]
+Description=DepthFusion MCP HTTP Server
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=30
+
+[Service]
+User=gregmorris
+WorkingDirectory=/home/gregmorris/projects/depthfusion
+EnvironmentFile=/home/gregmorris/.claude/depthfusion.env
+ExecStart=/home/gregmorris/projects/depthfusion/.venv/bin/python3 \
+    -m depthfusion.mcp.http_server
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
