@@ -74,6 +74,9 @@ function App() {
         onComplete={async () => {
           await setWizardCompleted(true).catch(console.error)
           setWizardNeeded(false)
+          // Re-check the vault — setup_*_auth stored a token the mount-time
+          // pollAuthState never saw (it ran before the wizard completed).
+          void pollAuthState(5_000).catch(() => {})
         }}
       />
     )
