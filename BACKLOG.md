@@ -3542,7 +3542,7 @@
 - [x] AC-1: Wizard shows on first launch when `wizard_completed` is not set in store
 - [x] AC-2: Mode-select screen shows three cards — Solo, Self-hosted VPS, Connect to server
 - [x] AC-3: Progress bar and Back button present on all steps after mode select
-- [ ] AC-4: "Re-run setup wizard" button in Settings resets `wizard_completed` and reloads
+- [x] AC-4: "Re-run setup wizard" button in Settings resets `wizard_completed` and reloads — **implemented in `SettingsPage.tsx` `handleRerunWizard`; page is behind `authState.status !== 'authenticated'` gate in `App.tsx`**
 - [x] AC-5: Wizard completion sets `wizard_completed = true`; subsequent launches skip wizard
 
 **Tasks:**
@@ -3559,7 +3559,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Wizard shows copyable `curl` install command and polls `localhost:7300/health` every 3 s; auto-advances 1 s after server detected
 - [x] AC-2: API key input validates `sk-ant-` prefix before accepting; button disabled (not inline error) on wrong format — spec/impl divergence, acceptable UX
-- [ ] AC-3: Key stored in OS keychain via `vault::store_tokens`; `deployment_mode = "solo"` persisted
+- [ ] AC-3: Key stored in OS keychain via `vault::store_tokens`; `deployment_mode = "solo"` persisted — IPC layer tested in `ipc.test.ts`; Rust `vault::store_tokens` tested in `local.rs`; on-device keychain check: `security find-generic-password -s depthfusion -a session_tokens -w` (see `docs/e65-on-device-verification.md`)
 - [x] AC-4: Dashboard loads after success screen without triggering OIDC flow
 
 **Tasks:**

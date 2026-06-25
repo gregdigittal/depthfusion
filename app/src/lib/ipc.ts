@@ -77,7 +77,11 @@ export async function setDeploymentMode(mode: string): Promise<void> {
  * Returns false on non-2xx or any network error — never rejects.
  */
 export async function checkServerHealth(url: string): Promise<boolean> {
-  return invoke<boolean>('check_server_health', { url })
+  try {
+    return await invoke<boolean>('check_server_health', { url })
+  } catch {
+    return false
+  }
 }
 
 /**
