@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DepthFusion",
   "version": "2.1.1",
-  "identifier": "com.depthfusion.app",
+  "identifier": "com.depthfusion.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
