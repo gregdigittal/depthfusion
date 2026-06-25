@@ -270,11 +270,29 @@ async def rest_stats(
     _: None = Depends(_check_mcp_auth),
 ):
     import pathlib
+    import sqlite3
     from depthfusion.core.project_registry import ProjectRegistry  # lazy import
 
+    # HNSW index entry count (from the sidecar meta file — cheap, no model load)
+    hnsw_meta_path = pathlib.Path(
+        os.getenv("DEPTHFUSION_HNSW_INDEX_PATH", "~/.agent-mc/depthfusion/hnsw.bin")
+    ).expanduser().with_suffix(".bin.meta.json")
+    hnsw_count = 0
+    if hnsw_meta_path.exists():
+        try:
+            hnsw_count = json.loads(hnsw_meta_path.read_text()).get("entry_count", 0)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Memory store entry count
     config = DepthFusionConfig.from_env()
-    bus_dir = pathlib.Path(config.bus_file_dir).expanduser()
-    context_files = len(list(bus_dir.rglob("*.md"))) if bus_dir.exists() else 0
+    mem_count = 0
+    try:
+        conn = sqlite3.connect(str(config.memory_store_path))
+        mem_count = conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+        conn.close()
+    except Exception:  # noqa: BLE001
+        pass
 
     registry = ProjectRegistry()
     projects_list = registry.list_projects()
@@ -284,7 +302,7 @@ async def rest_stats(
     )
 
     return {
-        "context_files": context_files,
+        "context_files": hnsw_count + mem_count,
         "projects": [p.slug for p in projects_list],
         "project_count": len(projects_list),
         "last_synced": last_synced,
