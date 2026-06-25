@@ -1,0 +1,9 @@
+# Passwordless sudo for depthfusion-mcp service management and unit file deployment
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl start depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable depthfusion-mcp
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
+gregmorris ALL=(ALL) NOPASSWD: /usr/bin/cp /home/gregmorris/projects/depthfusion/infra/systemd/depthfusion-mcp.service /etc/systemd/system/depthfusion-mcp.service
