@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useDashboard } from './hooks/useDashboard'
 import { useStats } from './hooks/useStats'
 import type { StatsData } from './hooks/useStats'
@@ -93,7 +94,7 @@ export function DashboardPage() {
   const { tiles } = useDashboard()
   const { data: stats, error } = useStats()
 
-  const tileContent: Record<string, JSX.Element> = {
+  const tileContent: Record<string, ReactNode> = {
     'recent-activity': <RecentActivity />,
     'search-stats': <SearchStats stats={stats} error={error} />,
     'storage-usage': <StorageUsage />,
