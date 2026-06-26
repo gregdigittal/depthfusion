@@ -22,7 +22,14 @@ function RecentActivity() {
   )
 }
 
-function SearchStats({ stats }: { stats: StatsData | null }) {
+function SearchStats({ stats, error }: { stats: StatsData | null; error: string | null }) {
+  if (error) {
+    return (
+      <div style={{ color: 'var(--danger-soft)', fontSize: 'var(--fs-small)' }}>
+        {error}
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
       <div>
@@ -57,7 +64,14 @@ function StorageUsage() {
   )
 }
 
-function SyncStatus({ stats }: { stats: StatsData | null }) {
+function SyncStatus({ stats, error }: { stats: StatsData | null; error: string | null }) {
+  if (error) {
+    return (
+      <div style={{ color: 'var(--danger-soft)', fontSize: 'var(--fs-small)' }}>
+        {error}
+      </div>
+    )
+  }
   const lastSync = stats?.last_synced
     ? new Date(stats.last_synced).toLocaleString()
     : '—'
@@ -77,13 +91,13 @@ function SyncStatus({ stats }: { stats: StatsData | null }) {
 
 export function DashboardPage() {
   const { tiles } = useDashboard()
-  const { data: stats } = useStats()
+  const { data: stats, error } = useStats()
 
-  const tileContent: Record<string, React.ReactNode> = {
+  const tileContent: Record<string, JSX.Element> = {
     'recent-activity': <RecentActivity />,
-    'search-stats': <SearchStats stats={stats} />,
+    'search-stats': <SearchStats stats={stats} error={error} />,
     'storage-usage': <StorageUsage />,
-    'sync-status': <SyncStatus stats={stats} />,
+    'sync-status': <SyncStatus stats={stats} error={error} />,
   }
 
   return (

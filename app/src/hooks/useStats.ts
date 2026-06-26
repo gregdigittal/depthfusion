@@ -11,6 +11,7 @@ export interface StatsData {
 export function useStats() {
   const [data, setData] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -18,15 +19,26 @@ export function useStats() {
     async function fetchStats() {
       try {
         const [serverUrl, tokens] = await Promise.all([getServerUrl(), loadTokens()])
+        console.log('[useStats] serverUrl:', serverUrl, 'hasToken:', !!tokens)
         if (cancelled) return
         const resp = await fetch(`${serverUrl}/api/v1/stats`, {
           headers: tokens ? { 'Authorization': `Bearer ${tokens.access_token}` } : {},
         })
-        if (!resp.ok) return
+        console.log('[useStats] response status:', resp.status)
+        if (!resp.ok) {
+          setError(`Stats fetch failed: ${resp.status}`)
+          return
+        }
         const json = await resp.json() as StatsData
-        if (!cancelled) setData(json)
-      } catch {
-        // stats are best-effort — silently degrade
+        console.log('[useStats] data:', json)
+        if (!cancelled) {
+          setData(json)
+          setError(null)
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('[useStats] error:', msg)
+        if (!cancelled) setError(msg)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -37,5 +49,5 @@ export function useStats() {
     return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
-  return { data, loading }
+  return { data, loading, error }
 }
