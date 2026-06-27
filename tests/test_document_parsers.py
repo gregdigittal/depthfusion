@@ -110,26 +110,86 @@ def _make_docx(*sections: dict) -> bytes:
     return buf.getvalue()
 
 
-MINIMAL_PDF = (
-    b"%PDF-1.4\n"
-    b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
-    b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n"
-    b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
-    b"  /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n"
-    b"4 0 obj << /Length 44 >>\nstream\n"
-    b"BT /F1 12 Tf 100 700 Td (Hello PDF) Tj ET\n"
-    b"endstream\nendobj\n"
-    b"5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n"
-    b"xref\n0 6\n"
-    b"0000000000 65535 f \n"
-    b"0000000009 00000 n \n"
-    b"0000000058 00000 n \n"
-    b"0000000115 00000 n \n"
-    b"0000000266 00000 n \n"
-    b"0000000360 00000 n \n"
-    b"trailer << /Size 6 /Root 1 0 R >>\n"
-    b"startxref\n441\n%%EOF\n"
-)
+def _build_minimal_pdf(num_pages: int) -> bytes:
+    """Build a structurally-valid multi-page PDF with no external libraries.
+
+    Emits ``num_pages`` real ``/Page`` objects under a single ``/Pages`` tree
+    with a correct ``/Count`` and ``/Kids`` array, plus a byte-accurate xref
+    table so pdfplumber/pdfminer parse it as exactly ``num_pages`` pages.
+
+    This is the always-available fallback used when neither ``fpdf`` nor
+    ``reportlab`` is installed (e.g. the CI environment). It must produce the
+    requested number of pages so the page-count assertions actually run.
+    """
+    num_pages = max(1, num_pages)
+
+    # Object numbering:
+    #   1            -> Catalog
+    #   2            -> Pages tree
+    #   3 .. 2+N     -> Page objects
+    #   3+N .. 2+2N  -> Content streams (one per page)
+    #   3+2N         -> shared Font
+    catalog_obj = 1
+    pages_obj = 2
+    first_page_obj = 3
+    first_content_obj = first_page_obj + num_pages
+    font_obj = first_content_obj + num_pages
+    total_objs = font_obj  # highest object number == total count of real objects
+
+    objects: list[bytes] = []  # objects[i] is body for object number i+1
+
+    # 1: Catalog
+    objects.append(b"<< /Type /Catalog /Pages %d 0 R >>" % pages_obj)
+
+    # 2: Pages tree
+    kids = b" ".join(b"%d 0 R" % (first_page_obj + i) for i in range(num_pages))
+    objects.append(
+        b"<< /Type /Pages /Kids [%s] /Count %d >>" % (kids, num_pages)
+    )
+
+    # 3 .. 2+N: Page objects
+    for i in range(num_pages):
+        content_obj = first_content_obj + i
+        objects.append(
+            b"<< /Type /Page /Parent %d 0 R /MediaBox [0 0 612 792] "
+            b"/Contents %d 0 R /Resources << /Font << /F1 %d 0 R >> >> >>"
+            % (pages_obj, content_obj, font_obj)
+        )
+
+    # 3+N .. 2+2N: Content streams
+    for i in range(num_pages):
+        stream = b"BT /F1 12 Tf 100 700 Td (Hello PDF page %d) Tj ET\n" % (i + 1)
+        objects.append(
+            b"<< /Length %d >>\nstream\n%sendstream" % (len(stream), stream)
+        )
+
+    # 3+2N: Font
+    objects.append(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    )
+
+    # Assemble body, tracking byte offsets for the xref table.
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for idx, body in enumerate(objects):
+        offsets.append(len(pdf))
+        pdf += b"%d 0 obj " % (idx + 1)
+        pdf += body
+        pdf += b"\nendobj\n"
+
+    # xref table
+    xref_start = len(pdf)
+    pdf += b"xref\n"
+    pdf += b"0 %d\n" % (total_objs + 1)
+    pdf += b"0000000000 65535 f \n"
+    for off in offsets:
+        pdf += b"%010d 00000 n \n" % off
+
+    # trailer
+    pdf += b"trailer << /Size %d /Root %d 0 R >>\n" % (total_objs + 1, catalog_obj)
+    pdf += b"startxref\n%d\n%%%%EOF\n" % xref_start
+
+    return bytes(pdf)
 
 
 def _make_pdf(num_pages: int = 1) -> bytes:
@@ -160,7 +220,7 @@ def _make_pdf(num_pages: int = 1) -> bytes:
     except ImportError:
         pass
 
-    return MINIMAL_PDF
+    return _build_minimal_pdf(num_pages)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
