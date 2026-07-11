@@ -95,6 +95,8 @@ from depthfusion.mcp.tools.system import (  # noqa: E402,F401
     _tool_status,
 )
 
+from depthfusion.mcp.tools.recommender_tools import _tool_recommend_model  # noqa: E402
+
 # Tool implementations — telemetry domain
 from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _check_backend_health,
@@ -262,6 +264,8 @@ def _dispatch_tool(
         return _tool_ingest_conversation(arguments)
     elif tool_name == "depthfusion_list_providers":
         return _tool_list_providers()
+    elif tool_name == "depthfusion_recommend_model":
+        return _tool_recommend_model(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 
