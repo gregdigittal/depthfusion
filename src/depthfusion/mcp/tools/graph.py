@@ -226,7 +226,11 @@ def _tool_set_memory_score(arguments: dict) -> str:
     # write to arbitrary server paths; discoveries dir is the only allowed root.
     # DEPTHFUSION_DISCOVERIES_DIR overrides for testing.
     _override = os.environ.get("DEPTHFUSION_DISCOVERIES_DIR")
-    _allowed = Path(_override).resolve() if _override else (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    _allowed = (
+        Path(_override).resolve()
+        if _override
+        else (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    )
     if not str(target).startswith(str(_allowed) + os.sep) and target != _allowed:
         return json.dumps({
             "ok": False,
@@ -349,7 +353,11 @@ def _tool_pin_discovery(arguments: dict) -> str:
     # ponytail: path confinement — same guard as set_memory_score
     # DEPTHFUSION_DISCOVERIES_DIR overrides for testing.
     _override = os.environ.get("DEPTHFUSION_DISCOVERIES_DIR")
-    _allowed = Path(_override).resolve() if _override else (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    _allowed = (
+        Path(_override).resolve()
+        if _override
+        else (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    )
     if not str(target).startswith(str(_allowed) + os.sep) and target != _allowed:
         return json.dumps({
             "error": "path outside allowed directory",
