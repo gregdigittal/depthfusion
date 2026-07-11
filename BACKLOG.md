@@ -3612,3 +3612,116 @@
 - [x] T-757: Baseline server health check and tool schema audit
 - [x] T-758: CORS compatibility check and patch if needed
 - [x] T-759: Write docs/chatgpt-mcp-setup.md setup guide
+
+---
+
+## E-67: Claims-Reality Rectification [active]
+
+> Close the gap between DepthFusion's README/CIQS claims and default-config code reality.
+> Every claim is either made true in the default experience or demoted to a labelled tier.
+> Source: Fable 5 architecture review 2026-07-11. Plan: .agent-hub/outputs/rectification-plan-2026-07-11.md
+
+### S-219: As a DepthFusion developer, I want a dispatcher parity test so that no advertised MCP tool can silently become undispatchable `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: A test enumerates every key in `TOOL_SCHEMAS` and asserts each dispatches without `ValueError("No dispatcher…")`.
+- [ ] AC-2: The reverse holds — every dispatch branch in `server.py` has a matching schema key.
+- [ ] AC-3: Deleting the `recommend_model` branch makes the test red.
+
+**Tasks:**
+- [ ] T-760: Add `tests/mcp/test_dispatch_parity.py` covering both directions of `TOOL_SCHEMAS` ↔ dispatch chain.
+- [ ] T-761: Extract a `DISPATCHABLE: frozenset[str]` in `server.py` so the dispatch set is introspectable by the test.
+
+### S-220: As an operator, I want the two rogue env gates on `DepthFusionConfig` so that fusion-gate and cognitive-scoring state is configurable and reportable `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `fusion_gates_enabled` and `cognitive_scoring` are fields on `DepthFusionConfig`, defaulting False.
+- [ ] AC-2: `from_env` still honours the existing `DEPTHFUSION_FUSION_GATES_ENABLED` / `DEPTHFUSION_COGNITIVE_SCORING` var names.
+- [ ] AC-3: `hybrid.py:217,316` read config, not raw `os.environ`.
+
+**Tasks:**
+- [ ] T-762: Add both fields + env loading to `core/config.py`.
+- [ ] T-763: Replace raw env reads in `retrieval/hybrid.py` with config lookups; thread config into `HybridRetriever` if needed.
+- [ ] T-764: Add `tests/retrieval/test_hybrid_gates_config.py` (config-set and env-set paths).
+
+### S-221: As an operator, I want `depthfusion_status` to report every effective flag so that I can see what is actually running `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `_tool_status` emits an `effective_flags` object reflecting all boolean/selector fields of `DepthFusionConfig`, including the two new gates.
+- [ ] AC-2: Flags grouped into `on_by_default`, `behind_flag`, `backends`, `install_mode`/`profile`.
+- [ ] AC-3: Existing top-level keys retained for back-compat.
+
+**Tasks:**
+- [ ] T-765: Rewrite `_tool_status` in `tools/system.py` using `dataclasses.fields` reflection.
+- [ ] T-766: Add `tests/mcp/test_status_flags.py` asserting rogue gates appear and count matches config fields.
+
+### S-222: As a prospective user, I want an honest README status line so that I understand what runs by default vs behind a flag `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: README presents three lists — On by default / Behind a flag or profile / Projected.
+- [ ] AC-2: No default-off feature is labelled "active".
+- [ ] AC-3: Every feature from the old headline appears in exactly one list.
+
+**Tasks:**
+- [ ] T-767: Rewrite the README status section into three tiered lists.
+
+### S-223: As a release manager, I want the release pipeline to publish (not draft) so that stale draft releases stop accumulating `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Duplicate `v2.1.1` draft and superseded `v2.1.0`/`v2.0.1`/`v1.1.0` drafts resolved.
+- [ ] AC-2: CI auto-publishes future tagged releases as non-draft.
+
+**Tasks:**
+- [ ] T-768: Triage and clean existing drafts via `gh release`.
+- [ ] T-769: Add/patch the release workflow to set `draft: false` on tag builds.
+
+### S-224: As a user, I want named configuration profiles so that the combinatorial config space collapses into sensible presets `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `DepthFusionConfig.from_profile(name)` supports `minimal`, `standard`, `server`, `research`.
+- [ ] AC-2: Individual env vars still override profile defaults.
+- [ ] AC-3: Active profile name is reported by `depthfusion_status`.
+
+**Tasks:**
+- [ ] T-770: Add `core/profiles.py` and `from_profile` to `core/config.py`.
+- [ ] T-771: Wire profile name into status output.
+- [ ] T-772: Add `tests/core/test_profiles.py` (preset contents + override round-trip).
+- [ ] T-773: Document profiles in README + `docs/`.
+
+### S-225: As a server-profile user, I want the Fernet CacheManager wired to `/api/v1/search` so that the "encrypted cache" claim is real `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `GET /api/v1/search` uses CacheManager keyed by `(principal, query, top_k, scope)` under `server` profile.
+- [ ] AC-2: Second identical request served from cache; on-disk payload encrypted.
+- [ ] AC-3: If wiring is deferred, the claim is removed from README and marked roadmap.
+
+**Tasks:**
+- [ ] T-774: Wire CacheManager into `mcp/http_server.py` search path; add `cache_enabled` flag.
+- [ ] T-775: Add `tests/http/test_search_cache.py` (hit/miss + ciphertext-at-rest).
+
+### S-226: As a user, I want the MemoryConsolidator to use embedding similarity with a defined write criterion `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Similarity uses embedding cosine (Jaccard fallback only when embeddings unavailable).
+- [ ] AC-2: Write criterion defined: cosine ≥ 0.92 + same scope + not pinned + audited; DRY-RUN remains default.
+- [ ] AC-3: If not implemented, README drops "autonomic loop" and calls it a maintenance script.
+
+**Tasks:**
+- [ ] T-776: Replace token Jaccard with embedding cosine in `cognitive/consolidator.py`.
+- [ ] T-777: Add `tests/cognitive/test_consolidator_embeddings.py` (paraphrase caught, pinned excluded).
+- [ ] T-778: Update README wording for the consolidator.
+
+### S-227: As a maintainer, I want a real evaluation goldset and rank-aware metrics so that CIQS numbers are measured, not projected `P0` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `recall_goldset_v2.jsonl` has ≥200 queries with graded (0/1/2) relevance and realistic multi-doc corpora.
+- [ ] AC-2: Harness reports MRR@10 and nDCG@5 alongside precision@k.
+- [ ] AC-3: A/B report compares `standard` vs `research` profile on the new metrics.
+- [ ] AC-4: README cites only measured numbers with profile + date; 95–97 moves to Roadmap section.
+
+**Tasks:**
+- [ ] T-779: Generate `tests/fixtures/recall_goldset_v2.jsonl` via `mine_session_prompts.py` + `generate_synthetic_corpus.py`.
+- [ ] T-780: Add MRR@10 and nDCG@5 to `scripts/benchmark.py` / `scripts/ciqs_harness.py`.
+- [ ] T-781: Add `tests/scripts/test_metrics.py` verifying metrics against known rankings.
+- [ ] T-782: Run standard-vs-research A/B via `scripts/ciqs_compare.py`; commit the report.
+- [ ] T-783: Update README with measured numbers; move 95–97 to Roadmap.
