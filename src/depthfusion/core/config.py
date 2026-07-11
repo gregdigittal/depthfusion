@@ -135,6 +135,10 @@ class DepthFusionConfig:
     mcp_http_enabled: bool = False   # DEPTHFUSION_MCP_HTTP_ENABLED
     mcp_http_port: int = 7301        # DEPTHFUSION_MCP_PORT
     mcp_http_token: str = ""         # DEPTHFUSION_MCP_TOKEN
+    # E-67 S-225: Fernet cache on REST search (enabled by server/research profiles)
+    cache_enabled: bool = False      # DEPTHFUSION_CACHE_ENABLED
+    # E-67 S-224: active profile name (set by from_profile(); empty = standard)
+    profile: str = ""                # "minimal"|"standard"|"server"|"research"|""
 
     # E-34 S-109 skill surfacing
     auto_draft_threshold: int = 3    # min distinct sessions before candidate is drafted
@@ -234,7 +238,27 @@ class DepthFusionConfig:
             fts_enabled=_env_bool("DEPTHFUSION_FTS_ENABLED", True),
             fusion_gates_enabled=_env_bool("DEPTHFUSION_FUSION_GATES_ENABLED", False),
             cognitive_scoring_enabled=_env_bool("DEPTHFUSION_COGNITIVE_SCORING", False),
+            cache_enabled=_env_bool("DEPTHFUSION_CACHE_ENABLED", False),
+            profile=os.environ.get("DEPTHFUSION_PROFILE", ""),
         )
+
+    @classmethod
+    def from_profile(cls, name: str, **overrides: object) -> "DepthFusionConfig":
+        """Return a config preset for the named profile.
+
+        Individual keyword args override the profile defaults, mirroring how
+        env vars override profile values in production.  Unknown profile names
+        raise ValueError immediately (fast-fail for typos in tests).
+        """
+        from depthfusion.core.profiles import get_profile_overrides
+        profile_overrides = get_profile_overrides(name)
+        profile_overrides.update(overrides)
+        # Strip keys that aren't dataclass fields (e.g. future-proofing in
+        # profiles.py that hasn't landed in config yet).
+        import dataclasses
+        valid = {f.name for f in dataclasses.fields(cls)}
+        safe_overrides = {k: v for k, v in profile_overrides.items() if k in valid}
+        return cls(profile=name, **safe_overrides)
 
     @property
     def event_log_path(self) -> Path:

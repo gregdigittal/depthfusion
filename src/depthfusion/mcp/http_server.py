@@ -242,12 +242,50 @@ class _SearchRequest(BaseModel):
     limit: int = 20
 
 
+# S-225: singleton CacheManager; initialised lazily on first search request when
+# cache_enabled=True.  None means either disabled or not yet initialised.
+_SEARCH_CACHE: Optional["CacheManager"] = None  # type: ignore[name-defined]
+
+
+def _get_search_cache() -> Optional["CacheManager"]:  # type: ignore[name-defined]
+    """Return the CacheManager singleton, creating it on first call."""
+    global _SEARCH_CACHE
+    if _SEARCH_CACHE is None:
+        from pathlib import Path
+
+        from depthfusion.cache.manager import CacheManager
+
+        cache_key_b64 = os.environ.get("DEPTHFUSION_CACHE_KEY")
+        key_bytes = cache_key_b64.encode() if cache_key_b64 else None
+        db_path = Path(os.environ.get(
+            "DEPTHFUSION_CACHE_DB",
+            str(Path.home() / ".claude" / ".depthfusion_search_cache.db"),
+        ))
+        _SEARCH_CACHE = CacheManager(db_path=db_path, key=key_bytes)
+    return _SEARCH_CACHE
+
+
+def _search_cache_key(q: str, limit: int) -> str:
+    import hashlib
+    return "search/" + hashlib.sha256(f"{q}\x00{limit}".encode()).hexdigest()[:32]
+
+
 @app.post("/api/v1/search")
 async def rest_search(
     body: _SearchRequest,
     _: None = Depends(_check_mcp_auth),
 ):
     from depthfusion.mcp.tools._shared import _tool_recall_impl  # lazy import
+
+    config = DepthFusionConfig.from_env()
+
+    # S-225: check Fernet cache on hit; populate on miss.
+    if config.cache_enabled:
+        cache = _get_search_cache()
+        cache_key = _search_cache_key(body.q, body.limit)
+        entry = cache.get(cache_key, "global")
+        if entry is not None and entry.data is not None:
+            return json.loads(entry.data)
 
     loop = asyncio.get_event_loop()
     raw = await loop.run_in_executor(
@@ -265,7 +303,12 @@ async def rest_search(
         }
         for b in data.get("blocks", [])
     ]
-    return {"results": results}
+    response_body = {"results": results}
+    if config.cache_enabled:
+        cache = _get_search_cache()
+        cache_key = _search_cache_key(body.q, body.limit)
+        cache.put(cache_key, "global", json.dumps(response_body).encode())
+    return response_body
 
 
 @app.get("/api/v1/stats")

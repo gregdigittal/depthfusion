@@ -37,7 +37,7 @@ def _tool_status(config: Any) -> str:
         "ambient_skip_tools", "skillforge_api_url", "skillforge_api_token",
         "skillforge_recursive_skill_id", "bus_file_dir", "api_token",
         "mcp_http_token", "gemma_url", "gemma_model", "event_log",
-        "gemma_model",
+        "profile",  # surfaced separately as install_mode.profile below
     }
 
     try:
@@ -71,6 +71,10 @@ def _tool_status(config: Any) -> str:
                 "on_by_default": on_by_default,
                 "behind_flag": behind_flag,
                 "backends": backends,
+            },
+            # S-224: active profile
+            "install_mode": {
+                "profile": getattr(config, "profile", "") or "standard",
             },
         },
         indent=2,
