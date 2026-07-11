@@ -188,20 +188,17 @@ class TestAutoLearnGraphWiring:
         sessions_dir = tmp_path / "sessions"
         sessions_dir.mkdir()
         (sessions_dir / "test.tmp").write_text("some session content")
+        monkeypatch.setenv("DEPTHFUSION_SESSIONS_DIR", str(sessions_dir))
 
         mock_out = tmp_path / "test-autocapture.md"
         mock_out.write_text("---\n---\nBody")
 
-        with patch("depthfusion.mcp.tools.capture.Path") as mock_path_cls, \
-             patch("depthfusion.capture.auto_learn.summarize_and_extract_graph") as mock_sag, \
+        with patch("depthfusion.capture.auto_learn.summarize_and_extract_graph") as mock_sag, \
              patch("depthfusion.capture.compressor.SessionCompressor") as mock_comp_cls, \
              patch("depthfusion.graph.store.get_store"):
-            # Patch Path.home() to return our tmp dir
-            mock_path_cls.home.return_value = tmp_path
             mock_comp = MagicMock()
             mock_comp.compress.return_value = mock_out
             mock_comp_cls.return_value = mock_comp
 
             _tool_auto_learn({"max_files": 1})
-            # summarize_and_extract_graph should have been called
             assert mock_sag.called

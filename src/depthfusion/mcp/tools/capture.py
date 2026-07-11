@@ -107,7 +107,8 @@ def _tool_auto_learn(arguments: dict) -> str:
     from pathlib import Path
     max_files = min(int(arguments.get("max_files", 5)), 50)
     project = arguments.get("project", "")
-    sessions_dir = Path.home() / ".claude" / "sessions"
+    _sessions_override = os.environ.get("DEPTHFUSION_SESSIONS_DIR")
+    sessions_dir = Path(_sessions_override) if _sessions_override else Path.home() / ".claude" / "sessions"
     if not sessions_dir.exists():
         return json.dumps({"compressed": 0, "message": "No sessions directory"})
 
