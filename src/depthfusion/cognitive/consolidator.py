@@ -40,7 +40,7 @@ class MemoryConsolidator:
             if not m.pinned and m.status != MemoryStatus.ARCHIVED
         ]
         # Embed all active memories in one batch when an embedder is available.
-        vectors: Optional[list[Optional[list[float]]]] = None
+        vectors: Optional[list[list[float]]] = None
         if self._embed_fn is not None and active:
             try:
                 batch = self._embed_fn([m.content for m in active])
