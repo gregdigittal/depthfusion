@@ -3594,3 +3594,21 @@
 - [x] T-754: Build `app/src/wizard/SuccessScreen.tsx` (checkmark, mode-specific summary line, "Go to Dashboard" button)
 - [x] T-755: Wire Connect mode through `SetupWizardPage.tsx` reusing `ServerUrlScreen` + `OidcSignInScreen`
 - [x] T-756: Add "Re-run setup wizard" card/button to `SettingsPage.tsx` (`setWizardCompleted(false)` + `window.location.reload()`)
+
+## E-66: ChatGPT macOS MCP Integration [done]
+
+> Enable ChatGPT desktop app for Mac to access DepthFusion memory and project context via MCP SSE at https://mcp.tonracein.com
+
+### S-218: As a ChatGPT user, I want to connect ChatGPT desktop to DepthFusion MCP so that ChatGPT can recall my project context and memories `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: ChatGPT macOS MCP connector config documented and tested
+- [ ] AC-2: All 27 DepthFusion tools reachable from ChatGPT with Bearer token auth
+- [ ] AC-3: Setup guide published at docs/chatgpt-mcp-setup.md
+- [ ] AC-4: Unsafe/lifecycle tools documented with warnings in guide
+
+**Tasks:**
+- [x] T-756: Research ChatGPT MCP connector config format and write working config
+- [x] T-757: Baseline server health check and tool schema audit
+- [x] T-758: CORS compatibility check and patch if needed
+- [x] T-759: Write docs/chatgpt-mcp-setup.md setup guide

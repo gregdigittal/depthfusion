@@ -221,7 +221,15 @@ def _tool_set_memory_score(arguments: dict) -> str:
                          f"got {type(fval).__name__}",
             })
 
-    target = Path(filename).expanduser()
+    target = Path(filename).expanduser().resolve()
+    # ponytail: path confinement — external callers (e.g. ChatGPT MCP) must not
+    # write to arbitrary server paths; discoveries dir is the only allowed root.
+    _allowed = (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    if not str(target).startswith(str(_allowed) + os.sep) and target != _allowed:
+        return json.dumps({
+            "ok": False,
+            "error": f"set_memory_score: path outside allowed directory: {filename}",
+        })
     if not target.exists():
         return json.dumps({
             "ok": False,
@@ -335,7 +343,14 @@ def _tool_pin_discovery(arguments: dict) -> str:
             "filename": filename,
         })
 
-    target = Path(filename).expanduser()
+    target = Path(filename).expanduser().resolve()
+    # ponytail: path confinement — same guard as set_memory_score
+    _allowed = (Path.home() / ".claude" / "shared" / "discoveries").resolve()
+    if not str(target).startswith(str(_allowed) + os.sep) and target != _allowed:
+        return json.dumps({
+            "error": "path outside allowed directory",
+            "filename": filename,
+        })
     if not target.exists():
         return json.dumps({
             "error": "file not found",

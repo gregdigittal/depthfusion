@@ -142,10 +142,12 @@ async def _check_mcp_auth(
             raise HTTPException(status_code=401, detail=f"Unauthorized: {exc}") from exc
         return
 
-    # Static bearer token fallback
+    # Static bearer token fallback — timing-safe comparison (secrets.compare_digest
+    # prevents leaking token prefix length via short-circuit string equality)
     static_token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
     if static_token:
-        if raw_token != static_token:
+        import secrets
+        if not secrets.compare_digest(raw_token, static_token):
             raise HTTPException(status_code=401, detail="Unauthorized")
         return
 

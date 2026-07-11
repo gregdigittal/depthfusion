@@ -85,7 +85,8 @@ class _LegacyTokenDep:
             HTTPAuthorizationCredentials | None, Depends(_bearer)
         ],
     ) -> Principal:
-        if credentials is None or credentials.credentials != self._token:
+        import secrets
+        if credentials is None or not secrets.compare_digest(credentials.credentials, self._token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
