@@ -191,7 +191,7 @@ TOOLS: dict[str, str] = {
         "Response: {providers: [{name, configured, healthy, memory_count}]}"
     ),
     # E-64 S-210 model recommendation engine
-    "recommend_model": (
+    "depthfusion_recommend_model": (
         "Return a ranked list of models for a given task category, optionally excluding "
         "specific vendors (Fable-5 isolation). "
         "Args: task_category (str, required) — 'code'|'review'|'planning'|'docs'; "
@@ -242,7 +242,7 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_ingest_conversation": None,
     "depthfusion_list_providers": None,
     # E-64 S-210 model recommendation engine (always enabled)
-    "recommend_model": None,
+    "depthfusion_recommend_model": None,
 }
 
 
@@ -597,6 +597,79 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "depthfusion_list_providers": {
         "properties": {},
         "required": [],
+    },
+    # S-147 project domain tools (schemas added E-67 S-219)
+    "depthfusion_register_project": {
+        "properties": {
+            "slug": {"type": "string", "description": "Short identifier e.g. 'depthfusion'"},
+            "name": {"type": "string", "description": "Human-readable project name"},
+            "local_path": {"type": "string", "description": "Absolute path on this host"},
+            "github_url": {"type": "string", "description": "GitHub URL (optional)"},
+            "description": {"type": "string", "description": "Project description (optional)"},
+        },
+        "required": ["slug", "name", "local_path"],
+    },
+    "depthfusion_list_projects": {
+        "properties": {},
+        "required": [],
+    },
+    "depthfusion_sync_project": {
+        "properties": {
+            "slug": {"type": "string", "description": "Registered project slug"},
+        },
+        "required": ["slug"],
+    },
+    "depthfusion_ingest_project": {
+        "properties": {
+            "slug": {"type": "string", "description": "Project slug"},
+            "source": {"type": "string", "description": "Absolute local path or GitHub URL (owner/repo or full URL)"},
+            "mode": {
+                "type": "string",
+                "enum": ["structural", "full"],
+                "default": "structural",
+                "description": "'structural' ingests key files only; 'full' ingests all source files",
+            },
+        },
+        "required": ["slug", "source"],
+    },
+    "depthfusion_research_topic": {
+        "properties": {
+            "topic": {"type": "string", "description": "Topic to research"},
+            "slug": {"type": "string", "description": "Tag prefix (default 'research')"},
+            "sources": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["web", "arxiv", "github"]},
+                "description": "Sources to query (default: ['web','arxiv','github'])",
+            },
+        },
+        "required": ["topic"],
+    },
+    # E-64 S-210 model recommendation engine (schema added E-67 S-219)
+    "depthfusion_recommend_model": {
+        "properties": {
+            "task_category": {
+                "type": "string",
+                "enum": ["code", "review", "planning", "docs"],
+                "description": "Task category for model selection",
+            },
+            "exclude_vendors": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Vendor names to exclude (Fable-5 isolation)",
+            },
+            "available_models": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Restrict to these model IDs",
+            },
+            "budget_usd": {"type": "number", "description": "Per-call USD budget ceiling"},
+            "min_confidence": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "Minimum confidence threshold",
+            },
+        },
+        "required": ["task_category"],
     },
 }
 

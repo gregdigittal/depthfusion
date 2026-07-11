@@ -110,6 +110,42 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
 )
 
 
+# S-219: canonical set of dispatchable tool names — must mirror the elif chain below.
+# Test: tests/mcp/test_dispatch_parity.py
+DISPATCHABLE: frozenset[str] = frozenset({
+    "depthfusion_status",
+    "depthfusion_recall_relevant",
+    "depthfusion_tag_session",
+    "depthfusion_publish_context",
+    "depthfusion_auto_learn",
+    "depthfusion_compress_session",
+    "depthfusion_graph_traverse",
+    "depthfusion_graph_status",
+    "depthfusion_set_scope",
+    "depthfusion_confirm_discovery",
+    "depthfusion_set_memory_score",
+    "depthfusion_recall_feedback",
+    "depthfusion_pin_discovery",
+    "depthfusion_retrieve_context",
+    "depthfusion_record_decision",
+    "depthfusion_record_incident",
+    "depthfusion_mark_superseded",
+    "depthfusion_report_outcome",
+    "depthfusion_record_telemetry",
+    "depthfusion_query_telemetry",
+    "depthfusion_session_seed",
+    "depthfusion_register_project",
+    "depthfusion_list_projects",
+    "depthfusion_sync_project",
+    "depthfusion_ingest_project",
+    "depthfusion_research_topic",
+    "depthfusion_bridge",
+    "depthfusion_ingest_conversation",
+    "depthfusion_list_providers",
+    "depthfusion_recommend_model",
+})
+
+
 def _make_tool_schema(name: str, description: str) -> dict:
     """Build an MCP tool schema with explicit JSON Schema properties."""
     schema = TOOL_SCHEMAS.get(name, {"properties": {}, "required": []})

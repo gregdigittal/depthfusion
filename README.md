@@ -810,10 +810,53 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 
 ## Project status & roadmap
 
-- **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total), E-61 security hardening (pentest findings AV-01–AV-05: nonce replay, RBAC role mismatch, cache key env, HWM restart-reset), E-65 OIDC auth + static Bearer token fallback for MCP server, E-66 ChatGPT Desktop macOS MCP integration (`docs/chatgpt-mcp-setup.md`, `docs/chatgpt-install.sh`, path confinement on `set_memory_score` / `pin_discovery`, timing-safe Bearer token comparison). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide. v1.2.2 patch: Gemma 4 26B added as recommended MLX model for ≥16 GB; `SO_REUSEADDR` fix in `mlx-serve-direct.py` prevents `EADDRINUSE` on launchd restarts; `claude mcp add` `--` flag fix. v2.1.1: default server URL updated to `https://mcp.tonracein.com` (port 7301).
-- **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
-- **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
+### What runs on every install (default config)
+
+These capabilities are active out of the box — no env vars required:
+
+- **Recall pipeline** — BM25 full-text search, semantic reranking (VPS tiers), RRF hybrid fusion
+- **Session memory** — capture, tag, compress, publish context
+- **Project context** — register projects, ingest files, seed sessions with project state
+- **MCP router** — 30 tools, RBAC authz, static Bearer token auth, OIDC optional
+- **Decision memory** — record decisions, incidents, outcomes, mark superseded
+- **Telemetry & observability** — per-recall latency, backend health, tier status
+- **Context bridge** — ingest ChatGPT/Gemini/DeepSeek conversation exports
+- **Topic research** — multi-source research with DepthFusion-backed knowledge
+- **Ambient capture** — automatic memory extraction on every tool call
+- **FTS5 index** — SQLite full-text search across memory store
+
+### Behind a flag or profile (set env var to enable)
+
+These are shipped but off by default — they require additional setup, cost tokens, or are still stabilising:
+
+| Feature | Env var | Notes |
+|---|---|---|
+| Knowledge Graph | `DEPTHFUSION_GRAPH_ENABLED=true` | Neo4j/graph store required |
+| Haiku reranker | `DEPTHFUSION_HAIKU_ENABLED=true` | Costs Anthropic API tokens |
+| Mamba fusion gates (B/C/Δ) | `DEPTHFUSION_FUSION_GATES_ENABLED=true` | Requires VPS tier ≥ 1 |
+| Cognitive scoring | `DEPTHFUSION_COGNITIVE_SCORING=true` | Requires cognitive module |
+| LLM tagger | `DEPTHFUSION_TAGGER_LLM=true` | Costs tokens per capture |
+| Autonomic consolidation | `DEPTHFUSION_AUTONOMIC=1` | DRY-RUN default; 30-day observation period |
+| REST API | `DEPTHFUSION_REST_API=true` | FastAPI on `127.0.0.1:7300` |
+| Cognitive retrieval | `DEPTHFUSION_COGNITIVE_RETRIEVAL=true` | Alpha |
+| Decision/operational memory | `DEPTHFUSION_DECISION_MEMORY=true` | Alpha |
+| Multi-agent working memory | `DEPTHFUSION_MULTI_AGENT_WM=true` | Alpha |
+
+### Projected (roadmap)
+
+- Named configuration profiles (`minimal` / `standard` / `server` / `research`) — E-67 S-224
+- Fernet-encrypted cache wired to REST search path — E-67 S-225
+- Embedding-similarity consolidation (replacing token-Jaccard) — E-67 S-226
+- Real evaluation goldset + rank-aware metrics (MRR@10, nDCG@5) — E-67 S-227
+- CIQS Cat D precision@5 ≥ 95 measured on production corpus (currently projected, not measured)
+
+### Release history
+
+- **v2.1.1:** default server URL updated to `https://mcp.tonracein.com` (port 7301); `depthfusion_recommend_model` dispatch bug fixed.
+- **v2.0.x:** E-65 OIDC auth + Bearer token; E-66 ChatGPT Desktop macOS MCP integration; security hardening AV-01–AV-05.
+- **v1.2.x:** E-47 Project Context Intelligence; E-48 Multi-Provider Context Bridge; macOS installer portability; Gemma 4 26B MLX support.
+- **v1.0.0:** 51 user stories across E-01–E-31. E-31 Structured Evolving Cognition complete.
+
 See `BACKLOG.md` for the full ledger.
 
 ---

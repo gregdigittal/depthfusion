@@ -117,6 +117,10 @@ class DepthFusionConfig:
     # S-77 Auto-compress cadence (None = manual-only)
     auto_compress_hours: Optional[float] = None
 
+    # E-67 S-220: retrieval pipeline gates (previously rogue env-only, now on config)
+    fusion_gates_enabled: bool = False   # DEPTHFUSION_FUSION_GATES_ENABLED (Mamba B/C/Δ)
+    cognitive_scoring_enabled: bool = False  # DEPTHFUSION_COGNITIVE_SCORING
+
     # E-31 Cognitive feature flags (all default OFF)
     cognitive_retrieval: bool = False
     llm_classifier: bool = False
@@ -228,6 +232,8 @@ class DepthFusionConfig:
             auto_recall_top_k=_env_int("DEPTHFUSION_AUTO_RECALL_TOP_K", 3),
             auto_recall_snippet_len=_env_int("DEPTHFUSION_AUTO_RECALL_SNIPPET_LEN", 800),
             fts_enabled=_env_bool("DEPTHFUSION_FTS_ENABLED", True),
+            fusion_gates_enabled=_env_bool("DEPTHFUSION_FUSION_GATES_ENABLED", False),
+            cognitive_scoring_enabled=_env_bool("DEPTHFUSION_COGNITIVE_SCORING", False),
         )
 
     @property

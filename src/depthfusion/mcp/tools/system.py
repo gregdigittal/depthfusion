@@ -19,15 +19,59 @@ from depthfusion.mcp.tools.capture import _tool_publish_context  # noqa: E402
 
 
 def _tool_status(config: Any) -> str:
+    import dataclasses
+
     enabled = get_enabled_tools(config)
+
+    # Reflect all boolean fields from DepthFusionConfig, grouped by default.
+    on_by_default: dict[str, bool] = {}
+    behind_flag: dict[str, bool] = {}
+    backends: dict[str, str] = {}
+
+    _BACKEND_FIELDS = {
+        "reranker_backend", "extractor_backend", "linker_backend",
+        "summariser_backend", "embedding_backend", "decision_extractor_backend",
+        "bus_backend",
+    }
+    _SKIP_FIELDS = {
+        "ambient_skip_tools", "skillforge_api_url", "skillforge_api_token",
+        "skillforge_recursive_skill_id", "bus_file_dir", "api_token",
+        "mcp_http_token", "gemma_url", "gemma_model", "event_log",
+        "gemma_model",
+    }
+
+    try:
+        for f in dataclasses.fields(config):
+            name = f.name
+            if name in _SKIP_FIELDS:
+                continue
+            val = getattr(config, name, None)
+            if name in _BACKEND_FIELDS:
+                backends[name] = val or ""
+            elif isinstance(val, bool):
+                default = f.default if f.default is not dataclasses.MISSING else None
+                if default is True:
+                    on_by_default[name] = val
+                else:
+                    behind_flag[name] = val
+    except Exception:
+        pass
+
     return json.dumps(
         {
             "depthfusion": "active",
+            # Back-compat top-level keys preserved
             "enabled_tools": enabled,
             "rlm_enabled": getattr(config, "rlm_enabled", True),
             "router_enabled": getattr(config, "router_enabled", True),
             "session_enabled": getattr(config, "session_enabled", True),
             "fusion_enabled": getattr(config, "fusion_enabled", True),
+            # Full config reflection (S-221)
+            "effective_flags": {
+                "on_by_default": on_by_default,
+                "behind_flag": behind_flag,
+                "backends": backends,
+            },
         },
         indent=2,
     )

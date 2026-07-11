@@ -123,8 +123,9 @@ class PipelineMode(Enum):
 class RecallPipeline:
     """Configures the retrieval pipeline based on install mode and tier."""
 
-    def __init__(self, mode: PipelineMode = PipelineMode.LOCAL):
+    def __init__(self, mode: PipelineMode = PipelineMode.LOCAL, config: Any = None):
         self.mode = mode
+        self._df_config = config  # DepthFusionConfig | None — None → env fallback
         self._reranker = HaikuReranker() if mode != PipelineMode.LOCAL else None
         # S-130 T-451: chunk boundary state persisted across apply_fusion_gates()
         # calls so cross-recall topic coherence accumulates correctly.
@@ -140,22 +141,24 @@ class RecallPipeline:
         with its local LLM backend.  Falls back to VPS_TIER1 if TierManager is
         unavailable.
         """
+        from depthfusion.core.config import DepthFusionConfig
         from depthfusion.utils.mode import normalise_mode
+        df_config = DepthFusionConfig.from_env()
         install_mode = normalise_mode(os.environ.get("DEPTHFUSION_MODE"))
         if install_mode == "local":
-            return cls(mode=PipelineMode.LOCAL)
+            return cls(mode=PipelineMode.LOCAL, config=df_config)
         if install_mode == "mac-mlx":
-            return cls(mode=PipelineMode.VPS_TIER1)
+            return cls(mode=PipelineMode.VPS_TIER1, config=df_config)
         if not _TIER_MANAGER_AVAILABLE or TierManager is None:
-            return cls(mode=PipelineMode.VPS_TIER1)
+            return cls(mode=PipelineMode.VPS_TIER1, config=df_config)
         try:
             tm = TierManager()
             cfg = tm.detect_tier()
             if _StorageTier is not None and cfg.tier == _StorageTier.VPS_TIER2:
-                return cls(mode=PipelineMode.VPS_TIER2)
-            return cls(mode=PipelineMode.VPS_TIER1)
+                return cls(mode=PipelineMode.VPS_TIER2, config=df_config)
+            return cls(mode=PipelineMode.VPS_TIER1, config=df_config)
         except Exception:
-            return cls(mode=PipelineMode.VPS_TIER1)
+            return cls(mode=PipelineMode.VPS_TIER1, config=df_config)
 
     def apply_reranker(
         self, blocks: list[dict], query: str, top_k: int = 5
@@ -214,9 +217,11 @@ class RecallPipeline:
           - The returned list is sorted by `gate_fused_score` desc when
             gates run; by original order when gates are disabled.
         """
-        if os.environ.get("DEPTHFUSION_FUSION_GATES_ENABLED", "false").lower() not in (
-            "true", "1", "yes",
-        ):
+        if self._df_config is not None:
+            gates_on = self._df_config.fusion_gates_enabled
+        else:
+            gates_on = os.environ.get("DEPTHFUSION_FUSION_GATES_ENABLED", "false").lower() in ("true", "1", "yes")
+        if not gates_on:
             return blocks
         if not blocks:
             return blocks
@@ -313,7 +318,11 @@ class RecallPipeline:
         sorted by `cognitive_score` descending. Fail-open: if CognitiveScorer
         raises, returns the original `blocks` unchanged.
         """
-        if os.getenv("DEPTHFUSION_COGNITIVE_SCORING", "false").lower() != "true":
+        if self._df_config is not None:
+            scoring_on = self._df_config.cognitive_scoring_enabled
+        else:
+            scoring_on = os.getenv("DEPTHFUSION_COGNITIVE_SCORING", "false").lower() == "true"
+        if not scoring_on:
             return blocks
         if not blocks:
             return blocks
