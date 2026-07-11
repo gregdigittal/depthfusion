@@ -10,7 +10,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v2.1.1 (main). 3482+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **30 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.1.1 (main). 3543+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -26,7 +26,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 | Tauri desktop app | Native app for macOS (Apple Silicon + Intel) and Windows 10/11 | [user-guide.md §1](docs/v2/user-guide.md) |
 | Offline mode | Encrypted local cache; queued write replay on reconnect | [user-guide.md §4](docs/v2/user-guide.md) |
 | Admin runbooks | Device approval/revocation, role assignment, backup/restore, audit queries | [admin-runbooks.md](docs/v2/admin-runbooks.md) |
-| ChatGPT Desktop (macOS) | Connect ChatGPT Desktop to DepthFusion's MCP server via SSE — 30 tools available; one-step install script | [chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md) |
+| ChatGPT Desktop (macOS) | Connect ChatGPT Desktop to DepthFusion's MCP server via SSE — 31 tools available; one-step install script | [chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md) |
 
 ---
 
@@ -82,7 +82,7 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 
 The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v2.0.0:
 
-- **3482 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **3543 tests collected**, full suite passing · 0 ruff · 0 mypy.
 - **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
   - **Cat A** — retrieval precision, no-regression sentinel
   - **Cat B** — BM25 score monotonicity + source-weight tier ordering
@@ -96,7 +96,7 @@ These are measured on the harness and goldset; the CIQS *quality* projections ab
 
 | | DepthFusion | mem0 | Zep | Letta | Cognee |
 |---|---|---|---|---|---|
-| **Claude Code MCP-native** | ✅ 30 tools | ❌ SDK only | ❌ SDK only | ❌ SDK only | ❌ SDK only |
+| **Claude Code MCP-native** | ✅ 31 tools | ❌ SDK only | ❌ SDK only | ❌ SDK only | ❌ SDK only |
 | **Per-query cost (local/self-host)** | **$0** | ⚠️ LLM API/op | ⚠️ credit-based¹ | ⚠️ LLM API/op | ⚠️ LLM API/op |
 | **Self-hosted (own your data)** | ✅ | ✅ Apache 2.0 | ⚠️ Graphiti only² | ✅ Apache 2.0 | ✅ Apache 2.0 |
 | **Hybrid BM25 + vector recall** | ✅ | ✅ v2 | ✅ Graphiti | ❌ context-managed | ⚠️ partial |
@@ -196,7 +196,7 @@ src/depthfusion/
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (30 canonical tools: 17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence)
+├── mcp/         — server (31 canonical tools: 22 always-on, 9 feature-flagged)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -534,11 +534,11 @@ A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) 
 
 ---
 
-## MCP Tools (30 canonical)
+## MCP Tools (31 canonical)
 
-After E-48 (Multi-Provider Context Bridge) and E-64 (HTTP MCP server + model recommendation engine), the MCP surface is 30 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; their underlying Python functions remain in the codebase. The canonical set:
+After E-48 (Multi-Provider Context Bridge), E-64 (HTTP MCP server + model recommendation engine), and E-67 (capability introspection), the MCP surface is 31 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; `depthfusion_describe_capabilities` was re-added in E-67. The canonical set:
 
-### Core retrieval & capture (17 always-on)
+### Core retrieval & capture (22 always-on)
 
 | Tool | Description | Required flag |
 |---|---|---|
@@ -559,24 +559,11 @@ After E-48 (Multi-Provider Context Bridge) and E-64 (HTTP MCP server + model rec
 | `depthfusion_sync_project` | Sync a registered project's BACKLOG, CLAUDE.md, and git log to the DepthFusion KB | always |
 | `depthfusion_ingest_project` | Deep-ingest a project's source files (local or GitHub) into the KB. Modes: structural (key files only) or full | always |
 | `depthfusion_research_topic` | Research a topic via DuckDuckGo, arXiv, and GitHub; results saved to ~/.claude/shared/research/ and published to the KB | always |
-
-### Multi-provider context bridge (3 always-on, E-48)
-
-| Tool | Description | Required flag |
-|---|---|---|
-| `depthfusion_bridge` | Delegate a prompt to an external LLM (GPT-4o, Gemini, DeepSeek, etc.) via OpenRouter. Injects relevant recalled memories as context; stores the response back into shared memory. | always |
+| `depthfusion_bridge` | Delegate a prompt to an external LLM (GPT-4o, Gemini, DeepSeek, etc.) via OpenRouter. Injects relevant recalled memories as context; stores the response back into shared memory. Requires `OPENROUTER_API_KEY`. | always |
 | `depthfusion_ingest_conversation` | Bulk-import a past conversation from ChatGPT, Gemini, or DeepSeek export format. Stores assistant-turn fragments with provenance tagging so they become searchable via `recall_relevant`. | always |
 | `depthfusion_list_providers` | List configured bridge providers, their health status, and how many memories each has contributed. Returns immediately without a network call. | always |
-
-Requires `OPENROUTER_API_KEY` in `depthfusion.env` for bridge and ingest tools to be healthy. `list_providers` always works and reports which providers are configured.
-
-### Model intelligence (1 always-on, E-64)
-
-| Tool | Description | Required flag |
-|---|---|---|
-| `recommend_model` | Query DepthFusion for the best model given task category, vendor exclusion (Fable-5 isolation), and per-task budget. Returns ranked candidates with `quality_rate`, `avg_cost_usd`, `confidence`, and `budget_warning`. Companion tool `record_model_telemetry` closes the feedback loop by writing actual outcomes back to the 30-day rolling stats window. Endpoint `GET /api/budget-summary` returns spend-vs-baseline report. | always |
-
-Requires DepthFusion HTTP MCP server running (`http://localhost:8765` or `http://176.9.147.206:8765`). See **[docs/v2/model-intelligence.md](docs/v2/model-intelligence.md)** for setup and the full budget-aware model selection protocol.
+| `depthfusion_recommend_model` | Query DepthFusion for the best model given task category, vendor exclusion (Fable-5 isolation), and per-task budget. Returns ranked candidates with `quality_rate`, `avg_cost_usd`, `confidence`, and `budget_warning`. Companion tool `record_model_telemetry` closes the feedback loop. Requires HTTP MCP server at `https://mcp.tonracein.com`. | always |
+| `depthfusion_describe_capabilities` | Introspect the active feature-flag profile: returns tier, mode, flag states, and which processing layers are engaged per operation (recall / publish / auto_learn). Added in E-67. | always |
 
 ### Feature-flagged (9 tools)
 
@@ -594,15 +581,15 @@ Requires DepthFusion HTTP MCP server running (`http://localhost:8765` or `http:/
 
 ### Removed in 2026-05-25 parity audit
 
-The following 11 tools were dropped from the MCP surface because they were either unshipped, dogfood-only, or had no user-callable value. Their underlying functions remain importable from `depthfusion.mcp.server` for internal use:
+The following 10 tools were dropped from the MCP surface because they were either unshipped, dogfood-only, or had no user-callable value. Their underlying functions remain importable from `depthfusion.mcp.server` for internal use. (`depthfusion_describe_capabilities` was in this list but re-added as always-on in E-67.)
 
-`depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_describe_capabilities`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`.
+`depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`.
 
 Full tool documentation with response shapes: see `docs/coordination/2026-05-05-from-depthfusion-e27-ready-for-agent-ops.md` §2.
 
 For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
 
-The generated CLI (`depthfusion-pp-cli`) exposes all 30 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+The generated CLI (`depthfusion-pp-cli`) exposes all 31 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 
@@ -645,7 +632,7 @@ Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.m
 
 ## ChatGPT Desktop Integration (E-66, v2.1.1)
 
-Connect **ChatGPT Desktop for macOS** to the DepthFusion MCP server. The existing SSE transport at `https://mcp.tonracein.com` satisfies ChatGPT's MCP connector requirements — no server-side changes required. All 30 tools are available; 19 are immediately useful in a chat context, 11 are designed for Claude Code's agentic loop.
+Connect **ChatGPT Desktop for macOS** to the DepthFusion MCP server. The existing SSE transport at `https://mcp.tonracein.com` satisfies ChatGPT's MCP connector requirements — no server-side changes required. All 31 tools are available; 19 are immediately useful in a chat context, 12 are designed for Claude Code's agentic loop.
 
 ### One-step install
 
@@ -817,7 +804,7 @@ These capabilities are active out of the box — no env vars required:
 - **Recall pipeline** — BM25 full-text search, semantic reranking (VPS tiers), RRF hybrid fusion
 - **Session memory** — capture, tag, compress, publish context
 - **Project context** — register projects, ingest files, seed sessions with project state
-- **MCP router** — 30 tools, RBAC authz, static Bearer token auth, OIDC optional
+- **MCP router** — 31 tools, RBAC authz, static Bearer token auth, OIDC optional
 - **Decision memory** — record decisions, incidents, outcomes, mark superseded
 - **Telemetry & observability** — per-recall latency, backend health, tier status
 - **Context bridge** — ingest ChatGPT/Gemini/DeepSeek conversation exports
