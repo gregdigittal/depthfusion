@@ -1,0 +1,57 @@
+---
+title: DepthFusion Build — Task Dependency Graph
+---
+graph LR
+    subgraph "v0.3.1 — Close the Data Gap (S1-S3)"
+        direction TB
+        T11[1.1 BM25 Length Norm<br/>2-3h ⬤ HIGH]
+        T12[1.2 Extended Snippets<br/>1h ⬤ HIGH]
+        T13[1.3 Wire RRF Fusion<br/>2-3h ⬤ HIGH]
+        T14[1.4 Git Log Hook<br/>3-4h ⬤ CRITICAL]
+        T15[1.5 Discovery Write-Back<br/>4-6h ⬤ CRITICAL]
+        T16[1.6 Source Classification<br/>1-2h ⬤ MEDIUM]
+        T17[1.7 CIQS Baseline<br/>2-3h ⬤ HIGH]
+
+        T11 --> T17
+        T12 --> T17
+        T13 --> T17
+        T14 --> T17
+        T15 --> T17
+        T16 --> T17
+    end
+
+    subgraph "v0.4.0 — Knowledge Graph (S4-S7)"
+        direction TB
+        T21[2.1 Entity Extraction<br/>6-8h ⬤ HIGH]
+        T22[2.2 Types & Store<br/>4-5h ⬤ HIGH]
+        T23[2.3 Edge Linking<br/>6-8h ⬤ HIGH]
+        T24[2.4 Graph Traversal<br/>5-6h ⬤ HIGH]
+        T25[2.5 Session Scope<br/>3-4h ⬤ MEDIUM]
+        T26[2.6 MCP Tool Integration<br/>4-5h ⬤ HIGH]
+        T27[2.7 Pipeline Integration<br/>4-6h ⬤ HIGH]
+        T28[2.8 PostCompact Extraction<br/>3-4h ⬤ MEDIUM]
+        T29[2.9 Testing & Benchmark<br/>4-6h ⬤ HIGH]
+
+        T21 --> T23
+        T22 --> T23
+        T22 --> T25
+        T23 --> T24
+        T24 --> T26
+        T25 --> T26
+        T26 --> T27
+        T21 --> T28
+        T23 --> T28
+        T27 --> T29
+        T28 --> T29
+    end
+
+    T17 -->|v0.3.1 tagged| T21
+    T17 -->|v0.3.1 tagged| T22
+
+    classDef critical fill:#8b0000,stroke:#ff4444,color:#fff
+    classDef high fill:#1a3a5c,stroke:#2a6cb0,color:#fff
+    classDef medium fill:#5c5c1a,stroke:#b0b02a,color:#fff
+
+    class T14,T15 critical
+    class T11,T12,T13,T17,T21,T22,T23,T24,T26,T27,T29 high
+    class T16,T25,T28 medium

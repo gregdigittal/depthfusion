@@ -1,0 +1,54 @@
+---
+title: DepthFusion Retrieval Pipeline (v0.4.0)
+---
+sequenceDiagram
+    participant CC as Claude Code
+    participant Hook as SessionStart Hook
+    participant MCP as MCP Server
+    participant Graph as Knowledge Graph
+    participant BM25 as BM25 Engine
+    participant Vec as ChromaDB (Tier 2)
+    participant RRF as RRF Fusion
+    participant Haiku as Haiku Reranker
+    participant Store as Discovery Files
+
+    Note over CC,Store: Session Start — Context Injection
+    CC->>Hook: new session started
+    Hook->>Hook: git log --oneline -5<br/>git branch --show-current<br/>cat BACKLOG.md | head -20
+    Hook->>MCP: depthfusion_recall_relevant(auto_query)
+    MCP->>Graph: expand_query(terms)
+    Graph-->>MCP: expanded_terms[]
+
+    alt Local Mode
+        MCP->>BM25: search(expanded_terms, top_k=5)
+        BM25-->>MCP: ranked_blocks[]
+    end
+
+    alt VPS Tier 1
+        MCP->>BM25: search(expanded_terms, top_k=10)
+        BM25-->>MCP: ranked_blocks[]
+        MCP->>Haiku: rerank(blocks, query)
+        Haiku-->>MCP: reranked_blocks[]
+    end
+
+    alt VPS Tier 2
+        MCP->>BM25: search(expanded_terms, top_k=10)
+        MCP->>Vec: search(expanded_terms, top_k=20)
+        BM25-->>RRF: bm25_results[]
+        Vec-->>RRF: vector_results[]
+        RRF->>Haiku: fused_blocks[]
+        Haiku-->>MCP: reranked_blocks[]
+    end
+
+    MCP->>Graph: boost_scores(results, query_entities)
+    Graph-->>MCP: boosted_results[]
+    MCP-->>CC: injected context (top-k blocks)
+
+    Note over CC,Store: Session End — Knowledge Capture
+    CC->>Hook: PostCompact triggered
+    Hook->>MCP: depthfusion_compress_session(tmp_file)
+    MCP->>MCP: extract key facts (heuristic/haiku)
+    MCP->>Store: write discovery file
+    MCP->>Graph: extract_entities(discovery)
+    Graph->>Graph: link_edges(new_entities)
+    Graph->>Graph: update_store()

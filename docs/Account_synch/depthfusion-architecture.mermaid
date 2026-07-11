@@ -1,0 +1,130 @@
+---
+title: DepthFusion v0.4.0 — System Architecture
+---
+graph TB
+    subgraph "Claude Code Session"
+        CC[Claude Code Agent]
+        SH[SessionStart Hook]
+        PH[PostCompact Hook]
+    end
+
+    subgraph "MCP Server (8+3 tools)"
+        MCP[depthfusion.mcp.server]
+        T1[recall_relevant]
+        T2[tag_session]
+        T3[publish_context]
+        T4[run_recursive]
+        T5[auto_learn]
+        T6[compress_session]
+        T7[tier_status]
+        T8[status]
+        T9[graph_traverse]
+        T10[graph_status]
+        T11[set_scope]
+    end
+
+    subgraph "Retrieval Pipeline"
+        BM25[BM25 Engine<br/>length-normalized]
+        VEC[ChromaDB Vector<br/>Tier 2 only]
+        RRF[RRF Fusion<br/>k=60]
+        RERANK[Haiku Reranker<br/>VPS only]
+        EXPAND[Graph Query<br/>Expansion]
+        BOOST[Graph Score<br/>Boost +0.15-0.30]
+    end
+
+    subgraph "Knowledge Graph (v0.4.0)"
+        EXT[Entity Extractor<br/>regex + haiku]
+        LINK[Edge Linker<br/>3 signals]
+        TRAV[Graph Traverser<br/>depth ≤ 3]
+        SCOPE[Scope Manager<br/>per-project/cross]
+        GS[Graph Store<br/>JSON/SQLite/ChromaDB]
+    end
+
+    subgraph "Capture & Memory"
+        AL[Auto-Learn<br/>heuristic + haiku]
+        COMP[Session Compressor<br/>haiku summarization]
+        DISC[Discovery Files<br/>~/.claude/shared/discoveries/]
+        MEM[Memory Files<br/>~/.claude/memory/]
+    end
+
+    subgraph "Context Router"
+        BUS[Event Bus<br/>InMemory/File]
+        PUB[Publisher]
+        SUB[Subscriber]
+        DISP[Dispatcher]
+        COST[Cost Estimator]
+    end
+
+    subgraph "Storage Layer"
+        REDIS[(Redis<br/>Hot Context)]
+        PG[(PostgreSQL 16<br/>Cold Context)]
+        CHROMA[(ChromaDB<br/>Vectors)]
+        SQLITE[(SQLite<br/>Graph Tier 1)]
+    end
+
+    subgraph "Recursive LLM"
+        RLM[RLM Client]
+        STRAT[Strategies]
+        TRAJ[Trajectory]
+        SAND[Sandbox]
+    end
+
+    subgraph "Metrics & Analysis"
+        COLL[Metrics Collector<br/>JSONL]
+        AGG[Aggregator]
+        SCAN[Scanner]
+        COMPAT[C1-C11<br/>Compatibility]
+    end
+
+    CC -->|query| SH
+    SH -->|git log + recall| MCP
+    PH -->|compacted session| AL
+    PH -->|extract entities| EXT
+
+    MCP --> T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & T9 & T10 & T11
+
+    T1 --> EXPAND
+    EXPAND -->|expanded terms| BM25
+    EXPAND -->|expanded terms| VEC
+    BM25 -->|ranked| RRF
+    VEC -->|ranked| RRF
+    RRF --> RERANK
+    RERANK --> BOOST
+    BOOST -->|final results| CC
+
+    T9 --> TRAV
+    TRAV --> GS
+    SCOPE --> GS
+
+    EXT --> LINK
+    LINK --> GS
+    GS --> SQLITE
+    GS --> CHROMA
+
+    AL --> COMP
+    COMP --> DISC
+    AL --> DISC
+
+    T3 --> PUB
+    PUB --> BUS
+    BUS --> SUB
+    SUB --> DISP
+    DISP --> COST
+
+    T4 --> RLM
+    RLM --> STRAT
+    STRAT --> TRAJ
+    TRAJ --> SAND
+
+    COLL --> AGG
+    SCAN --> COMPAT
+
+    classDef new fill:#2d5016,stroke:#4a8c2a,color:#fff
+    classDef existing fill:#1a3a5c,stroke:#2a6cb0,color:#fff
+    classDef storage fill:#5c3a1a,stroke:#b07a2a,color:#fff
+    classDef hook fill:#5c1a3a,stroke:#b02a6c,color:#fff
+
+    class T9,T10,T11,EXT,LINK,TRAV,SCOPE,GS,EXPAND,BOOST new
+    class BM25,VEC,RRF,RERANK,AL,COMP,BUS,PUB,SUB,DISP,COST,RLM,STRAT,TRAJ,SAND,COLL,AGG,SCAN,COMPAT existing
+    class REDIS,PG,CHROMA,SQLITE storage
+    class SH,PH hook

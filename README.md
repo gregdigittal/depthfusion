@@ -6,11 +6,11 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
-> **v2.0.0 — now on main:** DepthFusion v2 ships with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, classification-aware memory handling, and model performance intelligence (HTTP MCP server + `recommend_model` tool). V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. For the v1.x release, see the `v1.2.2` git tag.
+> **v2.1.1 — now on main:** DepthFusion v2 ships with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, classification-aware memory handling, model performance intelligence (HTTP MCP server + `recommend_model` tool), and **ChatGPT Desktop for macOS MCP integration** (E-66). V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. For the v1.x release, see the `v1.2.2` git tag.
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v2.0.0 (main). 3482+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server (E-64), and model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **30 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.1.1 (main). 3482+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **30 canonical MCP tools** (17 always-on, 9 feature-flagged, 3 bridge, 1 model-intelligence). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -26,6 +26,7 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 | Tauri desktop app | Native app for macOS (Apple Silicon + Intel) and Windows 10/11 | [user-guide.md §1](docs/v2/user-guide.md) |
 | Offline mode | Encrypted local cache; queued write replay on reconnect | [user-guide.md §4](docs/v2/user-guide.md) |
 | Admin runbooks | Device approval/revocation, role assignment, backup/restore, audit queries | [admin-runbooks.md](docs/v2/admin-runbooks.md) |
+| ChatGPT Desktop (macOS) | Connect ChatGPT Desktop to DepthFusion's MCP server via SSE — 30 tools available; one-step install script | [chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md) |
 
 ---
 
@@ -642,6 +643,38 @@ Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.m
 
 ---
 
+## ChatGPT Desktop Integration (E-66, v2.1.1)
+
+Connect **ChatGPT Desktop for macOS** to the DepthFusion MCP server. The existing SSE transport at `https://mcp.tonracein.com` satisfies ChatGPT's MCP connector requirements — no server-side changes required. All 30 tools are available; 19 are immediately useful in a chat context, 11 are designed for Claude Code's agentic loop.
+
+### One-step install
+
+```bash
+curl -s https://raw.githubusercontent.com/gregdigittal/depthfusion/main/docs/chatgpt-install.sh | python3
+```
+
+The script prompts for your `DEPTHFUSION_MCP_TOKEN` (no heredoc copy issues), writes `~/Library/Application Support/com.openai.chat/mcp.json` with mode 600, and prints the restart instruction.
+
+Your token lives in `~/.claude/depthfusion.env` — look for the `DEPTHFUSION_MCP_TOKEN=` line.
+
+### Manual config
+
+```json
+{
+  "mcpServers": {
+    "depthfusion": {
+      "type": "sse",
+      "url": "https://mcp.tonracein.com/sse",
+      "headers": { "Authorization": "Bearer <YOUR_TOKEN>" }
+    }
+  }
+}
+```
+
+Full guide: **[docs/chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md)**
+
+---
+
 ## Project Context Intelligence (E-47, v1.2.0)
 
 Five new tools give agents the ability to register, sync, ingest, and research across multiple projects. Sessions can be seeded with a project's full BACKLOG and CLAUDE.md context automatically.
@@ -778,7 +811,7 @@ The legacy `vps-tier1` / `vps-tier2` extras were removed in v0.6.0 (see S-56 / S
 ## Project status & roadmap
 
 - **Closed (v1.0.0):** 51 user stories across E-01 through E-31. E-31 (Structured Evolving Cognition) ships complete in v1.0.0.
-- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide. v1.2.2 patch: Gemma 4 26B added as recommended MLX model for ≥16 GB; `SO_REUSEADDR` fix in `mlx-serve-direct.py` prevents `EADDRINUSE` on launchd restarts; `claude mcp add` `--` flag fix.
+- **Closed (post-v1.0.0 on `main`):** E-38 MemPalace integration (temporal filter, KG provenance, linear blend, Wing/Room scoping, KG edge invalidation), E-39 SkillForge SF-2 integration, E-40 CIQS Cat D benchmark harness, E-41 metrics reliability (flock guard + skipped_lines), E-42 pruner grace period, E-43 SkillForge divergence gap resolution (JWT refresh + Mamba Python port), E-47 Project Context Intelligence & Research (ProjectRegistry, BACKLOG sync, project ingest, topic research, session seed extension — 5 new always-on tools, 26 canonical total), E-48 Multi-Provider Context Bridge (OpenRouterBackend, conversation parsers for ChatGPT/Gemini/DeepSeek, `depthfusion_bridge` / `depthfusion_ingest_conversation` / `depthfusion_list_providers` — 3 new tools, 29 canonical total), E-61 security hardening (pentest findings AV-01–AV-05: nonce replay, RBAC role mismatch, cache key env, HWM restart-reset), E-65 OIDC auth + static Bearer token fallback for MCP server, E-66 ChatGPT Desktop macOS MCP integration (`docs/chatgpt-mcp-setup.md`, `docs/chatgpt-install.sh`, path confinement on `set_memory_score` / `pin_discovery`, timing-safe Bearer token comparison). v1.2.1 patch: macOS installer portability (replace `tac` with portable awk so launchd plists write correctly on macOS), `uv sync --extra mac-mlx` documented throughout local update guide. v1.2.2 patch: Gemma 4 26B added as recommended MLX model for ≥16 GB; `SO_REUSEADDR` fix in `mlx-serve-direct.py` prevents `EADDRINUSE` on launchd restarts; `claude mcp add` `--` flag fix. v2.1.1: default server URL updated to `https://mcp.tonracein.com` (port 7301).
 - **Active (calendar-gated):** S-79 AC-2/AC-4 and S-80 AC-4 await ≥ 5 days of dogfood emissions; observability ACs only.
 - **Backlog:** E-26 CIQS Cat D AC-3 — benchmark-blocked (requires live corpus + eval set). MemoryConsolidator write mode (currently DRY-RUN) — planned after 30 days of production autonomic observation.
 See `BACKLOG.md` for the full ledger.

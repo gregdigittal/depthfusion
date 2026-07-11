@@ -14,12 +14,24 @@ Conventions:
 
 ### Added
 
+**E-66 — ChatGPT Desktop macOS MCP Integration (v2.1.1):**
+- `docs/chatgpt-mcp-setup.md` — full setup guide: config file path, token retrieval, tool reference table (30 tools; 11 marked Claude Code–only), troubleshooting (401, SSE drops, config not picked up)
+- `docs/chatgpt-install.sh` — one-step Python install script (no heredoc); prompts for `DEPTHFUSION_MCP_TOKEN` via `getpass`, writes `~/Library/Application Support/com.openai.chat/mcp.json` with mode 0o600 and directory mode 0o700
+- README "ChatGPT Desktop Integration" section with one-step install command and manual JSON snippet
+- `BACKLOG.md` E-66 epic: S-218 story (T-756–T-759) marked done
+
+**E-65 — MCP HTTP/SSE server auth hardening:**
+- `src/depthfusion/mcp/http_server.py`: fail-closed Bearer token auth on `/sse` and `/messages`; JWKS JWT validation when OIDC env vars are set; static `DEPTHFUSION_MCP_TOKEN` fallback; timing-safe comparison via `secrets.compare_digest`
+- `src/depthfusion/api/auth.py`: `_LegacyTokenDep.__call__` uses `secrets.compare_digest` to prevent Bearer token prefix leakage via short-circuit equality
+
+**Other:**
 - `docs/install/mac-mlx-quickstart.md` — complete install guide for Apple Silicon Macs: launchd plist setup, MLX-LM inference server, Claude Desktop + Claude Code CLI registration, HNSW cold-start note, troubleshooting section (launchctl load pitfall, duplicate plist labels, zsh paste issues)
 - `docs/install/README.md` updated — Mac MLX guide added to the install guide table
 - `scripts/mac-parity.sh` — idempotent plistlib-based script to add missing E-31 env vars (`DEPTHFUSION_GRAPH_ENABLED`, `DEPTHFUSION_COGNITIVE_RETRIEVAL`, `DEPTHFUSION_DECISION_MEMORY`, `DEPTHFUSION_OPERATIONAL_MEMORY`) to the macOS launchd plist and reload the service; supports `--dry-run`
 
 ### Changed
 
+- **Default server URL** updated to `https://mcp.tonracein.com` (port 7301) in Tauri desktop app settings (v2.1.1).
 - **Canonical 21-tool set** — parity audit removed 11 low-value / unshipped tools from the MCP server. All platforms now expose exactly 21 tools. Removed: `depthfusion_run_recursive`, `depthfusion_tier_status`, `depthfusion_describe_capabilities`, `depthfusion_get_cognitive_state`, `depthfusion_inspect_discovery`, `depthfusion_prune_discoveries`, `depthfusion_hnsw_capability`, `depthfusion_surface_skill_candidates`, `depthfusion_event_publish`, `depthfusion_event_seed`, `depthfusion_agent_trail`. Underlying Python functions are retained; only the MCP surface registration was removed.
 - **REST API feature-flag bug fix** — all 16 endpoint handlers in `api/rest.py` called `DepthFusionConfig()` (bare constructor, all flags False) instead of `DepthFusionConfig.from_env()`. Feature-flagged tools (`graph_*`, `cognitive_retrieval`, `decision_memory`, `operational_memory`) were silently excluded from REST responses on all platforms regardless of env vars. Fixed with global replacement.
 
@@ -28,6 +40,11 @@ Conventions:
 - **REST `/context` endpoint wiring bug** — `POST /context` now wraps the request body into the `arguments["item"]` shape expected by `_tool_publish_context`. Previously all REST publish calls returned `{"error": "publish_context: 'item' must be an object"}`. The endpoint now generates an `item_id` (UUID), uses `"rest-api"` as `source_agent`, and folds `project`/`session_id` into `item.metadata`. MCP tool (`depthfusion_publish_context`) was unaffected.
 
 ### Security
+
+**E-66 — Path confinement and token security:**
+- `src/depthfusion/mcp/tools/graph.py` (`_tool_set_memory_score`, `_tool_pin_discovery`): path confinement — resolves the caller-supplied filename and rejects any path outside `~/.claude/shared/discoveries/`. Prevents external callers (e.g. ChatGPT MCP) from writing to arbitrary server paths.
+- `docs/chatgpt-install.sh`: install script rewrote to use `getpass.getpass` (removes hardcoded token), sets file permissions to 0o600 and directory to 0o700.
+- Token rotation: `DEPTHFUSION_MCP_TOKEN` rotated after prior token was committed to public repo (now prompts interactively, never hardcodes).
 
 E-61 / T-684 — pentest remediation (all 4 High/Medium findings from AV-01–AV-05):
 

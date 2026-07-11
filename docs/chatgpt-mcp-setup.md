@@ -75,7 +75,7 @@ If you see a `401 Unauthorized` error, re-check the token in `mcp.json`.
 
 ## 4. Tool Reference
 
-All 27 tools available via this server. Tools marked **[Claude Code only]** are designed for the Claude Code agentic workflow and have limited utility in ChatGPT.
+All 30 tools available via this server. Tools marked **[Claude Code only]** are designed for the Claude Code agentic workflow and have limited utility in ChatGPT.
 
 | Tool | Description | Note |
 |---|---|---|
@@ -110,7 +110,7 @@ All 27 tools available via this server. Tools marked **[Claude Code only]** are 
 | `depthfusion_register_project` | Register a new project with DepthFusion | **[Claude Code only]** |
 | `depthfusion_sync_project` | Sync project metadata | **[Claude Code only]** |
 
-**19 tools** are fully usable in ChatGPT. **11 tools** are designed for Claude Code's agentic loop and will work but have limited practical value in a chat context.
+**19 tools** are fully usable in ChatGPT. **11 tools** are designed for Claude Code's agentic loop — they will work but have limited practical value in a chat context.
 
 ---
 
