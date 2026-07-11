@@ -1,9 +1,5 @@
 # DepthFusion Sync Guide
 
-> **Note: This doc describes V1 behavior.** V2 behavior is documented in `docs/v2/admin-runbooks.md` (§4 Backup and Restore). V2 uses admin-managed backup scripts and database checkpoints rather than rsync-based file sync. If you are running the `v2-enterprise` branch, refer to the V2 admin runbooks instead.
-
-
-
 Bidirectional rsync of discovery and memory files between local machine and VPS
 (`gregmorris@77.42.45.197`).
 

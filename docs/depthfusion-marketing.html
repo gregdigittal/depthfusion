@@ -370,7 +370,6 @@
     <div class="feat-card"><div class="feat-icon" style="background:rgba(245,158,11,.15)">🌐</div><h3>Cross-Project Index</h3><p>Query patterns, decisions, and code references across all your registered projects. Knowledge doesn't silo — it flows where you need it.</p><div class="feat-detail">Scoped queries with project filters</div></div>
     <div class="feat-card"><div class="feat-icon" style="background:rgba(239,68,68,.15)">🔍</div><h3>ContradictionEngine</h3><p>Detects when new memories conflict with established facts. Flags contradictions before they reach Claude's context — your architecture stays consistent.</p><div class="feat-detail">Confidence-weighted suppression</div></div>
     <div class="feat-card"><div class="feat-icon" style="background:rgba(139,92,246,.15)">📊</div><h3>EventLog + GraphTraversal</h3><p>Every recall, publish, and feedback event is logged. Graph traversal lets you follow memory chains — discover how a decision influenced downstream work.</p><div class="feat-detail">SQLite-backed, local-first</div></div>
-    <div class="feat-card"><div class="feat-icon" style="background:rgba(16,185,129,.15)">🍎</div><h3>Apple Silicon GPU — mac-mlx</h3><p>Run Gemma or Qwen locally on M-series Macs via mlx_lm.server on port 8000. Zero cloud cost, instant reranking, fully private. Same quality chain as GPU VPS — haiku fallback when the model server is not running.</p><div class="feat-detail">pip install -e '.[mac-mlx]' · arm64 macOS only</div></div>
   </div>
 </section>
 
@@ -400,7 +399,7 @@
   <div class="steps">
     <div class="step"><div class="step-num">1</div><h3>Captures as you work</h3><p>PostCompact and Stop hooks automatically extract decisions, patterns, and facts from every session. The LLM extractor achieves ≥80% precision — not noisy, not lossy.</p></div>
     <div class="step"><div class="step-num">2</div><h3>Scores and deduplicates</h3><p>The CognitiveScorer ranks every memory block across 8 dimensions. The ContradictionEngine suppresses conflicting facts. Only relevant, accurate context reaches Claude.</p></div>
-    <div class="step"><div class="step-num">3</div><h3>Surfaces it automatically</h3><p>At the start of each session, DepthFusion runs hybrid BM25 + reranker recall and injects the top-K scored blocks. Reranking runs via Haiku API (vps-cpu), local Gemma/vLLM (vps-gpu), or on-device Qwen/Gemma via MLX on Apple Silicon (mac-mlx). Claude starts every session already up to speed.</p></div>
+    <div class="step"><div class="step-num">3</div><h3>Surfaces it automatically</h3><p>At the start of each session, DepthFusion runs hybrid BM25 + Haiku recall and injects the top-K scored blocks. Claude starts every session already up to speed.</p></div>
   </div>
 </section>
 
@@ -421,12 +420,12 @@
 <!-- ══════════ CTA ══════════ -->
 <div class="cta-section z1 reveal">
   <h2>Ready to give Claude <span class="hl">a memory?</span></h2>
-  <p>One MCP server. Four deployment modes: local, VPS-CPU, VPS-GPU, and Apple Silicon (mac-mlx). Zero cloud dependencies for local and mac-mlx. Works with every Claude Code session from the moment you install it.</p>
+  <p>One MCP server. Zero cloud dependencies. Works with every Claude Code session from the moment you install it.</p>
   <div class="cta-card">
     <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Install via pip:</p>
     <div class="install-box">pip install depthfusion-mcp</div>
-    <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Or clone and choose your mode:</p>
-    <div class="install-box">git clone https://github.com/gregdigittal/depthfusion<br>cd depthfusion<br>pip install -e '.[local]'      # Laptop, zero deps<br>pip install -e '.[vps-cpu]'    # Cloud VPS + Haiku API<br>pip install -e '.[vps-gpu]'    # CUDA GPU + local Gemma<br>pip install -e '.[mac-mlx]'    # Apple Silicon GPU</div>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:1rem;">Or clone and run locally:</p>
+    <div class="install-box">git clone https://github.com/gregdigittal/depthfusion<br>cd depthfusion &amp;&amp; pip install -e .</div>
     <button class="btn-primary" style="width:100%;margin-top:1rem;">View Documentation →</button>
   </div>
 </div>

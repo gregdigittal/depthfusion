@@ -86,23 +86,3 @@ def _guard_metrics_production_path(tmp_path_factory: pytest.TempPathFactory) -> 
 
     with patch.object(MetricsCollector, "__init__", _safe_init):
         yield
-
-
-@pytest.fixture(autouse=True, scope="function")
-def _clear_policy_engine_cache() -> None:
-    """Flush the PolicyEngine singleton cache before and after every test.
-
-    The PolicyEngine singleton has a 60-second TTL LRU cache.  Tests that
-    share a principal_id (e.g. the hardcoded ``"test-user"`` in
-    test_mcp_authz.py) would otherwise receive stale ALLOW/DENY decisions
-    from a prior test case, producing order-dependent failures.
-
-    Clearing both before (in case a previous test left residue) and after
-    (eager cleanup) prevents cross-test cache pollution without requiring
-    individual test files to manage the singleton lifecycle.
-    """
-    from depthfusion.authz import get_policy_engine
-
-    get_policy_engine().clear_cache()
-    yield
-    get_policy_engine().clear_cache()

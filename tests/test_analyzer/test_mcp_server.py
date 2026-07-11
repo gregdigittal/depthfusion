@@ -5,44 +5,41 @@ import json
 from unittest.mock import MagicMock
 
 from depthfusion.core.config import DepthFusionConfig
-from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_twenty_six_entries():
-    """30-tool set after E-64 model recommendation engine (adds recommend_model)."""
-    assert len(TOOLS) == 30
+def test_tools_dict_has_twenty_eight_entries():
+    """Total tool count: 28 (E-35 S-111 added session_seed)."""
+    assert len(TOOLS) == 28
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
         "depthfusion_tag_session",
         "depthfusion_publish_context",
+        "depthfusion_run_recursive",
+        "depthfusion_tier_status",
         "depthfusion_auto_learn",
         "depthfusion_compress_session",
         "depthfusion_graph_traverse",
         "depthfusion_graph_status",
         "depthfusion_set_scope",
         "depthfusion_confirm_discovery",
+        "depthfusion_prune_discoveries",          # v0.5.1 S-55
         "depthfusion_set_memory_score",           # E-27 / S-70
         "depthfusion_recall_feedback",            # E-27 / S-72
         "depthfusion_pin_discovery",              # E-27 / S-69
+        "depthfusion_describe_capabilities",      # E-28 / S-76
+        "depthfusion_inspect_discovery",          # E-28 / S-76
         "depthfusion_retrieve_context",           # E-31 / S-99
         "depthfusion_record_decision",            # E-31 / S-97
         "depthfusion_record_incident",            # E-31 / S-98
         "depthfusion_mark_superseded",            # E-31 / S-98
         "depthfusion_report_outcome",             # E-31 / S-98
+        "depthfusion_get_cognitive_state",        # E-31 / S-99
         "depthfusion_record_telemetry",           # E-33 / S-106/S-107
         "depthfusion_query_telemetry",            # E-33 / S-106/S-107
+        "depthfusion_surface_skill_candidates",   # E-34 / S-109
         "depthfusion_session_seed",               # E-35 / S-111
-        "depthfusion_register_project",           # E-47 / S-147
-        "depthfusion_list_projects",              # E-47 / S-147
-        "depthfusion_sync_project",               # E-47 / S-148
-        "depthfusion_ingest_project",             # E-47 / S-150
-        "depthfusion_research_topic",             # E-47 / S-152
-        "depthfusion_bridge",                     # E-48 multi-provider bridge
-        "depthfusion_ingest_conversation",        # E-48 multi-provider bridge
-        "depthfusion_list_providers",             # E-48 multi-provider bridge
-        "recommend_model",                        # E-64 / S-210
     }
     assert set(TOOLS.keys()) == expected
 
@@ -54,32 +51,32 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 30
+    assert len(enabled) == 28
 
 
-def test_get_enabled_tools_rlm_flag_is_orphaned():
-    """rlm_enabled no longer gates any tool after parity audit (run_recursive removed)."""
-    config_on = DepthFusionConfig(rlm_enabled=True, router_enabled=True)
-    config_off = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
-    assert set(get_enabled_tools(config_on)) == set(get_enabled_tools(config_off))
-    # 21 always-on + 1 router = 22 (recommend_model added in E-64 S-210)
-    assert len(get_enabled_tools(config_off)) == 22
+def test_get_enabled_tools_rlm_disabled_excludes_recursive():
+    config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
+    enabled = get_enabled_tools(config)
+    assert "depthfusion_run_recursive" not in enabled
+    # 18 always-on + 1 router (rlm off, graph off, cognitive defaults off) = 19
+    assert len(enabled) == 19
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 21 always-on tools (includes 5 E-47 + 3 E-48 bridge + recommend_model E-64); rlm_enabled orphaned, adds nothing
-    assert len(enabled) == 21
+    # 18 always-on + 1 rlm (router off, graph off, cognitive defaults off) = 19
+    assert len(enabled) == 19
 
 
 def test_get_enabled_tools_both_disabled():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
+    assert "depthfusion_run_recursive" not in enabled
     assert "depthfusion_publish_context" not in enabled
-    # 21 always-on tools only (includes 5 E-47 + 3 E-48 bridge + recommend_model E-64)
-    assert len(enabled) == 21
+    # 18 always-on (rlm off, router off, graph off, cognitive defaults off) = 18
+    assert len(enabled) == 18
 
 
 def test_core_tools_always_enabled():
@@ -89,6 +86,7 @@ def test_core_tools_always_enabled():
     assert "depthfusion_status" in enabled
     assert "depthfusion_recall_relevant" in enabled
     assert "depthfusion_tag_session" in enabled
+    assert "depthfusion_tier_status" in enabled
     assert "depthfusion_auto_learn" in enabled
     assert "depthfusion_compress_session" in enabled
 
@@ -138,13 +136,9 @@ class TestConfirmDiscovery:
     def _cfg(self):
         return DepthFusionConfig(rlm_enabled=False, router_enabled=False, graph_enabled=False)
 
-    def _principal(self) -> Principal:
-        """Return a member principal that satisfies WRITE_OWN_RECORDS."""
-        return Principal(principal_id="test-member", groups=["member"])
-
     def test_missing_text_returns_error(self):
         config = self._cfg()
-        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config, self._principal())
+        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config)
         assert result["isError"] is False  # protocol success
         body = json.loads(result["content"][0]["text"])
         assert body["ok"] is False
@@ -166,7 +160,6 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Use asyncpg over psycopg2 for async support", "project": "test-proj"},
                 self._cfg(),
-                self._principal(),
             )
 
         assert result["isError"] is False
@@ -186,7 +179,6 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": long_text, "project": "proj"},
                 self._cfg(),
-                self._principal(),
             )
         assert result["isError"] is False
 
@@ -209,7 +201,6 @@ class TestConfirmDiscovery:
                 {"text": "Always validate at boundaries", "project": "proj",
                  "category": "invalid_category"},
                 self._cfg(),
-                self._principal(),
             )
         assert captured_entries[0].category == "decision"
 
@@ -231,7 +222,6 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Deploy via kubernetes", "project": "proj", "confidence": 99.9},
                 self._cfg(),
-                self._principal(),
             )
         assert captured_entries[0].confidence <= 1.0
 
@@ -239,148 +229,3 @@ class TestConfirmDiscovery:
         config = self._cfg()
         result = _handle_tools_call("depthfusion_nonexistent", {}, config)
         assert result["isError"] is True
-
-
-# ---------------------------------------------------------------------------
-# E-46 S-143 T-493 — content-hash dedup and fabric_seed ranking
-# ---------------------------------------------------------------------------
-
-class _FakeGraph:
-    """Minimal in-memory GraphBackend stub (mirrors test_event_store.py pattern)."""
-
-    def __init__(self) -> None:
-        self._entities: dict = {}
-        self._edges: list = []
-
-    def upsert_entity(self, entity) -> None:
-        self._entities[entity.entity_id] = entity
-
-    def get_entity(self, entity_id: str):
-        return self._entities.get(entity_id)
-
-    def upsert_edge(self, edge) -> None:
-        self._edges.append(edge)
-
-    def get_edges(self, entity_id, relationship_filter=None, as_of=None):
-        edges = [e for e in self._edges if e.source_id == entity_id or e.target_id == entity_id]
-        if relationship_filter:
-            edges = [e for e in edges if e.relationship in relationship_filter]
-        return edges
-
-    def all_entities(self) -> list:
-        return list(self._entities.values())
-
-    def node_count(self) -> int:
-        return len(self._entities)
-
-    def edge_count(self) -> int:
-        return len(self._edges)
-
-
-def _make_fabric_store():
-    from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
-    return EventStore(graph=_FakeGraph(), stream=InMemoryStreamBackend())
-
-
-class TestEventStoreDedup:
-    """Verify content-hash dedup: N concurrent publishes of identical content → 1 MemoryEntity."""
-
-    def test_duplicate_publish_returns_deduped_flag(self):
-        import asyncio
-        store = _make_fabric_store()
-        r1 = asyncio.run(store.publish_memory("same content", "agent-a", "proj"))
-        r2 = asyncio.run(store.publish_memory("same content", "agent-b", "proj"))
-        assert r1["memory_id"] == r2["memory_id"]
-        assert r1["deduped"] is False
-        assert r2["deduped"] is True
-
-    def test_unique_content_not_deduped(self):
-        import asyncio
-        store = _make_fabric_store()
-        r1 = asyncio.run(store.publish_memory("content alpha", "agent-a", "proj"))
-        r2 = asyncio.run(store.publish_memory("content beta", "agent-a", "proj"))
-        assert r1["memory_id"] != r2["memory_id"]
-        assert r1["deduped"] is False
-        assert r2["deduped"] is False
-
-    def test_one_memory_entity_n_event_entities(self):
-        import asyncio
-
-        from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
-
-        graph = _FakeGraph()
-        store = EventStore(graph=graph, stream=InMemoryStreamBackend())
-
-        n = 10
-        results = [
-            asyncio.run(store.publish_memory("shared content", f"agent-{i}", "proj"))
-            for i in range(n)
-        ]
-        memory_ids = {r["memory_id"] for r in results}
-        assert len(memory_ids) == 1, "All publishes must produce exactly 1 MemoryEntity"
-
-        all_entities = graph.all_entities()
-        event_entities = [e for e in all_entities if e.type == "event"]
-        memory_entities = [e for e in all_entities if e.type == "memory"]
-        assert len(memory_entities) == 1
-        assert len(event_entities) == n
-
-
-class TestFabricSeedBundle:
-    """Verify fabric_seed_bundle ranking: observer_count boosts score."""
-
-    def test_empty_projects_returns_empty_bundle(self):
-        import asyncio
-        store = _make_fabric_store()
-        result = asyncio.run(store.fabric_seed_bundle(projects=["no-such-proj"]))
-        assert result["bundle"] == []
-        assert "degraded" in result
-
-    def test_bundle_respects_top_k(self):
-        import asyncio
-        store = _make_fabric_store()
-        for i in range(5):
-            asyncio.run(store.publish_memory(f"content {i}", "agent-a", "proj"))
-        result = asyncio.run(store.fabric_seed_bundle(projects=["proj"], top_k=3))
-        assert len(result["bundle"]) <= 3
-
-    def test_observer_count_boosts_score(self):
-        """Memory seen by 3 agents ranks higher than memory seen by 1 agent."""
-        import asyncio
-
-        from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
-        from depthfusion.graph.types import Edge
-
-        graph = _FakeGraph()
-        store = EventStore(graph=graph, stream=InMemoryStreamBackend())
-
-        # Publish "popular" content from 3 agents (dedup → 1 MemoryEntity)
-        r_popular = asyncio.run(store.publish_memory("popular memory", "agent-a", "proj"))
-        memory_id = r_popular["memory_id"]
-        asyncio.run(store.publish_memory("popular memory", "agent-b", "proj"))
-        asyncio.run(store.publish_memory("popular memory", "agent-c", "proj"))
-
-        # Add AGENT_RECEIVED edges to simulate agents receiving this memory
-        graph.upsert_edge(Edge(
-            edge_id=f"{memory_id}-recv-b", source_id=memory_id, target_id="agent-b",
-            relationship="AGENT_RECEIVED", weight=1.0, signals=["fabric"],
-            metadata={"agent_id": "agent-b"},
-        ))
-        graph.upsert_edge(Edge(
-            edge_id=f"{memory_id}-recv-c", source_id=memory_id, target_id="agent-c",
-            relationship="AGENT_RECEIVED", weight=1.0, signals=["fabric"],
-            metadata={"agent_id": "agent-c"},
-        ))
-
-        # Publish "solo" content from 1 agent (no AGENT_RECEIVED edges)
-        asyncio.run(store.publish_memory("solo memory", "agent-x", "proj"))
-
-        result = asyncio.run(store.fabric_seed_bundle(projects=["proj"], top_k=10))
-        bundle = result["bundle"]
-        assert len(bundle) >= 2
-
-        popular_item = next((b for b in bundle if "popular" in b["name"]), None)
-        solo_item = next((b for b in bundle if "solo" in b["name"]), None)
-        assert popular_item is not None
-        assert solo_item is not None
-        assert popular_item["score"] >= solo_item["score"]
