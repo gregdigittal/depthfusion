@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 import time
@@ -55,6 +56,26 @@ def _percentile(values: list[float], pct: float) -> float:
         return sorted_vals[-1]
     frac = idx - lo
     return sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+
+
+def _mrr_at_k(ranked_ids: list[str], relevant_ids: set[str], k: int = 10) -> float:
+    """Mean Reciprocal Rank — reciprocal of the first-hit rank within top-k."""
+    for i, rid in enumerate(ranked_ids[:k], 1):
+        if rid in relevant_ids:
+            return 1.0 / i
+    return 0.0
+
+
+def _dcg(gains: list[float]) -> float:
+    return sum(g / math.log2(i + 2) for i, g in enumerate(gains))
+
+
+def _ndcg_at_k(ranked_ids: list[str], graded: dict[str, int], k: int = 5) -> float:
+    """nDCG@k — normalized Discounted Cumulative Gain using per-chunk grade (0/1/2)."""
+    gains = [float(graded.get(rid, 0)) for rid in ranked_ids[:k]]
+    ideal = sorted((v for v in graded.values() if v > 0), reverse=True)[:k]
+    ideal_dcg = _dcg([float(g) for g in ideal])
+    return 0.0 if ideal_dcg == 0.0 else _dcg(gains) / ideal_dcg
 
 
 def _run_bm25_for_entry(
@@ -123,10 +144,14 @@ def run_benchmark(
     latencies: list[float] = []
     hit_at_1 = 0
     hit_at_k = 0
+    mrr_sum = 0.0
+    ndcg_sum = 0.0
 
     for i, entry in enumerate(entries, 1):
         query = entry["query"]
         relevant = set(entry["relevant_chunk_ids"])
+        # graded_relevance: dict[chunk_id, score] — falls back to binary from relevant_chunk_ids
+        graded: dict[str, int] = entry.get("graded_relevance") or {cid: 1 for cid in relevant}
 
         if not quiet:
             print(f"  [{i}/{len(entries)}] {query[:60]!r}…", file=sys.stderr)
@@ -137,11 +162,15 @@ def run_benchmark(
         retrieved_set = set(top_ids)
         top_1_hit = bool(top_ids) and top_ids[0] in relevant
         top_k_hit = bool(retrieved_set & relevant)
+        mrr = _mrr_at_k(top_ids, relevant, k=10)
+        ndcg = _ndcg_at_k(top_ids, graded, k=5)
 
         if top_1_hit:
             hit_at_1 += 1
         if top_k_hit:
             hit_at_k += 1
+        mrr_sum += mrr
+        ndcg_sum += ndcg
 
         per_query.append({
             "query": query,
@@ -150,6 +179,8 @@ def run_benchmark(
             "retrieved_chunk_ids": top_ids,
             "top_1_hit": top_1_hit,
             "top_k_hit": top_k_hit,
+            "mrr": round(mrr, 4),
+            "ndcg_at_5": round(ndcg, 4),
             "latency_ms": round(latency_ms, 3),
         })
 
@@ -157,6 +188,8 @@ def run_benchmark(
     precision_at_1 = hit_at_1 / q_count
     precision_at_k = hit_at_k / q_count
     fallback_rate = 1.0 - precision_at_k
+    mrr_at_10 = mrr_sum / q_count
+    ndcg_at_5 = ndcg_sum / q_count
     p50 = _percentile(latencies, 50)
     p95 = _percentile(latencies, 95)
 
@@ -176,6 +209,8 @@ def run_benchmark(
             # precision_at_5 and hit_rate_at_5 as canonical aliases
             "precision_at_5": {"value": round(precision_at_k, 4), "basis": "measured"},
             "hit_rate_at_5": {"value": round(precision_at_k, 4), "basis": "measured"},
+            "mrr_at_10": {"value": round(mrr_at_10, 4), "basis": "measured"},
+            "ndcg_at_5": {"value": round(ndcg_at_5, 4), "basis": "measured"},
             "fallback_rate": {"value": round(fallback_rate, 4), "basis": "measured"},
             "cost_estimate_usd": {"value": 0.0, "basis": "estimated"},
         },
@@ -186,6 +221,7 @@ def run_benchmark(
         print(
             f"\nResults: precision@1={precision_at_1:.3f}  "
             f"precision@{top_k}={precision_at_k:.3f}  "
+            f"MRR@10={mrr_at_10:.3f}  nDCG@5={ndcg_at_5:.3f}  "
             f"p50={p50:.1f}ms  p95={p95:.1f}ms",
             file=sys.stderr,
         )

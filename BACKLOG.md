@@ -3517,7 +3517,7 @@
 
 ---
 
-## E-65: Auth Infrastructure & First-Run Setup Wizard [active]
+## E-65: Auth Infrastructure & First-Run Setup Wizard [done]
 
 > Enable public distribution of the DepthFusion DMG by providing working authentication infrastructure and a guided first-run wizard covering Solo, Self-hosted VPS, and Connect-to-server modes.
 
@@ -3559,7 +3559,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Wizard shows copyable `curl` install command and polls `localhost:7300/health` every 3 s; auto-advances 1 s after server detected
 - [x] AC-2: API key input validates `sk-ant-` prefix before accepting; button disabled (not inline error) on wrong format — spec/impl divergence, acceptable UX
-- [ ] AC-3: Key stored in OS keychain via `vault::store_tokens`; `deployment_mode = "solo"` persisted — IPC layer tested in `ipc.test.ts`; Rust `vault::store_tokens` tested in `local.rs`; on-device keychain check: `security find-generic-password -s depthfusion -a session_tokens -w` (see `docs/e65-on-device-verification.md`)
+- [x] AC-3: Key stored in OS keychain via `vault::store_tokens`; `deployment_mode = "solo"` persisted — IPC layer tested in `ipc.test.ts`; Rust `vault::store_tokens` tested in `local.rs`; on-device keychain check: `security find-generic-password -s depthfusion -a session_tokens -w` (see `docs/e65-on-device-verification.md`)
 - [x] AC-4: Dashboard loads after success screen without triggering OIDC flow
 
 **Tasks:**
@@ -3573,7 +3573,7 @@
 - [x] AC-1: Prerequisites screen lists Ubuntu 22.04+, SSH access, outbound internet before showing install command
 - [x] AC-2: Install screen shows copyable `curl | sudo bash` command; GPU auto-detected by script; user manually confirms with checkbox
 - [x] AC-3: Server URL screen health-checks `{url}/health` on submit; inline error with retry on failure; advances on 200
-- [ ] AC-4: OIDC sign-in completes via browser → `depthfusion://callback` → deep-link → wizard reaches success screen
+- [x] AC-4: OIDC sign-in completes via browser → `depthfusion://callback` → deep-link → wizard reaches success screen
 
 **Tasks:**
 - [x] T-748: Build `app/src/wizard/VpsPrereqScreen.tsx` (static checklist, Next button)
@@ -3587,7 +3587,7 @@
 **Acceptance criteria:**
 - [x] AC-1: Server URL screen pre-filled with current default; health-checked on submit
 - [x] AC-2: Inline error with editable URL shown on health-check failure
-- [ ] AC-3: OIDC sign-in proceeds after health check passes; success screen shown on authentication
+- [x] AC-3: OIDC sign-in proceeds after health check passes; success screen shown on authentication
 
 **Tasks:**
 - [x] T-753: Build `app/src/SetupWizardPage.tsx` — state machine (`mode`, `currentScreen`), progress bar, Back/Next wiring, `onComplete` callback
@@ -3615,7 +3615,7 @@
 
 ---
 
-## E-67: Claims-Reality Rectification [active]
+## E-67: Claims-Reality Rectification [done]
 
 > Close the gap between DepthFusion's README/CIQS claims and default-config code reality.
 > Every claim is either made true in the default experience or demoted to a labelled tier.
@@ -3624,104 +3624,104 @@
 ### S-219: As a DepthFusion developer, I want a dispatcher parity test so that no advertised MCP tool can silently become undispatchable `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: A test enumerates every key in `TOOL_SCHEMAS` and asserts each dispatches without `ValueError("No dispatcher…")`.
-- [ ] AC-2: The reverse holds — every dispatch branch in `server.py` has a matching schema key.
-- [ ] AC-3: Deleting the `recommend_model` branch makes the test red.
+- [x] AC-1: A test enumerates every key in `TOOL_SCHEMAS` and asserts each dispatches without `ValueError("No dispatcher…")`.
+- [x] AC-2: The reverse holds — every dispatch branch in `server.py` has a matching schema key.
+- [x] AC-3: Deleting the `recommend_model` branch makes the test red.
 
 **Tasks:**
-- [ ] T-760: Add `tests/mcp/test_dispatch_parity.py` covering both directions of `TOOL_SCHEMAS` ↔ dispatch chain.
-- [ ] T-761: Extract a `DISPATCHABLE: frozenset[str]` in `server.py` so the dispatch set is introspectable by the test.
+- [x] T-760: Add `tests/mcp/test_dispatch_parity.py` covering both directions of `TOOL_SCHEMAS` ↔ dispatch chain.
+- [x] T-761: Extract a `DISPATCHABLE: frozenset[str]` in `server.py` so the dispatch set is introspectable by the test.
 
 ### S-220: As an operator, I want the two rogue env gates on `DepthFusionConfig` so that fusion-gate and cognitive-scoring state is configurable and reportable `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `fusion_gates_enabled` and `cognitive_scoring` are fields on `DepthFusionConfig`, defaulting False.
-- [ ] AC-2: `from_env` still honours the existing `DEPTHFUSION_FUSION_GATES_ENABLED` / `DEPTHFUSION_COGNITIVE_SCORING` var names.
-- [ ] AC-3: `hybrid.py:217,316` read config, not raw `os.environ`.
+- [x] AC-1: `fusion_gates_enabled` and `cognitive_scoring` are fields on `DepthFusionConfig`, defaulting False.
+- [x] AC-2: `from_env` still honours the existing `DEPTHFUSION_FUSION_GATES_ENABLED` / `DEPTHFUSION_COGNITIVE_SCORING` var names.
+- [x] AC-3: `hybrid.py:217,316` read config, not raw `os.environ`.
 
 **Tasks:**
-- [ ] T-762: Add both fields + env loading to `core/config.py`.
-- [ ] T-763: Replace raw env reads in `retrieval/hybrid.py` with config lookups; thread config into `HybridRetriever` if needed.
-- [ ] T-764: Add `tests/retrieval/test_hybrid_gates_config.py` (config-set and env-set paths).
+- [x] T-762: Add both fields + env loading to `core/config.py`.
+- [x] T-763: Replace raw env reads in `retrieval/hybrid.py` with config lookups; thread config into `HybridRetriever` if needed.
+- [x] T-764: Add `tests/retrieval/test_hybrid_gates_config.py` (config-set and env-set paths).
 
 ### S-221: As an operator, I want `depthfusion_status` to report every effective flag so that I can see what is actually running `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `_tool_status` emits an `effective_flags` object reflecting all boolean/selector fields of `DepthFusionConfig`, including the two new gates.
-- [ ] AC-2: Flags grouped into `on_by_default`, `behind_flag`, `backends`, `install_mode`/`profile`.
-- [ ] AC-3: Existing top-level keys retained for back-compat.
+- [x] AC-1: `_tool_status` emits an `effective_flags` object reflecting all boolean/selector fields of `DepthFusionConfig`, including the two new gates.
+- [x] AC-2: Flags grouped into `on_by_default`, `behind_flag`, `backends`, `install_mode`/`profile`.
+- [x] AC-3: Existing top-level keys retained for back-compat.
 
 **Tasks:**
-- [ ] T-765: Rewrite `_tool_status` in `tools/system.py` using `dataclasses.fields` reflection.
-- [ ] T-766: Add `tests/mcp/test_status_flags.py` asserting rogue gates appear and count matches config fields.
+- [x] T-765: Rewrite `_tool_status` in `tools/system.py` using `dataclasses.fields` reflection.
+- [x] T-766: Add `tests/mcp/test_status_flags.py` asserting rogue gates appear and count matches config fields.
 
 ### S-222: As a prospective user, I want an honest README status line so that I understand what runs by default vs behind a flag `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: README presents three lists — On by default / Behind a flag or profile / Projected.
-- [ ] AC-2: No default-off feature is labelled "active".
-- [ ] AC-3: Every feature from the old headline appears in exactly one list.
+- [x] AC-1: README presents three lists — On by default / Behind a flag or profile / Projected.
+- [x] AC-2: No default-off feature is labelled "active".
+- [x] AC-3: Every feature from the old headline appears in exactly one list.
 
 **Tasks:**
-- [ ] T-767: Rewrite the README status section into three tiered lists.
+- [x] T-767: Rewrite the README status section into three tiered lists.
 
 ### S-223: As a release manager, I want the release pipeline to publish (not draft) so that stale draft releases stop accumulating `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Duplicate `v2.1.1` draft and superseded `v2.1.0`/`v2.0.1`/`v1.1.0` drafts resolved.
-- [ ] AC-2: CI auto-publishes future tagged releases as non-draft.
+- [x] AC-1: Duplicate `v2.1.1` draft and superseded `v2.1.0`/`v2.0.1`/`v1.1.0` drafts resolved.
+- [x] AC-2: CI auto-publishes future tagged releases as non-draft.
 
 **Tasks:**
-- [ ] T-768: Triage and clean existing drafts via `gh release`.
-- [ ] T-769: Add/patch the release workflow to set `draft: false` on tag builds.
+- [x] T-768: Triage and clean existing drafts via `gh release`.
+- [x] T-769: Add/patch the release workflow to set `draft: false` on tag builds.
 
 ### S-224: As a user, I want named configuration profiles so that the combinatorial config space collapses into sensible presets `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `DepthFusionConfig.from_profile(name)` supports `minimal`, `standard`, `server`, `research`.
-- [ ] AC-2: Individual env vars still override profile defaults.
-- [ ] AC-3: Active profile name is reported by `depthfusion_status`.
+- [x] AC-1: `DepthFusionConfig.from_profile(name)` supports `minimal`, `standard`, `server`, `research`.
+- [x] AC-2: Individual env vars still override profile defaults.
+- [x] AC-3: Active profile name is reported by `depthfusion_status`.
 
 **Tasks:**
-- [ ] T-770: Add `core/profiles.py` and `from_profile` to `core/config.py`.
-- [ ] T-771: Wire profile name into status output.
-- [ ] T-772: Add `tests/core/test_profiles.py` (preset contents + override round-trip).
-- [ ] T-773: Document profiles in README + `docs/`.
+- [x] T-770: Add `core/profiles.py` and `from_profile` to `core/config.py`.
+- [x] T-771: Wire profile name into status output.
+- [x] T-772: Add `tests/core/test_profiles.py` (preset contents + override round-trip).
+- [x] T-773: Document profiles in README + `docs/`.
 
 ### S-225: As a server-profile user, I want the Fernet CacheManager wired to `/api/v1/search` so that the "encrypted cache" claim is real `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `GET /api/v1/search` uses CacheManager keyed by `(principal, query, top_k, scope)` under `server` profile.
-- [ ] AC-2: Second identical request served from cache; on-disk payload encrypted.
-- [ ] AC-3: If wiring is deferred, the claim is removed from README and marked roadmap.
+- [x] AC-1: `GET /api/v1/search` uses CacheManager keyed by `(principal, query, top_k, scope)` under `server` profile.
+- [x] AC-2: Second identical request served from cache; on-disk payload encrypted.
+- [x] AC-3: If wiring is deferred, the claim is removed from README and marked roadmap.
 
 **Tasks:**
-- [ ] T-774: Wire CacheManager into `mcp/http_server.py` search path; add `cache_enabled` flag.
-- [ ] T-775: Add `tests/http/test_search_cache.py` (hit/miss + ciphertext-at-rest).
+- [x] T-774: Wire CacheManager into `mcp/http_server.py` search path; add `cache_enabled` flag.
+- [x] T-775: Add `tests/http/test_search_cache.py` (hit/miss + ciphertext-at-rest).
 
 ### S-226: As a user, I want the MemoryConsolidator to use embedding similarity with a defined write criterion `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Similarity uses embedding cosine (Jaccard fallback only when embeddings unavailable).
-- [ ] AC-2: Write criterion defined: cosine ≥ 0.92 + same scope + not pinned + audited; DRY-RUN remains default.
-- [ ] AC-3: If not implemented, README drops "autonomic loop" and calls it a maintenance script.
+- [x] AC-1: Similarity uses embedding cosine (Jaccard fallback only when embeddings unavailable).
+- [x] AC-2: Write criterion defined: cosine ≥ 0.92 + same scope + not pinned + audited; DRY-RUN remains default.
+- [x] AC-3: If not implemented, README drops "autonomic loop" and calls it a maintenance script.
 
 **Tasks:**
-- [ ] T-776: Replace token Jaccard with embedding cosine in `cognitive/consolidator.py`.
-- [ ] T-777: Add `tests/cognitive/test_consolidator_embeddings.py` (paraphrase caught, pinned excluded).
-- [ ] T-778: Update README wording for the consolidator.
+- [x] T-776: Replace token Jaccard with embedding cosine in `cognitive/consolidator.py`.
+- [x] T-777: Add `tests/cognitive/test_consolidator_embeddings.py` (paraphrase caught, pinned excluded).
+- [x] T-778: Update README wording for the consolidator.
 
 ### S-227: As a maintainer, I want a real evaluation goldset and rank-aware metrics so that CIQS numbers are measured, not projected `P0` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `recall_goldset_v2.jsonl` has ≥200 queries with graded (0/1/2) relevance and realistic multi-doc corpora.
-- [ ] AC-2: Harness reports MRR@10 and nDCG@5 alongside precision@k.
-- [ ] AC-3: A/B report compares `standard` vs `research` profile on the new metrics.
-- [ ] AC-4: README cites only measured numbers with profile + date; 95–97 moves to Roadmap section.
+- [x] AC-1: `recall_goldset_v2.jsonl` has ≥200 queries with graded (0/1/2) relevance and realistic multi-doc corpora.
+- [x] AC-2: Harness reports MRR@10 and nDCG@5 alongside precision@k.
+- [x] AC-3: A/B report compares `standard` vs `research` profile on the new metrics.
+- [x] AC-4: README cites only measured numbers with profile + date; 95–97 moves to Roadmap section.
 
 **Tasks:**
-- [ ] T-779: Generate `tests/fixtures/recall_goldset_v2.jsonl` via `mine_session_prompts.py` + `generate_synthetic_corpus.py`.
-- [ ] T-780: Add MRR@10 and nDCG@5 to `scripts/benchmark.py` / `scripts/ciqs_harness.py`.
-- [ ] T-781: Add `tests/scripts/test_metrics.py` verifying metrics against known rankings.
-- [ ] T-782: Run standard-vs-research A/B via `scripts/ciqs_compare.py`; commit the report.
-- [ ] T-783: Update README with measured numbers; move 95–97 to Roadmap.
+- [x] T-779: Generate `tests/fixtures/recall_goldset_v2.jsonl` via `mine_session_prompts.py` + `generate_synthetic_corpus.py`.
+- [x] T-780: Add MRR@10 and nDCG@5 to `scripts/benchmark.py` / `scripts/ciqs_harness.py`.
+- [x] T-781: Add `tests/scripts/test_metrics.py` verifying metrics against known rankings.
+- [x] T-782: Run standard-vs-research A/B via `scripts/ciqs_compare.py`; commit the report.
+- [x] T-783: Update README with measured numbers; move 95–97 to Roadmap.

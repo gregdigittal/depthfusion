@@ -1,0 +1,3648 @@
+{
+  "generated_at": "2026-07-11T22:30:17.705677+00:00",
+  "git_hash": "54da278",
+  "mode": "standard",
+  "top_k": 5,
+  "goldset_path": "tests/fixtures/recall_goldset_v2.jsonl",
+  "query_count": 200,
+  "metrics": {
+    "p50_latency_ms": {
+      "value": 0.013,
+      "basis": "measured"
+    },
+    "p95_latency_ms": {
+      "value": 0.016,
+      "basis": "measured"
+    },
+    "precision_at_1": {
+      "value": 1.0,
+      "basis": "measured"
+    },
+    "precision_at_5": {
+      "value": 1.0,
+      "basis": "measured"
+    },
+    "hit_rate_at_5": {
+      "value": 1.0,
+      "basis": "measured"
+    },
+    "mrr_at_10": {
+      "value": 1.0,
+      "basis": "measured"
+    },
+    "ndcg_at_5": {
+      "value": 0.9934,
+      "basis": "measured"
+    },
+    "fallback_rate": {
+      "value": 0.0,
+      "basis": "measured"
+    },
+    "cost_estimate_usd": {
+      "value": 0.0,
+      "basis": "estimated"
+    }
+  },
+  "per_query": [
+    {
+      "query": "BM25 term frequency inverse document frequency",
+      "description": "BM25 basics",
+      "relevant_chunk_ids": [
+        "g0p",
+        "g0s"
+      ],
+      "retrieved_chunk_ids": [
+        "g0p",
+        "g0s",
+        "gn0"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.092
+    },
+    {
+      "query": "BM25 fallback embeddings unavailable profile",
+      "description": "BM25 fallback",
+      "relevant_chunk_ids": [
+        "g1s",
+        "g1p"
+      ],
+      "retrieved_chunk_ids": [
+        "g1p",
+        "g1s",
+        "gn1"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.023
+    },
+    {
+      "query": "BM25 tokenisation lowercase whitespace punctuation",
+      "description": "BM25 tokenisation",
+      "relevant_chunk_ids": [
+        "g2p",
+        "g2s"
+      ],
+      "retrieved_chunk_ids": [
+        "g2p",
+        "g2s",
+        "gn2"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.019
+    },
+    {
+      "query": "BM25 index update incremental re-ingest",
+      "description": "BM25 index update",
+      "relevant_chunk_ids": [
+        "g3p",
+        "g3s"
+      ],
+      "retrieved_chunk_ids": [
+        "g3p",
+        "g3s",
+        "gn3"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.017
+    },
+    {
+      "query": "BM25 score normalisation range",
+      "description": "BM25 normalisation",
+      "relevant_chunk_ids": [
+        "g4p",
+        "g4s"
+      ],
+      "retrieved_chunk_ids": [
+        "g4p",
+        "g4s",
+        "gn4"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.017
+    },
+    {
+      "query": "BM25 top-K candidates before rerank 50",
+      "description": "BM25 top-K",
+      "relevant_chunk_ids": [
+        "g5s",
+        "g5p"
+      ],
+      "retrieved_chunk_ids": [
+        "g5p",
+        "g5s",
+        "gn5"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "BM25 chunk deduplication adjacent same file",
+      "description": "BM25 dedup",
+      "relevant_chunk_ids": [
+        "g6p",
+        "g6s"
+      ],
+      "retrieved_chunk_ids": [
+        "g6p",
+        "g6s",
+        "gn6"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "BM25 SQLite FTS5 virtual table implementation",
+      "description": "BM25 SQLite FTS5",
+      "relevant_chunk_ids": [
+        "g7s",
+        "g7p"
+      ],
+      "retrieved_chunk_ids": [
+        "g7p",
+        "g7s",
+        "gn7"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "BM25 code symbol punctuation split index",
+      "description": "BM25 code symbols",
+      "relevant_chunk_ids": [
+        "g8p",
+        "g8s"
+      ],
+      "retrieved_chunk_ids": [
+        "g8p",
+        "g8s",
+        "gn8"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "BM25 memory store project index isolation",
+      "description": "BM25 memory store",
+      "relevant_chunk_ids": [
+        "g9s",
+        "g9p"
+      ],
+      "retrieved_chunk_ids": [
+        "g9p",
+        "g9s",
+        "gn9"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "BM25 recall rate versus embedding precision comparison",
+      "description": "BM25 vs embeddings",
+      "relevant_chunk_ids": [
+        "g10p",
+        "g10s"
+      ],
+      "retrieved_chunk_ids": [
+        "g10p",
+        "g10s",
+        "gn10"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.017
+    },
+    {
+      "query": "BM25 goldset coverage exact match queries",
+      "description": "Goldset BM25 coverage",
+      "relevant_chunk_ids": [
+        "g11s",
+        "g11p"
+      ],
+      "retrieved_chunk_ids": [
+        "g11p",
+        "g11s",
+        "gn11"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "sentence transformer all-MiniLM-L6-v2 local embedding",
+      "description": "Embedding model",
+      "relevant_chunk_ids": [
+        "g12p",
+        "g12s"
+      ],
+      "retrieved_chunk_ids": [
+        "g12p",
+        "g12s",
+        "gn12"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.017
+    },
+    {
+      "query": "HNSW index approximate nearest neighbour binary file",
+      "description": "HNSW index",
+      "relevant_chunk_ids": [
+        "g13s",
+        "g13p"
+      ],
+      "retrieved_chunk_ids": [
+        "g13p",
+        "g13s",
+        "gn13"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "cosine similarity reranking BM25 candidates",
+      "description": "Cosine reranking",
+      "relevant_chunk_ids": [
+        "g14p",
+        "g14s"
+      ],
+      "retrieved_chunk_ids": [
+        "g14p",
+        "g14s",
+        "gn14"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "embedding dimension mismatch HNSW error rebuild",
+      "description": "Embedding dim error",
+      "relevant_chunk_ids": [
+        "g15p",
+        "g15s"
+      ],
+      "retrieved_chunk_ids": [
+        "g15p",
+        "g15s",
+        "gn15"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "batch embedding ingestion 64 chunks throughput",
+      "description": "Embedding batch",
+      "relevant_chunk_ids": [
+        "g16s",
+        "g16p"
+      ],
+      "retrieved_chunk_ids": [
+        "g16p",
+        "g16s",
+        "gn16"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "semantic similarity threshold cosine 0.3 filter",
+      "description": "Similarity threshold",
+      "relevant_chunk_ids": [
+        "g17s",
+        "g17p"
+      ],
+      "retrieved_chunk_ids": [
+        "g17p",
+        "g17s",
+        "gn17"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "OpenAI text-embedding-3-small 1536 dimensions",
+      "description": "OpenAI embedding",
+      "relevant_chunk_ids": [
+        "g18s",
+        "g18p"
+      ],
+      "retrieved_chunk_ids": [
+        "g18p",
+        "g18s",
+        "gn18"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "embedding cache content hash skip re-embed",
+      "description": "Embedding cache",
+      "relevant_chunk_ids": [
+        "g19p",
+        "g19s"
+      ],
+      "retrieved_chunk_ids": [
+        "g19p",
+        "g19s",
+        "gn19"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "embedding warm-up first query model load latency",
+      "description": "Embedding warm-up",
+      "relevant_chunk_ids": [
+        "g20s",
+        "g20p"
+      ],
+      "retrieved_chunk_ids": [
+        "g20p",
+        "g20s",
+        "gn20"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "embedding model change index rebuild required",
+      "description": "Index rebuild",
+      "relevant_chunk_ids": [
+        "g21p",
+        "g21s"
+      ],
+      "retrieved_chunk_ids": [
+        "g21p",
+        "g21s",
+        "gn21"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "Bearer token static DEPTHFUSION_MCP_TOKEN compare_digest",
+      "description": "Static bearer token",
+      "relevant_chunk_ids": [
+        "g22p",
+        "g22s"
+      ],
+      "retrieved_chunk_ids": [
+        "g22p",
+        "g22s",
+        "gn22"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "JWKS JWT RS256 validation DEPTHFUSION_JWKS_URI",
+      "description": "JWKS JWT validation",
+      "relevant_chunk_ids": [
+        "g23s",
+        "g23p"
+      ],
+      "retrieved_chunk_ids": [
+        "g23p",
+        "g23s",
+        "gn23"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "TokenExpiredError HTTP 401 JWT exp claim",
+      "description": "Token expired",
+      "relevant_chunk_ids": [
+        "g24s",
+        "g24p"
+      ],
+      "retrieved_chunk_ids": [
+        "g24p",
+        "g24s",
+        "gn24"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "JwksFetchError HTTP 503 JWKS unreachable",
+      "description": "JWKS fetch error",
+      "relevant_chunk_ids": [
+        "g25s",
+        "g25p"
+      ],
+      "retrieved_chunk_ids": [
+        "g25p",
+        "g25s",
+        "gn25"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "require_principal FastAPI dependency SSE messages",
+      "description": "require_principal",
+      "relevant_chunk_ids": [
+        "g26s",
+        "g26p"
+      ],
+      "retrieved_chunk_ids": [
+        "g26p",
+        "g26s",
+        "gn26"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "fail-closed auth no unauthenticated pass",
+      "description": "Fail-closed",
+      "relevant_chunk_ids": [
+        "g27s",
+        "g27p"
+      ],
+      "retrieved_chunk_ids": [
+        "g27p",
+        "g27s",
+        "gn27"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "DEPTHFUSION_V2_LEGACY_AUTH test only",
+      "description": "Legacy auth flag",
+      "relevant_chunk_ids": [
+        "g28p",
+        "g28s"
+      ],
+      "retrieved_chunk_ids": [
+        "g28p",
+        "g28s",
+        "gn28"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "IdentityError HTTP 401 generic failure",
+      "description": "IdentityError",
+      "relevant_chunk_ids": [
+        "g29s",
+        "g29p"
+      ],
+      "retrieved_chunk_ids": [
+        "g29p",
+        "g29s",
+        "gn29"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "OIDC issuer audience claim validation JWT",
+      "description": "OIDC claims",
+      "relevant_chunk_ids": [
+        "g30p",
+        "g30s"
+      ],
+      "retrieved_chunk_ids": [
+        "g30p",
+        "g30s",
+        "gn30"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "principal id cache isolation JWT sub hash",
+      "description": "Principal cache",
+      "relevant_chunk_ids": [
+        "g31s",
+        "g31p"
+      ],
+      "retrieved_chunk_ids": [
+        "g31p",
+        "g31s",
+        "gn31"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "MemoryObject confidence score recall feedback",
+      "description": "Memory confidence",
+      "relevant_chunk_ids": [
+        "g32s",
+        "g32p"
+      ],
+      "retrieved_chunk_ids": [
+        "g32p",
+        "g32s",
+        "gn32"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "MemoryType SEMANTIC EPISODIC DECISION PROCEDURAL enum",
+      "description": "MemoryType enum",
+      "relevant_chunk_ids": [
+        "g33p",
+        "g33s"
+      ],
+      "retrieved_chunk_ids": [
+        "g33p",
+        "g33s",
+        "gn33"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "MemoryStatus ACTIVE STALE ARCHIVED transitions",
+      "description": "MemoryStatus",
+      "relevant_chunk_ids": [
+        "g34p",
+        "g34s"
+      ],
+      "retrieved_chunk_ids": [
+        "g34p",
+        "g34s",
+        "gn34"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "memory store SQLite table schema structure",
+      "description": "Memory store schema",
+      "relevant_chunk_ids": [
+        "g35p",
+        "g35s"
+      ],
+      "retrieved_chunk_ids": [
+        "g35p",
+        "g35s",
+        "gn35"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "MemoryScope project_id consolidation isolation",
+      "description": "MemoryScope",
+      "relevant_chunk_ids": [
+        "g36p",
+        "g36s"
+      ],
+      "retrieved_chunk_ids": [
+        "g36p",
+        "g36s",
+        "gn36"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "recall_feedback positive negative signal chunk",
+      "description": "Recall feedback",
+      "relevant_chunk_ids": [
+        "g37s",
+        "g37p"
+      ],
+      "retrieved_chunk_ids": [
+        "g37p",
+        "g37s",
+        "gn37"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "session seed top N memories importance score",
+      "description": "Session seed",
+      "relevant_chunk_ids": [
+        "g38s",
+        "g38p"
+      ],
+      "retrieved_chunk_ids": [
+        "g38p",
+        "g38s",
+        "gn38"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "memory pinned field exclude consolidation embedding",
+      "description": "Pinned memory",
+      "relevant_chunk_ids": [
+        "g39p",
+        "g39s"
+      ],
+      "retrieved_chunk_ids": [
+        "g39p",
+        "g39s",
+        "gn39"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "MemoryObject updated_at recency tracking UTC",
+      "description": "Memory updated_at",
+      "relevant_chunk_ids": [
+        "g40s",
+        "g40p"
+      ],
+      "retrieved_chunk_ids": [
+        "g40s",
+        "g40p",
+        "gn40"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "memory content summary autogenerate first 200 chars",
+      "description": "Content vs summary",
+      "relevant_chunk_ids": [
+        "g41p",
+        "g41s"
+      ],
+      "retrieved_chunk_ids": [
+        "g41s",
+        "g41p",
+        "gn41"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "DepthFusionConfig profiles minimal standard server research",
+      "description": "Config profiles",
+      "relevant_chunk_ids": [
+        "g42p",
+        "g42s"
+      ],
+      "retrieved_chunk_ids": [
+        "g42p",
+        "g42s",
+        "gn42"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "DEPTHFUSION_CACHE_KEY Fernet base64 encrypt",
+      "description": "Cache key env",
+      "relevant_chunk_ids": [
+        "g43p",
+        "g43s"
+      ],
+      "retrieved_chunk_ids": [
+        "g43p",
+        "g43s",
+        "gn43"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "cognitive_scoring_enabled research profile flag",
+      "description": "Cognitive scoring flag",
+      "relevant_chunk_ids": [
+        "g44p",
+        "g44s"
+      ],
+      "retrieved_chunk_ids": [
+        "g44p",
+        "g44s",
+        "gn44"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "DEPTHFUSION_MCP_HOST 127.0.0.1 bind address",
+      "description": "MCP host",
+      "relevant_chunk_ids": [
+        "g45s",
+        "g45p"
+      ],
+      "retrieved_chunk_ids": [
+        "g45p",
+        "g45s",
+        "gn45"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "DEPTHFUSION_MCP_PORT 7301 default port",
+      "description": "MCP port",
+      "relevant_chunk_ids": [
+        "g46p",
+        "g46s"
+      ],
+      "retrieved_chunk_ids": [
+        "g46p",
+        "g46s",
+        "gn46"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "cache_enabled server profile CacheManager",
+      "description": "cache_enabled",
+      "relevant_chunk_ids": [
+        "g47p",
+        "g47s"
+      ],
+      "retrieved_chunk_ids": [
+        "g47p",
+        "g47s",
+        "gn47"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "DEPTHFUSION_MEMORY_DB_PATH SQLite path",
+      "description": "Memory DB path",
+      "relevant_chunk_ids": [
+        "g48s",
+        "g48p"
+      ],
+      "retrieved_chunk_ids": [
+        "g48p",
+        "g48s",
+        "gn48"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "DEPTHFUSION_HNSW_INDEX_PATH binary index",
+      "description": "HNSW path",
+      "relevant_chunk_ids": [
+        "g49p",
+        "g49s"
+      ],
+      "retrieved_chunk_ids": [
+        "g49p",
+        "g49s",
+        "gn49"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "DepthFusionConfig from_env class method request",
+      "description": "Config from_env",
+      "relevant_chunk_ids": [
+        "g50s",
+        "g50p"
+      ],
+      "retrieved_chunk_ids": [
+        "g50p",
+        "g50s",
+        "gn50"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "DEPTHFUSION_SEED_COUNT session seed limit",
+      "description": "Seed count",
+      "relevant_chunk_ids": [
+        "g51p",
+        "g51s"
+      ],
+      "retrieved_chunk_ids": [
+        "g51p",
+        "g51s",
+        "gn51"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_recall_relevant query limit response",
+      "description": "Recall relevant",
+      "relevant_chunk_ids": [
+        "g52s",
+        "g52p"
+      ],
+      "retrieved_chunk_ids": [
+        "g52p",
+        "g52s",
+        "gn52"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_ingest_project path extensions",
+      "description": "Ingest project",
+      "relevant_chunk_ids": [
+        "g53s",
+        "g53p"
+      ],
+      "retrieved_chunk_ids": [
+        "g53p",
+        "g53s",
+        "gn53"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_record_decision rationale context",
+      "description": "Record decision",
+      "relevant_chunk_ids": [
+        "g54p",
+        "g54s"
+      ],
+      "retrieved_chunk_ids": [
+        "g54p",
+        "g54s",
+        "gn54"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_publish_context checkpoint tags",
+      "description": "Publish context",
+      "relevant_chunk_ids": [
+        "g55p",
+        "g55s"
+      ],
+      "retrieved_chunk_ids": [
+        "g55p",
+        "g55s",
+        "gn55"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_session_seed top N importance",
+      "description": "Session seed tool",
+      "relevant_chunk_ids": [
+        "g56p",
+        "g56s"
+      ],
+      "retrieved_chunk_ids": [
+        "g56p",
+        "g56s",
+        "gn56"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "depthfusion_recall_feedback positive negative chunk",
+      "description": "Recall feedback tool",
+      "relevant_chunk_ids": [
+        "g57p",
+        "g57s"
+      ],
+      "retrieved_chunk_ids": [
+        "g57p",
+        "g57s",
+        "gn57"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_status auth_mode cache memory count",
+      "description": "Status tool",
+      "relevant_chunk_ids": [
+        "g58p",
+        "g58s"
+      ],
+      "retrieved_chunk_ids": [
+        "g58p",
+        "g58s",
+        "gn58"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_set_scope project_id memory scope",
+      "description": "Set scope",
+      "relevant_chunk_ids": [
+        "g59s",
+        "g59p"
+      ],
+      "retrieved_chunk_ids": [
+        "g59p",
+        "g59s",
+        "gn59"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "depthfusion_record_telemetry event_type payload",
+      "description": "Record telemetry",
+      "relevant_chunk_ids": [
+        "g60p",
+        "g60s"
+      ],
+      "retrieved_chunk_ids": [
+        "g60p",
+        "g60s",
+        "gn60"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "depthfusion_query_telemetry window_hours aggregate",
+      "description": "Query telemetry",
+      "relevant_chunk_ids": [
+        "g61s",
+        "g61p"
+      ],
+      "retrieved_chunk_ids": [
+        "g61p",
+        "g61s",
+        "gn61"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "POST /api/v1/search JSON body results",
+      "description": "REST search",
+      "relevant_chunk_ids": [
+        "g62p",
+        "g62s"
+      ],
+      "retrieved_chunk_ids": [
+        "g62p",
+        "g62s",
+        "gn62"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "GET /api/v1/stats context_files projects",
+      "description": "REST stats",
+      "relevant_chunk_ids": [
+        "g63p",
+        "g63s"
+      ],
+      "retrieved_chunk_ids": [
+        "g63p",
+        "g63s",
+        "gn63"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "GET /health status ok transport version",
+      "description": "Health endpoint",
+      "relevant_chunk_ids": [
+        "g64p",
+        "g64s"
+      ],
+      "retrieved_chunk_ids": [
+        "g64p",
+        "g64s",
+        "gn64"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.018
+    },
+    {
+      "query": "SSE GET /sse session endpoint event",
+      "description": "SSE endpoint",
+      "relevant_chunk_ids": [
+        "g65s",
+        "g65p"
+      ],
+      "retrieved_chunk_ids": [
+        "g65p",
+        "g65s",
+        "gn65"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "POST /messages sessionId JSON-RPC dispatch",
+      "description": "Messages endpoint",
+      "relevant_chunk_ids": [
+        "g66p",
+        "g66s"
+      ],
+      "retrieved_chunk_ids": [
+        "g66p",
+        "g66s",
+        "gn66"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "reset_cache_singleton autouse pytest fixture",
+      "description": "Cache reset fixture",
+      "relevant_chunk_ids": [
+        "g67s",
+        "g67p"
+      ],
+      "retrieved_chunk_ids": [
+        "g67p",
+        "g67s",
+        "gn67"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "dependency override _check_mcp_auth no_auth",
+      "description": "Dependency override",
+      "relevant_chunk_ids": [
+        "g68s",
+        "g68p"
+      ],
+      "retrieved_chunk_ids": [
+        "g68p",
+        "g68s",
+        "gn68"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "in-memory SQLite CacheManager memory db_path",
+      "description": "In-memory cache",
+      "relevant_chunk_ids": [
+        "g69p",
+        "g69s"
+      ],
+      "retrieved_chunk_ids": [
+        "g69p",
+        "g69s",
+        "gn69"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "subprocess benchmark.py JSON stdout validation",
+      "description": "Subprocess test",
+      "relevant_chunk_ids": [
+        "g70p",
+        "g70s"
+      ],
+      "retrieved_chunk_ids": [
+        "g70p",
+        "g70s",
+        "gn70"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "TestGoldsetFixture validate jsonl structure",
+      "description": "Goldset tests",
+      "relevant_chunk_ids": [
+        "g71s",
+        "g71p"
+      ],
+      "retrieved_chunk_ids": [
+        "g71p",
+        "g71s",
+        "gn71"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "test_cosine_identical orthogonal zero_norm",
+      "description": "Cosine unit tests",
+      "relevant_chunk_ids": [
+        "g72s",
+        "g72p"
+      ],
+      "retrieved_chunk_ids": [
+        "g72p",
+        "g72s",
+        "gn72"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "test_cross_scope_never_merged project_alpha beta",
+      "description": "Cross-scope test",
+      "relevant_chunk_ids": [
+        "g73s",
+        "g73p"
+      ],
+      "retrieved_chunk_ids": [
+        "g73p",
+        "g73s",
+        "gn73"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "test_same_scope_can_merge identical content",
+      "description": "Same scope test",
+      "relevant_chunk_ids": [
+        "g74p",
+        "g74s"
+      ],
+      "retrieved_chunk_ids": [
+        "g74p",
+        "g74s",
+        "gn74"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "ProjectRegistry list_projects slug path last_synced",
+      "description": "Project registry",
+      "relevant_chunk_ids": [
+        "g75s",
+        "g75p"
+      ],
+      "retrieved_chunk_ids": [
+        "g75p",
+        "g75s",
+        "gn75"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "ProjectRegistry register_project slug path idempotent",
+      "description": "Register project",
+      "relevant_chunk_ids": [
+        "g76p",
+        "g76s"
+      ],
+      "retrieved_chunk_ids": [
+        "g76p",
+        "g76s",
+        "gn76"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "project registry last_synced ISO 8601 UTC timestamp",
+      "description": "Last synced",
+      "relevant_chunk_ids": [
+        "g77s",
+        "g77p"
+      ],
+      "retrieved_chunk_ids": [
+        "g77p",
+        "g77s",
+        "gn77"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.019
+    },
+    {
+      "query": "multi-project single instance scope isolation",
+      "description": "Multi-project",
+      "relevant_chunk_ids": [
+        "g78s",
+        "g78p"
+      ],
+      "retrieved_chunk_ids": [
+        "g78p",
+        "g78s",
+        "gn78"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "project registry chunk_count per project",
+      "description": "Chunk count",
+      "relevant_chunk_ids": [
+        "g79p",
+        "g79s"
+      ],
+      "retrieved_chunk_ids": [
+        "g79p",
+        "g79s",
+        "gn79"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "systemd service depthfusion MCP Restart=on-failure",
+      "description": "Systemd service",
+      "relevant_chunk_ids": [
+        "g80p",
+        "g80s"
+      ],
+      "retrieved_chunk_ids": [
+        "g80p",
+        "g80s",
+        "gn80"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "VPS 176.9.147.206 Hetzner SSH gregmorris",
+      "description": "VPS host",
+      "relevant_chunk_ids": [
+        "g81s",
+        "g81p"
+      ],
+      "retrieved_chunk_ids": [
+        "g81p",
+        "g81s",
+        "gn81"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "nginx reverse proxy 127.0.0.1 7301 TLS",
+      "description": "Nginx proxy",
+      "relevant_chunk_ids": [
+        "g82s",
+        "g82p"
+      ],
+      "retrieved_chunk_ids": [
+        "g82p",
+        "g82s",
+        "gn82"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "journalctl log depthfusion-mcp systemd",
+      "description": "Log rotation",
+      "relevant_chunk_ids": [
+        "g83p",
+        "g83s"
+      ],
+      "retrieved_chunk_ids": [
+        "g83p",
+        "g83s",
+        "gn83"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "EnvironmentFile /etc/depthfusion/env systemd 600",
+      "description": "Env file",
+      "relevant_chunk_ids": [
+        "g84p",
+        "g84s"
+      ],
+      "retrieved_chunk_ids": [
+        "g84p",
+        "g84s",
+        "gn84"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "SQLite backup .backup command memory store",
+      "description": "Memory backup",
+      "relevant_chunk_ids": [
+        "g85s",
+        "g85p"
+      ],
+      "retrieved_chunk_ids": [
+        "g85p",
+        "g85s",
+        "gn85"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "CI GitHub Actions ruff mypy pytest matrix",
+      "description": "CI pipeline",
+      "relevant_chunk_ids": [
+        "g86p",
+        "g86s"
+      ],
+      "retrieved_chunk_ids": [
+        "g86p",
+        "g86s",
+        "gn86"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "docker-compose 127.0.0.1 bind ports dev",
+      "description": "Docker compose",
+      "relevant_chunk_ids": [
+        "g87p",
+        "g87s"
+      ],
+      "retrieved_chunk_ids": [
+        "g87p",
+        "g87s",
+        "gn87"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "depthfusion_graph_traverse node_id depth edges",
+      "description": "Graph traverse",
+      "relevant_chunk_ids": [
+        "g88p",
+        "g88s"
+      ],
+      "retrieved_chunk_ids": [
+        "g88p",
+        "g88s",
+        "gn88"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_graph_status node_count edge_count",
+      "description": "Graph status",
+      "relevant_chunk_ids": [
+        "g89p",
+        "g89s"
+      ],
+      "retrieved_chunk_ids": [
+        "g89p",
+        "g89s",
+        "gn89"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "knowledge graph node types DISCOVERY MEMORY DECISION",
+      "description": "Graph node types",
+      "relevant_chunk_ids": [
+        "g90s",
+        "g90p"
+      ],
+      "retrieved_chunk_ids": [
+        "g90p",
+        "g90s",
+        "gn90"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "depthfusion_pin_discovery content tags confidence",
+      "description": "Pin discovery",
+      "relevant_chunk_ids": [
+        "g91p",
+        "g91s"
+      ],
+      "retrieved_chunk_ids": [
+        "g91p",
+        "g91s",
+        "gn91"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_confirm_discovery verified weight boost",
+      "description": "Confirm discovery",
+      "relevant_chunk_ids": [
+        "g92s",
+        "g92p"
+      ],
+      "retrieved_chunk_ids": [
+        "g92s",
+        "g92p",
+        "gn92"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_mark_superseded old_id new_id edge",
+      "description": "Mark superseded",
+      "relevant_chunk_ids": [
+        "g93p",
+        "g93s"
+      ],
+      "retrieved_chunk_ids": [
+        "g93p",
+        "g93s",
+        "gn93"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_auto_learn session transcript extract",
+      "description": "Auto learn",
+      "relevant_chunk_ids": [
+        "g94p",
+        "g94s"
+      ],
+      "retrieved_chunk_ids": [
+        "g94p",
+        "g94s",
+        "gn94"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "graphify AST code knowledge graph output never read",
+      "description": "Graphify code graph",
+      "relevant_chunk_ids": [
+        "g95p",
+        "g95s"
+      ],
+      "retrieved_chunk_ids": [
+        "g95p",
+        "g95s",
+        "gn95"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "session seed startup warm-up context window",
+      "description": "Seed warm-up",
+      "relevant_chunk_ids": [
+        "g96s",
+        "g96p"
+      ],
+      "retrieved_chunk_ids": [
+        "g96p",
+        "g96s",
+        "gn96"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "seed composition DECISION SEMANTIC PROCEDURAL exclude EPISODIC",
+      "description": "Seed composition",
+      "relevant_chunk_ids": [
+        "g97p",
+        "g97s"
+      ],
+      "retrieved_chunk_ids": [
+        "g97p",
+        "g97s",
+        "gn97"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "DEPTHFUSION_SEED_COUNT 20 decision no truncate",
+      "description": "Seed limit",
+      "relevant_chunk_ids": [
+        "g98s",
+        "g98p"
+      ],
+      "retrieved_chunk_ids": [
+        "g98p",
+        "g98s",
+        "gn98"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "session_seed_loaded telemetry event monitoring",
+      "description": "Seed telemetry",
+      "relevant_chunk_ids": [
+        "g99p",
+        "g99s"
+      ],
+      "retrieved_chunk_ids": [
+        "g99p",
+        "g99s",
+        "gn99"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "DEPTHFUSION_SKIP_SEED debug no production",
+      "description": "Seed bypass",
+      "relevant_chunk_ids": [
+        "g100s",
+        "g100p"
+      ],
+      "retrieved_chunk_ids": [
+        "g100p",
+        "g100s",
+        "gn100"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_compress_session transcript SEMANTIC",
+      "description": "Compress session",
+      "relevant_chunk_ids": [
+        "g101s",
+        "g101p"
+      ],
+      "retrieved_chunk_ids": [
+        "g101p",
+        "g101s",
+        "gn101"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "depthfusion_research_topic web arXiv DISCOVERY",
+      "description": "Research topic",
+      "relevant_chunk_ids": [
+        "g102p",
+        "g102s"
+      ],
+      "retrieved_chunk_ids": [
+        "g102s",
+        "g102p",
+        "gn102"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "depthfusion_bridge structured findings SEMANTIC",
+      "description": "Bridge tool",
+      "relevant_chunk_ids": [
+        "g103s",
+        "g103p"
+      ],
+      "retrieved_chunk_ids": [
+        "g103p",
+        "g103s",
+        "gn103"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "research profile OpenAI embedding cognitive full",
+      "description": "Research profile",
+      "relevant_chunk_ids": [
+        "g104s",
+        "g104p"
+      ],
+      "retrieved_chunk_ids": [
+        "g104p",
+        "g104s",
+        "gn104"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_ingest_conversation EPISODIC transcript",
+      "description": "Ingest conversation",
+      "relevant_chunk_ids": [
+        "g105s",
+        "g105p"
+      ],
+      "retrieved_chunk_ids": [
+        "g105p",
+        "g105s",
+        "gn105"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "arXiv paper abstract DISCOVERY tag arxiv_id",
+      "description": "arXiv ingestion",
+      "relevant_chunk_ids": [
+        "g106p",
+        "g106s"
+      ],
+      "retrieved_chunk_ids": [
+        "g106p",
+        "g106s",
+        "gn106"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion_retrieve_context tags OR AND limit",
+      "description": "Retrieve context",
+      "relevant_chunk_ids": [
+        "g107p",
+        "g107s"
+      ],
+      "retrieved_chunk_ids": [
+        "g107p",
+        "g107s",
+        "gn107"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "telemetry events snake_case past tense types",
+      "description": "Telemetry events",
+      "relevant_chunk_ids": [
+        "g108s",
+        "g108p"
+      ],
+      "retrieved_chunk_ids": [
+        "g108s",
+        "g108p",
+        "gn108"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "telemetry window_hours 24 aggregate metrics",
+      "description": "Telemetry query",
+      "relevant_chunk_ids": [
+        "g109p",
+        "g109s"
+      ],
+      "retrieved_chunk_ids": [
+        "g109p",
+        "g109s",
+        "gn109"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "telemetry JSONL append-only no truncation rotation",
+      "description": "Telemetry storage",
+      "relevant_chunk_ids": [
+        "g110s",
+        "g110p"
+      ],
+      "retrieved_chunk_ids": [
+        "g110p",
+        "g110s",
+        "gn110"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "telemetry provider cost token estimate USD",
+      "description": "Provider cost",
+      "relevant_chunk_ids": [
+        "g111p",
+        "g111s"
+      ],
+      "retrieved_chunk_ids": [
+        "g111p",
+        "g111s",
+        "gn111"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "cache hit rate 50 percent production target",
+      "description": "Cache hit rate",
+      "relevant_chunk_ids": [
+        "g112s",
+        "g112p"
+      ],
+      "retrieved_chunk_ids": [
+        "g112p",
+        "g112s",
+        "gn112"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "chunking 512 tokens 128 overlap code function boundary",
+      "description": "Chunking strategy",
+      "relevant_chunk_ids": [
+        "g113s",
+        "g113p"
+      ],
+      "retrieved_chunk_ids": [
+        "g113p",
+        "g113s",
+        "gn113"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "change detection mtime content hash sha256",
+      "description": "Change detection",
+      "relevant_chunk_ids": [
+        "g114s",
+        "g114p"
+      ],
+      "retrieved_chunk_ids": [
+        "g114p",
+        "g114s",
+        "gn114"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "DEPTHFUSION_INGEST_EXTENSIONS comma-separated file types",
+      "description": "Ingest extensions",
+      "relevant_chunk_ids": [
+        "g115s",
+        "g115p"
+      ],
+      "retrieved_chunk_ids": [
+        "g115p",
+        "g115s",
+        "gn115"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "metadata extraction language file path chunk index",
+      "description": "Metadata extraction",
+      "relevant_chunk_ids": [
+        "g116s",
+        "g116p"
+      ],
+      "retrieved_chunk_ids": [
+        "g116p",
+        "g116s",
+        "gn116"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "ingestion progress batch 1000 files events",
+      "description": "Ingestion progress",
+      "relevant_chunk_ids": [
+        "g117p",
+        "g117s"
+      ],
+      "retrieved_chunk_ids": [
+        "g117p",
+        "g117s",
+        "gn117"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "file discovery recursive .depthfusionignore gitignore",
+      "description": "File discovery",
+      "relevant_chunk_ids": [
+        "g118s",
+        "g118p"
+      ],
+      "retrieved_chunk_ids": [
+        "g118p",
+        "g118s",
+        "gn118"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "ingestion error per-file skip continue result",
+      "description": "Ingestion errors",
+      "relevant_chunk_ids": [
+        "g119s",
+        "g119p"
+      ],
+      "retrieved_chunk_ids": [
+        "g119p",
+        "g119s",
+        "gn119"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "binary file skip MIME extension detection",
+      "description": "Binary skip",
+      "relevant_chunk_ids": [
+        "g120p",
+        "g120s"
+      ],
+      "retrieved_chunk_ids": [
+        "g120p",
+        "g120s",
+        "gn120"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "deduplication content hash before insert",
+      "description": "Ingestion dedup",
+      "relevant_chunk_ids": [
+        "g121s",
+        "g121p"
+      ],
+      "retrieved_chunk_ids": [
+        "g121p",
+        "g121s",
+        "gn121"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "cognitive scoring BM25 recency confidence feedback fusion",
+      "description": "Cognitive scoring",
+      "relevant_chunk_ids": [
+        "g122s",
+        "g122p"
+      ],
+      "retrieved_chunk_ids": [
+        "g122p",
+        "g122s",
+        "gn122"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "recency weight exp lambda days half-life 70",
+      "description": "Recency weight",
+      "relevant_chunk_ids": [
+        "g123p",
+        "g123s"
+      ],
+      "retrieved_chunk_ids": [
+        "g123p",
+        "g123s",
+        "gn123"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "confidence gate threshold 0.5 filter reject",
+      "description": "Confidence gate",
+      "relevant_chunk_ids": [
+        "g124s",
+        "g124p"
+      ],
+      "retrieved_chunk_ids": [
+        "g124p",
+        "g124s",
+        "gn124"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "BM25 normalise 0 1 before multiplicative fusion",
+      "description": "BM25 normalise fusion",
+      "relevant_chunk_ids": [
+        "g125s",
+        "g125p"
+      ],
+      "retrieved_chunk_ids": [
+        "g125p",
+        "g125s",
+        "gn125"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "feedback boost ceiling 0.3 max 30 percent",
+      "description": "Feedback boost",
+      "relevant_chunk_ids": [
+        "g126s",
+        "g126p"
+      ],
+      "retrieved_chunk_ids": [
+        "g126p",
+        "g126s",
+        "gn126"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "cognitive scoring latency 30 percent disabled standard",
+      "description": "Scoring latency",
+      "relevant_chunk_ids": [
+        "g127p",
+        "g127s"
+      ],
+      "retrieved_chunk_ids": [
+        "g127p",
+        "g127s",
+        "gn127"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "fusion gate stages BM25 cosine recency confidence",
+      "description": "Fusion stages",
+      "relevant_chunk_ids": [
+        "g128s",
+        "g128p"
+      ],
+      "retrieved_chunk_ids": [
+        "g128p",
+        "g128s",
+        "gn128"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "importance formula confidence decay type_weight feedback",
+      "description": "Importance formula",
+      "relevant_chunk_ids": [
+        "g129p",
+        "g129s"
+      ],
+      "retrieved_chunk_ids": [
+        "g129p",
+        "g129s",
+        "gn129"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "type weight DECISION 1.5 PROCEDURAL 1.2 multiplier",
+      "description": "Type weight",
+      "relevant_chunk_ids": [
+        "g130p",
+        "g130s"
+      ],
+      "retrieved_chunk_ids": [
+        "g130p",
+        "g130s",
+        "gn130"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "depthfusion serve start HTTP SSE server CLI",
+      "description": "CLI serve",
+      "relevant_chunk_ids": [
+        "g131p",
+        "g131s"
+      ],
+      "retrieved_chunk_ids": [
+        "g131p",
+        "g131s",
+        "gn131"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "benchmark.py goldset quiet output JSON",
+      "description": "Benchmark CLI",
+      "relevant_chunk_ids": [
+        "g132s",
+        "g132p"
+      ],
+      "retrieved_chunk_ids": [
+        "g132p",
+        "g132s",
+        "gn132"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "python -m depthfusion.ingest project extensions ignore",
+      "description": "CLI ingest",
+      "relevant_chunk_ids": [
+        "g133s",
+        "g133p"
+      ],
+      "retrieved_chunk_ids": [
+        "g133p",
+        "g133s",
+        "gn133"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "generate_synthetic_corpus.py count topics output",
+      "description": "Synthetic corpus",
+      "relevant_chunk_ids": [
+        "g134s",
+        "g134p"
+      ],
+      "retrieved_chunk_ids": [
+        "g134p",
+        "g134s",
+        "gn134"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion.export format json jsonl markdown filter",
+      "description": "Export CLI",
+      "relevant_chunk_ids": [
+        "g135p",
+        "g135s"
+      ],
+      "retrieved_chunk_ids": [
+        "g135p",
+        "g135s",
+        "gn135"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "depthfusion.admin clear-cache before principal",
+      "description": "Admin clear cache",
+      "relevant_chunk_ids": [
+        "g136p",
+        "g136s"
+      ],
+      "retrieved_chunk_ids": [
+        "g136p",
+        "g136s",
+        "gn136"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "depthfusion.admin status JSON output running",
+      "description": "Admin status",
+      "relevant_chunk_ids": [
+        "g137p",
+        "g137s"
+      ],
+      "retrieved_chunk_ids": [
+        "g137p",
+        "g137s",
+        "gn137"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "Fernet generate_key base64 CLI command",
+      "description": "Fernet key gen",
+      "relevant_chunk_ids": [
+        "g138s",
+        "g138p"
+      ],
+      "retrieved_chunk_ids": [
+        "g138p",
+        "g138s",
+        "gn138"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "ciqs_compare.py profile-a profile-b goldset delta",
+      "description": "CIQS compare",
+      "relevant_chunk_ids": [
+        "g139p",
+        "g139s"
+      ],
+      "retrieved_chunk_ids": [
+        "g139p",
+        "g139s",
+        "gn139"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "file_locking.py atomic os.rename tmp dest",
+      "description": "Atomic write",
+      "relevant_chunk_ids": [
+        "g140s",
+        "g140p"
+      ],
+      "retrieved_chunk_ids": [
+        "g140p",
+        "g140s",
+        "gn140"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "atomic_frontmatter_rewrite YAML confidence update",
+      "description": "Frontmatter rewrite",
+      "relevant_chunk_ids": [
+        "g141s",
+        "g141p"
+      ],
+      "retrieved_chunk_ids": [
+        "g141p",
+        "g141s",
+        "gn141"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "RecallStore singleton two locks read write concurrent",
+      "description": "RecallStore singleton",
+      "relevant_chunk_ids": [
+        "g142p",
+        "g142s"
+      ],
+      "retrieved_chunk_ids": [
+        "g142p",
+        "g142s",
+        "gn142"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "FeedbackStore JSONL append-only startup load",
+      "description": "FeedbackStore",
+      "relevant_chunk_ids": [
+        "g143p",
+        "g143s"
+      ],
+      "retrieved_chunk_ids": [
+        "g143p",
+        "g143s",
+        "gn143"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "FileLock timeout 5s LockTimeoutError deadlock",
+      "description": "Lock timeout",
+      "relevant_chunk_ids": [
+        "g144p",
+        "g144s"
+      ],
+      "retrieved_chunk_ids": [
+        "g144p",
+        "g144s",
+        "gn144"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "concurrent ingest project lock one process",
+      "description": "Concurrent ingest",
+      "relevant_chunk_ids": [
+        "g145p",
+        "g145s"
+      ],
+      "retrieved_chunk_ids": [
+        "g145p",
+        "g145s",
+        "gn145"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "DEPTHFUSION_EMBEDDING_BACKEND local openai cohere mistral",
+      "description": "Embedding backend",
+      "relevant_chunk_ids": [
+        "g146s",
+        "g146p"
+      ],
+      "retrieved_chunk_ids": [
+        "g146p",
+        "g146s",
+        "gn146"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "vLLM endpoint localhost 8000 local LLM",
+      "description": "vLLM",
+      "relevant_chunk_ids": [
+        "g147s",
+        "g147p"
+      ],
+      "retrieved_chunk_ids": [
+        "g147p",
+        "g147s",
+        "gn147"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "provider health check startup warning no halt",
+      "description": "Provider health",
+      "relevant_chunk_ids": [
+        "g148s",
+        "g148p"
+      ],
+      "retrieved_chunk_ids": [
+        "g148p",
+        "gn148",
+        "g148s"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.9502,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "HNSW index rebuild after embedding model switch",
+      "description": "Model switch rebuild",
+      "relevant_chunk_ids": [
+        "g149p",
+        "g149s"
+      ],
+      "retrieved_chunk_ids": [
+        "g149p",
+        "g149s",
+        "gn149"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "provider timeout 30s ProviderTimeoutError retry once",
+      "description": "Provider timeout",
+      "relevant_chunk_ids": [
+        "g150s",
+        "g150p"
+      ],
+      "retrieved_chunk_ids": [
+        "g150p",
+        "g150s",
+        "gn150"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "OPENAI_API_KEY invalid startup validation test call",
+      "description": "API key validation",
+      "relevant_chunk_ids": [
+        "g151s",
+        "g151p"
+      ],
+      "retrieved_chunk_ids": [
+        "g151p",
+        "g151s",
+        "gn151"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "Cohere embed-english-v3 1024-dim COHERE_API_KEY",
+      "description": "Cohere backend",
+      "relevant_chunk_ids": [
+        "g152s",
+        "g152p"
+      ],
+      "retrieved_chunk_ids": [
+        "g152p",
+        "g152s",
+        "gn152"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "provider cost token usage estimate jsonl log",
+      "description": "Provider cost log",
+      "relevant_chunk_ids": [
+        "g153s",
+        "g153p"
+      ],
+      "retrieved_chunk_ids": [
+        "g153p",
+        "g153s",
+        "gn153"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "Mistral mistral-embed 1024-dim MISTRAL_API_KEY",
+      "description": "Mistral",
+      "relevant_chunk_ids": [
+        "g154s",
+        "g154p"
+      ],
+      "retrieved_chunk_ids": [
+        "g154p",
+        "g154s",
+        "gn154"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "graded_relevance dict chunk_id int 0 1 2",
+      "description": "Goldset v2 field",
+      "relevant_chunk_ids": [
+        "g155p",
+        "g155s"
+      ],
+      "retrieved_chunk_ids": [
+        "g155p",
+        "g155s",
+        "gn155"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "nDCG at 5 graded relevance DCG formula",
+      "description": "nDCG@5",
+      "relevant_chunk_ids": [
+        "g156s",
+        "g156p"
+      ],
+      "retrieved_chunk_ids": [
+        "g156p",
+        "g156s",
+        "gn156"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "MRR at 10 reciprocal rank first relevant",
+      "description": "MRR@10",
+      "relevant_chunk_ids": [
+        "g157s",
+        "g157p"
+      ],
+      "retrieved_chunk_ids": [
+        "g157p",
+        "g157s",
+        "gn157"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "ideal DCG iDCG sort graded descending",
+      "description": "iDCG",
+      "relevant_chunk_ids": [
+        "g158p",
+        "g158s"
+      ],
+      "retrieved_chunk_ids": [
+        "g158p",
+        "g158s",
+        "gn158"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "benchmark metrics mrr_at_10 ndcg_at_5 measured",
+      "description": "Benchmark new metrics",
+      "relevant_chunk_ids": [
+        "g159s",
+        "g159p"
+      ],
+      "retrieved_chunk_ids": [
+        "g159p",
+        "g159s",
+        "gn159"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "ciqs_compare delta_mrr delta_ndcg profile comparison",
+      "description": "CIQS delta",
+      "relevant_chunk_ids": [
+        "g160s",
+        "g160p"
+      ],
+      "retrieved_chunk_ids": [
+        "g160p",
+        "g160s",
+        "gn160"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "principal cache key sha256 null byte separator",
+      "description": "Principal key sha256",
+      "relevant_chunk_ids": [
+        "g161s",
+        "g161p"
+      ],
+      "retrieved_chunk_ids": [
+        "g161s",
+        "g161p",
+        "gn161"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "backward compat binary relevance grade-1 nDCG",
+      "description": "Backward compat nDCG",
+      "relevant_chunk_ids": [
+        "g162s",
+        "g162p"
+      ],
+      "retrieved_chunk_ids": [
+        "g162p",
+        "g162s",
+        "gn162"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "synthetic goldset graded primary secondary noise",
+      "description": "Synthetic goldset",
+      "relevant_chunk_ids": [
+        "g163s",
+        "g163p"
+      ],
+      "retrieved_chunk_ids": [
+        "g163p",
+        "g163s",
+        "gn163"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "BACKLOG.md epic story task E-nn S-nn T-nn",
+      "description": "Backlog hierarchy",
+      "relevant_chunk_ids": [
+        "g164p",
+        "g164s"
+      ],
+      "retrieved_chunk_ids": [
+        "g164p",
+        "g164s",
+        "gn164"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "priority P0 P1 P2 P3 effort XS S M L XL",
+      "description": "Priority effort",
+      "relevant_chunk_ids": [
+        "g165p",
+        "g165s"
+      ],
+      "retrieved_chunk_ids": [
+        "g165p",
+        "g165s",
+        "gn165"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "mark complete checkbox - [ ] - [x] never delete",
+      "description": "Complete task",
+      "relevant_chunk_ids": [
+        "g166s",
+        "g166p"
+      ],
+      "retrieved_chunk_ids": [
+        "g166p",
+        "g166s",
+        "gn166"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "epic status backlog active done manual update",
+      "description": "Epic status",
+      "relevant_chunk_ids": [
+        "g167s",
+        "g167p"
+      ],
+      "retrieved_chunk_ids": [
+        "g167p",
+        "g167s",
+        "gn167"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "acceptance criteria AC-N testable specific story",
+      "description": "ACs format",
+      "relevant_chunk_ids": [
+        "g168s",
+        "g168p"
+      ],
+      "retrieved_chunk_ids": [
+        "g168p",
+        "g168s",
+        "gn168"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "backlog ID sequential no reuse no gaps new",
+      "description": "ID assignment",
+      "relevant_chunk_ids": [
+        "g169p",
+        "g169s"
+      ],
+      "retrieved_chunk_ids": [
+        "g169s",
+        "g169p",
+        "gn169"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.031
+    },
+    {
+      "query": "cross reference depends blocks story task ID",
+      "description": "Dependencies",
+      "relevant_chunk_ids": [
+        "g170s",
+        "g170p"
+      ],
+      "retrieved_chunk_ids": [
+        "g170p",
+        "g170s",
+        "gn170"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.011
+    },
+    {
+      "query": "tech debt epic refactor cleanup P2 P3",
+      "description": "Tech debt",
+      "relevant_chunk_ids": [
+        "g171s",
+        "g171p"
+      ],
+      "retrieved_chunk_ids": [
+        "g171p",
+        "g171s",
+        "gn171"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "user story as role want capability benefit",
+      "description": "User story format",
+      "relevant_chunk_ids": [
+        "g172s",
+        "g172p"
+      ],
+      "retrieved_chunk_ids": [
+        "g172p",
+        "g172s",
+        "gn172"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "secrets.compare_digest timing safe token compare",
+      "description": "Timing safe",
+      "relevant_chunk_ids": [
+        "g173s",
+        "g173p"
+      ],
+      "retrieved_chunk_ids": [
+        "g173p",
+        "g173s",
+        "gn173"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "DEPTHFUSION_OIDC_AUDIENCE aud claim validation JWT",
+      "description": "OIDC audience",
+      "relevant_chunk_ids": [
+        "g174s",
+        "g174p"
+      ],
+      "retrieved_chunk_ids": [
+        "g174p",
+        "g174s",
+        "gn174"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "DEPTHFUSION_OIDC_ISSUER iss claim exact match",
+      "description": "OIDC issuer",
+      "relevant_chunk_ids": [
+        "g175s",
+        "g175p"
+      ],
+      "retrieved_chunk_ids": [
+        "g175p",
+        "g175s",
+        "gn175"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "JWT RS256 JWKS public key kid header",
+      "description": "JWT RS256",
+      "relevant_chunk_ids": [
+        "g176p",
+        "g176s"
+      ],
+      "retrieved_chunk_ids": [
+        "g176s",
+        "g176p",
+        "gn176"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "JWKS key rotation auto re-fetch kid not found",
+      "description": "JWKS rotation",
+      "relevant_chunk_ids": [
+        "g177s",
+        "g177p"
+      ],
+      "retrieved_chunk_ids": [
+        "g177p",
+        "g177s",
+        "gn177"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "/health unauthenticated 200 ok status",
+      "description": "Health 200",
+      "relevant_chunk_ids": [
+        "g178p",
+        "g178s"
+      ],
+      "retrieved_chunk_ids": [
+        "g178p",
+        "g178s",
+        "gn178"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "HTTP 401 unauthorized detail token missing invalid",
+      "description": "401 detail",
+      "relevant_chunk_ids": [
+        "g179s",
+        "g179p"
+      ],
+      "retrieved_chunk_ids": [
+        "g179p",
+        "g179s",
+        "gn179"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "HTTP 503 JWKS fetch error retry backoff",
+      "description": "503 JWKS",
+      "relevant_chunk_ids": [
+        "g180p",
+        "g180s"
+      ],
+      "retrieved_chunk_ids": [
+        "g180s",
+        "g180p",
+        "gn180"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.8597,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "opaque token sha256 16 hex principal hash",
+      "description": "Opaque principal",
+      "relevant_chunk_ids": [
+        "g181p",
+        "g181s"
+      ],
+      "retrieved_chunk_ids": [
+        "g181p",
+        "g181s",
+        "gn181"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "error unknown isinstance Error message string",
+      "description": "Error unknown",
+      "relevant_chunk_ids": [
+        "g182s",
+        "g182p"
+      ],
+      "retrieved_chunk_ids": [
+        "g182p",
+        "g182s",
+        "gn182"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "ProviderTimeoutError one retry fallback local",
+      "description": "Provider retry",
+      "relevant_chunk_ids": [
+        "g183s",
+        "g183p"
+      ],
+      "retrieved_chunk_ids": [
+        "g183p",
+        "g183s",
+        "gn183"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "LockTimeoutError retry 2s HTTP 503",
+      "description": "Lock fail",
+      "relevant_chunk_ids": [
+        "g184p",
+        "g184s"
+      ],
+      "retrieved_chunk_ids": [
+        "g184p",
+        "g184s",
+        "gn184"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "DimensionMismatchError HNSW model dim names",
+      "description": "Dimension mismatch",
+      "relevant_chunk_ids": [
+        "g185p",
+        "g185s"
+      ],
+      "retrieved_chunk_ids": [
+        "g185p",
+        "g185s",
+        "gn185"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "ingestion per-file error skip files_failed",
+      "description": "Per-file error",
+      "relevant_chunk_ids": [
+        "g186s",
+        "g186p"
+      ],
+      "retrieved_chunk_ids": [
+        "g186p",
+        "g186s",
+        "gn186"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "FastAPI HTTPException status_code detail JSON",
+      "description": "HTTPException",
+      "relevant_chunk_ids": [
+        "g187p",
+        "g187s"
+      ],
+      "retrieved_chunk_ids": [
+        "g187p",
+        "g187s",
+        "gn187"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "cache get put miss principal_id compute key",
+      "description": "Cache flow",
+      "relevant_chunk_ids": [
+        "g188p",
+        "g188s"
+      ],
+      "retrieved_chunk_ids": [
+        "g188p",
+        "g188s",
+        "gn188"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.016
+    },
+    {
+      "query": "CacheManager db_path :memory: key Fernet None",
+      "description": "CacheManager init",
+      "relevant_chunk_ids": [
+        "g189p",
+        "g189s"
+      ],
+      "retrieved_chunk_ids": [
+        "g189p",
+        "g189s",
+        "gn189"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "DEPTHFUSION_CACHE_DB default home .claude path",
+      "description": "Cache DB default",
+      "relevant_chunk_ids": [
+        "g190p",
+        "g190s"
+      ],
+      "retrieved_chunk_ids": [
+        "g190p",
+        "g190s",
+        "gn190"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "cache key search/ sha256 32 hex format",
+      "description": "Cache key format",
+      "relevant_chunk_ids": [
+        "g191s",
+        "g191p"
+      ],
+      "retrieved_chunk_ids": [
+        "g191p",
+        "g191s",
+        "gn191"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "_get_search_cache lazy singleton thread not safe",
+      "description": "Cache lazy init",
+      "relevant_chunk_ids": [
+        "g192s",
+        "g192p"
+      ],
+      "retrieved_chunk_ids": [
+        "g192p",
+        "g192s",
+        "gn192"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.012
+    },
+    {
+      "query": "cache_enabled guard if before get put",
+      "description": "Cache guard",
+      "relevant_chunk_ids": [
+        "g193p",
+        "g193s"
+      ],
+      "retrieved_chunk_ids": [
+        "g193p",
+        "g193s",
+        "gn193"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "lazy initialization singleton pattern thread Python",
+      "description": "Lazy singleton",
+      "relevant_chunk_ids": [
+        "g194s",
+        "g194p"
+      ],
+      "retrieved_chunk_ids": [
+        "g194p",
+        "g194s",
+        "gn194"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "diagnostic health check endpoint startup validation",
+      "description": "Startup validation",
+      "relevant_chunk_ids": [
+        "g195s",
+        "g195p"
+      ],
+      "retrieved_chunk_ids": [
+        "g195p",
+        "g195s",
+        "gn195"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "async executor run_in_executor blocking CPU call FastAPI",
+      "description": "run_in_executor",
+      "relevant_chunk_ids": [
+        "g196s",
+        "g196p"
+      ],
+      "retrieved_chunk_ids": [
+        "g196p",
+        "g196s",
+        "gn196"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.013
+    },
+    {
+      "query": "pytest fixture autouse teardown yield cleanup",
+      "description": "Pytest yield fixture",
+      "relevant_chunk_ids": [
+        "g197s",
+        "g197p"
+      ],
+      "retrieved_chunk_ids": [
+        "g197p",
+        "g197s",
+        "gn197"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.015
+    },
+    {
+      "query": "config validation TypeError missing field required env var",
+      "description": "Config validation",
+      "relevant_chunk_ids": [
+        "g198p",
+        "g198s"
+      ],
+      "retrieved_chunk_ids": [
+        "g198p",
+        "g198s",
+        "gn198"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    },
+    {
+      "query": "deprecation migration path backward compat versioning",
+      "description": "Deprecation",
+      "relevant_chunk_ids": [
+        "g199p",
+        "g199s"
+      ],
+      "retrieved_chunk_ids": [
+        "g199p",
+        "g199s",
+        "gn199"
+      ],
+      "top_1_hit": true,
+      "top_k_hit": true,
+      "mrr": 1.0,
+      "ndcg_at_5": 1.0,
+      "latency_ms": 0.014
+    }
+  ]
+}

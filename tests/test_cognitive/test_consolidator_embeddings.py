@@ -163,6 +163,59 @@ def test_fallback_when_embed_fn_returns_none():
     assert len(result.merge_candidates) == 1
 
 
+def test_cross_scope_memories_never_merged():
+    """S-226 AC-2: memories in different project scopes must not merge even if similar."""
+    from depthfusion.core.memory_object import MemoryObject, MemoryScope, MemoryType
+
+    def _mem_with_scope(content: str, mid: str, scope_pid: str) -> MemoryObject:
+        m = MemoryObject(
+            id=mid,
+            project_id=scope_pid,
+            type=MemoryType.SEMANTIC,
+            content=content,
+            summary="",
+        )
+        m.scope = MemoryScope(project_id=scope_pid)
+        return m
+
+    m_a = _mem_with_scope("hello world", "a", "project-alpha")
+    m_b = _mem_with_scope("hello world", "b", "project-beta")  # identical content, different scope
+
+    # embed_fn returns identical vectors → cosine 1.0 > any threshold
+    def embed_fn(texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0]] * len(texts)
+
+    consolidator = MemoryConsolidator(merge_threshold=0.5, embed_fn=embed_fn)
+    result = consolidator.find_near_duplicates([m_a, m_b])
+    assert result.merge_candidates == [], "cross-scope memories must never be merge candidates"
+
+
+def test_same_scope_memories_can_merge():
+    """S-226 AC-2: memories in the same scope are still eligible for merging."""
+    from depthfusion.core.memory_object import MemoryObject, MemoryScope, MemoryType
+
+    def _mem_in_scope(content: str, mid: str, scope_pid: str) -> MemoryObject:
+        m = MemoryObject(
+            id=mid,
+            project_id=scope_pid,
+            type=MemoryType.SEMANTIC,
+            content=content,
+            summary="",
+        )
+        m.scope = MemoryScope(project_id=scope_pid)
+        return m
+
+    m1 = _mem_in_scope("hello world", "m1", "project-alpha")
+    m2 = _mem_in_scope("hello world", "m2", "project-alpha")
+
+    def embed_fn(texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0]] * len(texts)
+
+    consolidator = MemoryConsolidator(merge_threshold=0.92, embed_fn=embed_fn)
+    result = consolidator.find_near_duplicates([m1, m2])
+    assert len(result.merge_candidates) == 1, "same-scope near-duplicates must merge"
+
+
 def test_pinned_memories_excluded_from_embedding():
     """Pinned memories are never passed to embed_fn or considered for merge."""
     m_pinned = _make_memory("secret content", "pinned")

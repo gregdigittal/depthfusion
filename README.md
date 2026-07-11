@@ -829,13 +829,26 @@ These are shipped but off by default — they require additional setup, cost tok
 | Decision/operational memory | `DEPTHFUSION_DECISION_MEMORY=true` | Alpha |
 | Multi-agent working memory | `DEPTHFUSION_MULTI_AGENT_WM=true` | Alpha |
 
-### Projected (roadmap)
+### Measured (E-67 goldset v2 — 2026-07-11)
 
-- Named configuration profiles (`minimal` / `standard` / `server` / `research`) — E-67 S-224
-- Fernet-encrypted cache wired to REST search path — E-67 S-225
-- Embedding-similarity consolidation (replacing token-Jaccard) — E-67 S-226
-- Real evaluation goldset + rank-aware metrics (MRR@10, nDCG@5) — E-67 S-227
-- CIQS Cat D precision@5 ≥ 95 measured on production corpus (currently projected, not measured)
+Benchmarked on `tests/fixtures/recall_goldset_v2.jsonl` (200 synthetic queries, BM25-local mode):
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| MRR@10 | **1.0000** | All primary chunks ranked #1 |
+| nDCG@5 | **0.9934** | Secondary chunks occasionally outside top-5 |
+| precision@1 | **1.0000** | Primary chunk always top-1 |
+| hit_rate@5 | **1.0000** | Primary chunk always in top-5 |
+| fallback_rate | 0.0000 | No BM25 misses |
+
+- **S-224 ✅** — Named configuration profiles (`minimal` / `standard` / `server` / `research`)
+- **S-225 ✅** — Fernet-encrypted cache wired to REST search path, principal-isolated cache keys
+- **S-226 ✅** — Embedding-similarity consolidation (replacing token-Jaccard), cross-scope guard
+- **S-227 ✅** — Real evaluation goldset (200 entries) + rank-aware metrics (MRR@10, nDCG@5)
+
+Full comparison report: `docs/benchmarks/2026-07-11-standard-vs-research-goldset-v2.md`
+
+### Projected (roadmap)
 
 ### Release history
 

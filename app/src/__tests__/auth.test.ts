@@ -143,3 +143,90 @@ describe('startLogin', () => {
     expect(listenOrder).toBeLessThan(invokeOrder)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Deep-link callback → authenticated (S-216 AC-4, S-217 AC-3)
+// ---------------------------------------------------------------------------
+
+describe('deep-link callback handling', () => {
+  it('transitions to authenticated when depthfusion://callback arrives', async () => {
+    // Capture the handler registered by listenForDeepLink()
+    let capturedHandler: ((event: { payload: string[] }) => Promise<void>) | null = null
+    mockListen.mockImplementation(
+      (_event: string, handler: (e: { payload: string[] }) => Promise<void>) => {
+        capturedHandler = handler
+        return Promise.resolve(() => {})
+      },
+    )
+
+    const fakeTokenSet = {
+      access_token: 'tok-abc',
+      id_token: 'id-tok',
+      refresh_token: null,
+      expires_in: 3600,
+      token_type: 'Bearer',
+    }
+    mockInvoke
+      .mockResolvedValueOnce('https://auth.example.com/auth')  // start_login
+      .mockResolvedValueOnce(fakeTokenSet)                      // handle_deep_link
+
+    const states: string[] = []
+    const unsub = onAuthStateChange((s) => states.push(s.status))
+
+    await startLogin()
+    await capturedHandler!({ payload: ['depthfusion://callback?code=abc&state=xyz'] })
+
+    expect(states).toContain('authenticated')
+    expect(getAuthState().status).toBe('authenticated')
+    expect(getAuthState().token?.access_token).toBe('tok-abc')
+    expect(mockInvoke).toHaveBeenCalledWith('handle_deep_link', {
+      rawUrl: 'depthfusion://callback?code=abc&state=xyz',
+    })
+    unsub()
+  })
+
+  it('transitions to error when handle_deep_link exchange fails', async () => {
+    let capturedHandler: ((event: { payload: string[] }) => Promise<void>) | null = null
+    mockListen.mockImplementation(
+      (_event: string, handler: (e: { payload: string[] }) => Promise<void>) => {
+        capturedHandler = handler
+        return Promise.resolve(() => {})
+      },
+    )
+    mockInvoke
+      .mockResolvedValueOnce('https://auth.example.com/auth')
+      .mockRejectedValueOnce(new Error('token exchange failed'))
+
+    const states: string[] = []
+    const unsub = onAuthStateChange((s) => states.push(s.status))
+
+    await startLogin()
+    await capturedHandler!({ payload: ['depthfusion://callback?code=bad'] })
+
+    expect(getAuthState().status).toBe('error')
+    expect(states).toContain('error')
+    unsub()
+  })
+
+  it('ignores deep-link URLs that are not depthfusion://callback', async () => {
+    let capturedHandler: ((event: { payload: string[] }) => Promise<void>) | null = null
+    mockListen.mockImplementation(
+      (_event: string, handler: (e: { payload: string[] }) => Promise<void>) => {
+        capturedHandler = handler
+        return Promise.resolve(() => {})
+      },
+    )
+    mockInvoke.mockResolvedValueOnce('https://auth.example.com/auth')
+
+    const states: string[] = []
+    const unsub = onAuthStateChange((s) => states.push(s.status))
+
+    await startLogin()
+    await capturedHandler!({ payload: ['https://unrelated.example.com/other'] })
+
+    // Unrelated URL — state must remain pending (startLogin set it to pending)
+    expect(getAuthState().status).toBe('pending')
+    expect(mockInvoke).not.toHaveBeenCalledWith('handle_deep_link', expect.anything())
+    unsub()
+  })
+})
