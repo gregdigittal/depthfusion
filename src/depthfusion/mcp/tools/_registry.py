@@ -201,6 +201,14 @@ TOOLS: dict[str, str] = {
         "avg_cost_usd, cost_per_pass, confidence, rationale, source, sample_count, "
         "budget_warning}]}"
     ),
+    # S-76: describe which layers and mechanisms are engaged on this instance
+    "depthfusion_describe_capabilities": (
+        "Describe which DepthFusion layers and mechanisms are active on this instance. "
+        "No arguments required. "
+        "Response: {tier, install_mode, recall_layers, graph_enabled, haiku_enabled, "
+        "vector_search_enabled, embedding_backend, fusion_gates_enabled, router_enabled, "
+        "decision_extractor_enabled}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -243,6 +251,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_list_providers": None,
     # E-64 S-210 model recommendation engine (always enabled)
     "depthfusion_recommend_model": None,
+    # S-76: capability introspection (always enabled)
+    "depthfusion_describe_capabilities": None,
 }
 
 
@@ -670,6 +680,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
         },
         "required": ["task_category"],
+    },
+    # S-76: no arguments required
+    "depthfusion_describe_capabilities": {
+        "properties": {},
+        "required": [],
     },
 }
 

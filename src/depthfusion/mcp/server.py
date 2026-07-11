@@ -87,6 +87,7 @@ from depthfusion.mcp.tools.recall import (  # noqa: E402,F401
     _tool_recall_feedback,
     _tool_retrieve_context,
 )
+from depthfusion.mcp.tools.recommender_tools import _tool_recommend_model  # noqa: E402
 
 # Tool implementations — system domain
 from depthfusion.mcp.tools.system import (  # noqa: E402,F401
@@ -94,8 +95,6 @@ from depthfusion.mcp.tools.system import (  # noqa: E402,F401
     _tool_research_topic,
     _tool_status,
 )
-
-from depthfusion.mcp.tools.recommender_tools import _tool_recommend_model  # noqa: E402
 
 # Tool implementations — telemetry domain
 from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
@@ -108,7 +107,6 @@ from depthfusion.mcp.tools.telemetry import (  # noqa: E402,F401
     _tool_surface_skill_candidates,
     _tool_tier_status,
 )
-
 
 # S-219: canonical set of dispatchable tool names — must mirror the elif chain below.
 # Test: tests/mcp/test_dispatch_parity.py
@@ -143,6 +141,7 @@ DISPATCHABLE: frozenset[str] = frozenset({
     "depthfusion_ingest_conversation",
     "depthfusion_list_providers",
     "depthfusion_recommend_model",
+    "depthfusion_describe_capabilities",
 })
 
 
@@ -302,6 +301,8 @@ def _dispatch_tool(
         return _tool_list_providers()
     elif tool_name == "depthfusion_recommend_model":
         return _tool_recommend_model(arguments)
+    elif tool_name == "depthfusion_describe_capabilities":
+        return _tool_describe_capabilities()
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
 

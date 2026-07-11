@@ -29,10 +29,12 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
 
+      - name: Install project (for dependency graph)
+        run: pip install -e ".[dev]" --quiet || pip install -e "." --quiet
+
       - name: Audit Python dependencies
-        # --fail-on HIGH: block merge on high or critical severity CVEs only.
-        # Low/medium findings are surfaced as warnings but do not block.
-        run: pip-audit --fail-on HIGH -r pyproject.toml || pip-audit --fail-on HIGH
+        # Audit the installed environment. Exits non-zero on any CVE found.
+        run: pip-audit
 
   npm-audit:
     name: "Node.js dependency audit (npm audit)"

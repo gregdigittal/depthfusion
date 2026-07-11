@@ -110,11 +110,9 @@ class TestInspectDiscovery:
         assert result["exists"] is True
         assert result["frontmatter"] == {}
 
-    def test_tool_registered(self):
-        from depthfusion.core.config import DepthFusionConfig
-        cfg = DepthFusionConfig()
-        enabled = get_enabled_tools(cfg)
-        assert "depthfusion_inspect_discovery" in enabled
+    # depthfusion_inspect_discovery was removed from the tool registry (E-67
+    # rectification) — the function still exists for internal use but is no
+    # longer dispatched via MCP. Registry test intentionally omitted.
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +192,7 @@ class TestAutoLearnGraphWiring:
         mock_out = tmp_path / "test-autocapture.md"
         mock_out.write_text("---\n---\nBody")
 
-        with patch("depthfusion.mcp.server.Path") as mock_path_cls, \
+        with patch("depthfusion.mcp.tools.capture.Path") as mock_path_cls, \
              patch("depthfusion.capture.auto_learn.summarize_and_extract_graph") as mock_sag, \
              patch("depthfusion.capture.compressor.SessionCompressor") as mock_comp_cls, \
              patch("depthfusion.graph.store.get_store"):

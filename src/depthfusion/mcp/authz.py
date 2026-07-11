@@ -100,7 +100,9 @@ TOOL_CAPABILITIES: dict[str, Capability] = {
     "depthfusion_research_topic": Capability.WRITE_OWN_RECORDS,
     "depthfusion_bridge": Capability.WRITE_OWN_RECORDS,
     # ── Model recommendation (E-64 S-210) ───────────────────────────────
-    "recommend_model": Capability.READ_OWN_RECORDS,
+    "depthfusion_recommend_model": Capability.READ_OWN_RECORDS,
+    # ── Capability introspection (S-76) ─────────────────────────────────
+    "depthfusion_describe_capabilities": Capability.READ_OWN_RECORDS,
 }
 
 

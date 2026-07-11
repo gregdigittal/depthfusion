@@ -220,7 +220,9 @@ class RecallPipeline:
         if self._df_config is not None:
             gates_on = self._df_config.fusion_gates_enabled
         else:
-            gates_on = os.environ.get("DEPTHFUSION_FUSION_GATES_ENABLED", "false").lower() in ("true", "1", "yes")
+            gates_on = os.environ.get(
+                "DEPTHFUSION_FUSION_GATES_ENABLED", "false"
+            ).lower() in ("true", "1", "yes")
         if not gates_on:
             return blocks
         if not blocks:

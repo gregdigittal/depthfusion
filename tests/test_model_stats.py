@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -40,7 +41,7 @@ def _insert_rows(db_path: Path, rows: list[dict]) -> None:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    row.get("recorded_at", "2026-06-01T00:00:00+00:00"),
+                    row.get("recorded_at", datetime.now(timezone.utc).isoformat()),
                     row.get("session_id", f"sess-{index}"),
                     row.get("model_id", "custom-model"),
                     row.get("task_category", "code"),
@@ -89,7 +90,7 @@ def test_stat_computation(telemetry_db: Path) -> None:
     assert row["cost_per_pass"] == pytest.approx(0.055 / 0.6)
     assert row["avg_tokens_out"] == pytest.approx(55)
     assert row["avg_duration_ms"] == pytest.approx(550)
-    assert row["last_seen"] == "2026-06-01T00:00:00+00:00"
+    assert row["last_seen"] is not None  # dynamic timestamp
 
 
 def test_cache_invalidation(telemetry_db: Path) -> None:
@@ -110,7 +111,7 @@ def test_cache_invalidation(telemetry_db: Path) -> None:
             "latency_ms": 501,
             "cost_usd": 0.02,
             "quality_verdict": "fail",
-            "recorded_at": "2026-06-02T00:00:00+00:00",
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 

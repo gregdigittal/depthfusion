@@ -1,8 +1,6 @@
 """S-220: RecallPipeline reads gate flags from DepthFusionConfig, not raw env."""
-import pytest
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.retrieval.hybrid import PipelineMode, RecallPipeline
-
 
 _BLOCKS = [{"text": "a", "score": 1.0}, {"text": "b", "score": 0.5}]
 
@@ -21,7 +19,6 @@ class TestFusionGatesConfig:
     def test_gates_on_via_config_runs_pipeline(self, monkeypatch):
         # If fusion_gates_enabled=True the gate code path executes; we stub
         # SelectiveFusionWeighter to avoid needing the full cognitive stack.
-        import depthfusion.retrieval.hybrid as _mod
 
         class _FakeWeighter:
             def apply(self, blocks, *, query_embedding=None):
@@ -31,7 +28,7 @@ class TestFusionGatesConfig:
             def version_id(self):
                 return "test"
 
-        import importlib, sys
+        import sys
 
         fake_module = type(sys)("depthfusion.fusion.selective_fusion_weighter")
         fake_module.SelectiveFusionWeighter = _FakeWeighter
@@ -53,7 +50,7 @@ class TestFusionGatesConfig:
     def test_no_config_falls_back_to_env_on(self, monkeypatch):
         """Without config, DEPTHFUSION_FUSION_GATES_ENABLED=true enables gate."""
         monkeypatch.setenv("DEPTHFUSION_FUSION_GATES_ENABLED", "true")
-        import depthfusion.retrieval.hybrid as _mod, sys
+        import sys
 
         class _FW:
             def apply(self, blocks, *, query_embedding=None):

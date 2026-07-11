@@ -1,7 +1,6 @@
 """S-226: embedding cosine similarity in MemoryConsolidator."""
 from __future__ import annotations
 
-import math
 from typing import Optional
 
 import pytest
@@ -11,8 +10,7 @@ from depthfusion.cognitive.consolidator import (
     _cosine,
     _token_similarity,
 )
-from depthfusion.core.memory_object import MemoryObject, MemoryStatus
-
+from depthfusion.core.memory_object import MemoryObject
 
 # ---------------------------------------------------------------------------
 # Unit: _cosine helper

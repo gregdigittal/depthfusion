@@ -27,7 +27,7 @@ import logging
 import os
 import uuid
 from importlib.metadata import version as _pkg_version
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -244,10 +244,10 @@ class _SearchRequest(BaseModel):
 
 # S-225: singleton CacheManager; initialised lazily on first search request when
 # cache_enabled=True.  None means either disabled or not yet initialised.
-_SEARCH_CACHE: Optional["CacheManager"] = None  # type: ignore[name-defined]
+_SEARCH_CACHE: Optional[Any] = None
 
 
-def _get_search_cache() -> Optional["CacheManager"]:  # type: ignore[name-defined]
+def _get_search_cache() -> Any:
     """Return the CacheManager singleton, creating it on first call."""
     global _SEARCH_CACHE
     if _SEARCH_CACHE is None:

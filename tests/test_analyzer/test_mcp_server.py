@@ -5,41 +5,54 @@ import json
 from unittest.mock import MagicMock
 
 from depthfusion.core.config import DepthFusionConfig
+from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import TOOLS, _handle_tools_call, get_enabled_tools
 
 
-def test_tools_dict_has_twenty_eight_entries():
-    """Total tool count: 28 (E-35 S-111 added session_seed)."""
-    assert len(TOOLS) == 28
+def _make_principal(groups: list[str] | None = None) -> Principal:
+    return Principal(
+        principal_id="test-user",
+        upn="test-user@example.com",
+        display_name="test-user",
+        groups=groups or ["member"],
+    )
+
+
+def test_tools_dict_has_thirty_one_entries():
+    """Total tool count: 31 (registry as of E-67 rectification)."""
+    assert len(TOOLS) == 31
     expected = {
         "depthfusion_status",
         "depthfusion_recall_relevant",
         "depthfusion_tag_session",
         "depthfusion_publish_context",
-        "depthfusion_run_recursive",
-        "depthfusion_tier_status",
         "depthfusion_auto_learn",
         "depthfusion_compress_session",
         "depthfusion_graph_traverse",
         "depthfusion_graph_status",
         "depthfusion_set_scope",
         "depthfusion_confirm_discovery",
-        "depthfusion_prune_discoveries",          # v0.5.1 S-55
-        "depthfusion_set_memory_score",           # E-27 / S-70
-        "depthfusion_recall_feedback",            # E-27 / S-72
-        "depthfusion_pin_discovery",              # E-27 / S-69
-        "depthfusion_describe_capabilities",      # E-28 / S-76
-        "depthfusion_inspect_discovery",          # E-28 / S-76
-        "depthfusion_retrieve_context",           # E-31 / S-99
-        "depthfusion_record_decision",            # E-31 / S-97
-        "depthfusion_record_incident",            # E-31 / S-98
-        "depthfusion_mark_superseded",            # E-31 / S-98
-        "depthfusion_report_outcome",             # E-31 / S-98
-        "depthfusion_get_cognitive_state",        # E-31 / S-99
-        "depthfusion_record_telemetry",           # E-33 / S-106/S-107
-        "depthfusion_query_telemetry",            # E-33 / S-106/S-107
-        "depthfusion_surface_skill_candidates",   # E-34 / S-109
-        "depthfusion_session_seed",               # E-35 / S-111
+        "depthfusion_set_memory_score",
+        "depthfusion_recall_feedback",
+        "depthfusion_pin_discovery",
+        "depthfusion_retrieve_context",
+        "depthfusion_record_decision",
+        "depthfusion_record_incident",
+        "depthfusion_mark_superseded",
+        "depthfusion_report_outcome",
+        "depthfusion_record_telemetry",
+        "depthfusion_query_telemetry",
+        "depthfusion_session_seed",
+        "depthfusion_register_project",
+        "depthfusion_list_projects",
+        "depthfusion_sync_project",
+        "depthfusion_ingest_project",
+        "depthfusion_research_topic",
+        "depthfusion_bridge",
+        "depthfusion_ingest_conversation",
+        "depthfusion_list_providers",
+        "depthfusion_recommend_model",
+        "depthfusion_describe_capabilities",
     }
     assert set(TOOLS.keys()) == expected
 
@@ -51,44 +64,46 @@ def test_get_enabled_tools_all_flags_true():
     )
     enabled = get_enabled_tools(config)
     assert set(enabled) == set(TOOLS.keys())
-    assert len(enabled) == 28
+    assert len(enabled) == 31
 
 
 def test_get_enabled_tools_rlm_disabled_excludes_recursive():
+    # rlm_enabled no longer gates any tool in the current registry;
+    # router_enabled=True adds publish_context (1 extra over the 22 always-on).
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=True)
     enabled = get_enabled_tools(config)
-    assert "depthfusion_run_recursive" not in enabled
-    # 18 always-on + 1 router (rlm off, graph off, cognitive defaults off) = 19
-    assert len(enabled) == 19
+    assert "depthfusion_run_recursive" not in enabled  # trivially true — not registered
+    # 22 always-on + 1 publish_context (router=True, graph off, cognitive defaults off) = 23
+    assert len(enabled) == 23
 
 
 def test_get_enabled_tools_router_disabled_excludes_publish():
     config = DepthFusionConfig(rlm_enabled=True, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_publish_context" not in enabled
-    # 18 always-on + 1 rlm (router off, graph off, cognitive defaults off) = 19
-    assert len(enabled) == 19
+    # 22 always-on (router off, graph off, cognitive defaults off) = 22
+    assert len(enabled) == 22
 
 
 def test_get_enabled_tools_both_disabled():
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
-    assert "depthfusion_run_recursive" not in enabled
+    assert "depthfusion_run_recursive" not in enabled  # trivially true — not registered
     assert "depthfusion_publish_context" not in enabled
-    # 18 always-on (rlm off, router off, graph off, cognitive defaults off) = 18
-    assert len(enabled) == 18
+    # 22 always-on (rlm off, router off, graph off, cognitive defaults off) = 22
+    assert len(enabled) == 22
 
 
 def test_core_tools_always_enabled():
-    """Status, recall, tag, and v0.3.0 tools are never gated by feature flags."""
+    """Status, recall, tag, and other always-on tools are never gated by feature flags."""
     config = DepthFusionConfig(rlm_enabled=False, router_enabled=False)
     enabled = get_enabled_tools(config)
     assert "depthfusion_status" in enabled
     assert "depthfusion_recall_relevant" in enabled
     assert "depthfusion_tag_session" in enabled
-    assert "depthfusion_tier_status" in enabled
     assert "depthfusion_auto_learn" in enabled
     assert "depthfusion_compress_session" in enabled
+    assert "depthfusion_describe_capabilities" in enabled
 
 
 def test_confirm_discovery_always_enabled():
@@ -136,9 +151,12 @@ class TestConfirmDiscovery:
     def _cfg(self):
         return DepthFusionConfig(rlm_enabled=False, router_enabled=False, graph_enabled=False)
 
+    def _principal(self):
+        return _make_principal(groups=["member"])
+
     def test_missing_text_returns_error(self):
         config = self._cfg()
-        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config)
+        result = _handle_tools_call("depthfusion_confirm_discovery", {}, config, self._principal())
         assert result["isError"] is False  # protocol success
         body = json.loads(result["content"][0]["text"])
         assert body["ok"] is False
@@ -160,6 +178,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Use asyncpg over psycopg2 for async support", "project": "test-proj"},
                 self._cfg(),
+                self._principal(),
             )
 
         assert result["isError"] is False
@@ -179,6 +198,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": long_text, "project": "proj"},
                 self._cfg(),
+                self._principal(),
             )
         assert result["isError"] is False
 
@@ -201,6 +221,7 @@ class TestConfirmDiscovery:
                 {"text": "Always validate at boundaries", "project": "proj",
                  "category": "invalid_category"},
                 self._cfg(),
+                self._principal(),
             )
         assert captured_entries[0].category == "decision"
 
@@ -222,6 +243,7 @@ class TestConfirmDiscovery:
                 "depthfusion_confirm_discovery",
                 {"text": "Deploy via kubernetes", "project": "proj", "confidence": 99.9},
                 self._cfg(),
+                self._principal(),
             )
         assert captured_entries[0].confidence <= 1.0
 

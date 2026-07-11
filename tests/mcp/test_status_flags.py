@@ -1,6 +1,6 @@
 """S-221: depthfusion_status must report all effective config flags."""
 import json
-import pytest
+
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.mcp.tools.system import _tool_status
 

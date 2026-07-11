@@ -406,6 +406,7 @@ class TestConcurrency:
         monkeypatch.setattr(
             "depthfusion.core.feedback._discoveries_dir", lambda: tmp_path,
         )
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         f = _seed_discovery(tmp_path, "fX", salience=1.0)
         rid = store.register_recall(["fX"])
 

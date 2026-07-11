@@ -516,8 +516,9 @@ class TestSetMemoryScoreTool:
         )
         return f
 
-    def test_set_memory_score_partial_update(self, tmp_path):
+    def test_set_memory_score_partial_update(self, tmp_path, monkeypatch):
         """AC-4: supplying only importance leaves salience untouched."""
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         f = self._seed_discovery(tmp_path)
         result_text = _tool_set_memory_score(
             {"filename": str(f), "importance": 0.92}
@@ -533,8 +534,9 @@ class TestSetMemoryScoreTool:
         assert score.importance == pytest.approx(0.92, abs=1e-3)
         assert score.salience == pytest.approx(1.0, abs=1e-3)  # unchanged
 
-    def test_set_memory_score_idempotent(self, tmp_path):
+    def test_set_memory_score_idempotent(self, tmp_path, monkeypatch):
         """AC-4: calling twice with the same values is a no-op (no corruption)."""
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         f = self._seed_discovery(tmp_path)
         import json as _json
 
@@ -568,13 +570,14 @@ class TestSetMemoryScoreTool:
         assert "error" in result
         assert "number" in result["error"].lower()
 
-    def test_extractor_emits_byte_equivalent_format_to_splice(self, tmp_path):
+    def test_extractor_emits_byte_equivalent_format_to_splice(self, tmp_path, monkeypatch):
         """AC-2 / AC-4 (consensus Round 1, Commit 3): the format used by
         decision_extractor / negative_extractor must be byte-identical to
         the format ``_tool_set_memory_score``'s splice produces, so a
         no-op set_memory_score call (same values) does not introduce diff
         churn. Both sides should write four-decimal scalars.
         """
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         from depthfusion.capture.decision_extractor import (
             DecisionEntry,
             write_decisions,
@@ -626,7 +629,7 @@ class TestSetMemoryScoreTool:
         assert not ghost.exists()
 
     @pytest.mark.skipif(sys.platform == "win32", reason="fcntl file locking not available on Windows")
-    def test_set_memory_score_concurrent_partial_updates_serialize(self, tmp_path):
+    def test_set_memory_score_concurrent_partial_updates_serialize(self, tmp_path, monkeypatch):
         """AC-4 (consensus Round 1 / Codex finding, Commit 3): two callers
         each supplying ONLY ONE of (importance, salience) must serialize
         through the file lock — neither caller's update may be silently
@@ -638,6 +641,7 @@ class TestSetMemoryScoreTool:
         lost-write bug; the os.replace atomic gives torn-write protection
         but not RMW serialization.
         """
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         import json as _json
         import threading
         f = self._seed_discovery(tmp_path)
@@ -682,13 +686,14 @@ class TestSetMemoryScoreTool:
         assert score.salience == pytest.approx(4.50, abs=1e-3), \
             f"writer B's salience update lost: got {score.salience}"
 
-    def test_set_memory_score_concurrent_writes_no_corruption(self, tmp_path):
+    def test_set_memory_score_concurrent_writes_no_corruption(self, tmp_path, monkeypatch):
         """AC-4 (consensus-driven, mirrors S-78 torn-write coverage):
         concurrent set_memory_score calls must not produce a partial-write
         residue. The final file must parse cleanly to a valid MemoryScore;
         the persisted values must equal one of the writers' inputs (last
         winner wins) — never a mix of fields from different writers.
         """
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         import json as _json
         import threading
         f = self._seed_discovery(tmp_path)

@@ -112,20 +112,23 @@ class TestIsPinned:
 # ---------------------------------------------------------------------------
 
 class TestPinToolSetsTrue:
-    def test_pin_sets_pinned_true_in_frontmatter(self, tmp_path):
+    def test_pin_sets_pinned_true_in_frontmatter(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         path = _make_discovery(tmp_path)
         result = json.loads(_tool_pin_discovery({"filename": str(path), "pinned": True}))
         assert result == {"pinned": True, "filename": str(path)}
         assert "pinned: true" in path.read_text()
 
-    def test_pin_default_pinned_true(self, tmp_path):
+    def test_pin_default_pinned_true(self, tmp_path, monkeypatch):
         """pinned defaults to True when omitted."""
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         path = _make_discovery(tmp_path)
         result = json.loads(_tool_pin_discovery({"filename": str(path)}))
         assert result["pinned"] is True
         assert "pinned: true" in path.read_text()
 
-    def test_pin_idempotent_calling_twice(self, tmp_path):
+    def test_pin_idempotent_calling_twice(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         path = _make_discovery(tmp_path)
         _tool_pin_discovery({"filename": str(path), "pinned": True})
         result = json.loads(_tool_pin_discovery({"filename": str(path), "pinned": True}))
@@ -138,7 +141,8 @@ class TestPinToolSetsTrue:
 # ---------------------------------------------------------------------------
 
 class TestPinToolSetsFalse:
-    def test_unpin_sets_pinned_false_in_frontmatter(self, tmp_path):
+    def test_unpin_sets_pinned_false_in_frontmatter(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         # Start pinned
         path = _make_discovery(
             tmp_path,
@@ -149,7 +153,8 @@ class TestPinToolSetsFalse:
         assert "pinned: false" in path.read_text()
         assert path.read_text().count("pinned:") == 1
 
-    def test_unpin_idempotent_on_already_unpinned(self, tmp_path):
+    def test_unpin_idempotent_on_already_unpinned(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         path = _make_discovery(tmp_path)  # no pinned key
         result = json.loads(_tool_pin_discovery({"filename": str(path), "pinned": False}))
         assert result["pinned"] is False
@@ -211,7 +216,8 @@ class TestPinnedFileSkippedDuringPrune:
 # ---------------------------------------------------------------------------
 
 class TestMissingFileEdgeCase:
-    def test_missing_file_returns_error_dict_not_raise(self, tmp_path):
+    def test_missing_file_returns_error_dict_not_raise(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_DISCOVERIES_DIR", str(tmp_path))
         result = json.loads(
             _tool_pin_discovery({"filename": str(tmp_path / "ghost.md"), "pinned": True})
         )

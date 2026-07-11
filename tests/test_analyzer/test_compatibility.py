@@ -124,12 +124,15 @@ def test_c5_green_when_no_depthfusion_hooks(tmp_path: Path):
     assert result["status"] == GREEN
 
 
-def test_c6_green_when_venv_exists(tmp_path: Path):
+def test_c6_green_when_venv_exists(tmp_path: Path, monkeypatch):
+    # Create a fake .venv in tmp_path so the check works in CI (no real .venv).
+    (tmp_path / ".venv").mkdir()
+    import depthfusion.analyzer.compatibility as compat_mod
+    monkeypatch.setattr(compat_mod, "_PROJECT_ROOT", tmp_path)
     scanner = _make_scanner(tmp_path)
     checker = CompatibilityChecker(scanner=scanner)
-    # The project's actual .venv exists, so C6 should be GREEN
     result = checker.check_c6_python_environment()
-    assert result["status"] == GREEN  # real venv exists at project root
+    assert result["status"] == GREEN
 
 
 def test_c7_yellow_when_no_recall(tmp_path: Path):

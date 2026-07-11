@@ -2,7 +2,6 @@
 must have a schema.  Prevents silent tool registration without a dispatcher
 (the recommend_model class of bug).
 """
-import pytest
 
 
 def test_all_schema_tools_are_dispatchable():

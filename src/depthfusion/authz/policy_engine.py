@@ -478,7 +478,8 @@ def _make_cache_key(
     """Build a hashable cache key from the decision inputs."""
     acl = tuple(sorted(resource.get("acl_allow") or []))
     classification = resource.get("classification") or ""
-    return (principal.principal_id, capability.value, acl, classification)
+    groups = tuple(sorted(principal.groups or []))
+    return (principal.principal_id, groups, capability.value, acl, classification)
 
 
 def _check_classification(
