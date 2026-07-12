@@ -10,7 +10,38 @@ Conventions:
 
 ---
 
-## [Unreleased]
+## [v2.2.0] — 2026-07-12
+
+### Added
+
+**E-65 — Auth infrastructure & first-run setup wizard (final ACs):**
+- `app/src/__tests__/auth.test.ts`: 3 new tests for OIDC deep-link callback flow — `depthfusion://callback` → `authenticated` state transition, error path when `handle_deep_link` exchange fails, non-matching URL guard (S-216 AC-4, S-217 AC-3)
+- Existing Rust vault test `valid_key_round_trips_through_the_vault` in `app/src-tauri/src/auth/local.rs` confirmed as vault round-trip AC coverage (S-215 AC-3)
+
+**E-67 — Claims-reality rectification:**
+- `tests/mcp/test_dispatch_parity.py`: `DISPATCHABLE` frozenset in `server.py`; parity test asserts tool name set matches the frozenset (S-219)
+- `src/depthfusion/core/config.py`: `fusion_gates_enabled`, `cognitive_scoring_enabled` bool fields; `from_profile()` classmethod (S-220, S-224)
+- `src/depthfusion/core/profiles.py`: four named configuration profiles — `minimal`, `standard`, `server`, `research` (S-224)
+- `tests/core/test_profiles.py`: 12 tests covering profile overrides and `from_profile()` keyword-arg precedence (S-224)
+- `src/depthfusion/mcp/http_server.py`: Fernet `CacheManager` wired to `/api/v1/search`; principal-isolated cache keys via `_principal_id_from_auth()` — `sha256(principal_id + "\x00" + q + "\x00" + limit)[:32]` (S-225)
+- `tests/test_http_mcp/test_search_cache.py`: 8 cache isolation tests (S-225)
+- `src/depthfusion/cognitive/consolidator.py`: embedding cosine similarity in `MemoryConsolidator`; cross-scope merge guard prevents cross-project memory bleed (S-226)
+- `tests/test_cognitive/test_consolidator_embeddings.py`: 18 tests (S-226)
+- `tests/fixtures/recall_goldset_v2.jsonl`: 200-entry goldset with graded relevance (0=distractor, 1=secondary, 2=primary) (S-227)
+- `scripts/benchmark.py`: MRR@10 and nDCG@5 rank-aware retrieval metrics (S-227)
+- `docs/benchmarks/2026-07-11-standard-vs-research-goldset-v2.md`: standard vs. research profile comparison report (S-227)
+
+### Changed
+
+- `README.md`: three-tier feature-status table (On by default / Behind flag / Projected), measured benchmark values MRR@10=1.0000, nDCG@5=0.9934 (S-221, S-222, S-227)
+- `.github/workflows/release-desktop.yml`: `releaseDraft: false` — releases now publish immediately rather than as drafts (S-223)
+- `tests/mcp/test_status_flags.py`: `depthfusion_status` tool reflects all `DepthFusionConfig` boolean fields via `dataclasses.fields()` reflection (S-221)
+- `tests/retrieval/test_hybrid_gates_config.py`: `fusion_gates_enabled`/`cognitive_scoring_enabled` read from config object, not `os.environ` directly (S-220)
+- Version bumped `2.1.1` → `2.2.0` in `pyproject.toml`, `app/package.json`, `app/src-tauri/tauri.conf.json`
+
+---
+
+## [v2.1.1] — 2026-06-23
 
 ### Added
 
