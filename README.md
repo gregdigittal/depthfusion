@@ -6,11 +6,11 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
-> **v2.1.1 — now on main:** DepthFusion v2 ships with OIDC authentication, RBAC, device enrollment, a Tauri desktop app, classification-aware memory handling, model performance intelligence (HTTP MCP server + `recommend_model` tool), and **ChatGPT Desktop for macOS MCP integration** (E-66). V1 docs that describe V1-only behavior are marked at the top with deprecation notices pointing to the V2 equivalents in `docs/v2/`. For the v1.x release, see the `v1.2.2` git tag.
+> **v2.2.0 — now on main:** DepthFusion v2.2.0 closes E-65 (auth wizard: Solo/VPS/Connect setup flows, OIDC deep-link callback) and E-67 (claims-reality rectification: named profiles, Fernet cache wired, embedding consolidation, real MRR@10/nDCG@5 goldset, dispatcher parity, config flag visibility). All backlog epics are now `[done]`. For v2.1.x see the `v2.1.1` git tag.
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v2.1.1 (main). 3543+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.2.0 (main). 3545+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). Named configuration profiles (E-67). **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -852,6 +852,7 @@ Full comparison report: `docs/benchmarks/2026-07-11-standard-vs-research-goldset
 
 ### Release history
 
+- **v2.2.0:** E-65 auth wizard (Solo/VPS/Connect setup, OIDC deep-link); E-67 claims rectification (named profiles, Fernet cache, embedding consolidation, real MRR@10/nDCG@5, dispatcher parity, config flag visibility). All epics closed.
 - **v2.1.1:** default server URL updated to `https://mcp.tonracein.com` (port 7301); `depthfusion_recommend_model` dispatch bug fixed.
 - **v2.0.x:** E-65 OIDC auth + Bearer token; E-66 ChatGPT Desktop macOS MCP integration; security hardening AV-01–AV-05.
 - **v1.2.x:** E-47 Project Context Intelligence; E-48 Multi-Provider Context Bridge; macOS installer portability; Gemma 4 26B MLX support.
