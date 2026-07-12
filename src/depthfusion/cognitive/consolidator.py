@@ -51,6 +51,9 @@ class MemoryConsolidator:
 
         for i in range(len(active)):
             for j in range(i + 1, len(active)):
+                # S-226: memories in different project scopes must never merge
+                if active[i].scope.project_id != active[j].scope.project_id:
+                    continue
                 if vectors is not None:
                     sim = _cosine(vectors[i], vectors[j])
                 else:

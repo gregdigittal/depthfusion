@@ -265,24 +265,55 @@ def _get_search_cache() -> Any:
     return _SEARCH_CACHE
 
 
-def _search_cache_key(q: str, limit: int) -> str:
+def _principal_id_from_auth(authorization: Optional[str]) -> str:
+    """Extract a stable cache-key component for the authenticated principal.
+
+    Tries to decode the JWT payload (signature NOT re-verified — auth already
+    passed `_check_mcp_auth`). Falls back to a sha256 hash of the raw token so
+    opaque static tokens also get per-principal isolation.
+    """
     import hashlib
-    return "search/" + hashlib.sha256(f"{q}\x00{limit}".encode()).hexdigest()[:32]
+    if not authorization or not authorization.startswith("Bearer "):
+        return "anon"
+    raw_token = authorization[len("Bearer "):]
+    # Attempt JWT payload extraction (no signature check needed here)
+    try:
+        parts = raw_token.split(".")
+        if len(parts) == 3:
+            import base64
+            payload_b64 = parts[1] + "=="  # re-pad
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+            sub = payload.get("sub") or payload.get("client_id") or ""
+            if sub:
+                return hashlib.sha256(sub.encode()).hexdigest()[:16]
+    except Exception:  # noqa: BLE001
+        pass
+    # Opaque token — use its hash directly
+    return hashlib.sha256(raw_token.encode()).hexdigest()[:16]
+
+
+def _search_cache_key(q: str, limit: int, principal_id: str = "global") -> str:
+    import hashlib
+    return "search/" + hashlib.sha256(
+        f"{principal_id}\x00{q}\x00{limit}".encode()
+    ).hexdigest()[:32]
 
 
 @app.post("/api/v1/search")
 async def rest_search(
     body: _SearchRequest,
+    authorization: Optional[str] = Header(default=None),
     _: None = Depends(_check_mcp_auth),
 ):
     from depthfusion.mcp.tools._shared import _tool_recall_impl  # lazy import
 
     config = DepthFusionConfig.from_env()
 
-    # S-225: check Fernet cache on hit; populate on miss.
+    # S-225: cache keyed by (principal, query, limit) to prevent cross-user cache hits
     if config.cache_enabled:
         cache = _get_search_cache()
-        cache_key = _search_cache_key(body.q, body.limit)
+        principal_id = _principal_id_from_auth(authorization)
+        cache_key = _search_cache_key(body.q, body.limit, principal_id)
         entry = cache.get(cache_key, "global")
         if entry is not None and entry.data is not None:
             return json.loads(entry.data)
@@ -306,7 +337,8 @@ async def rest_search(
     response_body = {"results": results}
     if config.cache_enabled:
         cache = _get_search_cache()
-        cache_key = _search_cache_key(body.q, body.limit)
+        principal_id = _principal_id_from_auth(authorization)
+        cache_key = _search_cache_key(body.q, body.limit, principal_id)
         cache.put(cache_key, "global", json.dumps(response_body).encode())
     return response_body
 

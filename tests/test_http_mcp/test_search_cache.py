@@ -12,7 +12,12 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("DEPTHFUSION_V2_LEGACY_AUTH", "1")
 os.environ.setdefault("DEPTHFUSION_API_TOKEN", "test-cache-token")
 
-from depthfusion.mcp.http_server import _check_mcp_auth, _search_cache_key, app  # noqa: E402
+from depthfusion.mcp.http_server import (  # noqa: E402
+    _check_mcp_auth,
+    _principal_id_from_auth,
+    _search_cache_key,
+    app,
+)
 
 _FAKE_RECALL = json.dumps({"blocks": [
     {"chunk_id": "c1", "source": "file.md", "snippet": "hello", "score": 0.9}
@@ -112,6 +117,39 @@ def test_cache_key_deterministic():
 def test_cache_key_differentiates_limit():
     """limit=5 and limit=10 should produce different cache keys."""
     assert _search_cache_key("q", 5) != _search_cache_key("q", 10)
+
+
+def test_cache_key_differentiates_principal():
+    """Different principals must produce different cache keys for the same query."""
+    k_a = _search_cache_key("q", 5, principal_id="user-a")
+    k_b = _search_cache_key("q", 5, principal_id="user-b")
+    assert k_a != k_b
+
+
+def test_principal_id_from_opaque_token():
+    """Opaque (non-JWT) tokens produce a stable, non-empty id."""
+    p1 = _principal_id_from_auth("Bearer static-token-abc")
+    p2 = _principal_id_from_auth("Bearer static-token-abc")
+    assert p1 == p2
+    assert len(p1) > 0
+    assert p1 != _principal_id_from_auth("Bearer other-token")
+
+
+def test_principal_id_from_jwt():
+    """Tokens with a JWT structure are decoded to extract sub."""
+    import base64
+    # Build a minimal (unsigned) JWT with sub claim
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256"}').rstrip(b"=").decode()
+    payload = base64.urlsafe_b64encode(b'{"sub":"user-123"}').rstrip(b"=").decode()
+    fake_jwt = f"{header}.{payload}.fakesig"
+    pid = _principal_id_from_auth(f"Bearer {fake_jwt}")
+    # Should produce the same value as another call with the same sub
+    pid2 = _principal_id_from_auth(f"Bearer {fake_jwt}")
+    assert pid == pid2
+    # Sub "user-123" should differ from sub "user-456"
+    payload2 = base64.urlsafe_b64encode(b'{"sub":"user-456"}').rstrip(b"=").decode()
+    fake_jwt2 = f"{header}.{payload2}.fakesig"
+    assert _principal_id_from_auth(f"Bearer {fake_jwt2}") != pid
 
 
 def _make_in_memory_cache():

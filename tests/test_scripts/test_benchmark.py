@@ -21,6 +21,8 @@ REQUIRED_METRIC_KEYS = {
     "precision_at_1",
     "precision_at_5",
     "hit_rate_at_5",
+    "mrr_at_10",
+    "ndcg_at_5",
     "fallback_rate",
     "cost_estimate_usd",
 }
