@@ -3602,10 +3602,10 @@
 ### S-218: As a ChatGPT user, I want to connect ChatGPT desktop to DepthFusion MCP so that ChatGPT can recall my project context and memories `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: ChatGPT macOS MCP connector config documented and tested
-- [ ] AC-2: All 27 DepthFusion tools reachable from ChatGPT with Bearer token auth
-- [ ] AC-3: Setup guide published at docs/chatgpt-mcp-setup.md
-- [ ] AC-4: Unsafe/lifecycle tools documented with warnings in guide
+- [x] AC-1: ChatGPT macOS MCP connector config documented and tested
+- [x] AC-2: All 27 DepthFusion tools reachable from ChatGPT with Bearer token auth
+- [x] AC-3: Setup guide published at docs/chatgpt-mcp-setup.md
+- [x] AC-4: Unsafe/lifecycle tools documented with warnings in guide
 
 **Tasks:**
 - [x] T-756: Research ChatGPT MCP connector config format and write working config
