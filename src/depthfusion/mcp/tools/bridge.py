@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Optional
 
 try:
     from depthfusion.backends.openrouter import OpenRouterBackend
 except Exception:  # pragma: no cover — optional module in older environments
     OpenRouterBackend = None  # type: ignore[assignment,misc]
+
+from depthfusion.core.config import DepthFusionConfig
 
 logger = logging.getLogger("depthfusion.mcp.server")
 
@@ -15,8 +18,33 @@ from depthfusion.mcp.tools.capture import _tool_publish_context  # noqa: E402
 from depthfusion.mcp.tools.recall import _tool_recall  # noqa: E402
 
 
-def _tool_bridge(arguments: dict) -> str:
+def _tool_bridge(arguments: dict, config: Optional[DepthFusionConfig] = None) -> str:
+    """Bridge to an OpenRouter LLM with memory injection.
+
+    When *arguments* contains ``node_id`` (and optionally ``session_id``),
+    the tool retrieves the raw offloaded text from refs/ and returns it
+    directly — no LLM call is made.  This implements AC-3 of S-231.
+    """
     import hashlib
+
+    # S-231: node_id retrieval path — return raw offloaded text from refs/
+    node_id = arguments.get("node_id", "")
+    if node_id:
+        session_id = str(arguments.get("session_id", ""))
+        try:
+            from depthfusion.cognitive.offloader import ContextOffloader
+            from depthfusion.core.config import DepthFusionConfig
+            _cfg: DepthFusionConfig = config if config is not None else DepthFusionConfig()
+            offloader = ContextOffloader(_cfg)
+            raw_text = offloader.retrieve(node_id, session_id)
+            return json.dumps({"node_id": node_id, "session_id": session_id, "text": raw_text})
+        except FileNotFoundError:
+            return json.dumps({
+                "error": f"No offloaded ref for node_id={node_id!r} session_id={session_id!r}",
+                "node_id": node_id,
+            })
+        except Exception as exc:
+            return json.dumps({"error": str(exc), "node_id": node_id})
 
     if OpenRouterBackend is None:
         return json.dumps({"error": "OPENROUTER_API_KEY not configured", "model": ""})
