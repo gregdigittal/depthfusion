@@ -74,6 +74,7 @@ class ContextOffloader:
         out_dir = self._refs_base / session_id
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{node_id}.md"
+        self._assert_confined(out_path)
         try:
             out_path.write_text(text, encoding="utf-8")
         except OSError as exc:
@@ -89,13 +90,25 @@ class ContextOffloader:
         ------
         FileNotFoundError
             If the refs file does not exist.
+        PermissionError
+            If the resolved path escapes the refs base directory.
         """
         ref_path = self._refs_base / session_id / f"{node_id}.md"
+        self._assert_confined(ref_path)
         if not ref_path.exists():
             raise FileNotFoundError(
                 f"No offloaded ref for node_id={node_id!r} session_id={session_id!r}"
             )
         return ref_path.read_text(encoding="utf-8")
+
+    def _assert_confined(self, path: Path) -> None:
+        """Raise PermissionError if *path* escapes _refs_base (path traversal guard)."""
+        try:
+            path.resolve().relative_to(self._refs_base.resolve())
+        except ValueError:
+            raise PermissionError(
+                f"Path traversal rejected: {path!r} escapes refs base"
+            )
 
     def refs_count(self, session_id: str | None = None) -> int:
         """Return the number of stored ref files.

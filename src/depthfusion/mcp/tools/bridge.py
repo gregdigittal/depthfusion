@@ -31,6 +31,12 @@ def _tool_bridge(arguments: dict, config: Optional[DepthFusionConfig] = None) ->
     node_id = arguments.get("node_id", "")
     if node_id:
         session_id = str(arguments.get("session_id", ""))
+        # Reject path-separator characters in caller-supplied identifiers
+        # before they reach ContextOffloader._assert_confined().
+        import re as _re
+        _safe = _re.compile(r'^[A-Za-z0-9_\-]+$')
+        if not _safe.match(node_id) or (session_id and not _safe.match(session_id)):
+            return json.dumps({"error": "Invalid node_id or session_id", "node_id": node_id})
         try:
             from depthfusion.cognitive.offloader import ContextOffloader
             from depthfusion.core.config import DepthFusionConfig
@@ -38,9 +44,9 @@ def _tool_bridge(arguments: dict, config: Optional[DepthFusionConfig] = None) ->
             offloader = ContextOffloader(_cfg)
             raw_text = offloader.retrieve(node_id, session_id)
             return json.dumps({"node_id": node_id, "session_id": session_id, "text": raw_text})
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError) as exc:
             return json.dumps({
-                "error": f"No offloaded ref for node_id={node_id!r} session_id={session_id!r}",
+                "error": str(exc),
                 "node_id": node_id,
             })
         except Exception as exc:
