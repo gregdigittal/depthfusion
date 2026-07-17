@@ -38,6 +38,12 @@ def _tool_status(config: Any) -> str:
         "skillforge_recursive_skill_id", "bus_file_dir", "api_token",
         "mcp_http_token", "gemma_url", "gemma_model", "event_log",
         "profile",  # surfaced separately as install_mode.profile below
+        # distillation fields surfaced separately in distillation_status below
+        "distillation_backend", "local_llm_url",
+        # offload fields surfaced separately in offload_status below
+        "offload_mmd_max_tokens",
+        # persona fields surfaced separately in persona_status below
+        "persona_trigger_every_n",
     }
 
     try:
@@ -56,6 +62,73 @@ def _tool_status(config: Any) -> str:
                     behind_flag[name] = val
     except Exception:
         pass
+
+    # S-228: resolve distillation backend for status reporting
+    distillation_cfg = getattr(config, "distillation_backend", "auto") or "auto"
+    local_url = getattr(config, "local_llm_url", "") or ""
+
+    def _sync_probe_local(url: str) -> bool:
+        """Lightweight sync TCP-connect probe; no httpx dependency required."""
+        import socket
+        import urllib.parse
+
+        if not url:
+            return False
+        try:
+            parsed = urllib.parse.urlparse(url)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            with socket.create_connection((host, port), timeout=1.0):
+                return True
+        except OSError:
+            return False
+
+    if distillation_cfg == "local":
+        _resolved_backend = "local"
+    elif distillation_cfg == "haiku":
+        _resolved_backend = "haiku"
+    else:
+        # auto — perform a quick sync probe so status reflects the true runtime choice
+        _resolved_backend = "local" if _sync_probe_local(local_url) else "haiku"
+
+    distillation_status: dict[str, Any] = {
+        "configured_backend": distillation_cfg,
+        "local_llm_url": local_url,
+        "resolved_backend": _resolved_backend,
+    }
+
+    # S-231: offload status
+    _offload_enabled = getattr(config, "offload_enabled", False)
+    _offload_mmd_max_tokens = getattr(config, "offload_mmd_max_tokens", 400)
+    _refs_count = 0
+    if _offload_enabled:
+        try:
+            from depthfusion.cognitive.offloader import ContextOffloader
+            _refs_count = ContextOffloader(config).refs_count()
+        except Exception:
+            pass
+    offload_status: dict[str, Any] = {
+        "offload_enabled": _offload_enabled,
+        "offload_mmd_max_tokens": _offload_mmd_max_tokens,
+        "refs_count": _refs_count,
+    }
+
+    # S-229: persona engine status
+    _persona_last_updated: str | None = None
+    _persona_memory_count: int | None = None
+    try:
+        from depthfusion.cognitive.persona import get_persona_engine
+        _engine = get_persona_engine()
+        if _engine is not None:
+            _persona_last_updated = _engine.persona_last_updated
+            _persona_memory_count = _engine.memory_count_at_last_generation
+    except Exception:
+        pass
+    persona_status: dict[str, Any] = {
+        "persona_trigger_every_n": getattr(config, "persona_trigger_every_n", 50),
+        "persona_last_updated": _persona_last_updated,
+        "memory_count_at_last_generation": _persona_memory_count,
+    }
 
     return json.dumps(
         {
@@ -76,6 +149,12 @@ def _tool_status(config: Any) -> str:
             "install_mode": {
                 "profile": getattr(config, "profile", "") or "standard",
             },
+            # S-228: distillation backend
+            "distillation": distillation_status,
+            # S-231: offload status
+            "offload": offload_status,
+            # S-229: persona engine status
+            "persona": persona_status,
         },
         indent=2,
     )

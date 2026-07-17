@@ -297,6 +297,22 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     "'timeline' (all blocks in recency order, no scoring)"
                 ),
             },
+            "include_persona": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "When true, prepend the project persona summary as a preamble "
+                    "in the response (E-68 S-229)"
+                ),
+            },
+            "include_scenarios": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "When true, include the most relevant scenario block summary "
+                    "alongside L1 atoms in the response (E-68 S-230 AC-3)"
+                ),
+            },
         },
         "required": ["query"],
     },
