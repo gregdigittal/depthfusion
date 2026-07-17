@@ -3725,3 +3725,74 @@
 - [x] T-781: Add `tests/scripts/test_metrics.py` verifying metrics against known rankings.
 - [x] T-782: Run standard-vs-research A/B via `scripts/ciqs_compare.py`; commit the report.
 - [x] T-783: Update README with measured numbers; move 95–97 to Roadmap.
+
+---
+
+## E-68: Layered Memory & Context Offloading [backlog]
+
+> Augment DepthFusion with TencentDB Agent Memory's key advances: a configurable distillation backend (local-first, Haiku fallback), a L3 Persona layer, L2 Scenario grouping, and Mermaid-based context offloading. Together these close the token-reduction and persona-coherence gaps identified in the comparative analysis of 2026-07-17.
+
+### S-228: As a DepthFusion operator, I want a configurable distillation backend so that AI-powered memory passes use a local model when available and fall back to Haiku otherwise `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `DepthFusionConfig` has a `distillation_backend` field (`"auto"` | `"local"` | `"haiku"`), default `"auto"`, env var `DEPTHFUSION_DISTILLATION_BACKEND`
+- [ ] AC-2: `"auto"` probes the configured local endpoint (vLLM / Ollama / MLX, via `DEPTHFUSION_LOCAL_LLM_URL`) with a lightweight ping; uses local if reachable, Haiku otherwise
+- [ ] AC-3: `DistillationClient` exposes a single `async def complete(prompt: str) -> str` interface used by all cognitive passes (Persona, Scenario, future)
+- [ ] AC-4: `depthfusion_status` reports the resolved backend (`local` or `haiku`) and local endpoint URL when auto-probed
+- [ ] AC-5: Tests cover local-reachable path, local-unreachable → Haiku fallback, and explicit `"haiku"` override
+
+**Tasks:**
+- [ ] T-784: Add `distillation_backend` + `local_llm_url` fields to `DepthFusionConfig` (`core/config.py`) and env loading
+- [ ] T-785: Add `src/depthfusion/cognitive/distillation_client.py` — `DistillationClient(config)` with `_probe_local()`, `_complete_local()`, `_complete_haiku()`, and `complete()` dispatcher
+- [ ] T-786: Expose resolved backend in `_tool_status` (`mcp/tools/system.py`)
+- [ ] T-787: Add `tests/cognitive/test_distillation_client.py` (local-up, local-down→haiku, explicit-haiku, status reporting)
+
+### S-229: As a DepthFusion user, I want an auto-generated L3 Persona so that recall has a stable "who is this user" anchor without manual /learn discipline `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `PersonaEngine.generate(scope)` distills all L1 memories for a project scope into a `persona.md` file at `~/.claude/shared/discoveries/persona-{project_id}.md`
+- [ ] AC-2: Generation triggers automatically every `persona_trigger_every_n` new memories (configurable, default 50); skips if memory count delta < threshold
+- [ ] AC-3: `depthfusion_recall_relevant` accepts `include_persona: bool = False`; when `True`, prepends the persona.md content as a preamble to the result
+- [ ] AC-4: `depthfusion_status` reports `persona_last_updated` ISO timestamp and memory count at last generation
+- [ ] AC-5: Tests: persona generated from ≥50 mock memories, threshold gate respected, persona injected in recall output, distillation uses `DistillationClient` (S-228)
+
+**Tasks:**
+- [ ] T-788: Add `persona_trigger_every_n: int = 50` to `DepthFusionConfig`
+- [ ] T-789: Add `src/depthfusion/cognitive/persona.py` — `PersonaEngine(config, distillation_client)` with `generate(scope)` and `maybe_trigger(scope, new_count)`
+- [ ] T-790: Wire `PersonaEngine.maybe_trigger()` into the memory ingestion path (`_tool_auto_learn` / `_tool_ingest_conversation`)
+- [ ] T-791: Add `include_persona` param to `_tool_recall_relevant` in `mcp/tools/recall.py`
+- [ ] T-792: Expose `persona_last_updated` in `_tool_status`
+- [ ] T-793: Add `tests/cognitive/test_persona_engine.py` (generation, threshold gate, recall injection, distillation client integration)
+
+### S-230: As a DepthFusion user, I want L2 Scenario grouping so that related memories are clustered into readable scene blocks rather than a flat list `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `ScenarioEngine.rebuild(scope)` clusters L1 memories by embedding similarity + time window into named scene blocks, stored as `~/.claude/shared/discoveries/scenarios-{project_id}.md`
+- [ ] AC-2: Scenario rebuild is triggered after every Persona generation pass (S-229 → S-230 dependency chain)
+- [ ] AC-3: `depthfusion_recall_relevant` accepts `include_scenarios: bool = False`; when `True`, includes the matching scenario block summary alongside L1 atoms
+- [ ] AC-4: Scene block names are distilled by `DistillationClient` (S-228); fallback to timestamp-based label if distillation unavailable
+- [ ] AC-5: Tests: memories cluster correctly by topic/time, scenario file produced, recall includes scenario summary, rebuild triggered after persona generation
+
+**Tasks:**
+- [ ] T-794: Add `src/depthfusion/cognitive/scenario.py` — `ScenarioEngine(config, distillation_client)` with `rebuild(scope)` clustering (cosine similarity threshold + 24h time window)
+- [ ] T-795: Wire `ScenarioEngine.rebuild()` into `PersonaEngine.generate()` post-pass
+- [ ] T-796: Add `include_scenarios` param to `_tool_recall_relevant`
+- [ ] T-797: Add `tests/cognitive/test_scenario_engine.py` (clustering, file output, recall injection, rebuild trigger)
+
+### S-231: As a DepthFusion user running long sessions, I want context offloading with a Mermaid canvas so that verbose tool logs leave context and token usage drops materially `P2` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `ContextOffloader.offload(text, session_id)` writes verbose content to `~/.claude/shared/refs/{session_id}/{node_id}.md` and returns a compact Mermaid node reference string
+- [ ] AC-2: `depthfusion_compress_session` (existing tool) is extended to produce a Mermaid task canvas summarising the session's key state transitions; canvas is returned in the tool response and stored alongside the discovery file
+- [ ] AC-3: `depthfusion_bridge` accepts a `node_id` argument and returns the raw offloaded text from the corresponding `refs/` file (drill-down path)
+- [ ] AC-4: Mermaid canvas is token-capped at `offload_mmd_max_tokens` (default 400, configurable); excess nodes are summarised into an overflow node
+- [ ] AC-5: `offload_enabled` defaults to `False`; must be explicitly enabled (opt-in to avoid unexpected file writes)
+- [ ] AC-6: Tests: round-trip offload → node_id → bridge retrieval, Mermaid syntax validity check, token cap enforced, overflow node produced when exceeded
+
+**Tasks:**
+- [ ] T-798: Add `offload_enabled: bool = False` and `offload_mmd_max_tokens: int = 400` to `DepthFusionConfig`
+- [ ] T-799: Add `src/depthfusion/cognitive/offloader.py` — `ContextOffloader(config)` with `offload(text, session_id) -> str` (writes refs file, returns Mermaid node ref)
+- [ ] T-800: Extend `_tool_compress_session` in `mcp/tools/capture.py` to call `ContextOffloader` and produce Mermaid canvas when `offload_enabled`
+- [ ] T-801: Add `node_id` lookup to `_tool_bridge` in `mcp/tools/bridge.py`
+- [ ] T-802: Expose `offload_enabled` and `refs_count` in `_tool_status`
+- [ ] T-803: Add `tests/cognitive/test_offloader.py` (round-trip, token cap, overflow node, Mermaid syntax, node_id bridge retrieval)
