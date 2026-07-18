@@ -33,6 +33,9 @@ def _tool_recall(arguments: dict) -> str:
     zero) — absence is the signal for "this capability wasn't invoked".
     Metrics emission failures are swallowed so observability can never
     break recall.
+
+    E-68 S-229: when ``include_persona=True`` is in *arguments*, prepend the
+    persona file content for the resolved project as a preamble in the response.
     """
     import hashlib
 
@@ -119,7 +122,122 @@ def _tool_recall(arguments: dict) -> str:
     except Exception as exc:  # noqa: BLE001 — observability must not raise
         logger.debug("recall metrics emission failed: %s", exc)
 
+    # S-229: prepend persona preamble when include_persona=True.
+    if arguments.get("include_persona", False):
+        try:
+            response_json = _prepend_persona_preamble(response_json, arguments)
+        except Exception as exc:  # noqa: BLE001 — persona must not break recall
+            logger.debug("persona preamble injection failed: %s", exc)
+
+    # S-230: inject matching scenario block summary when include_scenarios=True.
+    if arguments.get("include_scenarios", False):
+        try:
+            response_json = _inject_scenario_summary(response_json, arguments)
+        except Exception as exc:  # noqa: BLE001 — scenarios must not break recall
+            logger.debug("scenario summary injection failed: %s", exc)
+
     return response_json
+
+
+def _prepend_persona_preamble(response_json: str, arguments: dict) -> str:
+    """Prepend the persona-{project_id}.md content as a preamble field.
+
+    The persona content is added as a ``persona_preamble`` key at the top of the
+    response dict, so MCP clients can display it before the retrieval blocks.
+    If the persona file does not exist, the key is omitted (no error).
+    """
+    from pathlib import Path
+
+    # Resolve project_id from argument overrides or auto-detect.
+    project_id: str | None = None
+    _raw = str(arguments.get("project", "")).strip()
+    if _raw:
+        import re as _re
+        project_id = _re.sub(r"[^a-z0-9-]", "-", _raw.lower()).strip("-") or None
+
+    if project_id is None:
+        try:
+            from depthfusion.hooks.git_post_commit import detect_project
+            detected = detect_project()
+            if detected and detected != "unknown":
+                project_id = detected
+        except Exception:
+            pass
+
+    if not project_id:
+        return response_json
+
+    persona_path = (
+        Path.home() / ".claude" / "shared" / "discoveries" / f"persona-{project_id}.md"
+    )
+    if not persona_path.exists():
+        return response_json
+
+    try:
+        persona_content = persona_path.read_text(encoding="utf-8")
+    except OSError:
+        return response_json
+
+    if not persona_content.strip():
+        return response_json
+
+    try:
+        data = json.loads(response_json)
+        data["persona_preamble"] = persona_content
+        # Move persona_preamble to the front of the dict for readability.
+        ordered: dict[Any, Any] = {"persona_preamble": data.pop("persona_preamble")}
+        ordered.update(data)
+        return json.dumps(ordered, indent=2)
+    except (json.JSONDecodeError, TypeError):
+        return response_json
+
+def _inject_scenario_summary(response_json: str, arguments: dict) -> str:
+    """Inject matching scenario block summary as ``scenario_summary`` in the response.
+
+    E-68 S-230 AC-3: when ``include_scenarios=True``, the most relevant scenario
+    block for the query is added to the response dict alongside L1 atoms.
+    If no scenarios file exists for the project, the key is omitted.
+    """
+    import re as _re
+
+    # Resolve project_id (same logic as _prepend_persona_preamble).
+    project_id: str | None = None
+    _raw = str(arguments.get("project", "")).strip()
+    if _raw:
+        project_id = _re.sub(r"[^a-z0-9-]", "-", _raw.lower()).strip("-") or None
+
+    if project_id is None:
+        try:
+            from depthfusion.hooks.git_post_commit import detect_project
+            detected = detect_project()
+            if detected and detected != "unknown":
+                project_id = detected
+        except Exception:
+            pass
+
+    if not project_id:
+        return response_json
+
+    # Get the query for relevance matching.
+    query = str(arguments.get("query", "")).strip()
+
+    try:
+        from depthfusion.cognitive.scenario import scenario_block_summary
+        summary = scenario_block_summary(project_id, query=query)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("scenario_block_summary raised: %s", exc)
+        return response_json
+
+    if not summary:
+        return response_json
+
+    try:
+        data = json.loads(response_json)
+        data["scenario_summary"] = summary
+        return json.dumps(data, indent=2)
+    except (json.JSONDecodeError, TypeError):
+        return response_json
+
 
 def _tool_recall_feedback(arguments: dict) -> str:
     """E-27 / S-72 — recall feedback loop entry point."""

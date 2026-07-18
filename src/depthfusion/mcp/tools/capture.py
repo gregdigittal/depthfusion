@@ -98,7 +98,7 @@ def _tool_publish_context(arguments: dict, config: Any = None) -> str:
         result = {"indexed_in_hnsw": indexed_in_hnsw, "result": result}
     return json.dumps(result)
 
-def _tool_auto_learn(arguments: dict) -> str:
+def _tool_auto_learn(arguments: dict, config: Any = None) -> str:
     """Trigger auto-learn: session compression or ambient capture (S-110)."""
     mode = arguments.get("mode", "session")
     if mode == "ambient":
@@ -136,6 +136,14 @@ def _tool_auto_learn(arguments: dict) -> str:
             if out:
                 results.append(str(out.name))
                 summarize_and_extract_graph(out, project, graph_store)
+
+        # S-229: maybe_trigger PersonaEngine after ingestion.
+        _maybe_trigger_persona(
+            scope={"project": project} if project else {},
+            new_count=len(results),
+            config=config,
+        )
+
         return json.dumps({
             "compressed": len(results),
             "files": results,
@@ -176,8 +184,134 @@ def _handle_ambient_capture(arguments: dict) -> str:
     except Exception as exc:
         return json.dumps({"error": str(exc), "published": False})
 
-def _tool_compress_session(arguments: dict) -> str:
-    """Compress a specific .tmp file into a discovery file."""
+def _build_mermaid_canvas(
+    session_id: str,
+    output_path: str,
+    *,
+    max_tokens: int = 400,
+) -> str:
+    """Build a Mermaid task-canvas representing session state transitions.
+
+    Reads the discovery file at *output_path* to extract state transitions
+    (lines starting with ``#`` headings or ``-`` bullet prefixes).  Each
+    transition becomes a Mermaid flowchart node.  The canvas is token-capped
+    at *max_tokens* using a char-based heuristic (~4 chars/token): when the
+    rendered diagram would exceed the cap, excess nodes are collapsed into a
+    single ``overflow`` node.
+
+    Parameters
+    ----------
+    session_id:
+        Used as the Mermaid diagram title and in overflow node labels.
+    output_path:
+        Path to the compressed discovery file (used as source of state lines).
+    max_tokens:
+        Maximum token budget for the canvas (~4 chars/token).
+
+    Returns
+    -------
+    str
+        A Mermaid ``flowchart TD`` diagram string.
+    """
+    from pathlib import Path as _Path
+
+    _CHARS_PER_TOKEN = 4
+    max_chars = max_tokens * _CHARS_PER_TOKEN
+
+    # Extract state lines from the discovery file.
+    state_lines: list[str] = []
+    try:
+        text = _Path(output_path).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or stripped.startswith("- "):
+                label = stripped.lstrip("#- ").strip()
+                if label:
+                    state_lines.append(label[:60])  # clamp node label length
+    except OSError:
+        pass
+
+    if not state_lines:
+        state_lines = ["session_start", "compress", "done"]
+
+    # Build Mermaid header
+    header = f"flowchart TD\n    title[\"{session_id} state canvas\"]\n"
+    nodes: list[str] = []
+    edges: list[str] = []
+
+    prev_id = "title"
+    for idx, label in enumerate(state_lines):
+        safe_label = label.replace('"', "'")
+        node_id = f"n{idx}"
+        nodes.append(f'    {node_id}["{safe_label}"]')
+        edges.append(f"    {prev_id} --> {node_id}")
+        prev_id = node_id
+
+    # Assemble and check size; collapse overflow nodes if needed
+    def _assemble(n: list[str], e: list[str]) -> str:
+        parts: list[str] = []
+        if n:
+            parts.append("\n".join(n))
+        if e:
+            parts.append("\n".join(e))
+        return header + "\n".join(parts) + "\n"
+
+    canvas = _assemble(nodes, edges)
+
+    if len(canvas) > max_chars and len(nodes) > 1:
+        overflow_node_template = '    overflow["… +{n} more nodes (token cap)"]'
+        # Use worst-case node count for size estimation (overestimates slightly).
+        worst_overflow_node = overflow_node_template.format(n=len(nodes))
+        overflow_edge_template = "    {anchor} --> overflow"
+        # Worst-case anchor is "title" (5 chars); any n-prefixed id is shorter.
+        worst_overflow_edge = overflow_edge_template.format(anchor="title")
+        overflow_chunk = len(worst_overflow_node) + 1 + len(worst_overflow_edge) + 1
+
+        # Budget available for regular nodes + edges (excluding header and overflow).
+        overflow_budget = max_chars - len(header) - overflow_chunk
+
+        kept_nodes: list[str] = []
+        kept_edges: list[str] = []
+        running = 0
+        cutoff = 0
+
+        if overflow_budget > 0:
+            for i, (nd, ed) in enumerate(zip(nodes, edges)):
+                chunk = len(nd) + 1 + len(ed) + 1
+                if running + chunk > overflow_budget:
+                    cutoff = i
+                    break
+                kept_nodes.append(nd)
+                kept_edges.append(ed)
+                running += chunk
+            else:
+                cutoff = len(nodes)
+
+        overflow_count = len(nodes) - cutoff
+        if overflow_count > 0:
+            last_kept_id = f"n{cutoff - 1}" if cutoff > 0 else "title"
+            kept_nodes.append(overflow_node_template.format(n=overflow_count))
+            kept_edges.append(overflow_edge_template.format(anchor=last_kept_id))
+
+        canvas = _assemble(kept_nodes, kept_edges)
+
+    # Hard clamp: if the canvas (even overflow-only) still exceeds max_chars,
+    # return a minimal header-only string clamped to max_chars.  This occurs
+    # when max_tokens is so small that header + overflow node > max_chars.
+    # We truncate rather than exceed the budget.
+    if len(canvas) > max_chars:
+        canvas = canvas[:max_chars]
+
+    return canvas
+
+
+def _tool_compress_session(arguments: dict, config: object = None) -> str:
+    """Compress a specific .tmp file into a discovery file.
+
+    When ``offload_enabled`` is set on *config*, also produces a Mermaid
+    task-canvas of session state transitions, returned in the response and
+    stored alongside the discovery file.
+    """
     from pathlib import Path
     session_path_str = arguments.get("session_path", "")
     if not session_path_str:
@@ -186,12 +320,35 @@ def _tool_compress_session(arguments: dict) -> str:
         from depthfusion.capture.compressor import SessionCompressor
         compressor = SessionCompressor()
         out = compressor.compress(Path(session_path_str))
-        if out:
-            return json.dumps({"success": True, "output": str(out)})
-        return json.dumps({
-            "success": False,
-            "message": "Nothing to compress (empty or already done)",
-        })
+        if not out:
+            return json.dumps({
+                "success": False,
+                "message": "Nothing to compress (empty or already done)",
+            })
+
+        # Base success response
+        result: dict = {"success": True, "output": str(out)}
+
+        # S-231: Mermaid canvas when offload_enabled
+        offload_enabled = getattr(config, "offload_enabled", False)
+        if offload_enabled:
+            max_tokens = getattr(config, "offload_mmd_max_tokens", 400)
+            session_id = Path(session_path_str).stem
+            canvas = _build_mermaid_canvas(
+                session_id=session_id,
+                output_path=str(out),
+                max_tokens=max_tokens,
+            )
+            # Store alongside discovery file
+            canvas_path = out.with_suffix(".mmd")
+            try:
+                canvas_path.write_text(canvas, encoding="utf-8")
+            except OSError as exc:
+                logger.warning("[compress] failed to write canvas %s: %s", canvas_path, exc)
+            result["mermaid_canvas"] = canvas
+            result["canvas_path"] = str(canvas_path)
+
+        return json.dumps(result)
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -306,7 +463,7 @@ def _tool_inspect_discovery(arguments: dict) -> str:
         "frontmatter": frontmatter,
     }, indent=2)
 
-def _tool_ingest_conversation(arguments: dict) -> str:
+def _tool_ingest_conversation(arguments: dict, config: Any = None) -> str:
     import hashlib
     import json
 
@@ -355,12 +512,38 @@ def _tool_ingest_conversation(arguments: dict) -> str:
         except Exception as exc:
             errors.append(str(exc))
             skipped += 1
+
+    # S-229: maybe_trigger PersonaEngine after ingestion.
+    _maybe_trigger_persona(
+        scope={"project": provider},
+        new_count=fragments_stored,
+        config=config,
+    )
+
     return json.dumps({
         "fragments_stored": fragments_stored,
         "skipped": skipped,
         "provider": provider,
         "errors": errors,
     })
+
+def _maybe_trigger_persona(
+    scope: dict,
+    new_count: int,
+    config: Any = None,
+) -> None:
+    """S-229: fire PersonaEngine.maybe_trigger when a persona engine is available.
+
+    Errors are swallowed so persona generation never crashes capture tools.
+    """
+    try:
+        from depthfusion.cognitive.persona import get_persona_engine
+        engine = get_persona_engine()
+        if engine is not None:
+            engine.maybe_trigger(scope, new_count)
+    except Exception as exc:  # noqa: BLE001 — graceful degradation
+        logger.debug("PersonaEngine.maybe_trigger failed (suppressed): %s", exc)
+
 
 def register_capture() -> None:
     """Register capture domain tools (stub for v2 tooling framework)."""

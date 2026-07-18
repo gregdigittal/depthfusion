@@ -140,6 +140,17 @@ class DepthFusionConfig:
     # E-67 S-224: active profile name (set by from_profile(); empty = standard)
     profile: str = ""                # "minimal"|"standard"|"server"|"research"|""
 
+    # E-68 S-228 DistillationClient
+    distillation_backend: str = "auto"   # "auto" | "local" | "haiku"
+    local_llm_url: str = ""              # e.g. "http://127.0.0.1:11434/v1"
+
+    # E-68 S-229 PersonaEngine
+    persona_trigger_every_n: int = 50   # DEPTHFUSION_PERSONA_TRIGGER_EVERY_N
+
+    # E-68 S-231 ContextOffloader (opt-in)
+    offload_enabled: bool = False        # DEPTHFUSION_OFFLOAD_ENABLED
+    offload_mmd_max_tokens: int = 400    # DEPTHFUSION_OFFLOAD_MMD_MAX_TOKENS
+
     # E-34 S-109 skill surfacing
     auto_draft_threshold: int = 3    # min distinct sessions before candidate is drafted
 
@@ -240,6 +251,11 @@ class DepthFusionConfig:
             cognitive_scoring_enabled=_env_bool("DEPTHFUSION_COGNITIVE_SCORING", False),
             cache_enabled=_env_bool("DEPTHFUSION_CACHE_ENABLED", False),
             profile=os.environ.get("DEPTHFUSION_PROFILE", ""),
+            distillation_backend=os.environ.get("DEPTHFUSION_DISTILLATION_BACKEND", "auto"),
+            local_llm_url=os.environ.get("DEPTHFUSION_LOCAL_LLM_URL", ""),
+            persona_trigger_every_n=_env_int("DEPTHFUSION_PERSONA_TRIGGER_EVERY_N", 50),
+            offload_enabled=_env_bool("DEPTHFUSION_OFFLOAD_ENABLED", False),
+            offload_mmd_max_tokens=_env_int("DEPTHFUSION_OFFLOAD_MMD_MAX_TOKENS", 400),
         )
 
     @classmethod
