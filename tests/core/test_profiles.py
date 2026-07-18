@@ -6,7 +6,6 @@ import pytest
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.core.profiles import PROFILE_NAMES, get_profile_overrides
 
-
 # ---------------------------------------------------------------------------
 # get_profile_overrides
 # ---------------------------------------------------------------------------

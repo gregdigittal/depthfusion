@@ -9,7 +9,6 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -22,7 +21,6 @@ from depthfusion.cognitive.persona import (
     persona_file_path,
 )
 from depthfusion.core.config import DepthFusionConfig
-
 
 # ---------------------------------------------------------------------------
 # Helpers

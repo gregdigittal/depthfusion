@@ -34,7 +34,9 @@ jobs:
 
       - name: Audit Python dependencies
         # Audit the installed environment. Exits non-zero on any CVE found.
-        run: pip-audit
+        # PYSEC-2026-311: chromadb >=1.0 — no fix version published as of 2026-07-18;
+        # suppressed until upstream releases a patch. Track: https://pypi.org/project/chromadb/
+        run: pip-audit --ignore-vuln PYSEC-2026-311
 
   npm-audit:
     name: "Node.js dependency audit (npm audit)"
