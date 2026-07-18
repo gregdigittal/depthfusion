@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useDashboard } from './hooks/useDashboard'
 import { useStats } from './hooks/useStats'
 import type { StatsData } from './hooks/useStats'
+import { useCognitiveStatus } from './hooks/useCognitiveStatus'
 import { TileGrid } from './components/TileGrid'
 
 function RecentActivity() {
@@ -90,6 +91,25 @@ function SyncStatus({ stats, error }: { stats: StatsData | null; error: string |
   )
 }
 
+function CognitiveSummary() {
+  const { data, loading, error } = useCognitiveStatus()
+  if (loading) return <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>Loading…</div>
+  if (error || !data) return <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>—</div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ color: 'var(--text)', fontSize: 'var(--fs-body)' }}>
+        {data.persona.memory_count_at_last_generation ?? 0} memories
+      </div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>
+        {data.offload.refs_count} offloaded refs
+      </div>
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-micro)' }}>
+        Backend: {data.distillation.resolved_backend}
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const { tiles } = useDashboard()
   const { data: stats, error } = useStats()
@@ -99,6 +119,7 @@ export function DashboardPage() {
     'search-stats': <SearchStats stats={stats} error={error} />,
     'storage-usage': <StorageUsage />,
     'sync-status': <SyncStatus stats={stats} error={error} />,
+    'cognitive-summary': <CognitiveSummary />,
   }
 
   return (

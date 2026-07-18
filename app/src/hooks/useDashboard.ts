@@ -14,6 +14,7 @@ const DEFAULT_TILES: TileConfig[] = [
   { id: 'search-stats', title: 'Search Stats', width: 1, height: 1 },
   { id: 'storage-usage', title: 'Storage Usage', width: 1, height: 1 },
   { id: 'sync-status', title: 'Sync Status', width: 1, height: 1 },
+  { id: 'cognitive-summary', title: 'Cognition', width: 1, height: 1 },
 ]
 
 function loadFromStorage(): TileConfig[] {

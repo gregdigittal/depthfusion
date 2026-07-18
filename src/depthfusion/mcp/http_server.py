@@ -389,6 +389,80 @@ async def rest_stats(
 
 
 # ---------------------------------------------------------------------------
+# Cognitive REST endpoints (S-232)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/cognitive/status")
+async def rest_cognitive_status(
+    _: None = Depends(_check_mcp_auth),
+):
+    """Return persona, offload, and distillation status from the cognitive layer."""
+    from depthfusion.mcp.tools.system import _tool_status  # lazy import
+
+    config = DepthFusionConfig.from_env()
+    raw = _tool_status(config)
+    return json.loads(raw)
+
+
+@app.post("/api/v1/cognitive/bridge")
+async def rest_cognitive_bridge(
+    request: Request,
+    _: None = Depends(_check_mcp_auth),
+):
+    """Retrieve raw offloaded text for a node_id from refs/."""
+    from depthfusion.mcp.tools.bridge import _tool_bridge  # lazy import
+
+    body: dict = await request.json()
+    node_id = body.get("node_id", "")
+    session_id = body.get("session_id", "")
+    if not node_id:
+        return {"error": "node_id is required"}
+    config = DepthFusionConfig.from_env()
+    raw = _tool_bridge({"node_id": node_id, "session_id": session_id}, config)
+    return json.loads(raw)
+
+
+@app.get("/api/v1/cognitive/scenarios")
+async def rest_cognitive_scenarios(
+    _: None = Depends(_check_mcp_auth),
+):
+    """Return parsed scenario blocks for the current project."""
+    import pathlib
+    import re
+
+    discoveries_dir = pathlib.Path("~/.claude/shared/discoveries").expanduser()
+    scenarios: list[dict] = []
+    project_ids: list[str] = []
+
+    pattern = re.compile(r"^scenarios-(.+)\.md$")
+    for path in sorted(discoveries_dir.glob("scenarios-*.md")):
+        m = pattern.match(path.name)
+        if not m:
+            continue
+        project_id = m.group(1)
+        project_ids.append(project_id)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        # Parse ## Scene headings as scenario blocks
+        blocks = re.split(r"\n(?=## )", text.strip())
+        for block in blocks:
+            lines = block.strip().splitlines()
+            if not lines:
+                continue
+            title = lines[0].lstrip("# ").strip()
+            body = "\n".join(lines[1:]).strip()
+            scenarios.append({
+                "project_id": project_id,
+                "title": title,
+                "summary": body[:400],
+            })
+
+    return {"scenarios": scenarios, "project_ids": project_ids}
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

@@ -101,3 +101,107 @@ export async function setupSoloAuth(apiKey: string): Promise<void> {
 export async function setupConnectAuth(bearerToken: string): Promise<void> {
   return invoke<void>('setup_connect_auth', { bearerToken })
 }
+
+// ---------------------------------------------------------------------------
+// Cognitive / Memory endpoints (S-232)
+// ---------------------------------------------------------------------------
+
+export interface CognitivePersona {
+  persona_trigger_every_n: number
+  persona_last_updated: string | null
+  memory_count_at_last_generation: number | null
+}
+
+export interface CognitiveOffload {
+  offload_enabled: boolean
+  offload_mmd_max_tokens: number
+  refs_count: number
+}
+
+export interface CognitiveDistillation {
+  configured_backend: string
+  local_llm_url: string
+  resolved_backend: string
+}
+
+export interface CognitiveStatus {
+  depthfusion: string
+  persona: CognitivePersona
+  offload: CognitiveOffload
+  distillation: CognitiveDistillation
+  rlm_enabled: boolean
+  router_enabled: boolean
+  session_enabled: boolean
+  fusion_enabled: boolean
+}
+
+export interface CognitiveScenario {
+  project_id: string
+  title: string
+  summary: string
+}
+
+export interface CognitiveScenariosResponse {
+  scenarios: CognitiveScenario[]
+  project_ids: string[]
+}
+
+export interface BridgeResponse {
+  node_id: string
+  session_id: string
+  text: string
+  error?: string
+}
+
+async function _cognitiveHeaders(): Promise<HeadersInit> {
+  const tokens = await loadTokens()
+  return tokens ? { Authorization: `Bearer ${tokens.access_token}` } : {}
+}
+
+/**
+ * Fetch persona, offload, and distillation status from the cognitive layer.
+ * Mirrors the depthfusion_status MCP tool via a dedicated REST endpoint.
+ */
+export async function getCognitiveStatus(): Promise<CognitiveStatus> {
+  const [serverUrl, headers] = await Promise.all([
+    getServerUrl(),
+    _cognitiveHeaders(),
+  ])
+  const resp = await fetch(`${serverUrl}/api/v1/cognitive/status`, { headers })
+  if (!resp.ok) throw new Error(`cognitive/status ${resp.status}`)
+  return resp.json()
+}
+
+/**
+ * Retrieve raw offloaded text for a refs/ node.
+ * Mirrors the depthfusion_bridge MCP tool's node_id retrieval path.
+ */
+export async function fetchBridgeContent(
+  nodeId: string,
+  sessionId = '',
+): Promise<BridgeResponse> {
+  const [serverUrl, headers] = await Promise.all([
+    getServerUrl(),
+    _cognitiveHeaders(),
+  ])
+  const resp = await fetch(`${serverUrl}/api/v1/cognitive/bridge`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node_id: nodeId, session_id: sessionId }),
+  })
+  if (!resp.ok) throw new Error(`cognitive/bridge ${resp.status}`)
+  return resp.json()
+}
+
+/**
+ * Fetch parsed scenario blocks from the server's discoveries directory.
+ */
+export async function getCognitiveScenarios(): Promise<CognitiveScenariosResponse> {
+  const [serverUrl, headers] = await Promise.all([
+    getServerUrl(),
+    _cognitiveHeaders(),
+  ])
+  const resp = await fetch(`${serverUrl}/api/v1/cognitive/scenarios`, { headers })
+  if (!resp.ok) throw new Error(`cognitive/scenarios ${resp.status}`)
+  return resp.json()
+}

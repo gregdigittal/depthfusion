@@ -15,14 +15,16 @@ import { GraphPage } from './GraphPage'
 import { DocumentViewer } from './DocumentViewer'
 import { SettingsPage } from './SettingsPage'
 import { SetupWizardPage } from './wizard/SetupWizardPage'
-import { LayoutDashboard, Search, GitFork, Settings } from 'lucide-react'
+import { LayoutDashboard, Search, GitFork, Settings, Brain } from 'lucide-react'
+import { CognitivePage } from './pages/CognitivePage'
 
-type Route = 'dashboard' | 'search' | 'graph' | 'settings'
+type Route = 'dashboard' | 'search' | 'graph' | 'settings' | 'memory'
 
 const NAV_TABS: { id: Route; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'search',    label: 'Search',    Icon: Search },
   { id: 'graph',     label: 'Graph',     Icon: GitFork },
+  { id: 'memory',   label: 'Memory',    Icon: Brain },
 ]
 
 function App() {
@@ -176,6 +178,7 @@ function App() {
           {route === 'settings' && (
             <SettingsPage onBack={() => setRoute('dashboard')} />
           )}
+          {route === 'memory' && <CognitivePage />}
         </main>
 
         {/* Document viewer drawer */}
