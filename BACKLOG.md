@@ -3796,3 +3796,28 @@
 - [x] T-801: Add `node_id` lookup to `_tool_bridge` in `mcp/tools/bridge.py`
 - [x] T-802: Expose `offload_enabled` and `refs_count` in `_tool_status`
 - [x] T-803: Add `tests/cognitive/test_offloader.py` (round-trip, token cap, overflow node, Mermaid syntax, node_id bridge retrieval)
+
+---
+
+## E-69: Tauri Desktop — Cognitive & Memory Panel [backlog]
+
+> Expose the E-68 layered memory layer (PersonaEngine L3, ScenarioEngine L2, ContextOffloader refs) in the Tauri desktop UI so users can inspect, understand, and interact with DepthFusion's cognitive state without dropping to the CLI.
+
+### S-232: As a DepthFusion desktop user, I want a Cognitive/Memory panel in the Tauri app so that I can inspect persona, scenarios, and offloaded context refs without needing CLI access `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: A "Memory" tab/panel is accessible from the main navigation
+- [ ] AC-2: Panel displays current persona summary (from `persona_last_updated` + persona file content) with last-generated timestamp
+- [ ] AC-3: Panel lists active scenarios (from ScenarioEngine output files) with memory count and time window per cluster
+- [ ] AC-4: Panel shows ContextOffloader refs count and lists offloaded node IDs with truncated previews; clicking a node fetches full content via `depthfusion_bridge`
+- [ ] AC-5: Panel shows distillation backend in use (local/haiku/auto) from `depthfusion_status` MCP tool
+- [ ] AC-6: A "Trigger Persona Rebuild" action calls the appropriate MCP tool and shows a success/error toast
+- [ ] AC-7: All data fetched via existing MCP tool calls through `ipc.ts` — no new backend endpoints required
+
+**Tasks:**
+- [ ] T-804: Add `CognitivePage.tsx` — Memory panel shell with tab navigation (Persona / Scenarios / Refs)
+- [ ] T-805: Wire `depthfusion_status` call into the panel to display backend mode, persona timestamp, refs count
+- [ ] T-806: Add `ScenarioList` component — reads scenario file summaries via `depthfusion_recall_relevant` or a new status sub-field
+- [ ] T-807: Add `RefsBrowser` component — lists offloaded node IDs, fetches content on-demand via `depthfusion_bridge`
+- [ ] T-808: Add "Memory" route to `App.tsx` navigation and link from Dashboard stats tiles
+- [ ] T-809: Add `tests/app/CognitivePage.test.tsx` — mock MCP responses, assert panel renders persona/scenarios/refs correctly
