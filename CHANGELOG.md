@@ -10,6 +10,32 @@ Conventions:
 
 ---
 
+## [Unreleased]
+
+### Added
+
+**E-68 — Layered Memory Augmentation (TencentDB Agent Memory-inspired):**
+- `src/depthfusion/cognitive/distillation_client.py`: `DistillationClient(config)` — configurable AI distillation backend; probes `DEPTHFUSION_LOCAL_LLM_URL` in `auto` mode, falls back to Haiku; `DEPTHFUSION_DISTILLATION_BACKEND=auto|local|haiku` (S-228)
+- `src/depthfusion/cognitive/persona.py`: `PersonaEngine` — auto-generates L3 user persona every `persona_trigger_every_n` (default 50) new memories; writes `~/.claude/shared/discoveries/persona-{project_id}.md`; wired into `depthfusion_capture` ingestion path (S-229)
+- `src/depthfusion/cognitive/scenario.py`: `ScenarioEngine` — clusters memories by cosine similarity + 24 h time window into L2 scene blocks; writes `scenarios-{project_id}.md`; triggered post-persona (S-230)
+- `src/depthfusion/cognitive/offloader.py`: `ContextOffloader` — offloads verbose blobs to `~/.claude/shared/refs/{session_id}/{node_id}.md`; returns compact Mermaid node refs `ref_{id}[/"📎 ctx:{id}"/]` (S-231)
+- `src/depthfusion/mcp/tools/bridge.py`: `node_id` retrieval path — `depthfusion_bridge node_id=<id>` returns raw blob without LLM call (S-231)
+- `src/depthfusion/mcp/tools/capture.py`: `depthfusion_compress_session` extended to produce Mermaid task canvas; `PersonaEngine.maybe_trigger()` wired into ingestion (S-229, S-231)
+- `src/depthfusion/mcp/tools/recall.py`: `include_persona` and `include_scenarios` params on `depthfusion_recall_relevant` (S-229, S-230)
+- `src/depthfusion/mcp/tools/system.py`: `depthfusion_status` reports `distillation_backend`, `persona_last_updated`, `offload_enabled`, `refs_count` (S-228, S-229, S-231)
+- `src/depthfusion/core/config.py`: `distillation_backend`, `local_llm_url`, `persona_trigger_every_n`, `offload_enabled`, `offload_mmd_max_tokens` fields (S-228, S-231)
+- `tests/test_cognitive/test_distillation_client.py`: 15 tests (S-228)
+- `tests/test_cognitive/test_persona_engine.py`: 25 tests (S-229)
+- `tests/test_cognitive/test_scenario_engine.py`: 67 tests (S-230)
+- `tests/test_cognitive/test_offloader.py`: 16 tests + 14 security path-traversal cases (S-231)
+
+### Security
+
+- `src/depthfusion/cognitive/offloader.py`: `_assert_confined()` — `path.resolve().relative_to(refs_base)` confinement check before any read or write; `PermissionError` on escape (S-231)
+- `src/depthfusion/mcp/tools/bridge.py`: allowlist regex `^[A-Za-z0-9_\-]+$` on `node_id` / `session_id` at MCP boundary before reaching `ContextOffloader` (S-231)
+
+---
+
 ## [v2.2.0] — 2026-07-12
 
 ### Added

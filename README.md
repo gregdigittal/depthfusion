@@ -6,11 +6,11 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
-> **v2.2.0 — now on main:** DepthFusion v2.2.0 closes E-65 (auth wizard: Solo/VPS/Connect setup flows, OIDC deep-link callback) and E-67 (claims-reality rectification: named profiles, Fernet cache wired, embedding consolidation, real MRR@10/nDCG@5 goldset, dispatcher parity, config flag visibility). All backlog epics are now `[done]`. For v2.1.x see the `v2.1.1` git tag.
+> **v2.2.0+ — now on main:** DepthFusion v2.2.0 closes E-65 (auth wizard: Solo/VPS/Connect setup flows, OIDC deep-link callback) and E-67 (claims-reality rectification: named profiles, Fernet cache wired, embedding consolidation, real MRR@10/nDCG@5 goldset, dispatcher parity, config flag visibility). **Post-tag on main:** E-68 adds the layered memory augmentation layer — configurable AI distillation backend (auto/local/haiku), L3 PersonaEngine (auto-generated user persona every 50 memories), L2 ScenarioEngine (cosine-similarity + 24h time-window clustering into readable scene blocks), and ContextOffloader (Mermaid canvas + `refs/` offloading for long sessions). All backlog epics are now `[done]`. For v2.1.x see the `v2.1.1` git tag.
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v2.2.0 (main). 3545+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). Named configuration profiles (E-67). **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.2.0+ (main). 3692+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). Named configuration profiles (E-67). **Layered memory augmentation (E-68):** configurable AI distillation backend (auto/local/haiku), L3 PersonaEngine, L2 ScenarioEngine, ContextOffloader + Mermaid canvas. **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -27,6 +27,10 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 | Offline mode | Encrypted local cache; queued write replay on reconnect | [user-guide.md §4](docs/v2/user-guide.md) |
 | Admin runbooks | Device approval/revocation, role assignment, backup/restore, audit queries | [admin-runbooks.md](docs/v2/admin-runbooks.md) |
 | ChatGPT Desktop (macOS) | Connect ChatGPT Desktop to DepthFusion's MCP server via SSE — 31 tools available; one-step install script | [chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md) |
+| AI Distillation Backend (E-68) | Configurable LLM backend for memory passes: `auto` probes local vLLM first, falls back to Haiku. Set `DEPTHFUSION_DISTILLATION_BACKEND=auto\|local\|haiku` | — |
+| L3 PersonaEngine (E-68) | Auto-generates a `persona-{project_id}.md` user persona every 50 new memories; prepended as recall preamble when `include_persona=true` | — |
+| L2 ScenarioEngine (E-68) | Clusters memories by cosine similarity + 24 h time window into readable scene blocks in `scenarios-{project_id}.md`; include via `include_scenarios=true` | — |
+| ContextOffloader + Mermaid canvas (E-68) | Offloads verbose tool logs to `refs/{session}/{node}.md`; `depthfusion_compress_session` produces a Mermaid task canvas; `depthfusion_bridge node_id=` retrieves raw text | — |
 
 ---
 
@@ -82,7 +86,7 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 
 The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v2.0.0:
 
-- **3543 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **3692 tests collected**, full suite passing · 0 ruff · 0 mypy.
 - **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
   - **Cat A** — retrieval precision, no-regression sentinel
   - **Cat B** — BM25 score monotonicity + source-weight tier ordering
@@ -185,6 +189,29 @@ E-31 Cognitive Infrastructure Layer (v1.0.0, all enabled by default):
 
   REST API: FastAPI on 127.0.0.1:7300 (DEPTHFUSION_REST_API=true)
     - loopback by default; DEPTHFUSION_API_PUBLIC=1 requires DEPTHFUSION_API_TOKEN
+
+E-68 Layered Memory Augmentation (TencentDB Agent Memory-inspired, all optional):
+  DistillationClient (DEPTHFUSION_DISTILLATION_BACKEND=auto|local|haiku):
+    - auto: probes DEPTHFUSION_LOCAL_LLM_URL, falls back to Haiku
+    - local: always uses the local vLLM/mlx_lm endpoint
+    - haiku: always uses Haiku via DEPTHFUSION_API_KEY (costs tokens)
+
+  PersonaEngine (L3 — triggers every persona_trigger_every_n=50 new memories):
+    - Distills a "who is this user" persona from memory corpus
+    - Writes ~/.claude/shared/discoveries/persona-{project_id}.md
+    - Included in recall via depthfusion_recall_relevant include_persona=true
+
+  ScenarioEngine (L2 — triggered after each persona pass):
+    - Clusters memories by cosine similarity + 24 h time window
+    - Writes ~/.claude/shared/discoveries/scenarios-{project_id}.md
+    - Included in recall via include_scenarios=true
+
+  ContextOffloader (DEPTHFUSION_OFFLOAD_ENABLED=true):
+    - depthfusion_compress_session produces a Mermaid task canvas
+      (SHA-256 node IDs, overflow node when > offload_mmd_max_tokens=400)
+    - Offloaded blobs written to ~/.claude/shared/refs/{session_id}/{node_id}.md
+    - depthfusion_bridge node_id=<id> retrieves raw blob text
+    - Path traversal: _assert_confined() (resolve+relative_to) + allowlist regex at MCP boundary
 ```
 
 ```
@@ -207,7 +234,10 @@ src/depthfusion/
 ├── cognitive/   — scorer (8-component), contradiction_engine, event_log,
 │                  memory_store (SQLite WAL), memory_objects (7 types),
 │                  decision_builder, operational_builder, working_memory,
-│                  consolidator (DRY-RUN autonomic loop), rest_api (FastAPI)
+│                  consolidator (DRY-RUN autonomic loop), rest_api (FastAPI),
+│                  distillation_client (auto/local/haiku backend),
+│                  persona (L3 PersonaEngine), scenario (L2 ScenarioEngine),
+│                  offloader (ContextOffloader + Mermaid canvas)
 └── install/     — install (CLI), migrate (Tier 1 → Tier 2)
 ```
 
@@ -757,10 +787,10 @@ Expected: **10 GREEN · 1 YELLOW** (C4 — CLaRa indicator string in PostCSS `no
 ```bash
 source .venv/bin/activate
 
-pytest                              # 2151 tests, GREEN (a few skipped if chromadb/cuda absent)
+pytest                              # 3692 tests, GREEN (a few skipped if chromadb/cuda absent)
 pytest tests/test_metrics/ -q       # 116 tests — observability (includes E-41 reliability tests)
 pytest tests/test_backends/ -q      # 225 tests — backend chain + factory
-pytest tests/test_cognitive/ -q     # 175 tests — E-31 cognitive layer
+pytest tests/test_cognitive/ -q     # 305 tests — E-31 + E-68 cognitive layer
 pytest --cov=depthfusion            # coverage report
 mypy src/                           # clean
 ruff check src/ tests/              # clean
@@ -828,6 +858,11 @@ These are shipped but off by default — they require additional setup, cost tok
 | Cognitive retrieval | `DEPTHFUSION_COGNITIVE_RETRIEVAL=true` | Alpha |
 | Decision/operational memory | `DEPTHFUSION_DECISION_MEMORY=true` | Alpha |
 | Multi-agent working memory | `DEPTHFUSION_MULTI_AGENT_WM=true` | Alpha |
+| AI distillation backend | `DEPTHFUSION_DISTILLATION_BACKEND=auto` | `auto` (default) / `local` / `haiku` |
+| Local LLM URL | `DEPTHFUSION_LOCAL_LLM_URL=http://localhost:8000/v1` | vLLM / mlx_lm endpoint for auto/local backend |
+| Context offloading | `DEPTHFUSION_OFFLOAD_ENABLED=true` | Mermaid canvas + refs/ offloading in compress_session |
+| Offload token cap | `DEPTHFUSION_OFFLOAD_MMD_MAX_TOKENS=400` | Canvas token budget before overflow node |
+| Persona trigger interval | `DEPTHFUSION_PERSONA_TRIGGER_N=50` | L3 PersonaEngine: generate every N new memories |
 
 ### Measured (E-67 goldset v2 — 2026-07-11)
 
@@ -852,7 +887,7 @@ Full comparison report: `docs/benchmarks/2026-07-11-standard-vs-research-goldset
 
 ### Release history
 
-- **v2.2.0:** E-65 auth wizard (Solo/VPS/Connect setup, OIDC deep-link); E-67 claims rectification (named profiles, Fernet cache, embedding consolidation, real MRR@10/nDCG@5, dispatcher parity, config flag visibility). All epics closed.
+- **v2.2.0+ (main):** E-65 auth wizard (Solo/VPS/Connect setup, OIDC deep-link); E-67 claims rectification (named profiles, Fernet cache, embedding consolidation, real MRR@10/nDCG@5, dispatcher parity, config flag visibility); **E-68 layered memory** (DistillationClient, L3 PersonaEngine, L2 ScenarioEngine, ContextOffloader + Mermaid canvas; path traversal hardened). All epics closed.
 - **v2.1.1:** default server URL updated to `https://mcp.tonracein.com` (port 7301); `depthfusion_recommend_model` dispatch bug fixed.
 - **v2.0.x:** E-65 OIDC auth + Bearer token; E-66 ChatGPT Desktop macOS MCP integration; security hardening AV-01–AV-05.
 - **v1.2.x:** E-47 Project Context Intelligence; E-48 Multi-Provider Context Bridge; macOS installer portability; Gemma 4 26B MLX support.
