@@ -7,7 +7,7 @@ set -euo pipefail
 LOG="/home/gregmorris/projects/depthfusion/.pm/logs/mcp-health.log"
 SERVICE="depthfusion-mcp.service"
 LOCAL_HEALTH_URL="http://127.0.0.1:7301/health"
-PUBLIC_HEALTH_URL="https://depthfusion.tonracein.com/health"
+PUBLIC_HEALTH_URL="https://mcp.tonracein.com/health"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 MAX_LOG_LINES=500
 
