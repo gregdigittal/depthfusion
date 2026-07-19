@@ -26,4 +26,6 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run integration tests
-        run: pytest tests/integration/ -v --timeout=120
+        # Override pyproject.toml addopts (-k filter excludes 'integration') so all
+        # tests in this directory are collected and run.
+        run: pytest tests/integration/ -v --timeout=120 --override-ini="addopts=-v --tb=short --timeout=120"
