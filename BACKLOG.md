@@ -3833,21 +3833,21 @@
 **Root cause:** Test asserts `"recommend_model"` as the key in `TOOLS`, `_TOOL_FLAGS`, and `TOOL_CAPABILITIES`, but all three dicts follow the `depthfusion_` prefix convention — the actual key is `"depthfusion_recommend_model"`. The test was written inconsistently with the established naming convention.
 
 **Acceptance criteria:**
-- [ ] AC-1: `test_registered_in_registry_and_authz` passes in `pytest tests/integration/test_recommender.py::TestRecommendModelTool::test_registered_in_registry_and_authz -v --override-ini="addopts=-v --tb=short"`
-- [ ] AC-2: No source dict keys are renamed — only the test assertion strings change
-- [ ] AC-3: No other tests in `TestRecommendModelTool` are broken
+- [x] AC-1: `test_registered_in_registry_and_authz` passes in `pytest tests/integration/test_recommender.py::TestRecommendModelTool::test_registered_in_registry_and_authz -v --override-ini="addopts=-v --tb=short"`
+- [x] AC-2: No source dict keys are renamed — only the test assertion strings change
+- [x] AC-3: No other tests in `TestRecommendModelTool` are broken
 
 **Tasks:**
-- [ ] T-810: In `tests/integration/test_recommender.py` lines 288-290, change all three assert strings from `"recommend_model"` to `"depthfusion_recommend_model"`
+- [x] T-810: In `tests/integration/test_recommender.py` lines 288-290, change all three assert strings from `"recommend_model"` to `"depthfusion_recommend_model"`
 
 ### S-234: As a DepthFusion contributor, I want `test_endpoint_requires_auth` to pass so that auth enforcement on the recommend-model endpoint is verified `P1` `XS`
 
 **Root cause:** `_require_principal_dep` is built at module import time via `_build_principal_dep()`. In CI (no OIDC env vars, no `DEPTHFUSION_V2_LEGACY_AUTH`), `_UnconfiguredPrincipalDep` is returned and always raises HTTP 503. The test creates a raw `TestClient` without overriding the dependency, so it receives 503 instead of the expected 401/403.
 
 **Acceptance criteria:**
-- [ ] AC-1: `test_endpoint_requires_auth` passes in `pytest tests/integration/test_recommender.py::TestRecommendModelEndpoint::test_endpoint_requires_auth -v --override-ini="addopts=-v --tb=short"`
-- [ ] AC-2: The test verifies that an unauthenticated request is rejected (401), not just that the endpoint returns an error
-- [ ] AC-3: `app.dependency_overrides` is cleaned up (via `finally` block or `pop`) after the test so other tests are not polluted
+- [x] AC-1: `test_endpoint_requires_auth` passes in `pytest tests/integration/test_recommender.py::TestRecommendModelEndpoint::test_endpoint_requires_auth -v --override-ini="addopts=-v --tb=short"`
+- [x] AC-2: The test verifies that an unauthenticated request is rejected (401), not just that the endpoint returns an error
+- [x] AC-3: `app.dependency_overrides` is cleaned up (via `finally` block or `pop`) after the test so other tests are not polluted
 
 **Tasks:**
-- [ ] T-811: Rewrite `test_endpoint_requires_auth` to override `_require_principal_dep` with an async callable raising HTTP 401, send an unauthenticated request, and assert `resp.status_code == 401`; use a `try/finally` to pop the override
+- [x] T-811: Rewrite `test_endpoint_requires_auth` to override `_require_principal_dep` with an async callable raising HTTP 401, send an unauthenticated request, and assert `resp.status_code == 401`; use a `try/finally` to pop the override
