@@ -285,9 +285,9 @@ class TestRecommendModelTool:
         from depthfusion.mcp.authz import TOOL_CAPABILITIES
         from depthfusion.mcp.tools._registry import _TOOL_FLAGS, TOOLS
 
-        assert "recommend_model" in TOOLS
-        assert "recommend_model" in _TOOL_FLAGS
-        assert "recommend_model" in TOOL_CAPABILITIES
+        assert "depthfusion_recommend_model" in TOOLS
+        assert "depthfusion_recommend_model" in _TOOL_FLAGS
+        assert "depthfusion_recommend_model" in TOOL_CAPABILITIES
 
 
 # ---------------------------------------------------------------------------
@@ -367,8 +367,18 @@ class TestRecommendModelEndpoint:
         assert resp.status_code == 400
 
     def test_endpoint_requires_auth(self):
+        from fastapi import HTTPException
+
+        from depthfusion.api.auth import _require_principal_dep
         from depthfusion.api.rest import app
 
-        c = TestClient(app, raise_server_exceptions=False)
-        resp = c.post("/api/recommend-model", json={"task_category": "code"})
-        assert resp.status_code in (401, 403, 422)
+        async def _reject_principal():
+            raise HTTPException(status_code=401)
+
+        app.dependency_overrides[_require_principal_dep] = _reject_principal
+        try:
+            c = TestClient(app, raise_server_exceptions=False)
+            resp = c.post("/api/recommend-model", json={"task_category": "code"})
+            assert resp.status_code in (401, 403, 422)
+        finally:
+            app.dependency_overrides.pop(_require_principal_dep, None)
