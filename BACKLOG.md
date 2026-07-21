@@ -3799,32 +3799,32 @@
 
 ---
 
-## E-69: Tauri Desktop — Cognitive & Memory Panel [backlog]
+## E-69: Tauri Desktop — Cognitive & Memory Panel [done]
 
 > Expose the E-68 layered memory layer (PersonaEngine L3, ScenarioEngine L2, ContextOffloader refs) in the Tauri desktop UI so users can inspect, understand, and interact with DepthFusion's cognitive state without dropping to the CLI.
 
 ### S-232: As a DepthFusion desktop user, I want a Cognitive/Memory panel in the Tauri app so that I can inspect persona, scenarios, and offloaded context refs without needing CLI access `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: A "Memory" tab/panel is accessible from the main navigation
-- [ ] AC-2: Panel displays current persona summary (from `persona_last_updated` + persona file content) with last-generated timestamp
-- [ ] AC-3: Panel lists active scenarios (from ScenarioEngine output files) with memory count and time window per cluster
-- [ ] AC-4: Panel shows ContextOffloader refs count and lists offloaded node IDs with truncated previews; clicking a node fetches full content via `depthfusion_bridge`
-- [ ] AC-5: Panel shows distillation backend in use (local/haiku/auto) from `depthfusion_status` MCP tool
-- [ ] AC-6: A "Trigger Persona Rebuild" action calls the appropriate MCP tool and shows a success/error toast
-- [ ] AC-7: All data fetched via existing MCP tool calls through `ipc.ts` — no new backend endpoints required
+- [x] AC-1: A "Memory" tab/panel is accessible from the main navigation
+- [x] AC-2: Panel displays current persona summary (from `persona_last_updated` + persona file content) with last-generated timestamp
+- [x] AC-3: Panel lists active scenarios (from ScenarioEngine output files) with memory count and time window per cluster
+- [x] AC-4: Panel shows ContextOffloader refs count and lists offloaded node IDs with truncated previews; clicking a node fetches full content via `depthfusion_bridge`
+- [x] AC-5: Panel shows distillation backend in use (local/haiku/auto) from `depthfusion_status` MCP tool
+- [x] AC-6: A "Trigger Persona Rebuild" action calls the appropriate MCP tool and shows a success/error toast
+- [x] AC-7: All data fetched via existing MCP tool calls through `ipc.ts` — no new backend endpoints required
 
 **Tasks:**
-- [ ] T-804: Add `CognitivePage.tsx` — Memory panel shell with tab navigation (Persona / Scenarios / Refs)
-- [ ] T-805: Wire `depthfusion_status` call into the panel to display backend mode, persona timestamp, refs count
-- [ ] T-806: Add `ScenarioList` component — reads scenario file summaries via `depthfusion_recall_relevant` or a new status sub-field
-- [ ] T-807: Add `RefsBrowser` component — lists offloaded node IDs, fetches content on-demand via `depthfusion_bridge`
-- [ ] T-808: Add "Memory" route to `App.tsx` navigation and link from Dashboard stats tiles
-- [ ] T-809: Add `tests/app/CognitivePage.test.tsx` — mock MCP responses, assert panel renders persona/scenarios/refs correctly
+- [x] T-804: Add `CognitivePage.tsx` — Memory panel shell with tab navigation (Persona / Scenarios / Refs)
+- [x] T-805: Wire `depthfusion_status` call into the panel to display backend mode, persona timestamp, refs count
+- [x] T-806: Add `ScenarioList` component — reads scenario file summaries via `depthfusion_recall_relevant` or a new status sub-field
+- [x] T-807: Add `RefsBrowser` component — lists offloaded node IDs, fetches content on-demand via `depthfusion_bridge`
+- [x] T-808: Add "Memory" route to `App.tsx` navigation and link from Dashboard stats tiles
+- [x] T-809: Add `tests/app/CognitivePage.test.tsx` — mock MCP responses, assert panel renders persona/scenarios/refs correctly
 
 ---
 
-## E-70: CI & Test Hygiene [active]
+## E-70: CI & Test Hygiene [done]
 
 > Ensure the nightly integration test suite is green and all test assertions are accurate reflections of the current source conventions.
 
