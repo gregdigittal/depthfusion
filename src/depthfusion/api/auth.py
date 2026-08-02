@@ -163,4 +163,4 @@ async def require_principal(
     return principal
 
 
-__all__ = ["require_principal", "_require_principal_dep", "_LegacyTokenDep"]
+__all__ = ["require_principal", "_require_principal_dep"]
