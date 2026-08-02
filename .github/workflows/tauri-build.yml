@@ -59,6 +59,15 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: app/pnpm-lock.yaml
 
+      - name: Install OpenSSL (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          vcpkg install openssl:x64-windows-static
+          $root = $env:VCPKG_INSTALLATION_ROOT
+          echo "OPENSSL_DIR=$root\installed\x64-windows-static" >> $env:GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
+
       - name: Install frontend dependencies
         working-directory: app
         run: pnpm install --frozen-lockfile
