@@ -41,12 +41,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import os
 import re
 import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 try:
     import yaml
@@ -177,6 +179,44 @@ def run_retrieval(prompt: str, top_k: int = 5) -> tuple[list[dict], str | None]:
 
 
 # --------------------------------------------------------------------------
+# Configuration profiles (T-818)
+# --------------------------------------------------------------------------
+#
+# The recall pipeline reads DepthFusionConfig.from_env() per call, so the
+# harness maps a named profile to its DEPTHFUSION_* env vars before the
+# run starts. Only the keys the profile actually overrides are touched;
+# for "standard" (no overrides) the ambient environment is left alone.
+
+_PROFILE_ENV_VARS = {
+    "graph_enabled": "DEPTHFUSION_GRAPH_ENABLED",
+    "haiku_enabled": "DEPTHFUSION_HAIKU_ENABLED",
+    "fusion_gates_enabled": "DEPTHFUSION_FUSION_GATES_ENABLED",
+    "cognitive_scoring_enabled": "DEPTHFUSION_COGNITIVE_SCORING",
+    "cognitive_retrieval": "DEPTHFUSION_COGNITIVE_RETRIEVAL",
+    "rest_api_enabled": "DEPTHFUSION_REST_API",
+    "mcp_http_enabled": "DEPTHFUSION_MCP_HTTP_ENABLED",
+    "cache_enabled": "DEPTHFUSION_CACHE_ENABLED",
+}
+
+
+def apply_profile(name: str) -> dict[str, Any]:
+    """Apply a named retrieval profile by setting DEPTHFUSION_* env vars.
+
+    Returns the profile overrides that were applied ({} for "standard").
+    Raises ValueError for unknown profile names via get_profile_overrides.
+    """
+    from depthfusion.core.profiles import get_profile_overrides
+
+    overrides = get_profile_overrides(name)
+    for key, value in overrides.items():
+        env_var = _PROFILE_ENV_VARS.get(key)
+        if env_var is None:
+            continue
+        os.environ[env_var] = "true" if value else "false"
+    return overrides
+
+
+# --------------------------------------------------------------------------
 # Subcommand: run
 # --------------------------------------------------------------------------
 
@@ -190,6 +230,17 @@ def cmd_run(args: argparse.Namespace) -> int:
     today = date.today().isoformat()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        overrides = apply_profile(args.profile)
+    except ValueError as profile_err:
+        print(f"ERROR: {profile_err}", file=sys.stderr)
+        return 2
+    if overrides:
+        applied = ", ".join(f"{k}={v}" for k, v in sorted(overrides.items()))
+        print(f"Profile '{args.profile}' applied: {applied}")
+    else:
+        print(f"Profile '{args.profile}' applied: no overrides (ambient env)")
 
     raw_path = out_dir / f"{today}-{mode}-run{run_n}-raw.jsonl"
     scoring_path = out_dir / f"{today}-{mode}-run{run_n}-scoring.md"
@@ -215,7 +266,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         for rec in records:
             f.write(json.dumps(rec.to_dict()) + "\n")
 
-    write_scoring_template(scoring_path, specs, records, mode=mode, run_n=run_n)
+    write_scoring_template(
+        scoring_path, specs, records, mode=mode, run_n=run_n, profile=args.profile
+    )
 
     print(f"Raw output:       {raw_path}")
     print(f"Scoring template: {scoring_path}")
@@ -232,12 +285,14 @@ def write_scoring_template(
     records: list[RawRecord],
     mode: str,
     run_n: int,
+    profile: str = "standard",
 ) -> None:
     lines: list[str] = []
     lines.append(f"# CIQS Scoring Template - {mode} / run {run_n}")
     lines.append("")
     lines.append(f"> Generated: {date.today().isoformat()}")
     lines.append("> DepthFusion version: " + _get_df_version())
+    lines.append(f"> Profile: {profile}")
     lines.append("")
     lines.append("Fill in an integer score (0-10) in each `score: ` line.")
     lines.append(
@@ -305,6 +360,116 @@ def _get_df_version() -> str:
 
 
 # --------------------------------------------------------------------------
+# Statistics: paired Wilcoxon signed-rank test (T-819)
+# --------------------------------------------------------------------------
+#
+# Pure-Python implementation — deliberately no scipy, keeping the harness
+# dependency-light (pyyaml is the only hard requirement). Exact permutation
+# p-values for small N, normal approximation with tie correction and
+# continuity correction for larger N.
+
+_EXACT_MAX_N = 25  # N <= 25 -> exact permutation p-value; else normal approx
+
+
+def _average_ranks(values: list[float]) -> list[float]:
+    """1-based ranks; tied values share the average of their rank span."""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        avg = (i + j + 2) / 2.0  # mean of 1-based positions i+1 .. j+1
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg
+        i = j + 1
+    return ranks
+
+
+def _exact_two_sided_p(ranks: list[float], w: float) -> float:
+    """Exact permutation p-value: 2 * P(W+ <= w) under the null.
+
+    Each rank independently takes sign +/- with equal probability. Ranks
+    are scaled x2 so tie-averaged half-integers become integers and the
+    W+ distribution falls out of a subset-sum DP.
+    """
+    scaled = [int(round(2 * r)) for r in ranks]
+    total = sum(scaled)
+    w_scaled = int(round(2 * w))
+    counts = [0] * (total + 1)
+    counts[0] = 1
+    for r in scaled:
+        for s in range(total, r - 1, -1):
+            counts[s] += counts[s - r]
+    p_le = sum(counts[: w_scaled + 1]) / (2 ** len(scaled))
+    return min(1.0, 2.0 * p_le)
+
+
+def _normal_two_sided_p(ranks: list[float], w: float) -> float:
+    """Normal approximation with tie correction + continuity correction.
+
+    variance = [N(N+1)(2N+1) - sum(t^3 - t)/2] / 24, where t ranges over
+    tie-group sizes; p = 2 * Phi(-(|W - mu| - 0.5) / sigma).
+    """
+    n = len(ranks)
+    mean = sum(ranks) / 2.0  # == N(N+1)/4
+    tie_term = 0.0
+    group_sizes: dict[float, int] = {}
+    for r in ranks:
+        group_sizes[r] = group_sizes.get(r, 0) + 1
+    for t in group_sizes.values():
+        if t > 1:
+            tie_term += (t ** 3 - t) / 2.0
+    var = (n * (n + 1) * (2 * n + 1) - tie_term) / 24.0
+    if var <= 0:
+        return 1.0
+    z = (abs(w - mean) - 0.5) / math.sqrt(var)
+    return min(1.0, math.erfc(z / math.sqrt(2.0)))
+
+
+def wilcoxon_signed_rank(
+    x: Sequence[float],
+    y: Sequence[float],
+    *,
+    method: str = "auto",
+) -> tuple[float, int, float]:
+    """Paired Wilcoxon signed-rank test (pure Python, no scipy).
+
+    Returns (W, N, p):
+      W - the test statistic, min(W+, W-) over tie-averaged ranks of |d|
+      N - number of pairs after excluding zero differences
+      p - two-sided p-value (exact permutation for N <= 25, otherwise
+          normal approximation with tie + continuity correction)
+
+    `method` is "auto" (default), "exact", or "normal". Pairs with
+    x[i] == y[i] are excluded (the "wilcoxon" zero method).
+    """
+    if len(x) != len(y):
+        raise ValueError(f"paired inputs must have equal length: {len(x)} != {len(y)}")
+    if method not in ("auto", "exact", "normal"):
+        raise ValueError(f"method must be auto|exact|normal, got {method!r}")
+
+    nonzero = [a - b for a, b in zip(x, y) if a != b]
+    n = len(nonzero)
+    if n == 0:
+        return 0.0, 0, 1.0
+
+    ranks = _average_ranks([abs(d) for d in nonzero])
+    w_plus = float(sum(r for r, d in zip(ranks, nonzero) if d > 0))
+    w_minus = float(sum(r for r, d in zip(ranks, nonzero) if d < 0))
+    w = min(w_plus, w_minus)
+
+    if method == "auto":
+        method = "exact" if n <= _EXACT_MAX_N else "normal"
+    if method == "exact":
+        p = _exact_two_sided_p(ranks, w)
+    else:
+        p = _normal_two_sided_p(ranks, w)
+    return w, n, p
+
+
+# --------------------------------------------------------------------------
 # Subcommand: score
 # --------------------------------------------------------------------------
 
@@ -369,6 +534,39 @@ def _derive_scored_path(raw_path: Path) -> Path:
     return raw_path.with_name(new_stem + raw_path.suffix)
 
 
+def _topic_totals(records: list[dict]) -> dict[str, float]:
+    """Per-topic total score (sum over rubric dims) from scored records."""
+    totals: dict[str, float] = {}
+    for rec in records:
+        scores = rec.get("scores")
+        if scores:
+            totals[rec["topic_id"]] = float(sum(scores.values()))
+    return totals
+
+
+def print_wilcoxon_comparison(
+    current_records: list[dict],
+    other_records: list[dict],
+    other_label: str,
+) -> None:
+    """Paired Wilcoxon signed-rank on per-topic totals vs another variant.
+
+    Pairs topics present (and scored) in both record sets, then prints
+    W, N (after zero-difference exclusion), and the two-sided p-value.
+    """
+    current = _topic_totals(current_records)
+    other = _topic_totals(other_records)
+    common = sorted(current.keys() & other.keys())
+    if not common:
+        print(f"Wilcoxon comparison vs {other_label}: no shared scored topics — skipped")
+        return
+    x = [current[t] for t in common]
+    y = [other[t] for t in common]
+    w, n, p = wilcoxon_signed_rank(x, y)
+    print(f"Paired comparison vs {other_label}: {len(common)} shared topics")
+    print(f"Wilcoxon signed-rank: W={w}, N={n}, p={p:.4f} (two-sided)")
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     raw_path = Path(args.raw)
     scoring_path = Path(args.scoring)
@@ -419,6 +617,19 @@ def cmd_score(args: argparse.Namespace) -> int:
 
     print(f"Scored output: {out_path}")
     print(f"{len(raw_records)} records scored.")
+
+    if args.compare_with:
+        other_path = Path(args.compare_with)
+        if not other_path.exists():
+            print(f"ERROR: comparison file not found: {other_path}", file=sys.stderr)
+            return 2
+        other_records: list[dict] = []
+        with open(other_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    other_records.append(json.loads(line))
+        print_wilcoxon_comparison(raw_records, other_records, str(other_path))
     return 0
 
 
@@ -437,6 +648,12 @@ def main(argv: list[str] | None = None) -> int:
         help="The DepthFusion mode in use (for output filename; does not switch modes)",
     )
     p_run.add_argument("--run", type=int, required=True, help="Run number (1..N)")
+    p_run.add_argument(
+        "--profile", default="standard", choices=("standard", "research"),
+        help="Retrieval configuration profile for the run: 'standard' (shipped "
+             "defaults, ambient env untouched) or 'research' (full-flag config "
+             "applied via DEPTHFUSION_* env vars)",
+    )
     p_run.add_argument("--out-dir", default="docs/benchmarks")
     p_run.add_argument("--top-k", type=int, default=5, help="top_k for Category A retrieval")
     p_run.add_argument("--force", action="store_true", help="Overwrite existing output")
@@ -445,6 +662,11 @@ def main(argv: list[str] | None = None) -> int:
     p_score = sub.add_parser("score", help="Merge a filled-in scoring template into raw JSONL")
     p_score.add_argument("--raw", required=True)
     p_score.add_argument("--scoring", required=True)
+    p_score.add_argument(
+        "--compare-with", metavar="SCORED_JSONL",
+        help="Optional scored JSONL from another variant; pairs per-topic "
+             "total scores and reports a Wilcoxon signed-rank test (W, N, p)",
+    )
     p_score.set_defaults(func=cmd_score)
 
     args = parser.parse_args(argv)

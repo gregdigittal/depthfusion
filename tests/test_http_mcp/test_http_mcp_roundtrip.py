@@ -61,7 +61,7 @@ _TEST_TOKEN: str = os.environ.get("DEPTHFUSION_API_TOKEN", _FALLBACK_TOKEN)
 from depthfusion.api.auth import require_principal  # noqa: E402
 from depthfusion.core.config import DepthFusionConfig  # noqa: E402
 from depthfusion.identity.models import Principal  # noqa: E402
-from depthfusion.mcp.http_server import _MCP_SESSIONS, app  # noqa: E402
+from depthfusion.mcp.http_server import _MCP_SESSIONS, _MCP_STREAMABLE_SESSIONS, app  # noqa: E402
 from depthfusion.mcp.server import _process_request  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -834,3 +834,108 @@ class TestLegacyTokenToolRoundTrip:
             assert resp.json().get("ok") is True
         finally:
             _MCP_SESSIONS.pop(sid, None)
+
+
+# ---------------------------------------------------------------------------
+# T-816: Streamable HTTP session lifecycle (initialize → tools/list → DELETE)
+# ---------------------------------------------------------------------------
+
+class TestStreamableHTTPLifecycle:
+    """Round-trip tests for the MCP 2025-03-26 streamable-HTTP transport.
+
+    Covers: session-ID issuance on initialize, subsequent routing by session,
+    202 for notifications, and DELETE teardown (T-816).
+    """
+
+    def _client(self) -> TestClient:
+        client = TestClient(app, raise_server_exceptions=False)
+        client.app.dependency_overrides[require_principal] = _admin_principal  # type: ignore[attr-defined]
+        return client
+
+    def test_initialize_issues_session_id(self) -> None:
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0.1"},
+            }},
+        )
+        assert resp.status_code == 200
+        sid = resp.headers.get("mcp-session-id")
+        assert sid is not None, "initialize must issue Mcp-Session-Id header"
+        assert sid in _MCP_STREAMABLE_SESSIONS
+        _MCP_STREAMABLE_SESSIONS.pop(sid, None)
+
+    def test_tools_list_with_session_id(self) -> None:
+        client = self._client()
+        init_resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"},
+            }},
+        )
+        sid = init_resp.headers["mcp-session-id"]
+        try:
+            resp = client.post(
+                "/mcp",
+                headers={"mcp-session-id": sid},
+                json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert "result" in body or "tools" in body
+        finally:
+            _MCP_STREAMABLE_SESSIONS.pop(sid, None)
+
+    def test_notification_returns_202(self) -> None:
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+        )
+        assert resp.status_code == 202
+        assert resp.content == b""
+
+    def test_delete_tears_down_session(self) -> None:
+        client = self._client()
+        init_resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"},
+            }},
+        )
+        sid = init_resp.headers["mcp-session-id"]
+        assert sid in _MCP_STREAMABLE_SESSIONS
+        del_resp = client.delete("/mcp", headers={"mcp-session-id": sid})
+        assert del_resp.status_code == 200
+        assert sid not in _MCP_STREAMABLE_SESSIONS
+
+    def test_unknown_session_id_returns_404(self) -> None:
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"mcp-session-id": str(uuid.uuid4())},
+            json={"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
+        )
+        assert resp.status_code == 404
+
+    def test_unsupported_protocol_version_returns_400(self) -> None:
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"mcp-protocol-version": "2024-01-01"},
+            json={"jsonrpc": "2.0", "id": 4, "method": "initialize", "params": {}},
+        )
+        assert resp.status_code == 400
+
+    def test_delete_missing_session_header_returns_400(self) -> None:
+        client = self._client()
+        resp = client.delete("/mcp")
+        assert resp.status_code == 400
+
+    def test_delete_unknown_session_returns_404(self) -> None:
+        client = self._client()
+        resp = client.delete("/mcp", headers={"mcp-session-id": str(uuid.uuid4())})
+        assert resp.status_code == 404

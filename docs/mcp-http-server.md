@@ -9,7 +9,51 @@ The HTTP MCP server (`src/depthfusion/mcp/http_server.py`) supports two MCP tran
 
 `GET /health` reports `"transports": ["sse", "streamable-http"]` and is unauthenticated.
 
-Both transports share the same `require_principal` auth dependency and the same `_process_request` dispatcher. The `POST /mcp` implementation is a synchronous shim; full MCP 2025-03-26 compliance (session-ID handling, GET/DELETE, SSE response path, 202 notifications, Accept/content-type negotiation) is tracked under E-71.
+Both transports share the same `require_principal` auth dependency and the same `_process_request` dispatcher.
+
+### Streamable HTTP endpoint reference (MCP 2025-03-26)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/mcp` | JSON-RPC request/response. `initialize` issues `Mcp-Session-Id`; requests bearing the header route to that session. Notifications (no `id`) → `202 Accepted`. |
+| `GET` | `/mcp` | Server-initiated `text/event-stream` keyed by `Mcp-Session-Id`. |
+| `DELETE` | `/mcp` | Session teardown. Requires `Mcp-Session-Id`; removes the session registry entry. |
+
+**Accept negotiation:** `POST /mcp` honours the `Accept` header. Clients that send only `text/event-stream` receive a single-event SSE response instead of JSON.
+
+**Protocol-version validation:** requests carrying `MCP-Protocol-Version` are validated; anything other than `2025-03-26` is rejected with `400`. The header may be omitted for back-compat.
+
+#### Curl examples
+
+```bash
+# initialize — note the Mcp-Session-Id in the response headers
+TOKEN=$DEPTHFUSION_API_TOKEN
+SESSION=$(curl -s -D - -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"0.1"}}}' \
+  http://127.0.0.1:7301/mcp | grep -i mcp-session-id | awk '{print $2}' | tr -d '\r')
+
+# tools/list using the session
+curl -s -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  http://127.0.0.1:7301/mcp | python3 -m json.tool
+
+# send a notification (no response body expected — returns 202)
+curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
+  http://127.0.0.1:7301/mcp
+
+# teardown
+curl -s -X DELETE \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SESSION" \
+  http://127.0.0.1:7301/mcp
+```
 
 ## Auth requirements
 

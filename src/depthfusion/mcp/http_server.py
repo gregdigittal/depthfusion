@@ -1,10 +1,16 @@
 """DepthFusion MCP HTTP/SSE server — JSON-RPC 2.0 over Server-Sent Events.
 
-Transport: two-endpoint SSE pattern (MCP spec 2025-03-26)
+Transport: two-endpoint SSE pattern (MCP spec 2024-11-05)
   GET  /sse             → long-lived SSE stream; sends endpoint event + 30s pings
   POST /messages        → receives JSON-RPC body, dispatches via _process_request,
                           pushes response onto the session SSE queue
   GET  /health          → unauthenticated health probe
+
+Streamable HTTP transport (MCP spec 2025-03-26)
+  POST /mcp             → JSON-RPC single-shot or session-bound requests;
+                          initialize issues Mcp-Session-Id; notifications → 202
+  GET  /mcp             → server-initiated text/event-stream keyed by session
+  DELETE /mcp           → session teardown
 
 Security:
   - Bind host: controlled by DEPTHFUSION_MCP_HOST (default 127.0.0.1 / loopback).
@@ -30,8 +36,8 @@ from importlib.metadata import version as _pkg_version
 from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
@@ -49,6 +55,14 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="DepthFusion MCP HTTP/SSE", version=_VERSION)
 
 _MCP_SESSIONS: dict[str, asyncio.Queue] = {}
+
+# Streamable HTTP session registry (MCP spec 2025-03-26): keyed by the
+# Mcp-Session-Id issued on initialize; each session owns an asyncio.Queue
+# feeding the GET /mcp server-initiated event stream.
+_MCP_STREAMABLE_SESSIONS: dict[str, asyncio.Queue] = {}
+
+_SUPPORTED_PROTOCOL_VERSIONS = frozenset({"2025-03-26"})
+_DEFAULT_PROTOCOL_VERSION = "2025-03-26"
 
 _PING_INTERVAL = 30.0
 
@@ -178,12 +192,131 @@ async def streamable_http_endpoint(
     request: Request,
     _principal: Principal = Depends(require_principal),
 ):
-    """Streamable HTTP transport (MCP spec 2025-03-26) — required by Claude Code ≥2.1.x."""
+    """Streamable HTTP transport (MCP spec 2025-03-26) — required by Claude Code ≥2.1.x.
+
+    - initialize → issues an Mcp-Session-Id header and registers the session.
+    - Subsequent requests carrying Mcp-Session-Id route to that session.
+    - JSON-RPC notifications (no id field) → HTTP 202 with empty body.
+    - Accept negotiation: application/json (default) or text/event-stream
+      response framing when the client only accepts SSE.
+    - MCP-Protocol-Version header validated: 2025-03-26 accepted, absent
+      header tolerated for back-compat, anything else → 400.
+    """
+    protocol_version = request.headers.get("mcp-protocol-version")
+    if protocol_version is not None and protocol_version not in _SUPPORTED_PROTOCOL_VERSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported MCP-Protocol-Version: {protocol_version}",
+        )
+
+    content_type = request.headers.get("content-type", "")
+    if content_type and "application/json" not in content_type.lower():
+        raise HTTPException(
+            status_code=415,
+            detail="Content-Type must be application/json",
+        )
+
     body = await request.json()
+
+    session_id = request.headers.get("mcp-session-id")
+    if session_id is not None and session_id not in _MCP_STREAMABLE_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
     config = DepthFusionConfig.from_env()
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(None, _process_request, body, config)
-    return response or {}
+
+    # JSON-RPC notifications (no id) → 202 Accepted, empty body.
+    if "id" not in body:
+        return Response(status_code=202)
+
+    headers = {"MCP-Protocol-Version": _DEFAULT_PROTOCOL_VERSION}
+
+    is_initialize = body.get("method") == "initialize"
+    if is_initialize and session_id is None:
+        session_id = str(uuid.uuid4())
+        _MCP_STREAMABLE_SESSIONS[session_id] = asyncio.Queue()
+        logger.info("MCP streamable-http session opened: %s", session_id)
+    if session_id is not None:
+        headers["Mcp-Session-Id"] = session_id
+
+    accept = request.headers.get("accept", "")
+    wants_sse = "text/event-stream" in accept and "application/json" not in accept
+    if wants_sse:
+        async def single_event() -> AsyncGenerator[str, None]:
+            if response:
+                yield f"event: message\ndata: {json.dumps(response)}\n\n"
+
+        return StreamingResponse(
+            single_event(),
+            media_type="text/event-stream",
+            headers={
+                **headers,
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    return JSONResponse(content=response or {}, headers=headers)
+
+
+@app.get("/mcp")
+async def streamable_http_sse_endpoint(
+    request: Request,
+    _principal: Principal = Depends(require_principal),
+) -> StreamingResponse:
+    """Server-initiated event stream for a streamable-http session (MCP 2025-03-26).
+
+    Requires the Mcp-Session-Id header issued by initialize; streams queued
+    server events with 30s keep-alive pings, mirroring the /sse transport.
+    """
+    session_id = request.headers.get("mcp-session-id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Mcp-Session-Id header required")
+    queue = _MCP_STREAMABLE_SESSIONS.get(session_id)
+    if queue is None:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=_PING_INTERVAL)
+                    yield f"event: message\ndata: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            logger.info("MCP streamable-http event stream closed: %s", session_id)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.delete("/mcp")
+async def streamable_http_delete_endpoint(
+    request: Request,
+    _principal: Principal = Depends(require_principal),
+):
+    """Tear down a streamable-http session (MCP 2025-03-26).
+
+    400 when the Mcp-Session-Id header is missing, 404 for unknown sessions.
+    """
+    session_id = request.headers.get("mcp-session-id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Mcp-Session-Id header required")
+    if session_id not in _MCP_STREAMABLE_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+    _MCP_STREAMABLE_SESSIONS.pop(session_id, None)
+    logger.info("MCP streamable-http session closed: %s", session_id)
+    return {"ok": True}
 
 
 @app.get("/sse")
