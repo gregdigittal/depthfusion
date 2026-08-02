@@ -8,3 +8,9 @@ Last updated by run: Resolve all open items on main: (1) mark BACKLOG tasks T-73
 - [rung:4|conf:0.9] For CI workflow node version bumps, grep the workflow files for the existing version string before patching so already-completed migrations are detected early and no-op tasks are reported cleanly.
 - [rung:4|conf:0.85] For Dependabot alerts on transitive Python dependencies, add an explicit lower-bound constraint in the relevant pyproject.toml extras section and regenerate the lockfile with uv lock rather than editing uv.lock directly.
 - [rung:4|conf:0.9] For lockfile-related dependency alerts, read the lockfile resolution before acting; the vulnerable dependency may already be resolved to a fixed version and the alert may be stale.
+
+## E-72 curated rules (2026-08-02)
+- Use __getattr__ for lazy module imports when a package has optional heavy dependencies (FastAPI, cryptography) that must not load in lightweight stdio/CLI mode
+- Declare ALL direct imports as package extras — pip check does not catch undeclared transitive dependencies
+- Always run an unconditional MCP import probe immediately after pip install in install scripts; conditional probes silently pass on broken installs
+- Test packaging in isolated fresh venvs per extra, not in the dev venv — dev venv always has everything installed
