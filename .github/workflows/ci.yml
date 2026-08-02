@@ -91,6 +91,39 @@ jobs:
           print('stdio-identity-import-ok')
           "
 
+  packaging-gate:
+    name: "Packaging gate (${{ matrix.extra }})"
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - extra: vps-cpu
+            runs-on: ubuntu-22.04
+          - extra: vps-gpu
+            runs-on: ubuntu-22.04
+          - extra: mac-mlx
+            runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install in clean venv (${{ matrix.extra }})
+        run: |
+          python -m venv /tmp/pkg-gate-venv
+          /tmp/pkg-gate-venv/bin/pip install --quiet -e ".[${{ matrix.extra }}]"
+
+      - name: Probe MCP server import (${{ matrix.extra }})
+        run: |
+          /tmp/pkg-gate-venv/bin/python -B -c "import depthfusion.mcp.server; print('packaging-gate-ok: ${{ matrix.extra }}')"
+
   frontend-test:
     name: "Frontend (TypeScript + Vitest)"
     runs-on: ubuntu-latest

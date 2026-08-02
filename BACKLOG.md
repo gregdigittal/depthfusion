@@ -3937,8 +3937,8 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 - [ ] AC-3: `from depthfusion.identity import Principal` does not trigger `cryptography` import
 
 **Tasks:**
-- [ ] T-824: Make `depthfusion.identity.__init__` lightweight — lazy-import `fastapi_deps` and `token_validator` via `__getattr__`; preserve existing public API
-- [ ] T-825: Add import probe to CI: `python -B -c 'import depthfusion.mcp.server'` in a fresh venv without `dev` or HTTP extras
+- [x] T-824: Make `depthfusion.identity.__init__` lightweight — lazy-import `fastapi_deps` and `token_validator` via `__getattr__`; preserve existing public API
+- [x] T-825: Add import probe to CI: `python -B -c 'import depthfusion.mcp.server'` in a fresh venv without `dev` or HTTP extras
 
 ### S-239: As a DepthFusion operator, I want all direct HTTP/OIDC dependencies declared in pyproject.toml so that `pip check` catches missing packages `P0` `S`
 
@@ -3947,7 +3947,7 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 - [ ] AC-2: `pip check` in a clean venv with any of those extras returns no missing requirements
 
 **Tasks:**
-- [ ] T-826: Add `cryptography>=49.0.0` to `mac-mlx`, `vps-cpu`, and `vps-gpu` in `pyproject.toml`
+- [x] T-826: Add `cryptography>=49.0.0` to `mac-mlx`, `vps-cpu`, and `vps-gpu` in `pyproject.toml`
 
 ### S-240: As a DepthFusion installer, I want the install script to fail fast on a broken MCP import so that packaging errors surface immediately `P0` `XS`
 
@@ -3956,8 +3956,8 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 - [ ] AC-2: Same probe added to `scripts/install-vps.sh` and any other platform installer
 
 **Tasks:**
-- [ ] T-827: Add MCP import smoke-test probe to `scripts/install-mac-mlx.sh` (fail-fast, non-optional)
-- [ ] T-828: Add same probe to `scripts/install-vps.sh`
+- [x] T-827: Add MCP import smoke-test probe to `scripts/install-mac-mlx.sh` (fail-fast, non-optional)
+- [x] T-828: Add same probe to `scripts/install-vps.sh`
 
 ### S-241: As a DepthFusion maintainer, I want a clean-venv packaging CI gate so that missing dependency declarations are caught before release `P1` `S`
 
