@@ -52,15 +52,22 @@ Register in `~/.claude/settings.json` (or `~/.claude/mcp.json`):
 
 One server instance can serve multiple Claude Code windows simultaneously — each opens its own session via `initialize`.
 
-### Scenario C — Remote custom connector
+### Scenario C — Claude.ai Remote Custom Connector
 
-For remote access (e.g. a Tailscale-connected VPS), use the same `type: http` registration with the server's private IP:
+A Claude.ai Remote Custom Connector requires a **publicly reachable HTTPS endpoint** that
+Anthropic's infrastructure can reach.
 
-```json
-"url": "http://100.x.y.z:7301/mcp"
-```
+> **Important:** `127.0.0.1`, `localhost`, Tailscale-only, and private-VPN URLs will
+> **NOT** work as cloud-brokered connectors. Anthropic's servers cannot route to private
+> addresses. Use a public domain with valid TLS (e.g. `https://mcp.yourserver.com/mcp`).
 
-Set `DEPTHFUSION_MCP_HOST=0.0.0.0` on the server **only** when the network-layer access control (Tailscale ACL, firewall) restricts who can reach port 7301. Auth is still required — `DEPTHFUSION_API_TOKEN` must be set and all clients must send `Authorization: Bearer <token>`.
+Set `DEPTHFUSION_MCP_HOST=0.0.0.0` and place a TLS-terminating reverse proxy (nginx, Caddy,
+or Cloudflare Tunnel) in front of port 7301. Configure `DEPTHFUSION_MCP_ALLOWED_ORIGINS`
+to restrict the `Origin` header when the server is publicly reachable.
+
+For Tailscale or other private-network setups, continue using Scenario B (Claude Code with the
+Tailscale IP) — the `/mcp` endpoint is reachable to clients on the same network without
+requiring a public URL.
 
 ---
 
@@ -86,7 +93,7 @@ Both transports share the same `require_principal` auth dependency and `_process
 
 **Protocol-version validation:** `MCP-Protocol-Version: 2025-03-26` accepted; anything else → `400`. Omitting the header is tolerated for back-compat.
 
-**Origin validation (DNS-rebinding guard):** `/mcp` routes reject requests whose `Origin` header is present but not in the allowed list. Absent `Origin` is always accepted (CLI tools and Claude Code do not send it). Default allowlist: `http://localhost`, `https://localhost`, `http://127.0.0.1`, `https://127.0.0.1`, `http://[::1]`, `https://[::1]`. Override with `DEPTHFUSION_MCP_ALLOWED_ORIGINS` (comma-separated).
+**Origin validation (DNS-rebinding guard):** `/mcp` routes check the `Origin` header when `DEPTHFUSION_MCP_ALLOWED_ORIGINS` is set. Absent `Origin` is always accepted (CLI tools and Claude Code do not send it). When the env var is **not set**, the check is fully permissive (any `Origin` accepted). When set, only listed origins are accepted; unlisted origins receive `403 {"error":"Origin not allowed"}`. Set `DEPTHFUSION_MCP_ALLOWED_ORIGINS` to a comma-separated list when the server is publicly reachable.
 
 #### Curl examples
 
@@ -133,7 +140,7 @@ All `/mcp`, `/sse`, and `/messages` endpoints require a valid Bearer token. `/he
 | `DEPTHFUSION_API_TOKEN` | Yes (dev) | Shared bearer token for legacy auth mode |
 | `DEPTHFUSION_MCP_HOST` | No | Bind address (default `127.0.0.1`) |
 | `DEPTHFUSION_MCP_PORT` | No | Bind port (default `7301`) |
-| `DEPTHFUSION_MCP_ALLOWED_ORIGINS` | No | Comma-separated list of allowed `Origin` values for `/mcp` routes. Overrides the default loopback allowlist entirely. |
+| `DEPTHFUSION_MCP_ALLOWED_ORIGINS` | No | Comma-separated allowed `Origin` values for `/mcp` routes. When unset, all origins are accepted (permissive). When set, only listed origins pass; others get `403`. |
 
 If `DEPTHFUSION_V2_LEGACY_AUTH=1` is set without `DEPTHFUSION_API_TOKEN`, startup fails. In production, remove `DEPTHFUSION_V2_LEGACY_AUTH` and configure OIDC/JWKS via the `DEPTHFUSION_OIDC_*` variables.
 

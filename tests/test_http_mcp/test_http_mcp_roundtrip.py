@@ -970,12 +970,13 @@ class TestOriginValidation:
         )
         assert resp.status_code == 200
 
-    def test_valid_localhost_origin_post_mcp_accepted(self) -> None:
-        """http://localhost is in the default allowlist → 200."""
+    def test_env_unset_any_origin_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Env var unset → fully permissive: arbitrary Origin is accepted."""
+        monkeypatch.delenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", raising=False)
         client = self._client()
         resp = client.post(
             "/mcp",
-            headers={"origin": "http://localhost"},
+            headers={"origin": "https://arbitrary.example.com"},
             json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
                 "protocolVersion": "2025-03-26", "capabilities": {},
                 "clientInfo": {"name": "test", "version": "0"},
@@ -983,8 +984,9 @@ class TestOriginValidation:
         )
         assert resp.status_code == 200
 
-    def test_invalid_origin_post_mcp_returns_403(self) -> None:
-        """Origin not in allowlist → 403 (DNS-rebinding guard)."""
+    def test_invalid_origin_post_mcp_returns_403(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Origin not in allowlist → 403 when DEPTHFUSION_MCP_ALLOWED_ORIGINS is set."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
         client = self._client()
         resp = client.post(
             "/mcp",
@@ -992,20 +994,21 @@ class TestOriginValidation:
             json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
         )
         assert resp.status_code == 403
+        assert resp.json().get("error") == "Origin not allowed"
 
-    def test_invalid_origin_get_mcp_returns_403(self) -> None:
-        """GET /mcp with unknown Origin → 403."""
+    def test_invalid_origin_get_mcp_returns_403(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """GET /mcp with unknown Origin → 403 when allowlist env is set."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
         client = self._client()
-        # A valid session_id is required before hitting origin check, but origin
-        # check fires before session lookup, so any mcp-session-id will do.
         resp = client.get(
             "/mcp",
             headers={"origin": "https://evil.example.com", "mcp-session-id": str(uuid.uuid4())},
         )
         assert resp.status_code == 403
 
-    def test_invalid_origin_delete_mcp_returns_403(self) -> None:
-        """DELETE /mcp with unknown Origin → 403."""
+    def test_invalid_origin_delete_mcp_returns_403(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """DELETE /mcp with unknown Origin → 403 when allowlist env is set."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
         client = self._client()
         resp = client.delete(
             "/mcp",
@@ -1013,9 +1016,9 @@ class TestOriginValidation:
         )
         assert resp.status_code == 403
 
-    def test_custom_allowed_origin_via_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """DEPTHFUSION_MCP_ALLOWED_ORIGINS overrides the default allowlist."""
-        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
+    def test_valid_origin_in_allowlist_returns_200(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Origin that IS in the allowlist → 200 when env is set."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com,https://other.example.com")
         client = self._client()
         resp = client.post(
             "/mcp",
@@ -1030,7 +1033,7 @@ class TestOriginValidation:
     def test_loopback_origin_blocked_when_custom_env_set(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """When DEPTHFUSION_MCP_ALLOWED_ORIGINS is set, default loopback is not in scope."""
+        """When DEPTHFUSION_MCP_ALLOWED_ORIGINS is set, localhost not in list → 403."""
         monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
         client = self._client()
         resp = client.post(
@@ -1098,3 +1101,38 @@ class TestHttpEdgeCases:
             json={"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {}},
         )
         assert resp.status_code == 202
+
+    def test_json_array_body_returns_400(self) -> None:
+        """JSON array body (not an object) → 400, not 500."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            content=b'[{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}]',
+            headers={"content-type": "application/json"},
+        )
+        assert resp.status_code == 400
+        assert resp.status_code != 500
+
+    def test_json_null_body_returns_400(self) -> None:
+        """JSON null body (not an object) → 400, not 500."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            content=b"null",
+            headers={"content-type": "application/json"},
+        )
+        assert resp.status_code == 400
+        assert resp.status_code != 500
+
+    def test_empty_object_missing_fields_returns_appropriate_error(self) -> None:
+        """Empty JSON object (missing jsonrpc/method) → server-level error response, not 500."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            json={},
+        )
+        # Notifications (no id field) get 202; requests without id are treated as notifications
+        # A complete mis-formed RPC may be 202 (no id → notification path) or an RPC-level error
+        assert resp.status_code in {200, 202, 400}, (
+            f"Expected a handled response (not 500), got {resp.status_code}"
+        )

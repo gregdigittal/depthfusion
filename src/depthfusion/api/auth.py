@@ -32,10 +32,11 @@ misconfigured servers fail loudly rather than granting open access.
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Annotated  # noqa: F401 — used in _UnconfiguredPrincipalDep signature
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPBearer
 
 from depthfusion.identity.fastapi_deps import PrincipalDep, make_require_principal
 from depthfusion.identity.models import Principal
@@ -49,12 +50,7 @@ _bearer = HTTPBearer(auto_error=False)
 class _UnconfiguredPrincipalDep:
     """Returned when OIDC env vars are absent. Always raises 503."""
 
-    async def __call__(
-        self,
-        credentials: Annotated[
-            HTTPAuthorizationCredentials | None, Depends(_bearer)
-        ],
-    ) -> Principal:  # pragma: no cover
+    async def __call__(self, request: Request) -> Principal:  # pragma: no cover
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -74,19 +70,29 @@ class _LegacyTokenDep:
     Authorization header matches the configured static token and returns a
     synthetic Principal. Intended for smoke tests and local dev environments
     without a live Entra tenant — never use in production.
+
+    Note: reads Authorization header directly from Request rather than using
+    Annotated[..., Depends(_bearer)] inside __call__, because FastAPI 0.119.x
+    misclassifies Annotated dependency params in bound-method signatures as
+    query parameters. ponytail: direct header parse, upgrade path = none needed.
     """
 
     def __init__(self, api_token: str) -> None:
         self._token = api_token
 
-    async def __call__(
-        self,
-        credentials: Annotated[
-            HTTPAuthorizationCredentials | None, Depends(_bearer)
-        ],
-    ) -> Principal:
-        import secrets
-        if credentials is None or not secrets.compare_digest(credentials.credentials, self._token):
+    async def __call__(self, request: Request) -> Principal:
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.lower().startswith("bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "invalid_token",
+                    "detail": "Bearer token does not match DEPTHFUSION_API_TOKEN.",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        token = auth_header[7:]  # strip "Bearer "
+        if not secrets.compare_digest(token, self._token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={

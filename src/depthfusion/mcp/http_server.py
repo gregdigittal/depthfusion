@@ -20,11 +20,10 @@ Security:
     Bearer token via require_principal (DEPTHFUSION_V2_LEGACY_AUTH=1 +
     DEPTHFUSION_API_TOKEN for development; JWKS/OIDC in production).
     There is no pass-through mode.
-  - Origin header validation (MCP 2025-03-26 §2.1): /mcp routes reject requests
-    whose Origin header is present but not in the allowlist. Default allowlist:
-    loopback origins only (localhost, 127.0.0.1, [::1]). Override with
-    DEPTHFUSION_MCP_ALLOWED_ORIGINS (comma-separated). Absent Origin is always
-    accepted (CLI tools and Claude Code do not send it).
+  - Origin header validation (MCP 2025-03-26 §2.1): /mcp routes check the Origin
+    header only when DEPTHFUSION_MCP_ALLOWED_ORIGINS is set. When unset the check
+    is permissive (any Origin accepted). When set, only listed origins are accepted;
+    unlisted origins receive 403. Absent Origin is always accepted.
   - /health is the only unauthenticated endpoint.
 """
 from __future__ import annotations
