@@ -6,11 +6,14 @@ on:
       - main
     paths:
       - "app/**"
+      - ".github/workflows/tauri-build.yml"
   pull_request:
     branches:
       - main
     paths:
       - "app/**"
+      - ".github/workflows/tauri-build.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
