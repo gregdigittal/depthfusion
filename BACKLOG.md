@@ -3923,7 +3923,7 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 
 ---
 
-## E-72: Packaging Integrity & MCP Stdio Reliability [active]
+## E-72: Packaging Integrity & MCP Stdio Reliability [done]
 
 > Eliminate the class of failure where an optional dependency (cryptography, FastAPI)
 > is silently absent from a supported install mode, causing MCP import crashes at runtime.
@@ -3932,9 +3932,9 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 ### S-238: As a DepthFusion user on Mac/VPS, I want the stdio MCP server to import cleanly without FastAPI or cryptography so that local stdio mode works without the HTTP stack `P0` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Fresh `local` install can import and start the stdio MCP server without FastAPI or cryptography installed
-- [ ] AC-2: `depthfusion.identity.__init__` no longer eagerly imports `fastapi_deps` or `token_validator` at module load time
-- [ ] AC-3: `from depthfusion.identity import Principal` does not trigger `cryptography` import
+- [x] AC-1: Fresh `local` install can import and start the stdio MCP server without FastAPI or cryptography installed
+- [x] AC-2: `depthfusion.identity.__init__` no longer eagerly imports `fastapi_deps` or `token_validator` at module load time
+- [x] AC-3: `from depthfusion.identity import Principal` does not trigger `cryptography` import
 
 **Tasks:**
 - [x] T-824: Make `depthfusion.identity.__init__` lightweight — lazy-import `fastapi_deps` and `token_validator` via `__getattr__`; preserve existing public API
@@ -3943,8 +3943,8 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 ### S-239: As a DepthFusion operator, I want all direct HTTP/OIDC dependencies declared in pyproject.toml so that `pip check` catches missing packages `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: `cryptography>=49.0.0` is declared in `mac-mlx`, `vps-cpu`, and `vps-gpu` extras
-- [ ] AC-2: `pip check` in a clean venv with any of those extras returns no missing requirements
+- [x] AC-1: `cryptography>=49.0.0` is declared in `mac-mlx`, `vps-cpu`, and `vps-gpu` extras
+- [x] AC-2: `pip check` in a clean venv with any of those extras returns no missing requirements
 
 **Tasks:**
 - [x] T-826: Add `cryptography>=49.0.0` to `mac-mlx`, `vps-cpu`, and `vps-gpu` in `pyproject.toml`
@@ -3952,8 +3952,8 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 ### S-240: As a DepthFusion installer, I want the install script to fail fast on a broken MCP import so that packaging errors surface immediately `P0` `XS`
 
 **Acceptance criteria:**
-- [ ] AC-1: `scripts/install-mac-mlx.sh` runs `python -B -c 'import depthfusion.mcp.server'` after pip install and exits non-zero with the full traceback if it fails
-- [ ] AC-2: Same probe added to `scripts/install-vps.sh` and any other platform installer
+- [x] AC-1: `scripts/install-mac-mlx.sh` runs `python -B -c 'import depthfusion.mcp.server'` after pip install and exits non-zero with the full traceback if it fails
+- [x] AC-2: Same probe added to `scripts/install-vps.sh` and any other platform installer
 
 **Tasks:**
 - [x] T-827: Add MCP import smoke-test probe to `scripts/install-mac-mlx.sh` (fail-fast, non-optional)
@@ -3962,11 +3962,11 @@ was updated. `docs/configuration-profiles.md` did not exist until now (written i
 ### S-241: As a DepthFusion maintainer, I want a clean-venv packaging CI gate so that missing dependency declarations are caught before release `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: CI job creates a fresh venv, installs each supported extra (`mac-mlx`, `vps-cpu`, `vps-gpu`), and runs the MCP import probe
-- [ ] AC-2: Job fails if any extra cannot import `depthfusion.mcp.server`
+- [x] AC-1: CI job creates a fresh venv, installs each supported extra (`mac-mlx`, `vps-cpu`, `vps-gpu`), and runs the MCP import probe
+- [x] AC-2: Job fails if any extra cannot import `depthfusion.mcp.server`
 
 **Tasks:**
-- [ ] T-829: Add `packaging-gate` job to `ci.yml` covering `mac-mlx`, `vps-cpu`, and `vps-gpu` extras
+- [x] T-829: Add `packaging-gate` job to `ci.yml` covering `mac-mlx`, `vps-cpu`, and `vps-gpu` extras
 
 ### S-242: As a DepthFusion operator, I want the HTTP MCP endpoint to validate the Origin header so that the server meets MCP 2025-03-26 spec and is protected from cross-origin abuse `P1` `S`
 
