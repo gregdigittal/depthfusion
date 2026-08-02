@@ -173,6 +173,19 @@ async def health():
     return {"status": "ok", "transport": "sse", "version": _VERSION}
 
 
+@app.post("/mcp")
+async def streamable_http_endpoint(
+    request: Request,
+    _principal: Principal = Depends(require_principal),
+):
+    """Streamable HTTP transport (MCP spec 2025-03-26) — required by Claude Code ≥2.1.x."""
+    body = await request.json()
+    config = DepthFusionConfig.from_env()
+    loop = asyncio.get_event_loop()
+    response = await loop.run_in_executor(None, _process_request, body, config)
+    return response or {}
+
+
 @app.get("/sse")
 async def sse_endpoint(
     request: Request,
