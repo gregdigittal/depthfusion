@@ -3851,3 +3851,72 @@
 
 **Tasks:**
 - [x] T-811: Rewrite `test_endpoint_requires_auth` to override `_require_principal_dep` with an async callable raising HTTP 401, send an unauthenticated request, and assert `resp.status_code == 401`; use a `try/finally` to pop the override
+
+---
+
+## E-71: Transport Hardening & Documentation Closure [active]
+
+> Close the three post-E-70 gaps: full MCP 2025-03-26 compliance for the streamable-HTTP transport,
+> the S-227 real-embedding benchmark that gates the CIQS ≥95 README claim, and the T-773 docs
+> deliverable for configuration profiles. Exit criteria: all three stories done, CI green, README
+> claim annotated or validated.
+
+### S-235: As a Claude Code ≥2.1.x user, I want full MCP 2025-03-26 streamable-HTTP compliance so that session IDs, GET/DELETE, SSE response path, and 202 notifications work as specified `P0` `M`
+
+**Context:** Commit 8c76dc4 added a minimal `POST /mcp` shim (13 lines, synchronous executor).
+It handles basic JSON-RPC round-trips but lacks: session-ID lifecycle (initialize → session header
+→ DELETE teardown), GET /mcp for server-sent event streams, 202 Accepted for notifications,
+Accept/content-type negotiation, and protocol-version validation. A conforming MCP 2025-03-26
+client will fail against this endpoint in ways that surface as DepthFusion bugs.
+
+**Acceptance criteria:**
+- [ ] AC-1: `POST /mcp` with `Accept: application/json` returns JSON-RPC response (existing)
+- [ ] AC-2: `POST /mcp` with `Accept: text/event-stream` returns an SSE stream with the response as a `data:` event
+- [ ] AC-3: `POST /mcp` for a notification (no `id` field) returns HTTP 202 with empty body
+- [ ] AC-4: `GET /mcp` with valid session-ID returns the server-sent event stream for that session
+- [ ] AC-5: `DELETE /mcp` with valid session-ID terminates the session and returns 200
+- [ ] AC-6: Round-trip integration test covers the `initialize` → tool call → `DELETE` lifecycle
+- [ ] AC-7: `GET /health` returns `"transports": ["sse", "streamable-http"]` (correctness bug already fixed in `8c76dc4`+patch)
+- [ ] AC-8: `docs/mcp-http-server.md` updated to document `POST /mcp`, `GET /mcp`, `DELETE /mcp` with curl examples
+
+**Tasks:**
+- [ ] T-812: Implement session-ID lifecycle in `streamable_http_endpoint`: issue session header on `initialize`, route by session, handle `DELETE /mcp`
+- [ ] T-813: Add `GET /mcp` SSE stream path for server-initiated events
+- [ ] T-814: Return 202 for notification requests (no `id` in JSON-RPC body)
+- [ ] T-815: Add Accept/content-type negotiation and protocol-version header validation
+- [ ] T-816: Write round-trip integration test covering `initialize` → tool call → `DELETE` lifecycle
+- [ ] T-817: Update `docs/mcp-http-server.md` with full endpoint reference and curl examples
+
+### S-236: As a DepthFusion maintainer, I want a real-embedding A/B benchmark so that the CIQS ≥95 README claim has discriminating evidence behind it `P0` `S`
+
+**Context:** S-227 AC-3 committed a benchmark report (`docs/benchmarks/2026-07-11-standard-vs-research-goldset-v2.md`)
+showing MRR@10 = 1.0000 and nDCG@5 = 0.9934 for both profiles with zero delta. Both profiles
+degraded to identical BM25-only behaviour in the CI environment (no GPU / OpenAI key). The README
+currently shows ~95–97 CIQS projection for v2.0.0 vps-gpu annotated as pending validation.
+
+**Acceptance criteria:**
+- [ ] AC-1: Benchmark re-run on VPS with `DEPTHFUSION_EMBEDDING_BACKEND=openai` and the v2 goldset
+- [ ] AC-2: Report shows non-trivial delta between `standard` and `research` profiles (or documents why no delta exists at the embedding layer)
+- [ ] AC-3: Paired significance test (Wilcoxon or bootstrap CI) included
+- [ ] AC-4: README annotation updated: either confirm the ~95–97 projection with evidence or revise it to match measured values
+- [ ] AC-5: Report committed to `docs/benchmarks/` with the standard naming convention
+
+**Tasks:**
+- [ ] T-818: SSH to VPS, export `OPENAI_API_KEY`, run `scripts/ciqs_harness.py` with `--profile standard` and `--profile research`
+- [ ] T-819: Add paired significance test to harness output (Wilcoxon signed-rank)
+- [ ] T-820: Write benchmark report and commit to `docs/benchmarks/`
+- [ ] T-821: Update README CIQS projection row and remove pending-validation annotation if evidence supports it
+
+### S-237: As a DepthFusion operator, I want docs/configuration-profiles.md so that the three named profiles are discoverable without reading source code `P1` `XS`
+
+**Context:** T-773 (S-224) required "document profiles in README + docs/" but only the README
+was updated. `docs/configuration-profiles.md` did not exist until now (written in this session).
+
+**Acceptance criteria:**
+- [x] AC-1: `docs/configuration-profiles.md` exists and documents `minimal`, `standard`, and `research` profiles with effective flags and example env blocks
+- [x] AC-2: Each profile section includes a "when to use" description and any prerequisites (e.g. `OPENAI_API_KEY` for `research`)
+- [x] AC-3: A reference to `docs/configuration-profiles.md` is present in `CLAUDE.md` or the README profiles section
+
+**Tasks:**
+- [x] T-822: Write `docs/configuration-profiles.md` (done in this session)
+- [x] T-823: Add a one-line pointer in the README profiles section linking to `docs/configuration-profiles.md`

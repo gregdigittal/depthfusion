@@ -170,7 +170,7 @@ def _raise_if_auth_required() -> None:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "transport": "sse", "version": _VERSION}
+    return {"status": "ok", "transports": ["sse", "streamable-http"], "version": _VERSION}
 
 
 @app.post("/mcp")

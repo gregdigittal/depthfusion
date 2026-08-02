@@ -72,13 +72,15 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 | v0.3.0 vps-cpu (Tier 1: BM25 + Haiku rerank) | ~88 | +2 vs local | ≥65% | ≤1500 ms | Medium |
 | v0.3.0 vps-cpu (Tier 2: + ChromaDB fusion) | ~90 | +3 vs local | ≥70% | ≤1500 ms | Medium |
 | **v1.0.0 (E-31 cognitive layer)** | **~94–96** | +4 vs Tier 2 | **≥85%** | **≤1500 ms** | Medium-high |
-| **v2.0.0 (S-212 + E-46 + E-48, vps-gpu)** | **~95–97** | +4 vs Tier 2 | **≥90%** | **≤1500 ms** | Medium-high |
+| **v2.0.0 (S-212 + E-46 + E-48, vps-gpu)** | **~95–97** | +4 vs Tier 2 | **≥90%** | **≤1500 ms** | Medium-high ¹ |
 
 **v2.0.0 improvements over v1.0.0:**
 - **Category D continuity: 85% → ≥90%** — PRECEDED_BY edges from VPS event entities (S-212) add verified +4.17pp Cat D delta_mrr; edges accumulate nightly via the 03:15 UTC session linker
 - **Multi-agent shared memory** — Event Graph Fabric (E-46) tracks “who knew what, when” across agent sessions; new sessions inherit room working memory automatically via `depthfusion_session_seed`
 - **Cross-provider knowledge** — Multi-Provider Bridge (E-48) ingests ChatGPT/Gemini/DeepSeek conversation exports; `depthfusion_bridge` routes to 10+ providers and stores responses back as searchable memory
 - **Enterprise access control** — OIDC+PKCE auth, RBAC (viewer/contributor/operator/admin), data classification (PUBLIC→RESTRICTED), Fernet cache encryption; Tauri desktop app for macOS and Windows
+
+<sub>¹ **v2.0.0 vps-gpu CIQS projection is pending real-embedding validation.** The S-227 A/B benchmark was run in a BM25-only environment (no GPU / OpenAI embedding key); both profiles produced identical scores. The ~95–97 CIQS estimate above is a projection until re-run with `DEPTHFUSION_EMBEDDING_BACKEND=openai` on VPS. Tracked under E-71. Until then, treat this row as *estimated*.</sub>
 
 > **Industry benchmark context.** The CIQS suite above measures developer-workflow recall quality (retrieval precision across coding sessions, cross-session continuity of architectural decisions). The leading industry benchmarks for agent memory — LoCoMo, LongMemEval, BEAM — measure conversation-history recall (user preferences, multi-session chat). These are complementary task types: mem0 reports LoCoMo 92.5 / LongMemEval 94.4; Zep’s Graphiti engine reports DMR 94.8% / LongMemEval 63.8%. A direct CIQS run against external systems is planned under E-26.
 
@@ -876,14 +878,12 @@ Benchmarked on `tests/fixtures/recall_goldset_v2.jsonl` (200 synthetic queries, 
 | hit_rate@5 | **1.0000** | Primary chunk always in top-5 |
 | fallback_rate | 0.0000 | No BM25 misses |
 
-- **S-224 ✅** — Named configuration profiles (`minimal` / `standard` / `server` / `research`)
+- **S-224 ✅** — Named configuration profiles (`minimal` / `standard` / `server` / `research`) — see [`docs/configuration-profiles.md`](docs/configuration-profiles.md)
 - **S-225 ✅** — Fernet-encrypted cache wired to REST search path, principal-isolated cache keys
 - **S-226 ✅** — Embedding-similarity consolidation (replacing token-Jaccard), cross-scope guard
 - **S-227 ✅** — Real evaluation goldset (200 entries) + rank-aware metrics (MRR@10, nDCG@5)
 
 Full comparison report: `docs/benchmarks/2026-07-11-standard-vs-research-goldset-v2.md`
-
-### Projected (roadmap)
 
 ### Release history
 

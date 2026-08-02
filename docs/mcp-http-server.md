@@ -1,3 +1,16 @@
+## Transports
+
+The HTTP MCP server (`src/depthfusion/mcp/http_server.py`) supports two MCP transports:
+
+| Endpoint | Transport | MCP spec | Required by |
+|---|---|---|---|
+| `GET /sse` + `POST /messages` | SSE (two-endpoint) | pre-2025-03-26 | Claude Code ≤2.0.x |
+| `POST /mcp` | Streamable HTTP | MCP 2025-03-26 | Claude Code ≥2.1.x |
+
+`GET /health` reports `"transports": ["sse", "streamable-http"]` and is unauthenticated.
+
+Both transports share the same `require_principal` auth dependency and the same `_process_request` dispatcher. The `POST /mcp` implementation is a synchronous shim; full MCP 2025-03-26 compliance (session-ID handling, GET/DELETE, SSE response path, 202 notifications, Accept/content-type negotiation) is tracked under E-71.
+
 ## Auth requirements
 
 The HTTP MCP server lives in `src/depthfusion/mcp/http_server.py` and exposes the MCP two-endpoint SSE transport on `GET /sse` and `POST /messages`. `/health` is unauthenticated, but `/sse` and `/messages` are protected by FastAPI's `require_principal` dependency from `src/depthfusion/api/auth.py`.

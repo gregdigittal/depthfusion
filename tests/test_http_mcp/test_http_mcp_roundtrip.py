@@ -120,9 +120,12 @@ class TestHealthEndpoint:
         resp = plain_client.get("/health")
         assert resp.json().get("status") == "ok"
 
-    def test_health_json_has_transport_sse(self, plain_client: TestClient) -> None:
+    def test_health_json_has_transports(self, plain_client: TestClient) -> None:
         resp = plain_client.get("/health")
-        assert resp.json().get("transport") == "sse"
+        transports = resp.json().get("transports")
+        assert isinstance(transports, list)
+        assert "sse" in transports
+        assert "streamable-http" in transports
 
     def test_health_json_has_version_string(self, plain_client: TestClient) -> None:
         resp = plain_client.get("/health")
