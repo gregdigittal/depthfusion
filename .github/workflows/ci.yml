@@ -56,6 +56,29 @@ jobs:
       - name: Type check with mypy
         run: mypy src/depthfusion/core/ src/depthfusion/recursive/ src/depthfusion/mcp/ --ignore-missing-imports
 
+  stdio-import-probe:
+    name: "stdio import probe (no extras)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal package (no extras)
+        run: |
+          python -m venv /tmp/stdio-probe-venv
+          /tmp/stdio-probe-venv/bin/pip install -e . --quiet
+
+      - name: Probe stdio import (must not pull in cryptography)
+        run: |
+          /tmp/stdio-probe-venv/bin/python -B -c "import depthfusion.mcp.server; print('stdio-import-ok')"
+
   frontend-test:
     name: "Frontend (TypeScript + Vitest)"
     runs-on: ubuntu-latest
