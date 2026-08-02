@@ -19,7 +19,6 @@ from .errors import (
     TokenExpiredError,
     TokenInvalidError,
 )
-from .jwks_cache import JwksCache
 from .models import DeviceCodeResult, Principal
 from .principal_store import PrincipalStore
 from .service_account import (
@@ -58,11 +57,13 @@ __all__ = [
 ]
 
 # Names deferred until first access:
+# - JwksCache imports ``httpx`` (network I/O, not needed for stdio mode).
 # - TokenValidator imports ``cryptography`` (RS256 primitives).
 # - OidcClient imports TokenValidator, so it also pulls in ``cryptography``.
 # - PrincipalDep / make_require_principal / require_principal import ``fastapi``.
 # None of these are needed for the core MCP stdio path, so they are loaded on demand.
 _LAZY: dict[str, str] = {
+    "JwksCache": ".jwks_cache",
     "TokenValidator": ".token_validator",
     "OidcClient": ".oidc_client",
     "PrincipalDep": ".fastapi_deps",
