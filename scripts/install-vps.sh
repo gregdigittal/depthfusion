@@ -179,6 +179,14 @@ uv pip install --python "$VENV_DIR/bin/python" -e "$REPO_DIR[$DF_MODE]"
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$REPO_DIR"
 success "DepthFusion installed in $DF_MODE mode"
 
+VENV_PYTHON="$VENV_DIR/bin/python"
+echo "==> Verifying MCP server import..."
+"$VENV_PYTHON" -B -c 'import depthfusion.mcp.server' || {
+    echo "ERROR: MCP server import failed. Installation incomplete." >&2
+    exit 1
+}
+echo "==> MCP import OK"
+
 # =============================================================================
 # STEP 4 — Env file (root-only, chmod 600). Secrets sourced here, never inline.
 # =============================================================================

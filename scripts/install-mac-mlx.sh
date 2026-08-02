@@ -155,6 +155,13 @@ info "Installing DepthFusion with mac-mlx extras (this takes 3–6 minutes) …"
 "$VENV_PIP" install --quiet -e "$REPO_DIR[mac-mlx]"
 success "DepthFusion installed (mlx-lm, sentence-transformers, chromadb, hnswlib)"
 
+echo "==> Verifying MCP server import..."
+"$VENV_PYTHON" -B -c 'import depthfusion.mcp.server' || {
+    echo "ERROR: MCP server import failed. Installation incomplete." >&2
+    exit 1
+}
+echo "==> MCP import OK"
+
 # =============================================================================
 # STEP 8 — API key
 # =============================================================================
