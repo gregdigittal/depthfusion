@@ -688,8 +688,8 @@ class TestLegacyAuth:
     """DEPTHFUSION_V2_LEGACY_AUTH=1 + DEPTHFUSION_API_TOKEN auth flow."""
 
     def _is_legacy(self) -> bool:
-        from depthfusion.api.auth import _LegacyTokenDep, _require_principal_dep
-        return isinstance(_require_principal_dep, _LegacyTokenDep)
+        import os
+        return os.environ.get("DEPTHFUSION_V2_LEGACY_AUTH", "").strip() == "1"
 
     def test_health_always_200_in_legacy_mode(self) -> None:
         client = TestClient(app, raise_server_exceptions=False)
@@ -758,8 +758,8 @@ class TestLegacyTokenToolRoundTrip:
     """End-to-end legacy token auth + /messages without dependency_overrides."""
 
     def _is_legacy(self) -> bool:
-        from depthfusion.api.auth import _LegacyTokenDep, _require_principal_dep
-        return isinstance(_require_principal_dep, _LegacyTokenDep)
+        import os
+        return os.environ.get("DEPTHFUSION_V2_LEGACY_AUTH", "").strip() == "1"
 
     def test_tools_list_via_legacy_token(self) -> None:
         if not self._is_legacy():
