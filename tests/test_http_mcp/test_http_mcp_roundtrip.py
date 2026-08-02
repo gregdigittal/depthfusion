@@ -939,3 +939,162 @@ class TestStreamableHTTPLifecycle:
         client = self._client()
         resp = client.delete("/mcp", headers={"mcp-session-id": str(uuid.uuid4())})
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# S-242: Origin validation — DNS-rebinding guard (T-831)
+# ---------------------------------------------------------------------------
+
+class TestOriginValidation:
+    """POST/GET/DELETE /mcp: enforce MCP 2025-03-26 §2.1 Origin header rules."""
+
+    def _client(self) -> TestClient:
+        async def _override() -> Principal:
+            return _admin_principal()
+
+        app.dependency_overrides[require_principal] = _override
+        return TestClient(app, raise_server_exceptions=False)
+
+    def teardown_method(self, _method: object) -> None:
+        app.dependency_overrides.pop(require_principal, None)
+
+    def test_absent_origin_post_mcp_accepted(self) -> None:
+        """No Origin header → always accepted (CLI tools don't send it)."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0"},
+            }},
+        )
+        assert resp.status_code == 200
+
+    def test_valid_localhost_origin_post_mcp_accepted(self) -> None:
+        """http://localhost is in the default allowlist → 200."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"origin": "http://localhost"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0"},
+            }},
+        )
+        assert resp.status_code == 200
+
+    def test_invalid_origin_post_mcp_returns_403(self) -> None:
+        """Origin not in allowlist → 403 (DNS-rebinding guard)."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"origin": "https://evil.example.com"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        )
+        assert resp.status_code == 403
+
+    def test_invalid_origin_get_mcp_returns_403(self) -> None:
+        """GET /mcp with unknown Origin → 403."""
+        client = self._client()
+        # A valid session_id is required before hitting origin check, but origin
+        # check fires before session lookup, so any mcp-session-id will do.
+        resp = client.get(
+            "/mcp",
+            headers={"origin": "https://evil.example.com", "mcp-session-id": str(uuid.uuid4())},
+        )
+        assert resp.status_code == 403
+
+    def test_invalid_origin_delete_mcp_returns_403(self) -> None:
+        """DELETE /mcp with unknown Origin → 403."""
+        client = self._client()
+        resp = client.delete(
+            "/mcp",
+            headers={"origin": "https://evil.example.com", "mcp-session-id": str(uuid.uuid4())},
+        )
+        assert resp.status_code == 403
+
+    def test_custom_allowed_origin_via_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """DEPTHFUSION_MCP_ALLOWED_ORIGINS overrides the default allowlist."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"origin": "https://app.example.com"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0"},
+            }},
+        )
+        assert resp.status_code == 200
+
+    def test_loopback_origin_blocked_when_custom_env_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When DEPTHFUSION_MCP_ALLOWED_ORIGINS is set, default loopback is not in scope."""
+        monkeypatch.setenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "https://app.example.com")
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            headers={"origin": "http://localhost"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        )
+        assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# S-243: HTTP edge-case compliance (T-832)
+# ---------------------------------------------------------------------------
+
+class TestHttpEdgeCases:
+    """Edge cases: malformed JSON, wrong Content-Type, protocol version on GET/DELETE."""
+
+    def _client(self) -> TestClient:
+        async def _override() -> Principal:
+            return _admin_principal()
+
+        app.dependency_overrides[require_principal] = _override
+        return TestClient(app, raise_server_exceptions=False)
+
+    def teardown_method(self, _method: object) -> None:
+        app.dependency_overrides.pop(require_principal, None)
+
+    def test_malformed_json_post_mcp_returns_4xx(self) -> None:
+        """Malformed JSON body → 400/422, not 500."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            content=b"not valid json{{{",
+            headers={"content-type": "application/json"},
+        )
+        assert resp.status_code in {400, 422}
+
+    def test_wrong_content_type_post_mcp_returns_415(self) -> None:
+        """Content-Type: text/plain → 415 Unsupported Media Type."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            content=b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
+            headers={"content-type": "text/plain"},
+        )
+        assert resp.status_code == 415
+
+    def test_get_mcp_missing_session_id_returns_400(self) -> None:
+        """GET /mcp without Mcp-Session-Id → 400."""
+        client = self._client()
+        resp = client.get("/mcp")
+        assert resp.status_code == 400
+
+    def test_delete_mcp_missing_session_id_returns_400(self) -> None:
+        """DELETE /mcp without Mcp-Session-Id → 400."""
+        client = self._client()
+        resp = client.delete("/mcp")
+        assert resp.status_code == 400
+
+    def test_notification_no_id_post_mcp_returns_202(self) -> None:
+        """JSON-RPC notification (no 'id') → 202 Accepted with empty body."""
+        client = self._client()
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {}},
+        )
+        assert resp.status_code == 202

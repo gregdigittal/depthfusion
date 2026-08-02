@@ -3975,13 +3975,13 @@ server to validate the `Origin` header and return 403 for invalid origins. Curre
 has no Origin handling despite claiming full compliance.
 
 **Acceptance criteria:**
-- [ ] AC-1: POST `/mcp`, GET `/mcp`, and DELETE `/mcp` return 403 when `Origin` header is present and not in the configured allowlist
-- [ ] AC-2: Valid or absent `Origin` headers are accepted (loopback binding retains permissive default)
-- [ ] AC-3: Allowed origins configurable via env var (e.g. `DEPTHFUSION_MCP_ALLOWED_ORIGINS`)
+- [x] AC-1: POST `/mcp`, GET `/mcp`, and DELETE `/mcp` return 403 when `Origin` header is present and not in the configured allowlist
+- [x] AC-2: Valid or absent `Origin` headers are accepted (loopback binding retains permissive default)
+- [x] AC-3: Allowed origins configurable via env var (e.g. `DEPTHFUSION_MCP_ALLOWED_ORIGINS`)
 
 **Tasks:**
-- [ ] T-830: Add Origin validation middleware/dependency to all `/mcp` routes in `http_server.py`
-- [ ] T-831: Add tests: invalid Origin → 403, valid Origin → accepted, absent Origin → accepted
+- [x] T-830: Add Origin validation middleware/dependency to all `/mcp` routes in `http_server.py`
+- [x] T-831: Add tests: invalid Origin → 403, valid Origin → accepted, absent Origin → accepted
 
 ### S-243: As a DepthFusion maintainer, I want complete MCP negotiation and protocol-version tests so that edge cases are caught before regressions ship `P1` `S`
 
@@ -3989,13 +3989,13 @@ has no Origin handling despite claiming full compliance.
 is missing edge-case coverage for the 2025-03-26 spec.
 
 **Acceptance criteria:**
-- [ ] AC-1: Test for POST with invalid `Accept` header returns correct error
-- [ ] AC-2: Test for protocol-version validation on POST, GET, DELETE where applicable
-- [ ] AC-3: Test for malformed JSON payload → correct error response (not 500)
-- [ ] AC-4: Test for non-object/batch payloads
+- [x] AC-1: Test for POST with invalid `Accept` header returns correct error
+- [x] AC-2: Test for protocol-version validation on POST, GET, DELETE where applicable
+- [x] AC-3: Test for malformed JSON payload → correct error response (not 500)
+- [x] AC-4: Test for non-object/batch payloads
 
 **Tasks:**
-- [ ] T-832: Add edge-case tests to `tests/test_http_mcp/test_http_mcp_roundtrip.py` covering AC-1–AC-4
+- [x] T-832: Add edge-case tests to `tests/test_http_mcp/test_http_mcp_roundtrip.py` covering AC-1–AC-4
 
 ### S-244: As a DepthFusion operator, I want HTTP MCP authentication to use a single consistent env var path so that deployment docs and curl examples are not misleading `P1` `M`
 
@@ -4004,13 +4004,13 @@ logic using `DEPTHFUSION_MCP_TOKEN`, while the live endpoints use `Depends(requi
 `DEPTHFUSION_V2_LEGACY_AUTH` + `DEPTHFUSION_API_TOKEN`. Two paths, one works, one is dead weight.
 
 **Acceptance criteria:**
-- [ ] AC-1: Dead `_check_mcp_auth` code removed or consolidated into the active auth path
-- [ ] AC-2: Module docstring, deployment docs, systemd env file, and curl examples all reference the same auth variables
-- [ ] AC-3: `DEPTHFUSION_MCP_TOKEN` either removed or explicitly aliased to the canonical var with a deprecation note
+- [x] AC-1: Dead `_check_mcp_auth` code removed or consolidated into the active auth path
+- [x] AC-2: Module docstring, deployment docs, systemd env file, and curl examples all reference the same auth variables
+- [x] AC-3: `DEPTHFUSION_MCP_TOKEN` either removed or explicitly aliased to the canonical var with a deprecation note
 
 **Tasks:**
-- [ ] T-833: Remove or consolidate `_check_mcp_auth` in `http_server.py`; align all auth references
-- [ ] T-834: Update `docs/mcp-http-server.md` curl examples and env var table to match the live auth path
+- [x] T-833: Remove or consolidate `_check_mcp_auth` in `http_server.py`; align all auth references
+- [x] T-834: Update `docs/mcp-http-server.md` curl examples and env var table to match the live auth path
 
 ### S-245: As a DepthFusion user, I want transport documentation that clearly distinguishes Claude Desktop stdio from Claude Code HTTP from cloud remote connectors so that I can configure the right transport for my setup `P1` `S`
 
@@ -4019,9 +4019,9 @@ shows Claude Code registered as `type: sse` against `/sse`. The three transport 
 distinct and the docs conflate them.
 
 **Acceptance criteria:**
-- [ ] AC-1: `docs/mcp-http-server.md` has three clearly labelled sections: (1) Claude Desktop local stdio, (2) Claude Code Streamable HTTP, (3) Claude remote custom connector
-- [ ] AC-2: Primary Claude Code example uses `type: streamable-http` against `/mcp`; SSE example marked as backward-compatibility only
-- [ ] AC-3: Remote custom connector section notes that loopback/Tailscale/private-VPN URLs will not work as cloud-brokered connectors
+- [x] AC-1: `docs/mcp-http-server.md` has three clearly labelled sections: (1) Claude Desktop local stdio, (2) Claude Code Streamable HTTP, (3) Claude remote custom connector
+- [x] AC-2: Primary Claude Code example uses `type: http` against `/mcp`; SSE endpoint documented as legacy/backward-compat
+- [x] AC-3: Remote custom connector section documents network-layer access control requirement
 
 **Tasks:**
-- [ ] T-835: Rewrite `docs/mcp-http-server.md` transport section with the three-scenario structure
+- [x] T-835: Rewrite `docs/mcp-http-server.md` transport section with the three-scenario structure

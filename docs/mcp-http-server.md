@@ -1,33 +1,99 @@
-## Transports
+## Transport scenarios
 
-The HTTP MCP server (`src/depthfusion/mcp/http_server.py`) supports two MCP transports:
+The DepthFusion MCP layer supports three distinct usage patterns:
+
+### Scenario A — Claude Desktop (stdio)
+
+Claude Desktop spawns `python -m depthfusion.mcp.server` as a child process and communicates over stdin/stdout. No HTTP server is involved. Configuration in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "depthfusion": {
+      "command": "python",
+      "args": ["-m", "depthfusion.mcp.server"],
+      "env": {
+        "DEPTHFUSION_API_TOKEN": "<token>"
+      }
+    }
+  }
+}
+```
+
+The stdio path requires **only the base package** — no HTTP/FastAPI extras needed. `pip install depthfusion` (no extra) is sufficient.
+
+### Scenario B — Claude Code (Streamable HTTP)
+
+Claude Code ≥2.1.x uses the **Streamable HTTP transport** (MCP spec 2025-03-26). The long-running HTTP server must be started first:
+
+```bash
+DEPTHFUSION_V2_LEGACY_AUTH=1 \
+DEPTHFUSION_API_TOKEN=<token> \
+DEPTHFUSION_MCP_HOST=127.0.0.1 \
+DEPTHFUSION_MCP_PORT=7301 \
+  python -m depthfusion.mcp.http_server
+```
+
+Register in `~/.claude/settings.json` (or `~/.claude/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "depthfusion": {
+      "type": "http",
+      "url": "http://127.0.0.1:7301/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DEPTHFUSION_API_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+One server instance can serve multiple Claude Code windows simultaneously — each opens its own session via `initialize`.
+
+### Scenario C — Remote custom connector
+
+For remote access (e.g. a Tailscale-connected VPS), use the same `type: http` registration with the server's private IP:
+
+```json
+"url": "http://100.x.y.z:7301/mcp"
+```
+
+Set `DEPTHFUSION_MCP_HOST=0.0.0.0` on the server **only** when the network-layer access control (Tailscale ACL, firewall) restricts who can reach port 7301. Auth is still required — `DEPTHFUSION_API_TOKEN` must be set and all clients must send `Authorization: Bearer <token>`.
+
+---
+
+## Transports
 
 | Endpoint | Transport | MCP spec | Required by |
 |---|---|---|---|
+| `POST /mcp` | Streamable HTTP | 2025-03-26 | Claude Code ≥2.1.x |
 | `GET /sse` + `POST /messages` | SSE (two-endpoint) | pre-2025-03-26 | Claude Code ≤2.0.x |
-| `POST /mcp` | Streamable HTTP | MCP 2025-03-26 | Claude Code ≥2.1.x |
+| `GET /health` | — | — | unauthenticated probe |
 
-`GET /health` reports `"transports": ["sse", "streamable-http"]` and is unauthenticated.
-
-Both transports share the same `require_principal` auth dependency and the same `_process_request` dispatcher.
+Both transports share the same `require_principal` auth dependency and `_process_request` dispatcher.
 
 ### Streamable HTTP endpoint reference (MCP 2025-03-26)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/mcp` | JSON-RPC request/response. `initialize` issues `Mcp-Session-Id`; requests bearing the header route to that session. Notifications (no `id`) → `202 Accepted`. |
+| `POST` | `/mcp` | JSON-RPC request/response. `initialize` issues `Mcp-Session-Id`. Notifications (no `id`) → `202 Accepted`. |
 | `GET` | `/mcp` | Server-initiated `text/event-stream` keyed by `Mcp-Session-Id`. |
-| `DELETE` | `/mcp` | Session teardown. Requires `Mcp-Session-Id`; removes the session registry entry. |
+| `DELETE` | `/mcp` | Session teardown. Requires `Mcp-Session-Id`. |
 
-**Accept negotiation:** `POST /mcp` honours the `Accept` header. Clients that send only `text/event-stream` receive a single-event SSE response instead of JSON.
+**Accept negotiation:** `POST /mcp` honours the `Accept` header. Clients that send only `text/event-stream` receive a single-event SSE response.
 
-**Protocol-version validation:** requests carrying `MCP-Protocol-Version` are validated; anything other than `2025-03-26` is rejected with `400`. The header may be omitted for back-compat.
+**Protocol-version validation:** `MCP-Protocol-Version: 2025-03-26` accepted; anything else → `400`. Omitting the header is tolerated for back-compat.
+
+**Origin validation (DNS-rebinding guard):** `/mcp` routes reject requests whose `Origin` header is present but not in the allowed list. Absent `Origin` is always accepted (CLI tools and Claude Code do not send it). Default allowlist: `http://localhost`, `https://localhost`, `http://127.0.0.1`, `https://127.0.0.1`, `http://[::1]`, `https://[::1]`. Override with `DEPTHFUSION_MCP_ALLOWED_ORIGINS` (comma-separated).
 
 #### Curl examples
 
 ```bash
-# initialize — note the Mcp-Session-Id in the response headers
 TOKEN=$DEPTHFUSION_API_TOKEN
+
+# initialize — capture Mcp-Session-Id
 SESSION=$(curl -s -D - -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"0.1"}}}' \
@@ -40,7 +106,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
   http://127.0.0.1:7301/mcp | python3 -m json.tool
 
-# send a notification (no response body expected — returns 202)
+# notification — returns 202 with empty body
 curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Mcp-Session-Id: $SESSION" \
@@ -55,84 +121,36 @@ curl -s -X DELETE \
   http://127.0.0.1:7301/mcp
 ```
 
-## Auth requirements
+---
 
-The HTTP MCP server lives in `src/depthfusion/mcp/http_server.py` and exposes the MCP two-endpoint SSE transport on `GET /sse` and `POST /messages`. `/health` is unauthenticated, but `/sse` and `/messages` are protected by FastAPI's `require_principal` dependency from `src/depthfusion/api/auth.py`.
+## Auth and environment variables
 
-For the current shared-server setup, use the legacy token auth path:
+All `/mcp`, `/sse`, and `/messages` endpoints require a valid Bearer token. `/health` is unauthenticated.
+
+| Variable | Required | Description |
+|---|---|---|
+| `DEPTHFUSION_V2_LEGACY_AUTH` | Yes (dev) | Set to `1` to use bearer-token auth backed by `DEPTHFUSION_API_TOKEN` |
+| `DEPTHFUSION_API_TOKEN` | Yes (dev) | Shared bearer token for legacy auth mode |
+| `DEPTHFUSION_MCP_HOST` | No | Bind address (default `127.0.0.1`) |
+| `DEPTHFUSION_MCP_PORT` | No | Bind port (default `7301`) |
+| `DEPTHFUSION_MCP_ALLOWED_ORIGINS` | No | Comma-separated list of allowed `Origin` values for `/mcp` routes. Overrides the default loopback allowlist entirely. |
+
+If `DEPTHFUSION_V2_LEGACY_AUTH=1` is set without `DEPTHFUSION_API_TOKEN`, startup fails. In production, remove `DEPTHFUSION_V2_LEGACY_AUTH` and configure OIDC/JWKS via the `DEPTHFUSION_OIDC_*` variables.
+
+---
+
+## Health probe
 
 ```bash
-DEPTHFUSION_V2_LEGACY_AUTH=1
-DEPTHFUSION_API_TOKEN=<shared-secret>
-DEPTHFUSION_MCP_HOST=127.0.0.1
-DEPTHFUSION_MCP_PORT=7301
+curl --silent --max-time 2 --fail http://127.0.0.1:7301/health
 ```
 
-`DEPTHFUSION_V2_LEGACY_AUTH=1` explicitly selects bearer-token auth backed by `DEPTHFUSION_API_TOKEN`. Clients must send `Authorization: Bearer <token>`. If `DEPTHFUSION_V2_LEGACY_AUTH=1` is set without `DEPTHFUSION_API_TOKEN`, startup fails. If neither full OIDC/JWKS auth nor this legacy-token pair is configured, `require_principal` fails closed instead of allowing unauthenticated MCP calls.
+Returns: `{"status": "ok", "transports": ["sse", "streamable-http"], "version": "<ver>"}`.
 
-The `/sse` endpoint requires `require_principal` before it opens the SSE stream, so even read-only MCP sessions must authenticate. The same requirement applies to `/messages`, which carries JSON-RPC requests for the active SSE session.
+The `session-start.sh` hook probes this URL before reporting DepthFusion availability. If unreachable, it falls back to the Python subprocess path non-fatally so Claude Code startup is never blocked.
 
-## Curl verification
-
-After the server is running and `DEPTHFUSION_API_TOKEN` is exported in the shell, verify the authenticated SSE endpoint with:
-
-```bash
-curl --max-time 5 -i -H "Authorization: Bearer $DEPTHFUSION_API_TOKEN" http://127.0.0.1:7301/sse
-```
-
-Expected result: HTTP 200 with `content-type: text/event-stream`, followed by an SSE payload beginning with:
-
-```text
-event: endpoint
-data: /messages?sessionId=<uuid>
-```
-
-The command times out after five seconds because the SSE stream is designed to stay open.
-
-## Claude Code MCP registration
-
-Register Claude Code against the HTTP SSE endpoint rather than spawning `python -m depthfusion.mcp.server` for each client. Put this in `~/.claude/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "depthfusion": {
-      "type": "sse",
-      "url": "http://127.0.0.1:7301/sse",
-      "headers": {
-        "Authorization": "Bearer ${DEPTHFUSION_API_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-If the installed Claude Code build reads MCP servers from `~/.claude/settings.json`, place the same `mcpServers.depthfusion` object there instead and preserve the rest of the settings file. Remote clients can use the same registration with the host changed to the private reachable address, such as a Tailscale IP:
-
-```json
-"url": "http://100.x.y.z:7301/sse"
-```
-
-Each Claude Code process must have `DEPTHFUSION_API_TOKEN` in its environment so the registration can send the bearer token.
+---
 
 ## Multi-client sharing
 
-One long-running HTTP MCP server instance can serve multiple Claude Code clients. Each client opens its own `GET /sse` connection, receives a unique `sessionId`, and sends JSON-RPC MCP requests to `POST /messages?sessionId=...`. The server keeps a separate queue per session, so responses are routed back over the matching SSE stream.
-
-This lets many local or Tailscale-connected Claude Code sessions share the same DepthFusion process, loaded code, configuration, caches, and backing stores. It also avoids the startup cost and isolation of one Python MCP subprocess per Claude Code window.
-
-## Python-subprocess fallback path
-
-The deployed Claude `session-start.sh` hook probes the HTTP MCP server before relying on local Python work. It builds the health URL from the MCP host and port:
-
-```bash
-DEPTHFUSION_HEALTH_URL="http://${DEPTHFUSION_MCP_HOST:-127.0.0.1}:${DEPTHFUSION_MCP_PORT:-7301}/health"
-```
-
-Then it runs a bounded health check:
-
-```bash
-curl --silent --max-time 2 --fail "$DEPTHFUSION_HEALTH_URL"
-```
-
-If `/health` responds, the hook can report the HTTP MCP server as available in the session-start context. If the HTTP server is unavailable, the hook logs a warning and falls back to the existing Python subprocess path so session startup still gets best-effort DepthFusion context. That fallback runs the DepthFusion virtualenv Python locally, imports the session-start or tagging logic, and exits non-fatally if DepthFusion cannot be reached. Claude Code startup must not be blocked by either the HTTP probe or the subprocess fallback.
+One HTTP server instance serves multiple Claude Code sessions. Each client calls `initialize` on `POST /mcp` to receive a unique `Mcp-Session-Id`, then routes subsequent requests using that header. The server maintains a per-session queue so responses are delivered over the correct stream. This avoids the per-window Python subprocess startup cost.
