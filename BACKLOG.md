@@ -4025,3 +4025,126 @@ distinct and the docs conflate them.
 
 **Tasks:**
 - [x] T-835: Rewrite `docs/mcp-http-server.md` transport section with the three-scenario structure
+
+---
+
+## E-73: Growth, Reliability & Observability [active]
+
+> Expand DepthFusion's reach (MCP clients beyond Claude Code), fix trust-eroding UI placeholders, add the hygiene scheduler that prevents recall quality decay, ship session crash recovery as a novel differentiator, harden the server for team use, and add observability tooling for power users.
+
+### S-246: As a Cursor/Windsurf/Cline user, I want a config snippet and quick-start guide so that I can connect DepthFusion to my editor without figuring out the MCP transport format myself `P1` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `docs/mcp-client-setup.md` exists with Cursor, Windsurf, and Cline JSON config snippets that reference the live mcp.tonracein.com endpoint
+- [ ] AC-2: README "Connect to your editor" section links to the new doc
+- [ ] AC-3: At least one end-to-end smoke test confirms the config snippet works against a live server
+
+**Tasks:**
+- [ ] T-836: Write `docs/mcp-client-setup.md` with config snippets for Cursor, Windsurf, and Cline (Streamable HTTP transport, Bearer token auth)
+- [ ] T-837: Add "Connect to your editor" section to README linking to the new doc
+- [ ] T-838: Smoke-test each config snippet against mcp.tonracein.com
+
+### S-247: As a DepthFusion user, I want the Tauri dashboard to show real activity data so that I can trust the UI reflects actual system state `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Recent Activity tile calls `/query/sessions?limit=10` and renders real session IDs, project names, and timestamps
+- [ ] AC-2: Storage Usage tile calls `/query/aggregate` and renders real item count and estimated storage bytes
+- [ ] AC-3: Both tiles show a loading skeleton while fetching and an error state on failure
+- [ ] AC-4: No hardcoded placeholder data remains in `DashboardPage.tsx`
+
+**Tasks:**
+- [ ] T-839: Replace hardcoded recent-activity list in `DashboardPage.tsx` with real `/query/sessions?limit=10` API call
+- [ ] T-840: Replace hardcoded StorageUsage with real `/query/aggregate` stats call
+- [ ] T-841: Add loading skeleton and error state to both tiles
+
+### S-248: As a DepthFusion operator, I want a nightly memory hygiene job so that recall quality does not degrade as the memory store grows `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: A scheduler (APScheduler or stdlib `schedule`) runs decay + dedup + prune nightly at 02:00 UTC when the server is running
+- [ ] AC-2: Each hygiene run publishes a `hygiene_report` ContextItem tagged `["hygiene", project_slug]` with items_decayed, duplicates_merged, and candidates_pruned counts
+- [ ] AC-3: The scheduler is wired into the FastAPI `lifespan` startup so it starts automatically and stops cleanly on shutdown
+- [ ] AC-4: `DEPTHFUSION_HYGIENE_SCHEDULE` env var (cron expression, default `0 2 * * *`) controls the schedule
+
+**Tasks:**
+- [ ] T-842: Add `schedule/hygiene_job.py` that runs `apply_decay` → `dedup_against_corpus` → `identify_candidates` in sequence and returns a summary dict
+- [ ] T-843: Publish `hygiene_report` ContextItem after each run via the EventStore
+- [ ] T-844: Wire scheduler into FastAPI lifespan startup/shutdown in `mcp/http_server.py`
+
+### S-249: As a DepthFusion maintainer, I want an embedding A/B benchmark so that I can quantify whether upgrading from all-MiniLM-L6-v2 improves recall `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `scripts/retrieval_benchmark.py` accepts `--model-a` and `--model-b` args and outputs a side-by-side recall@k, MRR, and NDCG comparison table
+- [ ] AC-2: Benchmark runs cleanly with two sentence-transformers models (no API key required)
+- [ ] AC-3: Results are written to `docs/agent-outputs/` in the standard dual-format (md + html)
+
+**Tasks:**
+- [ ] T-845: Extend `scripts/retrieval_benchmark.py` to accept `--model-a` / `--model-b` and run both embedding models over the same synthetic corpus
+- [ ] T-846: Output recall@k (k=1,3,5), MRR, and NDCG comparison table; write results to `docs/agent-outputs/`
+
+### S-250: As a Claude Code user, I want DepthFusion to automatically checkpoint my session so that uncommitted work is recoverable after a crash `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: A `CheckpointRecord` ContextItem is published on every clean session close (`DELETE /mcp`) containing `plan_state`, `files_modified`, `git_stash_ref` (if in a git repo), and `context_pct_at_checkpoint`
+- [ ] AC-2: An ambient lightweight trace is written to the event bus on every tool call via `_process_request` (tagged `type=ambient_trace`, excluded from standard recall)
+- [ ] AC-3: `depthfusion_session_seed` accepts `mode="resume"` and returns the most recent checkpoint plus standard recall results; includes `recovery_command` if `git_stash_ref` is present
+- [ ] AC-4: New `depthfusion_session_checkpoint` MCP tool allows agents to publish a manual checkpoint at plan boundaries
+- [ ] AC-5: Checkpoint TTL defaults to 7 days; configurable via `DEPTHFUSION_CHECKPOINT_TTL_DAYS`
+
+**Tasks:**
+- [ ] T-847: Add `CheckpointRecord` schema and `publish_checkpoint(session_id, config, plan_state, files_modified)` function to `core/event_store.py`
+- [ ] T-848: Hook checkpoint publish into `DELETE /mcp` handler in `mcp/http_server.py` (before session is removed from dict)
+- [ ] T-849: Add ambient trace side-effect to `_process_request` dispatcher (lightweight, non-blocking)
+- [ ] T-850: Add `depthfusion_session_checkpoint` to `mcp/tools/` registry
+- [ ] T-851: Add `mode="resume"` branch to `_tool_session_seed` in `mcp/tools/project.py`
+- [ ] T-852: Add SIGTERM lifespan hook to checkpoint all open sessions on server shutdown
+
+### S-251: As a DepthFusion operator, I want rate limiting and multi-worker session safety so that the server is safe for team and hosted deployment `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `POST /mcp` is rate-limited to `DEPTHFUSION_RATE_LIMIT_PUBLISH` calls/minute/principal (default 60) and `DEPTHFUSION_RATE_LIMIT_RECALL` calls/minute/principal (default 300)
+- [ ] AC-2: Rate limiter is backed by Redis when `DEPTHFUSION_REDIS_URL` is set; falls back to in-process counter when absent
+- [ ] AC-3: `_MCP_SESSIONS` and `_MCP_STREAMABLE_SESSIONS` single-worker constraint is documented in `docs/deployment.md` with a clear path to Redis-backed session store
+- [ ] AC-4: A 429 response from the rate limiter returns `{"error": "rate_limited", "retry_after_seconds": N}`
+
+**Tasks:**
+- [ ] T-853: Add `fastapi-limiter` to `vps-cpu` and `vps-gpu` extras in `pyproject.toml`
+- [ ] T-854: Wire rate limits onto `POST /mcp` endpoint keyed by authenticated principal
+- [ ] T-855: Add `DEPTHFUSION_RATE_LIMIT_PUBLISH` and `DEPTHFUSION_RATE_LIMIT_RECALL` env vars with documented defaults
+- [ ] T-856: Document single-worker session dict constraint and Redis upgrade path in `docs/deployment.md`
+
+### S-252: As a Claude Code agent, I want streaming recall results so that I can start using the first relevant memory before the full reranker pipeline completes `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion_recall_relevant` accepts `stream=true` parameter
+- [ ] AC-2: When streaming, results are pushed to the open SSE session stream as they clear the BM25 minimum score threshold (~20ms for first result)
+- [ ] AC-3: Reranker scores arrive as follow-up `score_update` events on the same stream
+- [ ] AC-4: Non-streaming behaviour is unchanged when `stream` is omitted or false
+
+**Tasks:**
+- [ ] T-857: Convert `_tool_recall` to an async generator that yields results above BM25 threshold before waiting for full rerank
+- [ ] T-858: Add `stream` parameter to `depthfusion_recall_relevant` tool schema
+- [ ] T-859: Wire streamed recall results through the session asyncio Queue to the open SSE event stream
+
+### S-253: As a DepthFusion user, I want a checkpoint timeline in the Tauri dashboard so that I can see my session history and resume from a prior checkpoint `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: A new `/query/checkpoints?project=<slug>&limit=20` REST endpoint returns checkpoint records for a project
+- [ ] AC-2: Tauri dashboard has a `CheckpointTimeline` tile showing each checkpoint's timestamp, project, files modified, and plan step
+- [ ] AC-3: Each checkpoint row has a "Resume from here" action that calls `depthfusion_session_seed(mode="resume", checkpoint_id=<id>)`
+
+**Tasks:**
+- [ ] T-860: Add `/query/checkpoints` endpoint to `api/rest.py`
+- [ ] T-861: Build `CheckpointTimeline` tile in Tauri `DashboardPage.tsx`
+- [ ] T-862: Wire "Resume from here" action through Tauri IPC to `depthfusion_session_seed`
+
+### S-254: As a team lead, I want cross-session diff analysis so that I can see what all agents changed in a file this week `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Checkpoint records store gzipped, base64-encoded git diffs per modified file (capped at 4KB/file)
+- [ ] AC-2: `/query/aggregate?type=file_diffs&file=<path>&since=<iso>` returns chronological diff history for a file across all checkpoint records
+- [ ] AC-3: Tauri dashboard has a `FileDiffHistory` panel accessible from the checkpoint timeline
+
+**Tasks:**
+- [ ] T-863: Extend checkpoint publish to run `git diff HEAD -- <file>` for each modified file and store gzipped diff in `metadata.diffs` (4KB cap per file)
+- [ ] T-864: Add `?type=file_diffs&file=<path>&since=<iso>` query branch to `/query/aggregate` in `api/rest.py`
+- [ ] T-865: Build `FileDiffHistory` panel in Tauri dashboard, accessible from the checkpoint timeline tile
