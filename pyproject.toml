@@ -191,4 +191,5 @@ constraint-dependencies = [
     "markdown>=3.8.1",    # CVE: uncaught exception
     "pygments>=2.20.0",   # CVE: ReDoS on GUID matching
     "pydantic-settings>=2.14.2",  # Dependabot: transitive via chromadb (pinned 2.14.1)
+    "pyasn1>=0.6.4",              # CVE: BER/CER/DER DoS + quadratic complexity (transitive via python-jose/rsa)
 ]
