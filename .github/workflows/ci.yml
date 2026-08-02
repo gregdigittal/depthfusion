@@ -56,6 +56,41 @@ jobs:
       - name: Type check with mypy
         run: mypy src/depthfusion/core/ src/depthfusion/recursive/ src/depthfusion/mcp/ --ignore-missing-imports
 
+  stdio-import-probe:
+    name: "stdio import probe (no extras)"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal package (no extras)
+        run: |
+          python -m venv /tmp/stdio-probe-venv
+          /tmp/stdio-probe-venv/bin/pip install -e . --quiet
+
+      - name: Probe identity models import (must not pull in httpx/cryptography/fastapi)
+        run: |
+          /tmp/stdio-probe-venv/bin/python -B -c "
+          import sys
+          # Root-cause probe: identity.__init__ must NOT eagerly load httpx/cryptography/fastapi
+          # when only depthfusion.identity.models is needed (the Claude Desktop stdio path).
+          # Full mcp.server import pulls in all tool backends (fastapi, pydantic, haiku) by design;
+          # lazy tool loading in server.py is tracked separately.
+          from depthfusion.identity.models import Principal
+          heavy = [m for m in sys.modules if any(x in m for x in ('httpx', 'cryptography', 'fastapi', 'pydantic'))]
+          if heavy:
+              print(f'FAIL: identity init pulled in heavy modules: {heavy[:5]}', file=sys.stderr)
+              sys.exit(1)
+          print('stdio-identity-import-ok')
+          "
+
   frontend-test:
     name: "Frontend (TypeScript + Vitest)"
     runs-on: ubuntu-latest
