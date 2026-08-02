@@ -3854,7 +3854,7 @@
 
 ---
 
-## E-71: Transport Hardening & Documentation Closure [active]
+## E-71: Transport Hardening & Documentation Closure [done]
 
 > Close the three post-E-70 gaps: full MCP 2025-03-26 compliance for the streamable-HTTP transport,
 > the S-227 real-embedding benchmark that gates the CIQS ≥95 README claim, and the T-773 docs
@@ -3870,22 +3870,22 @@ Accept/content-type negotiation, and protocol-version validation. A conforming M
 client will fail against this endpoint in ways that surface as DepthFusion bugs.
 
 **Acceptance criteria:**
-- [ ] AC-1: `POST /mcp` with `Accept: application/json` returns JSON-RPC response (existing)
-- [ ] AC-2: `POST /mcp` with `Accept: text/event-stream` returns an SSE stream with the response as a `data:` event
-- [ ] AC-3: `POST /mcp` for a notification (no `id` field) returns HTTP 202 with empty body
-- [ ] AC-4: `GET /mcp` with valid session-ID returns the server-sent event stream for that session
-- [ ] AC-5: `DELETE /mcp` with valid session-ID terminates the session and returns 200
-- [ ] AC-6: Round-trip integration test covers the `initialize` → tool call → `DELETE` lifecycle
-- [ ] AC-7: `GET /health` returns `"transports": ["sse", "streamable-http"]` (correctness bug already fixed in `8c76dc4`+patch)
-- [ ] AC-8: `docs/mcp-http-server.md` updated to document `POST /mcp`, `GET /mcp`, `DELETE /mcp` with curl examples
+- [x] AC-1: `POST /mcp` with `Accept: application/json` returns JSON-RPC response (existing)
+- [x] AC-2: `POST /mcp` with `Accept: text/event-stream` returns an SSE stream with the response as a `data:` event
+- [x] AC-3: `POST /mcp` for a notification (no `id` field) returns HTTP 202 with empty body
+- [x] AC-4: `GET /mcp` with valid session-ID returns the server-sent event stream for that session
+- [x] AC-5: `DELETE /mcp` with valid session-ID terminates the session and returns 200
+- [x] AC-6: Round-trip integration test covers the `initialize` → tool call → `DELETE` lifecycle
+- [x] AC-7: `GET /health` returns `"transports": ["sse", "streamable-http"]` (correctness bug already fixed in `8c76dc4`+patch)
+- [x] AC-8: `docs/mcp-http-server.md` updated to document `POST /mcp`, `GET /mcp`, `DELETE /mcp` with curl examples
 
 **Tasks:**
-- [ ] T-812: Implement session-ID lifecycle in `streamable_http_endpoint`: issue session header on `initialize`, route by session, handle `DELETE /mcp`
-- [ ] T-813: Add `GET /mcp` SSE stream path for server-initiated events
-- [ ] T-814: Return 202 for notification requests (no `id` in JSON-RPC body)
-- [ ] T-815: Add Accept/content-type negotiation and protocol-version header validation
-- [ ] T-816: Write round-trip integration test covering `initialize` → tool call → `DELETE` lifecycle
-- [ ] T-817: Update `docs/mcp-http-server.md` with full endpoint reference and curl examples
+- [x] T-812: Implement session-ID lifecycle in `streamable_http_endpoint`: issue session header on `initialize`, route by session, handle `DELETE /mcp`
+- [x] T-813: Add `GET /mcp` SSE stream path for server-initiated events
+- [x] T-814: Return 202 for notification requests (no `id` in JSON-RPC body)
+- [x] T-815: Add Accept/content-type negotiation and protocol-version header validation
+- [x] T-816: Write round-trip integration test covering `initialize` → tool call → `DELETE` lifecycle
+- [x] T-817: Update `docs/mcp-http-server.md` with full endpoint reference and curl examples
 
 ### S-236: As a DepthFusion maintainer, I want a real-embedding A/B benchmark so that the CIQS ≥95 README claim has discriminating evidence behind it `P0` `S`
 
@@ -3895,17 +3895,17 @@ degraded to identical BM25-only behaviour in the CI environment (no GPU / OpenAI
 currently shows ~95–97 CIQS projection for v2.0.0 vps-gpu annotated as pending validation.
 
 **Acceptance criteria:**
-- [ ] AC-1: Benchmark re-run on VPS with `DEPTHFUSION_EMBEDDING_BACKEND=openai` and the v2 goldset
-- [ ] AC-2: Report shows non-trivial delta between `standard` and `research` profiles (or documents why no delta exists at the embedding layer)
-- [ ] AC-3: Paired significance test (Wilcoxon or bootstrap CI) included
-- [ ] AC-4: README annotation updated: either confirm the ~95–97 projection with evidence or revise it to match measured values
-- [ ] AC-5: Report committed to `docs/benchmarks/` with the standard naming convention
+- [x] AC-1: Benchmark re-run on VPS with `DEPTHFUSION_EMBEDDING_BACKEND=openai` and the v2 goldset
+- [x] AC-2: Report shows non-trivial delta between `standard` and `research` profiles (or documents why no delta exists at the embedding layer)
+- [x] AC-3: Paired significance test (Wilcoxon or bootstrap CI) included
+- [x] AC-4: README annotation updated: either confirm the ~95–97 projection with evidence or revise it to match measured values
+- [x] AC-5: Report committed to `docs/benchmarks/` with the standard naming convention
 
 **Tasks:**
-- [ ] T-818: SSH to VPS, export `OPENAI_API_KEY`, run `scripts/ciqs_harness.py` with `--profile standard` and `--profile research`
-- [ ] T-819: Add paired significance test to harness output (Wilcoxon signed-rank)
-- [ ] T-820: Write benchmark report and commit to `docs/benchmarks/`
-- [ ] T-821: Update README CIQS projection row and remove pending-validation annotation if evidence supports it
+- [x] T-818: SSH to VPS, export `OPENAI_API_KEY`, run `scripts/ciqs_harness.py` with `--profile standard` and `--profile research`
+- [x] T-819: Add paired significance test to harness output (Wilcoxon signed-rank)
+- [x] T-820: Write benchmark report and commit to `docs/benchmarks/`
+- [x] T-821: Update README CIQS projection row and remove pending-validation annotation if evidence supports it
 
 ### S-237: As a DepthFusion operator, I want docs/configuration-profiles.md so that the three named profiles are discoverable without reading source code `P1` `XS`
 
