@@ -16,13 +16,14 @@ Security:
   - Bind host: controlled by DEPTHFUSION_MCP_HOST (default 127.0.0.1 / loopback).
     Set to 0.0.0.0 only when exposing the server to remote clients AND auth is
     fully configured (see below).
-  - Fail-closed auth: every request to /sse and /messages MUST carry a valid
-    Bearer token.  If no token is present, or no auth backend is configured,
-    the server returns HTTP 401.  There is no pass-through mode.
-  - JWT validation: JWKS-backed RS256 when DEPTHFUSION_JWKS_URI is set
-    (together with DEPTHFUSION_OIDC_ISSUER and DEPTHFUSION_OIDC_AUDIENCE).
-    Falls back to static bearer token comparison (DEPTHFUSION_MCP_TOKEN) when
-    the OIDC vars are absent.
+  - Fail-closed auth: all /mcp, /sse, and /messages endpoints require a valid
+    Bearer token via require_principal (DEPTHFUSION_V2_LEGACY_AUTH=1 +
+    DEPTHFUSION_API_TOKEN for development; JWKS/OIDC in production).
+    There is no pass-through mode.
+  - Origin header validation (MCP 2025-03-26 §2.1): /mcp routes check the Origin
+    header only when DEPTHFUSION_MCP_ALLOWED_ORIGINS is set. When unset the check
+    is permissive (any Origin accepted). When set, only listed origins are accepted;
+    unlisted origins receive 403. Absent Origin is always accepted.
   - /health is the only unauthenticated endpoint.
 """
 from __future__ import annotations
@@ -36,16 +37,13 @@ from importlib.metadata import version as _pkg_version
 from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
 from depthfusion.core.config import DepthFusionConfig
-from depthfusion.identity.errors import IdentityError, JwksFetchError, TokenExpiredError
-from depthfusion.identity.jwks_cache import JwksCache
 from depthfusion.identity.models import Principal
-from depthfusion.identity.token_validator import TokenValidator
 from depthfusion.mcp.server import _process_request
 
 _VERSION = _pkg_version("depthfusion")
@@ -67,38 +65,38 @@ _DEFAULT_PROTOCOL_VERSION = "2025-03-26"
 _PING_INTERVAL = 30.0
 
 # ---------------------------------------------------------------------------
-# JWKS-backed JWT validator — initialised lazily on first auth call.
-# A single instance is shared across all requests; JwksCache is concurrency-safe.
+# Origin validation — MCP 2025-03-26 §2.1 DNS-rebinding guard
 # ---------------------------------------------------------------------------
 
-_token_validator: Optional[TokenValidator] = None
+
+class _OriginForbidden(Exception):
+    """Raised when a request's Origin header is not in the allowed list."""
 
 
-def _get_token_validator() -> Optional[TokenValidator]:
-    """Return a JWT validator if OIDC env vars are fully configured, else None."""
-    global _token_validator
-    if _token_validator is not None:
-        return _token_validator
+@app.exception_handler(_OriginForbidden)
+async def _origin_forbidden_handler(request: Request, exc: _OriginForbidden) -> JSONResponse:
+    return JSONResponse(status_code=403, content={"error": "Origin not allowed"})
 
-    jwks_uri = os.getenv("DEPTHFUSION_JWKS_URI", "")
-    issuer = os.getenv("DEPTHFUSION_OIDC_ISSUER", "")
-    audience = os.getenv("DEPTHFUSION_OIDC_AUDIENCE", "")
 
-    if jwks_uri and issuer and audience:
-        cache = JwksCache(jwks_uri=jwks_uri)
-        _token_validator = TokenValidator(
-            jwks_cache=cache,
-            expected_issuer=issuer,
-            expected_audience=audience,
-        )
-        logger.info("MCP auth: JWKS JWT validation active (issuer=%s)", issuer)
-    else:
-        logger.warning(
-            "MCP auth: DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE not set; "
-            "falling back to static bearer token."
-        )
+async def _check_origin(request: Request) -> None:
+    """Reject /mcp requests whose Origin header is not in the allowed list.
 
-    return _token_validator
+    Behavior:
+    - Absent Origin header → always accepted (CLI tools, Claude Code).
+    - DEPTHFUSION_MCP_ALLOWED_ORIGINS not set → permissive, no restriction.
+    - DEPTHFUSION_MCP_ALLOWED_ORIGINS set → Origin must match the list; if
+      the Origin header is present and not listed → 403 {"error": "Origin not allowed"}.
+    """
+    origin = request.headers.get("origin")
+    if origin is None:
+        return
+    raw = os.getenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "")
+    if not raw:
+        # Env var not set → fully permissive
+        return
+    allowed = frozenset(o.strip().rstrip("/") for o in raw.split(",") if o.strip())
+    if origin.rstrip("/") not in allowed:
+        raise _OriginForbidden()
 
 
 # ---------------------------------------------------------------------------
@@ -115,70 +113,6 @@ def get_mcp_bind_host() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Auth dependency — always enforced on /sse and /messages
-# ---------------------------------------------------------------------------
-
-async def _check_mcp_auth(
-    authorization: Optional[str] = Header(default=None),
-) -> None:
-    """Validate Bearer token on every authenticated endpoint — fail closed.
-
-    The server ALWAYS requires a valid Bearer token.  If no token is present,
-    or if no auth backend is configured, the request is rejected with HTTP 401.
-
-    Validation order:
-      1. No Authorization header (or header without "Bearer " prefix) → 401.
-      2. JWKS JWT validation when DEPTHFUSION_JWKS_URI/OIDC_ISSUER/OIDC_AUDIENCE
-         are all set — full RS256 signature + claim checks via identity module.
-         Exception ordering: TokenExpiredError → 401; JwksFetchError → 503;
-         IdentityError → 401.
-      3. Static bearer token comparison (DEPTHFUSION_MCP_TOKEN) — dev fallback
-         when no OIDC provider is configured.
-      4. No auth backend configured at all → 401 (fail closed).
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        _raise_if_auth_required()
-        return
-
-    raw_token = authorization[len("Bearer "):]
-
-    validator = _get_token_validator()
-
-    if validator is not None:
-        # Full JWT validation path
-        try:
-            await validator.validate(raw_token)
-        except TokenExpiredError as exc:
-            raise HTTPException(status_code=401, detail=f"Token expired: {exc}") from exc
-        except JwksFetchError as exc:
-            raise HTTPException(status_code=503, detail=f"Auth service unavailable: {exc}") from exc
-        except IdentityError as exc:
-            raise HTTPException(status_code=401, detail=f"Unauthorized: {exc}") from exc
-        return
-
-    # Static bearer token fallback — timing-safe comparison (secrets.compare_digest
-    # prevents leaking token prefix length via short-circuit string equality)
-    static_token = os.getenv("DEPTHFUSION_MCP_TOKEN", "")
-    if static_token:
-        import secrets
-        if not secrets.compare_digest(raw_token, static_token):
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        return
-
-    # No auth backend configured — always fail closed
-    raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-def _raise_if_auth_required() -> None:
-    """Reject any request that carries no Bearer token — always.
-
-    The server is fail-closed: missing tokens are never permitted regardless
-    of bind address.
-    """
-    raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -191,6 +125,7 @@ async def health():
 async def streamable_http_endpoint(
     request: Request,
     _principal: Principal = Depends(require_principal),
+    _origin: None = Depends(_check_origin),
 ):
     """Streamable HTTP transport (MCP spec 2025-03-26) — required by Claude Code ≥2.1.x.
 
@@ -216,7 +151,16 @@ async def streamable_http_endpoint(
             detail="Content-Type must be application/json",
         )
 
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be valid JSON")
+
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Request body must be a JSON object, not an array or primitive",
+        )
 
     session_id = request.headers.get("mcp-session-id")
     if session_id is not None and session_id not in _MCP_STREAMABLE_SESSIONS:
@@ -264,6 +208,7 @@ async def streamable_http_endpoint(
 async def streamable_http_sse_endpoint(
     request: Request,
     _principal: Principal = Depends(require_principal),
+    _origin: None = Depends(_check_origin),
 ) -> StreamingResponse:
     """Server-initiated event stream for a streamable-http session (MCP 2025-03-26).
 
@@ -304,6 +249,7 @@ async def streamable_http_sse_endpoint(
 async def streamable_http_delete_endpoint(
     request: Request,
     _principal: Principal = Depends(require_principal),
+    _origin: None = Depends(_check_origin),
 ):
     """Tear down a streamable-http session (MCP 2025-03-26).
 
@@ -411,33 +357,6 @@ def _get_search_cache() -> Any:
     return _SEARCH_CACHE
 
 
-def _principal_id_from_auth(authorization: Optional[str]) -> str:
-    """Extract a stable cache-key component for the authenticated principal.
-
-    Tries to decode the JWT payload (signature NOT re-verified — auth already
-    passed `_check_mcp_auth`). Falls back to a sha256 hash of the raw token so
-    opaque static tokens also get per-principal isolation.
-    """
-    import hashlib
-    if not authorization or not authorization.startswith("Bearer "):
-        return "anon"
-    raw_token = authorization[len("Bearer "):]
-    # Attempt JWT payload extraction (no signature check needed here)
-    try:
-        parts = raw_token.split(".")
-        if len(parts) == 3:
-            import base64
-            payload_b64 = parts[1] + "=="  # re-pad
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-            sub = payload.get("sub") or payload.get("client_id") or ""
-            if sub:
-                return hashlib.sha256(sub.encode()).hexdigest()[:16]
-    except Exception:  # noqa: BLE001
-        pass
-    # Opaque token — use its hash directly
-    return hashlib.sha256(raw_token.encode()).hexdigest()[:16]
-
-
 def _search_cache_key(q: str, limit: int, principal_id: str = "global") -> str:
     import hashlib
     return "search/" + hashlib.sha256(
@@ -448,9 +367,10 @@ def _search_cache_key(q: str, limit: int, principal_id: str = "global") -> str:
 @app.post("/api/v1/search")
 async def rest_search(
     body: _SearchRequest,
-    authorization: Optional[str] = Header(default=None),
-    _: None = Depends(_check_mcp_auth),
+    _principal: Principal = Depends(require_principal),
 ):
+    import hashlib
+
     from depthfusion.mcp.tools._shared import _tool_recall_impl  # lazy import
 
     config = DepthFusionConfig.from_env()
@@ -458,8 +378,9 @@ async def rest_search(
     # S-225: cache keyed by (principal, query, limit) to prevent cross-user cache hits
     if config.cache_enabled:
         cache = _get_search_cache()
-        principal_id = _principal_id_from_auth(authorization)
-        cache_key = _search_cache_key(body.q, body.limit, principal_id)
+        # principal_id is the JWT sub claim; hash it to a fixed-width key component
+        principal_key = hashlib.sha256(_principal.principal_id.encode()).hexdigest()[:16]
+        cache_key = _search_cache_key(body.q, body.limit, principal_key)
         entry = cache.get(cache_key, "global")
         if entry is not None and entry.data is not None:
             return json.loads(entry.data)
@@ -483,15 +404,15 @@ async def rest_search(
     response_body = {"results": results}
     if config.cache_enabled:
         cache = _get_search_cache()
-        principal_id = _principal_id_from_auth(authorization)
-        cache_key = _search_cache_key(body.q, body.limit, principal_id)
+        principal_key = hashlib.sha256(_principal.principal_id.encode()).hexdigest()[:16]
+        cache_key = _search_cache_key(body.q, body.limit, principal_key)
         cache.put(cache_key, "global", json.dumps(response_body).encode())
     return response_body
 
 
 @app.get("/api/v1/stats")
 async def rest_stats(
-    _: None = Depends(_check_mcp_auth),
+    _: Principal = Depends(require_principal),
 ):
     import pathlib
     import sqlite3
@@ -540,7 +461,7 @@ async def rest_stats(
 
 @app.get("/api/v1/cognitive/status")
 async def rest_cognitive_status(
-    _: None = Depends(_check_mcp_auth),
+    _: Principal = Depends(require_principal),
 ):
     """Return persona, offload, and distillation status from the cognitive layer."""
     from depthfusion.mcp.tools.system import _tool_status  # lazy import
@@ -553,7 +474,7 @@ async def rest_cognitive_status(
 @app.post("/api/v1/cognitive/bridge")
 async def rest_cognitive_bridge(
     request: Request,
-    _: None = Depends(_check_mcp_auth),
+    _: Principal = Depends(require_principal),
 ):
     """Retrieve raw offloaded text for a node_id from refs/."""
     from depthfusion.mcp.tools.bridge import _tool_bridge  # lazy import
@@ -570,7 +491,7 @@ async def rest_cognitive_bridge(
 
 @app.get("/api/v1/cognitive/scenarios")
 async def rest_cognitive_scenarios(
-    _: None = Depends(_check_mcp_auth),
+    _: Principal = Depends(require_principal),
 ):
     """Return parsed scenario blocks for the current project."""
     import pathlib
@@ -619,9 +540,6 @@ def main() -> None:
     fail-closed: all requests to /sse and /messages require a valid Bearer
     token regardless of bind address.
     """
-    # Initialise the validator at startup so config errors surface immediately
-    _get_token_validator()
-
     host = get_mcp_bind_host()
     port = int(os.getenv("DEPTHFUSION_MCP_PORT", "7301"))
 
