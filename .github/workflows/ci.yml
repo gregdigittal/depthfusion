@@ -154,3 +154,24 @@ jobs:
 
       - name: Run tests
         run: pnpm --dir app test
+
+  packaging-gate:
+    name: Packaging gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        extra: [mac-mlx, vps-cpu, vps-gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Create isolated venv and install
+        run: |
+          python -m venv /tmp/pkg-test-venv
+          /tmp/pkg-test-venv/bin/pip install -e ".[${{ matrix.extra }}]" --quiet
+      - name: MCP import probe
+        run: /tmp/pkg-test-venv/bin/python -B -c 'import depthfusion.mcp.server; print("stdio-import-ok")'
+      - name: pip check
+        run: /tmp/pkg-test-venv/bin/pip check
