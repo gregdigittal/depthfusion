@@ -698,6 +698,17 @@ Full guide: **[docs/chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md)**
 
 ---
 
+## Connect to your editor
+
+Cursor, Windsurf, and Cline can connect to DepthFusion via the **Streamable HTTP transport**
+(`POST https://mcp.tonracein.com/mcp`, MCP spec 2025-03-26) using a Bearer token.
+All 31 tools are available in each editor's AI assistant.
+
+Full setup guide with ready-to-paste JSON config snippets for each editor:
+**[docs/mcp-client-setup.md](docs/mcp-client-setup.md)**
+
+---
+
 ## Project Context Intelligence (E-47, v1.2.0)
 
 Five new tools give agents the ability to register, sync, ingest, and research across multiple projects. Sessions can be seeded with a project's full BACKLOG and CLAUDE.md context automatically.
