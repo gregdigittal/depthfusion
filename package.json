@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "test": "uv run pytest --tb=short -q"
+  }
+}

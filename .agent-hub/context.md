@@ -102,3 +102,38 @@ Key changes:
 - Python dependencies updated to resolve Dependabot alerts: pydantic-settings 2.14.2+, yt-dlp 2026.6.9+, starlette 1.3.0+, PyJWT 2.13.0+; uv lock re-synced
 - pnpm install run in /app with esbuild override already in package.json; lock file synchronized
 - CI green on push; no Dependabot medium/moderate alerts remain
+
+---
+
+## 2026-08-03 — Session recovery + E-73 flesh-out
+
+Context: prior session died without a clean handoff. Recovered state from git log,
+BACKLOG.md, tmux worker panes (all idle, nothing mid-dispatch), and the coordination
+lock log (no competing session — all claims are this user).
+
+Status: `main` branch, clean except 3 pre-existing untracked ephemeral files in
+`.agent-hub/outputs/` (Jun/Jul, not new). E-72 (Packaging Integrity & MCP Stdio
+Reliability) is `[done]` — S-238–S-245 all complete. **E-73: Growth, Reliability &
+Observability** is the current `[active]` epic.
+
+E-73 stories (S-246–S-254) already existed fully fleshed (ACs + tasks) as of the
+last commit — verified them against the actual codebase rather than assuming:
+- S-246 editor config docs (Cursor/Windsurf/Cline), S-247 Tauri dashboard real data,
+  S-248 nightly hygiene scheduler, S-249 embedding A/B benchmark, S-250 session
+  crash-recovery checkpointing, S-251 rate limiting/multi-worker safety, S-252
+  streaming recall, S-253 checkpoint timeline UI, S-254 cross-session file diff history.
+- **Fixed a spec defect in S-249**: it originally pointed at extending
+  `scripts/retrieval_benchmark.py` with `--model-a`/`--model-b`, but that script
+  already exists for an unrelated purpose (ACL-overhead latency benchmarking, not
+  embedding recall). Re-scoped S-249 to create a new `scripts/embedding_ab_benchmark.py`
+  instead, with a note not to touch the existing retrieval_benchmark.py.
+- Confirmed all file paths referenced across S-246–S-254 exist in the repo
+  (`app/src/DashboardPage.tsx`, `src/depthfusion/api/rest.py`,
+  `src/depthfusion/mcp/http_server.py`, `src/depthfusion/core/event_store.py`).
+- No overlap with S-236 (already `[done]`) — that story validated the README's CIQS
+  claim on the VPS with real embeddings; S-249 is a general-purpose two-model
+  recall/MRR/NDCG comparison tool, different scope.
+
+No story work has started under E-73 yet. Next: pick a story (S-247 is P0 — Tauri
+dashboard still showing placeholder data, likely the highest-value next pick) and
+dispatch to a worker window (fe/be/ops all idle).

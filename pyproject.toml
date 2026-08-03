@@ -15,6 +15,9 @@ dependencies = [
     "python-pptx>=0.6",
     "pyyaml>=6.0",
     "structlog>=24.0",
+    # S-248: nightly hygiene scheduler — APScheduler drives the AsyncIOScheduler
+    # cron job (decay→dedup→prune). T-848 introduced the dep; T-849 wired lifespan.
+    "apscheduler>=3.10",
 ]
 
 [project.optional-dependencies]

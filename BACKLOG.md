@@ -4072,13 +4072,15 @@ distinct and the docs conflate them.
 
 ### S-249: As a DepthFusion maintainer, I want an embedding A/B benchmark so that I can quantify whether upgrading from all-MiniLM-L6-v2 improves recall `P2` `S`
 
+**Context:** `scripts/retrieval_benchmark.py` already exists but is unrelated (ACL-overhead latency benchmark, p50/p95/p99 timing) — do not extend it. `scripts/ciqs_compare.py` is the closest existing tool (two-mode bootstrap-CI comparison) but operates on scored CIQS battery runs, not raw embedding recall. This story creates a new, differently-named script.
+
 **Acceptance criteria:**
-- [ ] AC-1: `scripts/retrieval_benchmark.py` accepts `--model-a` and `--model-b` args and outputs a side-by-side recall@k, MRR, and NDCG comparison table
+- [ ] AC-1: `scripts/embedding_ab_benchmark.py` accepts `--model-a` and `--model-b` args and outputs a side-by-side recall@k, MRR, and NDCG comparison table
 - [ ] AC-2: Benchmark runs cleanly with two sentence-transformers models (no API key required)
 - [ ] AC-3: Results are written to `docs/agent-outputs/` in the standard dual-format (md + html)
 
 **Tasks:**
-- [ ] T-845: Extend `scripts/retrieval_benchmark.py` to accept `--model-a` / `--model-b` and run both embedding models over the same synthetic corpus
+- [ ] T-845: Create `scripts/embedding_ab_benchmark.py` accepting `--model-a` / `--model-b`, running both embedding models over the same synthetic corpus
 - [ ] T-846: Output recall@k (k=1,3,5), MRR, and NDCG comparison table; write results to `docs/agent-outputs/`
 
 ### S-250: As a Claude Code user, I want DepthFusion to automatically checkpoint my session so that uncommitted work is recoverable after a crash `P1` `M`

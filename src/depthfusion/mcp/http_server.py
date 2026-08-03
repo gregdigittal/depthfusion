@@ -29,6 +29,7 @@ Security:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -42,6 +43,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from depthfusion.api.auth import require_principal
+from depthfusion.capture.hygiene import build_scheduler  # S-248: nightly hygiene scheduler
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.identity.models import Principal
 from depthfusion.mcp.server import _process_request
@@ -50,7 +52,46 @@ _VERSION = _pkg_version("depthfusion")
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DepthFusion MCP HTTP/SSE", version=_VERSION)
+
+# ---------------------------------------------------------------------------
+# Lifespan — starts/stops the hygiene scheduler (S-248 AC-1)
+# ---------------------------------------------------------------------------
+
+@contextlib.asynccontextmanager
+async def _lifespan(app: FastAPI):  # type: ignore[type-arg]  # noqa: ARG001
+    """FastAPI lifespan context manager.
+
+    Starts the APScheduler AsyncIOScheduler on app startup and shuts it down
+    cleanly on app shutdown so no scheduler threads leak.  Failures to build
+    or start the scheduler are logged and swallowed — the HTTP server must
+    remain available even when the hygiene scheduler cannot initialise.
+    """
+    try:
+        scheduler = build_scheduler()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("lifespan: could not build hygiene scheduler: %s", exc)
+        scheduler = None
+
+    if scheduler is not None:
+        try:
+            scheduler.start()
+            logger.info("lifespan: hygiene scheduler started")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("lifespan: failed to start hygiene scheduler: %s", exc)
+            scheduler = None
+
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            try:
+                scheduler.shutdown(wait=False)
+                logger.info("lifespan: hygiene scheduler stopped")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("lifespan: error stopping hygiene scheduler: %s", exc)
+
+
+app = FastAPI(title="DepthFusion MCP HTTP/SSE", version=_VERSION, lifespan=_lifespan)
 
 _MCP_SESSIONS: dict[str, asyncio.Queue] = {}
 
