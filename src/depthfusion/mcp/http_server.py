@@ -180,9 +180,13 @@ async def _publish_session_checkpoint(session_id: str) -> None:
         return
 
     try:
+        from depthfusion.core.event_store import project_root_path
         from depthfusion.mcp import session_activity
         from depthfusion.mcp.tools._state import _get_fabric_store
-        cwd = Path.cwd()
+        # One project root for both the stash probe and the diff capture
+        # (T-863). Defaults to os.getcwd(), i.e. the previous Path.cwd().
+        project_path = project_root_path()
+        cwd = Path(project_path)
         git_stash_ref = _detect_git_stash_ref(cwd)
         plan_state, files_modified, context_pct = session_activity.snapshot_for_checkpoint(
             session_id
@@ -196,6 +200,7 @@ async def _publish_session_checkpoint(session_id: str) -> None:
             agent_id="mcp-server",
             git_stash_ref=git_stash_ref,
             context_pct_at_checkpoint=context_pct,
+            project_path=project_path,
         )
         logger.info("checkpoint published: session=%s project=%s", session_id, project_slug)
         # Activity has now been durably captured in the CheckpointRecord —

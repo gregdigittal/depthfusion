@@ -19,6 +19,9 @@ _EXPECTED_KEYS = {
     "plan_state",
     "git_stash_ref",
     "context_pct_at_checkpoint",
+    # T-863: best-effort side-channel (git diffs). Additive — always present in
+    # to_dict(), defaulting to {} for records written before the field existed.
+    "metadata",
 }
 
 

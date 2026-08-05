@@ -17,13 +17,24 @@
  *      transport for the same endpoint.
  *   2. Feedback is rendered inline in the row. There is no toast library in this
  *      codebase and adding one for a single call site is not warranted.
+ *
+ * S-254 T-865 turns the files column into a per-file drill-down. It previously
+ * collapsed the list through `formatFilesModified` into one string ("a, b, +N
+ * more") with the full list only in a `title` tooltip, which left no per-path
+ * element to hang a handler on. The row now maps `files_modified` itself: the
+ * first FILES_SHOWN paths become real <button type="button"> pills and the
+ * remainder collapse into a non-interactive "+N more" badge that carries the
+ * former tooltip. `formatFilesModified` is deliberately left exported and
+ * unmodified in lib/checkpoints.ts — it is still the single-string formatter for
+ * any other caller and is covered by __tests__/checkpoints.test.ts.
  */
 import { useState } from 'react'
 import { getServerUrl, loadTokens } from '../lib/ipc'
 import { useCheckpoints } from '../hooks/useCheckpoints'
-import { formatFilesModified } from '../lib/checkpoints'
+import { FILES_SHOWN } from '../lib/checkpoints'
 import type { CheckpointRecord } from '../lib/checkpoints'
-import { TileError, TileLoading } from './TilePrimitives'
+import { FileDiffHistory } from './FileDiffHistory'
+import { TileEmpty, TileError, TileLoading } from './TilePrimitives'
 
 /**
  * Render an ISO-8601 `created_at` as a short local date + time.
@@ -96,6 +107,20 @@ async function postResume(checkpoint: CheckpointRecord): Promise<void> {
 function CheckpointRow({ checkpoint }: { checkpoint: CheckpointRecord }) {
   const [resuming, setResuming] = useState(false)
   const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null)
+  // Which file's diff history is open beneath this row; null = none.
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+
+  /** Open `path`'s diff panel, or close it when it is already the open one. */
+  function toggleFile(path: string) {
+    setSelectedFile((current) => (current === path ? null : path))
+  }
+
+  const shownFiles = checkpoint.files_modified.slice(0, FILES_SHOWN)
+  const hiddenCount = checkpoint.files_modified.length - shownFiles.length
+  // Ties the open pill to the panel it toggles. Only set while the panel is
+  // actually rendered — aria-controls pointing at a missing id is a dangling
+  // reference, so the attribute is omitted rather than always present.
+  const panelId = `diff-panel-${checkpoint.checkpoint_id}`
 
   async function handleResume() {
     setResuming(true)
@@ -118,6 +143,8 @@ function CheckpointRow({ checkpoint }: { checkpoint: CheckpointRecord }) {
         <span
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
             gap: 'var(--sp-2)',
             fontSize: 'var(--fs-micro)',
             color: 'var(--faint)',
@@ -126,17 +153,46 @@ function CheckpointRow({ checkpoint }: { checkpoint: CheckpointRecord }) {
           <span className="df-activity__time">
             {formatCheckpointTime(checkpoint.created_at)}
           </span>
-          <span
-            title={checkpoint.files_modified.join('\n')}
-            style={{
-              maxWidth: '22rem',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {formatFilesModified(checkpoint.files_modified)}
-          </span>
+          {shownFiles.length === 0 ? (
+            <span>no files</span>
+          ) : (
+            shownFiles.map((path) => {
+              const open = selectedFile === path
+              return (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => toggleFile(path)}
+                  aria-expanded={open}
+                  aria-controls={open ? panelId : undefined}
+                  aria-label={`${open ? 'Hide' : 'Show'} diff history for ${path}`}
+                  title={path}
+                  style={{
+                    maxWidth: '14rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontSize: 'var(--fs-micro)',
+                    fontFamily: 'var(--font-mono)',
+                    color: open ? 'var(--accent)' : 'var(--muted)',
+                    background: open ? 'var(--accent-wash)' : 'var(--surface-2)',
+                    border: `1px solid ${open ? 'var(--accent-border)' : 'var(--border)'}`,
+                    borderRadius: 'var(--r-sm)',
+                    cursor: 'pointer',
+                    padding: '0 var(--sp-1)',
+                  }}
+                >
+                  {path}
+                </button>
+              )
+            })
+          )}
+          {hiddenCount > 0 ? (
+            // Non-interactive: the remainder has no single path to drill into, so
+            // it stays a badge and inherits the tooltip the whole column used to
+            // carry.
+            <span title={checkpoint.files_modified.join('\n')}>+{hiddenCount} more</span>
+          ) : null}
           <span>{checkpoint.plan_state}</span>
         </span>
       </div>
@@ -168,6 +224,14 @@ function CheckpointRow({ checkpoint }: { checkpoint: CheckpointRecord }) {
           {resumeResult.message}
         </span>
       ) : null}
+      {selectedFile !== null ? (
+        // flexBasis 100% drops the panel onto its own line inside the wrapping
+        // row; minWidth 0 lets the diff's own overflow-x-auto do the scrolling
+        // instead of widening this flex track.
+        <div id={panelId} style={{ flexBasis: '100%', minWidth: 0 }}>
+          <FileDiffHistory file={selectedFile} onClose={() => setSelectedFile(null)} />
+        </div>
+      ) : null}
     </li>
   )
 }
@@ -184,11 +248,10 @@ export function CheckpointTimeline() {
   }
 
   if (checkpoints.length === 0) {
-    return (
-      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>
-        No checkpoints published yet.
-      </div>
-    )
+    // Uses the shared TileEmpty primitive that was extracted from this very
+    // inline block in S-254 — keeping a local copy alongside it would be the
+    // duplication the extraction removed.
+    return <TileEmpty message="No checkpoints published yet." />
   }
 
   return (
