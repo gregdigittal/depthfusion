@@ -229,6 +229,9 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # propagate to write_decisions() as a filename component.
     _raw_explicit = str(arguments.get("project", "")).strip()
     explicit_project = _sanitise_project_slug(_raw_explicit) or None
+    # S-250 AC-2: ambient traces (event_type="ambient_trace") are excluded
+    # from standard recall by default. Explicit opt-in via this argument.
+    include_ambient_trace = bool(arguments.get("include_ambient_trace", False))
 
     recall_id: str | None = None  # minted after raw_blocks assembled; None on empty-result paths
 
@@ -244,9 +247,13 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     from depthfusion.retrieval.hybrid import (
         extract_frontmatter_project,
         extract_frontmatter_sub_scope,
+        extract_frontmatter_type,
     )
     from depthfusion.retrieval.hybrid import (
         extract_session_project as _extract_session_project,
+    )
+    from depthfusion.retrieval.hybrid import (
+        filter_blocks_by_ambient_trace as _filter_blocks_by_ambient_trace,
     )
     from depthfusion.retrieval.hybrid import (
         lexical_richness_penalty as _lexical_richness_penalty,
@@ -278,6 +285,10 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         if file_project is None and source_label == "session":
             file_project = _extract_session_project(content)
         file_sub_scope = extract_frontmatter_sub_scope(content)
+        # S-250 AC-2: `type:` frontmatter (e.g. `type: ambient_trace`) survives
+        # the same section-split loss as `project:`/`sub_scope:` — tag at
+        # file-load time for the same reason those two are tagged here.
+        file_type = extract_frontmatter_type(content)
         for block in _split_into_blocks(content, source_label, md_file.stem):
             if mtime_iso is not None:
                 block["mtime_iso"] = mtime_iso
@@ -285,6 +296,8 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
                 block["project"] = file_project
             if file_sub_scope is not None:
                 block["sub_scope"] = file_sub_scope
+            if file_type is not None:
+                block["type"] = file_type
             raw_blocks.append(block)
 
     # Source 1: goal session state files (.tmp)
@@ -335,6 +348,25 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         return json.dumps({
             "query": query, "blocks": [], "recall_id": None,
             "message": "No session context available",
+            "strategy": "bm25-only",
+            "hnsw_available": _hnsw_available,
+        })
+
+    # S-250 AC-2: third chained predicate filter — excludes `type: ambient_trace`
+    # blocks from standard recall. Applied unconditionally (before the
+    # cross_project branch below) so ambient traces are excluded from every
+    # recall path, not only the project-scoped one. Explicit opt-in via
+    # `include_ambient_trace=true`.
+    raw_blocks = _filter_blocks_by_ambient_trace(
+        raw_blocks, include_ambient_trace=include_ambient_trace,
+    )
+    if not raw_blocks:
+        return json.dumps({
+            "query": query, "blocks": [], "recall_id": None,
+            "message": (
+                "No session context available (matching context was "
+                "ambient-trace only; pass include_ambient_trace=true to include it)"
+            ),
             "strategy": "bm25-only",
             "hnsw_available": _hnsw_available,
         })

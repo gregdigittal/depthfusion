@@ -30,11 +30,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import os
+import subprocess
 import uuid
 from importlib.metadata import version as _pkg_version
+from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
@@ -46,6 +49,7 @@ from depthfusion.api.auth import require_principal
 from depthfusion.capture.hygiene import build_scheduler  # S-248: nightly hygiene scheduler
 from depthfusion.core.config import DepthFusionConfig
 from depthfusion.identity.models import Principal
+from depthfusion.mcp.ratelimit import classify_tool_call, get_rate_limiter  # S-251
 from depthfusion.mcp.server import _process_request
 
 _VERSION = _pkg_version("depthfusion")
@@ -83,6 +87,15 @@ async def _lifespan(app: FastAPI):  # type: ignore[type-arg]  # noqa: ARG001
     try:
         yield
     finally:
+        # S-250 T-852: checkpoint any still-open sessions before the
+        # scheduler stops — uvicorn invokes this `finally` on graceful ASGI
+        # shutdown (including SIGTERM). Best-effort: a failure here must
+        # never prevent the hygiene scheduler from shutting down cleanly.
+        try:
+            await _checkpoint_open_sessions_on_shutdown()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("lifespan: error checkpointing open sessions: %s", exc)
+
         if scheduler is not None:
             try:
                 scheduler.shutdown(wait=False)
@@ -99,6 +112,112 @@ _MCP_SESSIONS: dict[str, asyncio.Queue] = {}
 # Mcp-Session-Id issued on initialize; each session owns an asyncio.Queue
 # feeding the GET /mcp server-initiated event stream.
 _MCP_STREAMABLE_SESSIONS: dict[str, asyncio.Queue] = {}
+
+
+# ---------------------------------------------------------------------------
+# Session checkpointing — S-250 / E-73 (T-848 DELETE /mcp, T-852 shutdown)
+# ---------------------------------------------------------------------------
+
+
+def _detect_git_stash_ref(cwd: Path) -> str | None:
+    """Best-effort, READ-ONLY: report the top `git stash` ref if one exists.
+
+    Never creates a stash — silently stashing a user's uncommitted work as a
+    side effect of session teardown would be a surprising, unrequested
+    mutation of their working tree. This only reports whether uncommitted
+    work was already stashed (by the user or another tool) before this
+    checkpoint was taken. Returns None outside a git repo, when git is
+    missing, or when the stash list is empty.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(cwd), "stash", "list", "-n", "1", "--format=%gd"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("_detect_git_stash_ref: git invocation failed: %s", exc)
+        return None
+    if result.returncode != 0:
+        return None
+    lines = [ln.strip() for ln in result.stdout.strip().splitlines() if ln.strip()]
+    return lines[0] if lines else None
+
+
+async def _publish_session_checkpoint(session_id: str) -> None:
+    """Best-effort CheckpointRecord publish for one streamable-http session.
+
+    Shared by the DELETE /mcp handler (T-848, clean close) and the lifespan
+    shutdown hook (T-852, SIGTERM/graceful exit) — same checkpoint shape,
+    different trigger.
+
+    ``project_slug`` is auto-detected from the server process's working
+    directory (mirrors the recall pipeline's project auto-detection
+    convention in ``mcp/tools/_shared.py``). ``plan_state``,
+    ``files_modified``, and ``context_pct_at_checkpoint`` come from the
+    per-session activity tracker (``mcp/session_activity.py``), populated by
+    every ``tools/call`` request that ran through ``mcp/server.py::
+    _process_request`` for this session (S-250 AC-1 / T-849). When the
+    session made no tracked tool calls, the tracker itself returns the same
+    placeholder triple (``""``/``[]``/``None``) this used to hardcode — that
+    remains correct in the genuine no-activity case.
+
+    Never raises — logged and swallowed on failure so a checkpoint publish
+    problem can never block session teardown or server shutdown.
+    """
+    project_slug = ""
+    try:
+        from depthfusion.hooks.git_post_commit import detect_project
+        project_slug = detect_project()
+    except Exception as exc:  # noqa: BLE001 — detection is best-effort
+        logger.debug("_publish_session_checkpoint: project detection failed: %s", exc)
+
+    if not project_slug or project_slug == "unknown":
+        logger.debug(
+            "_publish_session_checkpoint: no project context for session %s — skipping",
+            session_id,
+        )
+        return
+
+    try:
+        from depthfusion.mcp import session_activity
+        from depthfusion.mcp.tools._state import _get_fabric_store
+        cwd = Path.cwd()
+        git_stash_ref = _detect_git_stash_ref(cwd)
+        plan_state, files_modified, context_pct = session_activity.snapshot_for_checkpoint(
+            session_id
+        )
+        store = _get_fabric_store()
+        await store.publish_checkpoint(
+            session_id=session_id,
+            project_slug=project_slug,
+            plan_state=plan_state,
+            files_modified=files_modified,
+            agent_id="mcp-server",
+            git_stash_ref=git_stash_ref,
+            context_pct_at_checkpoint=context_pct,
+        )
+        logger.info("checkpoint published: session=%s project=%s", session_id, project_slug)
+        # Activity has now been durably captured in the CheckpointRecord —
+        # drop the in-memory tracker entry so a (rare) reused session id
+        # starts fresh rather than double-counting stale tool calls.
+        session_activity.clear_session(session_id)
+    except Exception as exc:  # noqa: BLE001 — must never block teardown/shutdown
+        logger.warning(
+            "checkpoint publish failed for session=%s project=%s: %s",
+            session_id, project_slug, exc,
+        )
+
+
+async def _checkpoint_open_sessions_on_shutdown() -> None:
+    """Checkpoint every still-open streamable-http session (T-852).
+
+    Runs from the lifespan `finally` block, which uvicorn invokes on
+    graceful ASGI shutdown (including SIGTERM) — mirrors the DELETE /mcp
+    checkpoint (T-848) for sessions a client never explicitly closed.
+    """
+    for session_id in list(_MCP_STREAMABLE_SESSIONS.keys()):
+        await _publish_session_checkpoint(session_id)
+
 
 _SUPPORTED_PROTOCOL_VERSIONS = frozenset({"2025-03-26"})
 _DEFAULT_PROTOCOL_VERSION = "2025-03-26"
@@ -207,9 +326,37 @@ async def streamable_http_endpoint(
     if session_id is not None and session_id not in _MCP_STREAMABLE_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found or expired")
 
+    # S-251 AC-1/AC-4 (T-854): per-principal rate limiting on tool calls.
+    # Gated behind `require_principal` above — that dependency has already
+    # fail-closed (401) any request without a valid, authenticated
+    # principal, so `_principal.principal_id` here is always real. Only
+    # `tools/call` requests consume quota; `initialize`/`tools/list`/
+    # notifications are protocol bookkeeping, not the publish/recall
+    # operations AC-1 exists to throttle.
+    if body.get("method") == "tools/call":
+        tool_name = (body.get("params") or {}).get("name", "")
+        bucket, limit = classify_tool_call(tool_name)
+        rl_result = await get_rate_limiter().check(_principal.principal_id, bucket, limit)
+        if not rl_result.allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "rate_limited",
+                    "retry_after_seconds": rl_result.retry_after_seconds,
+                },
+            )
+
     config = DepthFusionConfig.from_env()
     loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(None, _process_request, body, config)
+    # S-250 AC-1/AC-2 (T-849): thread the session id through so
+    # `_process_request` can feed the per-session activity tracker and the
+    # ambient-trace side effect. `session_id` is `None` for the very first
+    # call on a connection (`initialize`, before a session id is issued) —
+    # `_process_request` treats that as "no session to track", which is
+    # correct (nothing to checkpoint against yet).
+    response = await loop.run_in_executor(
+        None, functools.partial(_process_request, body, config, session_id=session_id)
+    )
 
     # JSON-RPC notifications (no id) → 202 Accepted, empty body.
     if "id" not in body:
@@ -301,6 +448,12 @@ async def streamable_http_delete_endpoint(
         raise HTTPException(status_code=400, detail="Mcp-Session-Id header required")
     if session_id not in _MCP_STREAMABLE_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found or expired")
+    # S-250 AC-1 / T-848: publish a checkpoint on clean session close — before
+    # the session is removed from the dict, per the task ordering requirement.
+    try:
+        await _publish_session_checkpoint(session_id)
+    except Exception as exc:  # noqa: BLE001 — teardown must proceed regardless
+        logger.warning("checkpoint publish failed during DELETE /mcp for %s: %s", session_id, exc)
     _MCP_STREAMABLE_SESSIONS.pop(session_id, None)
     logger.info("MCP streamable-http session closed: %s", session_id)
     return {"ok": True}
@@ -356,8 +509,11 @@ async def messages_endpoint(
     config = DepthFusionConfig.from_env()
 
     loop = asyncio.get_event_loop()
+    # S-250 AC-1/AC-2 (T-849): legacy SSE sessions are tracked by the query
+    # param `sessionId` — thread it through the same way the streamable-HTTP
+    # transport does.
     response = await loop.run_in_executor(
-        None, _process_request, body, config
+        None, functools.partial(_process_request, body, config, session_id=sessionId)
     )
 
     if response:

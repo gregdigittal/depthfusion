@@ -81,6 +81,8 @@ TOOL_CAPABILITIES: dict[str, Capability] = {
     "depthfusion_recall_feedback": Capability.WRITE_OWN_RECORDS,
     "depthfusion_pin_discovery": Capability.WRITE_OWN_RECORDS,
     "depthfusion_ingest_conversation": Capability.WRITE_OWN_RECORDS,
+    # ── Session checkpointing (E-73 S-250/S-254 T-850) ───────────────────
+    "depthfusion_session_checkpoint": Capability.WRITE_OWN_RECORDS,
     # ── Decisions / knowledge management ────────────────────────────────
     "depthfusion_record_decision": Capability.WRITE_OWN_RECORDS,
     "depthfusion_record_incident": Capability.WRITE_OWN_RECORDS,

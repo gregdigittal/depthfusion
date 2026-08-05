@@ -121,6 +121,88 @@ def _tool_ingest_project(arguments: dict) -> str:
     except Exception as e:
         return json.dumps({"error": str(e), "ingested": False})
 
+def _tool_session_seed_resume(
+    *,
+    session_id: str,
+    project_slug: str,
+    checkpoint_id: str | None = None,
+    top_k: int = 3,
+    snippet_len: int = 800,
+    project_context_prefix: str = "",
+) -> str:
+    """`depthfusion_session_seed(mode="resume")` — S-250 AC-3.
+
+    Returns the named checkpoint (``checkpoint_id``) or the most recent one
+    for ``project_slug`` when omitted, alongside standard recall results
+    (S-111's ``_recall_and_seed``), plus a ``recovery_command`` when the
+    checkpoint carries a ``git_stash_ref``.
+    """
+    if not project_slug:
+        return json.dumps({
+            "error": "project_slug required for resume mode",
+            "session_id": session_id,
+            "checkpoint": None,
+        })
+
+    from depthfusion.hooks.session_start import (
+        _build_seed_query,
+        _detect_project_name,
+        _recall_and_seed,
+        _recent_git_messages,
+    )
+
+    try:
+        store = _get_fabric_store()
+        checkpoint = (
+            store.get_checkpoint(checkpoint_id, project_slug)
+            if checkpoint_id
+            else store.get_latest_checkpoint(project_slug)
+        )
+        if checkpoint is None:
+            result: dict = {
+                "error": (
+                    f"No checkpoint found for project {project_slug!r}"
+                    + (f" with checkpoint_id={checkpoint_id!r}" if checkpoint_id else "")
+                ),
+                "checkpoint": None,
+                "session_id": session_id,
+                "project_slug": project_slug,
+            }
+            if project_context_prefix:
+                result["project_context_prefix"] = project_context_prefix
+            return json.dumps(result)
+
+        cwd = Path.cwd()
+        project_name = _detect_project_name(cwd)
+        git_messages = _recent_git_messages(cwd)
+        query = _build_seed_query(project_name, git_messages)
+        published = _recall_and_seed(session_id, top_k=top_k, snippet_len=snippet_len)
+
+        result = {
+            "checkpoint": checkpoint.to_dict(),
+            "published": published,
+            "query": query,
+            "session_id": session_id,
+            "project_slug": project_slug,
+        }
+        if checkpoint.git_stash_ref:
+            result["recovery_command"] = f"git stash pop {checkpoint.git_stash_ref}"
+        if project_context_prefix:
+            result["project_context_prefix"] = project_context_prefix
+        return json.dumps(result)
+    except Exception as exc:  # noqa: BLE001 — resume must degrade, not crash the tool call
+        logger.warning("session_seed resume mode failed for project=%s: %s", project_slug, exc)
+        result = {
+            "error": str(exc),
+            "checkpoint": None,
+            "session_id": session_id,
+            "project_slug": project_slug,
+        }
+        if project_context_prefix:
+            result["project_context_prefix"] = project_context_prefix
+        return json.dumps(result)
+
+
 def _tool_session_seed(arguments: dict) -> str:
     """Publish top recall results as high-priority session-seed ContextItems (S-111/S-143)."""
     project_slug = arguments.get("project_slug", "").strip()
@@ -209,6 +291,16 @@ def _tool_session_seed(arguments: dict) -> str:
                     result["project_context_prefix"] = project_context_prefix
             return json.dumps(result)
 
+    if mode == "resume":
+        return _tool_session_seed_resume(
+            session_id=session_id,
+            project_slug=project_slug,
+            checkpoint_id=arguments.get("checkpoint_id") or None,
+            top_k=int(arguments.get("top_k", 3)),
+            snippet_len=int(arguments.get("snippet_len", 800)),
+            project_context_prefix=project_context_prefix,
+        )
+
     # Default: recall mode (S-111)
     from depthfusion.hooks.session_start import (
         _build_seed_query,
@@ -243,6 +335,74 @@ def _tool_session_seed(arguments: dict) -> str:
             if project_context_prefix:
                 result["project_context_prefix"] = project_context_prefix
         return json.dumps(result)
+
+def _tool_session_checkpoint(arguments: dict) -> str:
+    """Publish a manual ``CheckpointRecord`` at a plan boundary (E-73 T-850).
+
+    Thin wrapper over ``EventStore.publish_checkpoint`` — reuses the existing
+    schema and persistence path (JSON file + best-effort graph mirror) rather
+    than duplicating publish logic. The resulting checkpoint is retrievable
+    via ``EventStore.get_checkpoint`` / ``get_latest_checkpoint``, and by
+    ``depthfusion_session_seed(mode="resume")``.
+
+    Args: session_id (str, required), project_slug (str, required),
+    plan_state (str, required), files_modified (list[str], required),
+    git_stash_ref (str, optional), context_pct_at_checkpoint (number, optional).
+    Response: {checkpoint_id, created_at, session_id, project_slug} or {error}.
+    """
+    import asyncio
+
+    session_id = str(arguments.get("session_id", "")).strip()
+    project_slug = str(arguments.get("project_slug", "")).strip()
+    plan_state = arguments.get("plan_state", "")
+    files_modified = arguments.get("files_modified")
+
+    if not session_id:
+        return json.dumps({"error": "session_id is required"})
+    if not project_slug:
+        return json.dumps({"error": "project_slug is required"})
+    if not isinstance(plan_state, str) or not plan_state.strip():
+        return json.dumps({"error": "plan_state is required"})
+    if not isinstance(files_modified, list):
+        return json.dumps({"error": "files_modified is required and must be a list"})
+
+    git_stash_ref = arguments.get("git_stash_ref") or None
+    context_pct_raw = arguments.get("context_pct_at_checkpoint")
+    if context_pct_raw is None:
+        context_pct_at_checkpoint = None
+    else:
+        try:
+            context_pct_at_checkpoint = float(context_pct_raw)
+        except (TypeError, ValueError):
+            return json.dumps({
+                "error": "context_pct_at_checkpoint must be a number",
+            })
+
+    try:
+        store = _get_fabric_store()
+        record = asyncio.run(
+            store.publish_checkpoint(
+                session_id=session_id,
+                project_slug=project_slug,
+                plan_state=plan_state,
+                files_modified=[str(f) for f in files_modified],
+                git_stash_ref=git_stash_ref,
+                context_pct_at_checkpoint=context_pct_at_checkpoint,
+            )
+        )
+        return json.dumps({
+            "checkpoint_id": record.checkpoint_id,
+            "created_at": record.created_at,
+            "session_id": record.session_id,
+            "project_slug": record.project_slug,
+        })
+    except Exception as exc:  # noqa: BLE001 — tool call must degrade, not crash
+        logger.warning(
+            "session_checkpoint failed for project=%s session=%s: %s",
+            project_slug, session_id, exc,
+        )
+        return json.dumps({"error": str(exc)})
+
 
 def register_project() -> None:
     """Register project domain tools (stub for v2 tooling framework)."""

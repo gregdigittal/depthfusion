@@ -15,6 +15,7 @@ import logging
 import os
 import time
 from asyncio import AbstractEventLoop
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator, Protocol, runtime_checkable
@@ -219,6 +220,172 @@ def _graph_lock_path(project_slug: str) -> Path:
     return lock_dir / f".{project_slug}.graphlock"
 
 
+# ---------------------------------------------------------------------------
+# CheckpointRecord — S-250 / E-73 session checkpointing
+# ---------------------------------------------------------------------------
+
+_DEFAULT_CHECKPOINT_TTL_DAYS = 7
+
+
+def checkpoint_ttl_days() -> int:
+    """Resolve the checkpoint retention window in days (S-250 AC-5).
+
+    Defaults to ``_DEFAULT_CHECKPOINT_TTL_DAYS`` (7); overridable via
+    ``DEPTHFUSION_CHECKPOINT_TTL_DAYS``. A missing, empty, or non-integer
+    value falls back to the default rather than raising, so a malformed env
+    var degrades to safe behaviour instead of crashing the hygiene job or
+    the checkpoint publish path. A non-positive value also falls back to
+    the default (a TTL of 0 or negative days would prune every checkpoint
+    immediately, which is never the intent of an unset/misconfigured var).
+    """
+    raw = os.environ.get("DEPTHFUSION_CHECKPOINT_TTL_DAYS", "").strip()
+    if not raw:
+        return _DEFAULT_CHECKPOINT_TTL_DAYS
+    try:
+        value = int(raw)
+    except ValueError:
+        log.warning(
+            "invalid DEPTHFUSION_CHECKPOINT_TTL_DAYS=%r — falling back to default %d days",
+            raw, _DEFAULT_CHECKPOINT_TTL_DAYS,
+        )
+        return _DEFAULT_CHECKPOINT_TTL_DAYS
+    return value if value > 0 else _DEFAULT_CHECKPOINT_TTL_DAYS
+
+
+def _checkpoint_base_dir() -> Path:
+    """Root directory for persisted checkpoint JSON files (no side effects).
+
+    Read-only resolution — does NOT create the directory. Callers that need
+    to write must create the per-project directory themselves (see
+    ``checkpoint_store_dir``); callers that only need to read (prune, lookup)
+    must treat a missing directory as "no checkpoints yet", not an error.
+    """
+    return Path(
+        os.environ.get("DEPTHFUSION_CHECKPOINT_DIR", Path.home() / ".depthfusion" / "checkpoints")
+    ).expanduser()
+
+
+def checkpoint_store_dir(project_slug: str) -> Path:
+    """Per-project directory holding persisted ``CheckpointRecord`` JSON files.
+
+    Creates the directory if absent — this is the write-path helper (used by
+    ``EventStore.publish_checkpoint``). Layout:
+    ``<DEPTHFUSION_CHECKPOINT_DIR or ~/.depthfusion/checkpoints>/<project_slug>/``.
+    """
+    d = _checkpoint_base_dir() / project_slug
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@dataclass
+class CheckpointRecord:
+    """A session checkpoint (S-250 / E-73 Growth, Reliability & Observability).
+
+    Captured on clean session close (``DELETE /mcp``), on server shutdown
+    (SIGTERM via the FastAPI lifespan), or on-demand at plan boundaries.
+    Enables ``depthfusion_session_seed(mode="resume")`` to hand a fresh agent
+    session enough state to pick up where a crashed or closed session left
+    off, without re-deriving it from scratch.
+
+    AC-1 binding literal fields (S-250 acceptance criterion — do not rename
+    or drop these four):
+      * ``plan_state``                — free-form summary of the active plan/task
+      * ``files_modified``            — paths touched since the last checkpoint
+      * ``git_stash_ref``             — a ``git stash`` ref if uncommitted work
+                                         was stashed at checkpoint time, else
+                                         ``None``
+      * ``context_pct_at_checkpoint`` — context-window utilisation (0-100) at
+                                         checkpoint time, else ``None``
+
+    ``checkpoint_id``, ``session_id``, ``project_slug``, and ``created_at``
+    are identity/addressing fields required so a checkpoint can be persisted
+    and later looked up by id or by "most recent for this project" — they are
+    not part of the AC-1 literal set but are necessary for the record to be
+    retrievable at all.
+    """
+
+    checkpoint_id: str
+    session_id: str
+    project_slug: str
+    created_at: str  # ISO-8601 UTC
+    plan_state: str
+    files_modified: list[str] = field(default_factory=list)
+    git_stash_ref: str | None = None
+    context_pct_at_checkpoint: float | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "checkpoint_id": self.checkpoint_id,
+            "session_id": self.session_id,
+            "project_slug": self.project_slug,
+            "created_at": self.created_at,
+            "plan_state": self.plan_state,
+            "files_modified": list(self.files_modified),
+            "git_stash_ref": self.git_stash_ref,
+            "context_pct_at_checkpoint": self.context_pct_at_checkpoint,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CheckpointRecord":
+        return cls(
+            checkpoint_id=d["checkpoint_id"],
+            session_id=d.get("session_id", ""),
+            project_slug=d.get("project_slug", ""),
+            created_at=d.get("created_at", ""),
+            plan_state=d.get("plan_state", ""),
+            files_modified=list(d.get("files_modified") or []),
+            git_stash_ref=d.get("git_stash_ref"),
+            context_pct_at_checkpoint=d.get("context_pct_at_checkpoint"),
+        )
+
+
+def prune_expired_checkpoints(project_slug: str, *, ttl_days: int | None = None) -> int:
+    """Delete checkpoint JSON files older than the TTL window (S-250 AC-5).
+
+    Synchronous and file-glob based (mirrors ``capture/pruner.py``'s
+    age-based heuristic) so it can be called directly from the synchronous
+    nightly hygiene job (``capture/hygiene.py``) without an event loop.
+
+    Age is judged by ``CheckpointRecord.created_at`` (the record's own
+    creation timestamp), not filesystem mtime, so a copied or restored
+    checkpoint file with a stale mtime still expires on its original
+    creation time.
+
+    Never raises — a missing checkpoint directory is treated as "nothing to
+    prune" (returns 0, no directory is created as a side effect of a
+    read/prune call), and a malformed or unreadable checkpoint file is
+    logged and skipped rather than aborting the whole run.
+
+    Returns the number of checkpoint files deleted.
+    """
+    ttl = ttl_days if ttl_days is not None else checkpoint_ttl_days()
+    cutoff_ts = datetime.now(timezone.utc).timestamp() - ttl * 86400.0
+    d = _checkpoint_base_dir() / project_slug
+    if not d.exists():
+        return 0
+
+    deleted = 0
+    for path in sorted(d.glob("*.json")):
+        try:
+            record = CheckpointRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            created_ts = datetime.fromisoformat(record.created_at).timestamp()
+        except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
+            log.warning(
+                "prune_expired_checkpoints: skipping malformed checkpoint %s — %s: %s",
+                path, type(exc).__name__, exc,
+            )
+            continue
+        if created_ts < cutoff_ts:
+            try:
+                path.unlink()
+                deleted += 1
+            except OSError as exc:
+                log.warning(
+                    "prune_expired_checkpoints: could not delete %s — %s", path, exc,
+                )
+    return deleted
+
+
 class EventStore:
     """Fabric-level event store.
 
@@ -386,6 +553,167 @@ class EventStore:
         await self._stream_publish(project_slug, event_entity)
 
         return {"memory_id": content_hash, "event_id": event_id, "deduped": deduped}
+
+    # ------------------------------------------------------------------
+    # Checkpointing — S-250 / E-73 (T-847)
+    # ------------------------------------------------------------------
+
+    async def publish_checkpoint(
+        self,
+        session_id: str,
+        project_slug: str,
+        plan_state: str,
+        files_modified: list[str],
+        *,
+        agent_id: str = "system",
+        git_stash_ref: str | None = None,
+        context_pct_at_checkpoint: float | None = None,
+        checkpoint_id: str | None = None,
+    ) -> CheckpointRecord:
+        """Persist a ``CheckpointRecord`` and mirror it into the event fabric.
+
+        The record is written to two places:
+
+        1. A JSON file under ``checkpoint_store_dir(project_slug)`` — the
+           durable, directly-queryable copy that ``get_checkpoint`` /
+           ``get_latest_checkpoint`` read from, and that the nightly hygiene
+           job's ``prune_expired_checkpoints`` TTL-prunes (S-250 AC-5). This
+           write is authoritative; if it fails, the exception propagates —
+           callers must know a checkpoint publish failed.
+        2. An ``event`` Entity in the graph (``event_type="checkpoint"``) via
+           the existing ``publish()`` path, for fabric-wide observability
+           parity with every other event type. This mirror is best-effort —
+           a graph-write failure is logged and swallowed rather than losing
+           the checkpoint file that was already written.
+
+        Returns the ``CheckpointRecord`` that was persisted.
+        """
+        timestamp_iso = datetime.now(timezone.utc).isoformat()
+        record_id = checkpoint_id or _event_entity_id(
+            agent_id, "checkpoint", timestamp_iso, [session_id]
+        )
+        record = CheckpointRecord(
+            checkpoint_id=record_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            created_at=timestamp_iso,
+            plan_state=plan_state,
+            files_modified=list(files_modified),
+            git_stash_ref=git_stash_ref,
+            context_pct_at_checkpoint=context_pct_at_checkpoint,
+        )
+
+        loop = asyncio.get_event_loop()
+
+        def _write_file() -> None:
+            d = checkpoint_store_dir(project_slug)
+            path = d / f"{record.checkpoint_id}.json"
+            path.write_text(json.dumps(record.to_dict(), indent=2), encoding="utf-8")
+
+        await loop.run_in_executor(None, _write_file)
+
+        try:
+            await self.publish(
+                agent_id=agent_id,
+                project_slug=project_slug,
+                memory_refs=[],
+                event_type="checkpoint",
+                session_id=session_id,
+            )
+        except Exception as exc:  # noqa: BLE001 — best-effort fabric mirror
+            log.warning(
+                "EventStore.publish_checkpoint: graph mirror failed for checkpoint_id=%s — %s: %s",
+                record.checkpoint_id, type(exc).__name__, exc,
+            )
+
+        return record
+
+    def get_checkpoint(self, checkpoint_id: str, project_slug: str) -> CheckpointRecord | None:
+        """Load a single checkpoint by id. Returns ``None`` if not found or malformed.
+
+        Synchronous — pure local-file I/O, no graph or network access, so no
+        executor hop is needed (mirrors ``EventStore.graph`` being a plain
+        property rather than an async accessor).
+        """
+        path = _checkpoint_base_dir() / project_slug / f"{checkpoint_id}.json"
+        if not path.exists():
+            return None
+        try:
+            return CheckpointRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError, KeyError) as exc:
+            log.warning(
+                "get_checkpoint: malformed record %s — %s: %s", path, type(exc).__name__, exc,
+            )
+            return None
+
+    def get_latest_checkpoint(
+        self, project_slug: str, session_id: str | None = None,
+    ) -> CheckpointRecord | None:
+        """Return the most recently created checkpoint for a project.
+
+        ``session_id``, when given, narrows the search to checkpoints from
+        that session only. Returns ``None`` when no (matching) checkpoint
+        exists — including when the project has no checkpoint directory yet.
+        """
+        d = _checkpoint_base_dir() / project_slug
+        if not d.exists():
+            return None
+
+        records: list[CheckpointRecord] = []
+        for path in d.glob("*.json"):
+            try:
+                rec = CheckpointRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError, KeyError) as exc:
+                log.warning(
+                    "get_latest_checkpoint: skipping malformed record %s — %s: %s",
+                    path, type(exc).__name__, exc,
+                )
+                continue
+            if session_id and rec.session_id != session_id:
+                continue
+            records.append(rec)
+
+        if not records:
+            return None
+        records.sort(key=lambda r: r.created_at)
+        return records[-1]
+
+    # ------------------------------------------------------------------
+    # Ambient trace publishing — S-250 AC-2 (T-849)
+    # ------------------------------------------------------------------
+
+    async def publish_ambient_trace(
+        self,
+        agent_id: str,
+        project_slug: str,
+        session_id: str | None = None,
+    ) -> str:
+        """Publish a lightweight ambient trace event.
+
+        Ambient traces are low-signal, high-frequency activity markers
+        (intended to be recorded on every MCP tool call) so a resumed
+        session can reconstruct recent activity even without an explicit
+        checkpoint. They are recorded with ``event_type="ambient_trace"`` so
+        ``get_recent_events`` and other fabric consumers can distinguish
+        them from both ordinary publishes and checkpoints.
+
+        Excluded from standard recall by default — see
+        ``retrieval/hybrid.py::filter_blocks_by_ambient_trace`` and
+        ``mcp/tools/_shared.py::_tool_recall_impl``'s ``include_ambient_trace``
+        argument, which is the recall-side half of this AC. This method is
+        the publish-side half: a thin, single-purpose wrapper over
+        ``publish()`` (same Entity write + best-effort stream fan-out) with
+        a distinct ``event_type`` tag.
+
+        Returns the event entity_id.
+        """
+        return await self.publish(
+            agent_id=agent_id,
+            project_slug=project_slug,
+            memory_refs=[],
+            event_type="ambient_trace",
+            session_id=session_id,
+        )
 
     async def get_recent_events(
         self,
