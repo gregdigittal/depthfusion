@@ -4149,14 +4149,14 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 ### S-253: As a DepthFusion user, I want a checkpoint timeline in the Tauri dashboard so that I can see my session history and resume from a prior checkpoint `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: A new `/query/checkpoints?project=<slug>&limit=20` REST endpoint returns checkpoint records for a project
-- [ ] AC-2: Tauri dashboard has a `CheckpointTimeline` tile showing each checkpoint's timestamp, project, files modified, and plan step
-- [ ] AC-3: Each checkpoint row has a "Resume from here" action that calls `depthfusion_session_seed(mode="resume", checkpoint_id=<id>)`
+- [x] AC-1: A new `/query/checkpoints?project=<slug>&limit=20` REST endpoint returns checkpoint records for a project
+- [x] AC-2: Tauri dashboard has a `CheckpointTimeline` tile showing each checkpoint's timestamp, project, files modified, and plan step
+- [x] AC-3: Each checkpoint row has a "Resume from here" action that calls `depthfusion_session_seed(mode="resume", checkpoint_id=<id>)`
 
 **Tasks:**
-- [ ] T-860: Add `/query/checkpoints` endpoint to `api/rest.py`
-- [ ] T-861: Build `CheckpointTimeline` tile in Tauri `DashboardPage.tsx`
-- [ ] T-862: Wire "Resume from here" action through Tauri IPC to `depthfusion_session_seed`
+- [x] T-860: Add `/query/checkpoints` endpoint to `api/rest.py`
+- [x] T-861: Build `CheckpointTimeline` tile in Tauri `DashboardPage.tsx`
+- [x] T-862: Wire "Resume from here" action through Tauri IPC to `depthfusion_session_seed`
 
 ### S-254: As a team lead, I want cross-session diff analysis so that I can see what all agents changed in a file this week `P2` `M`
 

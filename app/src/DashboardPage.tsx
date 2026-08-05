@@ -7,50 +7,8 @@ import { useRecentSessions } from './hooks/useRecentSessions'
 import type { SessionEvent } from './hooks/useRecentSessions'
 import { useStorageUsage } from './hooks/useStorageUsage'
 import { TileGrid } from './components/TileGrid'
-
-// ---------------------------------------------------------------------------
-// Shared skeleton and error primitives
-// ---------------------------------------------------------------------------
-
-function SkeletonRow() {
-  return (
-    <div
-      style={{
-        height: '1em',
-        borderRadius: 4,
-        background: 'var(--muted)',
-        opacity: 0.25,
-        marginBottom: 'var(--sp-2)',
-      }}
-    />
-  )
-}
-
-function TileError({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
-      <div style={{ color: 'var(--danger-soft)', fontSize: 'var(--fs-small)' }}>
-        {message}
-      </div>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          style={{
-            alignSelf: 'flex-start',
-            fontSize: 'var(--fs-small)',
-            color: 'var(--accent)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          Retry
-        </button>
-      )}
-    </div>
-  )
-}
+import { SkeletonRow, TileError, TileLoading } from './components/TilePrimitives'
+import { CheckpointTimeline } from './components/CheckpointTimeline'
 
 // ---------------------------------------------------------------------------
 // RecentActivity — S-247: fetches /query/sessions?limit=10
@@ -148,13 +106,8 @@ function StorageUsage() {
   const { data, loading, error, retry } = useStorageUsage()
 
   if (loading) {
-    return (
-      <div style={{ width: '100%' }}>
-        <SkeletonRow />
-        <SkeletonRow />
-        <SkeletonRow />
-      </div>
-    )
+    // Identical output to the previous three inline <SkeletonRow /> calls.
+    return <TileLoading rows={3} />
   }
 
   if (error) {
@@ -253,6 +206,8 @@ export function DashboardPage() {
     'storage-usage': <StorageUsage />,
     'sync-status': <SyncStatus stats={stats} error={error} />,
     'cognitive-summary': <CognitiveSummary />,
+    // Key must match the DEFAULT_TILES id in hooks/useDashboard.ts exactly.
+    'checkpoint-timeline': <CheckpointTimeline />,
   }
 
   return (

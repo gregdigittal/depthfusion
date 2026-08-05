@@ -339,6 +339,64 @@ class CheckpointRecord:
         )
 
 
+def list_checkpoints(
+    project_slug: str | None = None, limit: int = 20, cursor: str | None = None,
+) -> list[CheckpointRecord]:
+    """Return checkpoints newest first (T-860 / S-253).
+
+    Module-level and filesystem-only — deliberately a sibling of
+    ``prune_expired_checkpoints`` and ``checkpoint_store_dir`` rather than an
+    ``EventStore`` method, because reading persisted ``CheckpointRecord`` JSON
+    touches no graph and no stream.  Read paths must not have to construct (or
+    lazily open) a ``GraphBackend`` just to list files.
+
+    Note the ordering contrast with ``EventStore.get_latest_checkpoint``, which
+    sorts ASCENDING and takes ``[-1]``: this function sorts ``created_at``
+    DESCENDING and returns the leading ``limit`` records, so callers get the
+    most recent checkpoints without re-sorting.
+
+    An empty or ``None`` *project_slug* means **all projects**: every
+    immediate subdirectory of the checkpoint root is scanned and the merged
+    result is sorted globally by ``created_at`` before the ``limit`` slice.
+    This is what makes an unscoped caller (the dashboard tile, which has no
+    project selector yet) show real rows instead of an always-empty list.
+
+    Returns an empty list — never raises — when no checkpoint directory
+    exists yet.  Malformed record files are logged and skipped rather than
+    failing the whole listing.
+
+    ``cursor`` is accepted for forward compatibility with the opaque offset
+    cursors used by ``/query/discoveries`` and ``/query/sessions``, but is
+    deliberately not interpreted yet (T-860): this returns a single
+    ``limit``-bounded page.
+    """
+    base = _checkpoint_base_dir()
+    if project_slug:
+        dirs = [base / project_slug]
+    else:
+        if not base.is_dir():
+            return []
+        dirs = sorted(p for p in base.iterdir() if p.is_dir())
+
+    records: list[CheckpointRecord] = []
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for path in d.glob("*.json"):
+            try:
+                rec = CheckpointRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError, KeyError) as exc:
+                log.warning(
+                    "list_checkpoints: skipping malformed record %s — %s: %s",
+                    path, type(exc).__name__, exc,
+                )
+                continue
+            records.append(rec)
+
+    records.sort(key=lambda r: r.created_at, reverse=True)
+    return records[:limit]
+
+
 def prune_expired_checkpoints(project_slug: str, *, ttl_days: int | None = None) -> int:
     """Delete checkpoint JSON files older than the TTL window (S-250 AC-5).
 

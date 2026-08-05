@@ -316,6 +316,17 @@ async def get_sessions(
     return result
 
 
+@app.get("/query/checkpoints")
+async def get_checkpoints(
+    project: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=1000),
+    principal: Principal = Depends(require_principal),
+):
+    from depthfusion.api.query import query_checkpoints
+
+    return query_checkpoints(project_slug=project, limit=limit, principal=principal)
+
+
 @app.get("/query/aggregate")
 async def get_aggregate(
     from_: Optional[str] = Query(default=None, alias="from"),
@@ -407,6 +418,10 @@ class SessionSeedBody(BaseModel):
     project: str
     branch: Optional[str] = None
     context: Optional[str] = None
+    # T-862: resume-from-checkpoint. ``mode`` is left as None when omitted so the
+    # tool's own default (mode="recall", project.py:250) stays in force.
+    mode: Optional[str] = None
+    checkpoint_id: Optional[str] = None
 
 class CompressSessionBody(BaseModel):
     max_tokens: Optional[int] = None
@@ -569,11 +584,20 @@ async def set_scope(body: ScopeBody, principal: Principal = Depends(require_prin
 @app.post("/session/seed")
 async def session_seed(body: SessionSeedBody, principal: Principal = Depends(require_principal)):
     from depthfusion.mcp.server import _tool_session_seed
-    args = {"project": body.project}
+    # ``project`` is retained for _resolve_ambient_project_slug (mcp/server.py), which
+    # reads ``arguments.get("project") or arguments.get("project_slug")`` — dropping it
+    # would silently break ambient tracing for existing MCP clients.  ``project_slug``
+    # is what _tool_session_seed itself reads (project.py:207) and what resume mode
+    # requires (project.py:142), so both keys are set from the same value.
+    args = {"project": body.project, "project_slug": body.project}
     if body.branch is not None:
         args["branch"] = body.branch
     if body.context is not None:
         args["context"] = body.context
+    if body.mode is not None:
+        args["mode"] = body.mode
+    if body.checkpoint_id is not None:
+        args["checkpoint_id"] = body.checkpoint_id
     return _parse_tool_result(_tool_session_seed(args))
 
 

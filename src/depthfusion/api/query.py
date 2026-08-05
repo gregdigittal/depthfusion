@@ -319,6 +319,39 @@ def query_sessions(
 
 
 # ---------------------------------------------------------------------------
+# Checkpoints — T-860 / S-253
+# ---------------------------------------------------------------------------
+
+def query_checkpoints(
+    project_slug: Optional[str] = None,
+    limit: int = 20,
+    principal: "Optional[Principal]" = None,
+) -> dict[str, Any]:
+    """Return session checkpoints, newest first.
+
+    Stays a pure filesystem reader like every other function in this module:
+    it delegates to the module-level, graph-free
+    :func:`depthfusion.core.event_store.list_checkpoints` (a sibling of
+    ``prune_expired_checkpoints``) so the on-disk layout has exactly one
+    owner, and no ``EventStore`` / ``GraphBackend`` is constructed on this
+    read path.
+
+    No ACL trimming is applied: ``CheckpointRecord`` carries no acl frontmatter
+    and is not principal-scoped, so *principal* is accepted only to keep the
+    signature uniform with the other query readers (and because the route gate
+    already authenticated the caller).
+
+    An empty or ``None`` *project_slug* means all projects — the checkpoint
+    root is scanned per-project and merged, newest first.
+    """
+    from depthfusion.core.event_store import list_checkpoints
+
+    records = list_checkpoints(project_slug, limit=limit)
+    items = [r.to_dict() for r in records]
+    return {"items": items, "total": len(items), "count": len(items)}
+
+
+# ---------------------------------------------------------------------------
 # Aggregate
 # ---------------------------------------------------------------------------
 
