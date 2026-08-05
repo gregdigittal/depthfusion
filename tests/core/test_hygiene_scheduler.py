@@ -129,17 +129,12 @@ class TestBuildScheduler:
 
     def test_apscheduler_import_error_returns_none(self, monkeypatch):
         monkeypatch.delenv("DEPTHFUSION_HYGIENE_SKIP", raising=False)
-        import sys
-        with patch.dict(sys.modules, {
-            "apscheduler": None,
-            "apscheduler.schedulers": None,
-            "apscheduler.schedulers.asyncio": None,
-            "apscheduler.triggers": None,
-            "apscheduler.triggers.cron": None,
-        }):
-            from depthfusion.capture.hygiene import build_scheduler
-            result = build_scheduler()
-        assert result is None
+        # build_scheduler reads the module-level _APSCHEDULER_AVAILABLE flag,
+        # which is bound at import time — patching sys.modules after import has
+        # no effect on it. Patch the resolved flag instead.
+        import depthfusion.capture.hygiene as hygiene_mod
+        monkeypatch.setattr(hygiene_mod, "_APSCHEDULER_AVAILABLE", False)
+        assert hygiene_mod.build_scheduler() is None
 
 
 # ---------------------------------------------------------------------------

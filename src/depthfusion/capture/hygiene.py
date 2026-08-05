@@ -138,6 +138,13 @@ def run_hygiene_for_project(
         logger.warning("hygiene[%s] prune error: %s", project_slug, exc)
         result["errors"].append({"phase": "prune", "error": str(exc)})
 
+    # Flat headline counts (S-248 AC-2). The nested per-phase dicts above keep
+    # the full breakdown; these three are the contract consumers read.
+    # Default to 0 so a failed phase reports zero rather than a missing key.
+    result["items_decayed"] = result["decay"].get("decayed", 0)
+    result["duplicates_merged"] = result["dedup"].get("superseded_count", 0)
+    result["candidates_pruned"] = result["prune"].get("candidates_count", 0)
+
     return result
 
 

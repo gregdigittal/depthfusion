@@ -778,8 +778,7 @@ def main() -> None:
     ]
     for name, va, vb in metrics:
         delta = (vb - va) * 100
-        sign = "+" if delta >= 0 else ""
-        print(f"{name:<14} {_fmt_pct(va):>12} {_fmt_pct(vb):>12} {sign}{delta:>+11.2f}pp")
+        print(f"{name:<14} {_fmt_pct(va):>12} {_fmt_pct(vb):>12} {delta:>+12.2f}pp")
     print("-" * 56)
     print(f"{'Model A':<14} {args.model_a}")
     print(f"{'Model B':<14} {args.model_b}")
