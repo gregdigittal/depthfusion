@@ -112,9 +112,10 @@ class TestToolCapabilitiesCoverage:
         )
 
     def test_count_is_29(self) -> None:
-        """There must be exactly 31 tools annotated (29 original + recommend_model E-64 + describe_capabilities S-76)."""
-        assert len(TOOL_CAPABILITIES) == 31, (
-            f"Expected 31 annotated tools, got {len(TOOL_CAPABILITIES)}. "
+        """There must be exactly 32 tools annotated (29 original + recommend_model
+        E-64 + describe_capabilities S-76 + session_checkpoint E-73 T-850)."""
+        assert len(TOOL_CAPABILITIES) == 32, (
+            f"Expected 32 annotated tools, got {len(TOOL_CAPABILITIES)}. "
             f"TOOL_CAPABILITIES keys: {list(TOOL_CAPABILITIES.keys())}"
         )
 

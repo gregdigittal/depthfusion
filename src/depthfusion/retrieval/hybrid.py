@@ -91,6 +91,13 @@ _FRONTMATTER_VALID_UNTIL_RE = re.compile(
 _FRONTMATTER_SUB_SCOPE_RE = re.compile(
     r"^sub_scope:\s*(\S+)\s*$", re.MULTILINE,
 )
+# `type:` frontmatter key — reused from the existing discovery-file convention
+# (capture/decision_extractor.py already writes `type: decisions`). S-250 AC-2
+# gives one specific value, `ambient_trace`, recall-filtering meaning; every
+# other value (including no `type:` key at all) is passed through unaffected.
+_FRONTMATTER_TYPE_RE = re.compile(
+    r"^type:\s*(\S+)\s*$", re.MULTILINE,
+)
 
 # S-121: fusion blend mode. Default "rrf" preserves existing behaviour; set
 # DEPTHFUSION_BLEND_MODE=linear to activate MemPalace-style linear blend.
@@ -665,6 +672,25 @@ def extract_frontmatter_sub_scope(content: str) -> str | None:
     return key_match.group(1).strip() if key_match else None
 
 
+def extract_frontmatter_type(content: str) -> str | None:
+    """Parse `type:` from YAML frontmatter; return the raw value or None.
+
+    Mirrors `extract_frontmatter_project()` / `extract_frontmatter_sub_scope()`.
+    This is a generic passthrough parser — `type:` already carries several
+    unrelated values across the codebase (e.g. `type: decisions`, written by
+    `capture/decision_extractor.py`). Only `filter_blocks_by_ambient_trace()`
+    gives one specific value (`ambient_trace`) recall-filtering meaning; every
+    other value is returned as-is and has no special handling here.
+    """
+    if not content:
+        return None
+    fm_match = _FRONTMATTER_PROJECT_RE.match(content)
+    if not fm_match:
+        return None
+    key_match = _FRONTMATTER_TYPE_RE.search(fm_match.group("fm"))
+    return key_match.group(1).strip() if key_match else None
+
+
 def extract_frontmatter_validity(content: str) -> tuple[datetime | None, datetime | None]:
     """Parse optional valid_from / valid_until ISO-8601 fields from YAML frontmatter.
 
@@ -845,6 +871,55 @@ def filter_blocks_by_sub_scope(
         b for b in blocks
         if _block_passes_sub_scope(b, sub_scope=sub_scope)
     ]
+
+
+_AMBIENT_TRACE_TYPE = "ambient_trace"
+
+
+def _block_is_ambient_trace(block: dict) -> bool:
+    """True iff `block` carries the `type: ambient_trace` label (S-250 AC-2).
+
+    Resolution order mirrors `filter_blocks_by_project` / `_sub_scope_of_block`:
+      1. `block["type"]` — explicit key set at file-load time (survives
+         section-splitting that would strip file-level frontmatter from
+         later blocks)
+      2. `extract_frontmatter_type(block["content"])` — fallback for block 0
+         of a section-split file whose frontmatter is still intact
+    """
+    raw = block.get("type")
+    if raw is None:
+        content = block.get("content", "")
+        raw = extract_frontmatter_type(content) if content else None
+    return raw == _AMBIENT_TRACE_TYPE
+
+
+def filter_blocks_by_ambient_trace(
+    blocks: list[dict],
+    *,
+    include_ambient_trace: bool = False,
+) -> list[dict]:
+    """Exclude ambient-trace-labelled blocks from standard recall (S-250 AC-2).
+
+    Third predicate filter in the recall chain — additive to
+    `filter_blocks_by_project` and `filter_blocks_by_sub_scope`; callers
+    chain all three (`_shared.py::_tool_recall_impl` applies this filter
+    unconditionally, independent of project/cross_project scoping, so
+    ambient traces are excluded from *every* standard recall path, not only
+    the project-scoped one).
+
+    Rules (mirrors the unlabelled-included, additive convention of the other
+    two predicate filters in this module):
+      * `include_ambient_trace=True` → return `blocks` unchanged (explicit
+        opt-in — the caller asked for ambient traces specifically)
+      * block has no `type` at all    → INCLUDED (back-compat; also the
+        common case — most blocks never set `type`)
+      * block `type` != "ambient_trace" → INCLUDED (e.g. "decisions",
+        "session" — this filter only ever acts on one specific value)
+      * block `type` == "ambient_trace" → EXCLUDED unless `include_ambient_trace`
+    """
+    if include_ambient_trace:
+        return list(blocks)
+    return [b for b in blocks if not _block_is_ambient_trace(b)]
 
 
 def boilerplate_penalty(content: str) -> float:

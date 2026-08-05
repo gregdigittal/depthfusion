@@ -1,6 +1,7 @@
 """DepthFusion MCP server — 21 tools, conditionally registered based on feature flags."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import time
 from typing import Any
 
 from depthfusion.identity.models import Principal
+from depthfusion.mcp import session_activity as _session_activity
 from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ from depthfusion.mcp.tools.project import (  # noqa: E402,F401
     _tool_ingest_project,
     _tool_list_projects,
     _tool_register_project,
+    _tool_session_checkpoint,
     _tool_session_seed,
     _tool_sync_project,
 )
@@ -142,6 +145,7 @@ DISPATCHABLE: frozenset[str] = frozenset({
     "depthfusion_list_providers",
     "depthfusion_recommend_model",
     "depthfusion_describe_capabilities",
+    "depthfusion_session_checkpoint",
 })
 
 
@@ -303,13 +307,153 @@ def _dispatch_tool(
         return _tool_recommend_model(arguments)
     elif tool_name == "depthfusion_describe_capabilities":
         return _tool_describe_capabilities()
+    elif tool_name == "depthfusion_session_checkpoint":
+        return _tool_session_checkpoint(arguments)
     else:
         raise ValueError(f"No dispatcher for {tool_name}")
+
+# ---------------------------------------------------------------------------
+# Ambient trace side-effect — S-250 AC-1 / AC-2 (T-849)
+#
+# Publishes a lightweight `event_type="ambient_trace"` event on every
+# `tools/call` request that flows through `_process_request`, without
+# blocking the response path, and feeds the per-session activity tracker
+# (`mcp/session_activity.py`) that `http_server.py::_publish_session_checkpoint`
+# reads from so DELETE /mcp and shutdown checkpoints carry real
+# `plan_state`/`files_modified`/`context_pct_at_checkpoint` instead of
+# placeholders.
+#
+# `_process_request` is synchronous and is invoked from two thread contexts
+# that own no event loop of their own: the stdio `main()` loop below, and a
+# FastAPI `ThreadPoolExecutor` worker thread
+# (`http_server.py`'s `loop.run_in_executor(None, _process_request, ...)`).
+# A single dedicated background thread runs its own event loop so the
+# ambient-trace publish can be scheduled onto it via
+# `asyncio.run_coroutine_threadsafe` from either context — the caller never
+# awaits the result.
+# ---------------------------------------------------------------------------
+
+_ambient_loop_lock = threading.Lock()
+_ambient_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_ambient_trace_loop() -> asyncio.AbstractEventLoop:
+    """Lazily start (once) the dedicated ambient-trace background loop thread."""
+    global _ambient_loop
+    with _ambient_loop_lock:
+        if _ambient_loop is None or _ambient_loop.is_closed():
+            loop = asyncio.new_event_loop()
+
+            def _run_forever() -> None:
+                asyncio.set_event_loop(loop)
+                loop.run_forever()
+
+            threading.Thread(
+                target=_run_forever, daemon=True, name="depthfusion-ambient-trace",
+            ).start()
+            _ambient_loop = loop
+        return _ambient_loop
+
+
+async def _publish_ambient_trace_safe(
+    agent_id: str,
+    project_slug: str,
+    session_id: str | None,
+) -> None:
+    """The actual publish, executed on the ambient-trace background loop.
+
+    Every failure mode (fabric store unavailable, graph write failure) is
+    caught and logged here — narrowly, at debug level, since a missed
+    ambient trace is expected to be routine/frequent and non-actionable
+    under normal operation (e.g. graph backend not configured) rather than
+    something that should ever be allowed to surface as a tool-call error.
+    """
+    try:
+        from depthfusion.mcp.tools._state import _get_fabric_store
+
+        store = _get_fabric_store()
+        await store.publish_ambient_trace(
+            agent_id=agent_id, project_slug=project_slug, session_id=session_id,
+        )
+    except Exception as exc:  # noqa: BLE001 — ambient trace is best-effort by design
+        logger.debug(
+            "ambient_trace publish failed (agent=%s project=%s session=%s): %s",
+            agent_id, project_slug, session_id, exc,
+        )
+
+
+def _resolve_ambient_project_slug(arguments: dict) -> str:
+    """Best-effort project_slug resolution for an ambient-trace publish.
+
+    Prefers an explicit ``project``/``project_slug`` argument on the tool
+    call (sanitised the same way recall does); falls back to CWD-based
+    detection (mirrors ``http_server.py::_publish_session_checkpoint``'s
+    convention) so a call without an explicit argument still yields a
+    usable slug when the server process is running inside a known
+    project's working tree. Returns ``""`` when nothing can be resolved.
+    """
+    explicit = _sanitise_project_slug(
+        str(arguments.get("project") or arguments.get("project_slug") or "")
+    )
+    if explicit:
+        return explicit
+    try:
+        from depthfusion.hooks.git_post_commit import detect_project
+
+        detected = detect_project()
+    except Exception as exc:  # noqa: BLE001 — detection is best-effort
+        logger.debug("_resolve_ambient_project_slug: detection failed: %s", exc)
+        return ""
+    return "" if detected in ("", "unknown") else detected
+
+
+def _record_ambient_activity(
+    tool_name: str,
+    arguments: dict,
+    principal: Principal | None,
+    session_id: str | None,
+) -> None:
+    """Side-effect hook called for every ``tools/call`` request (T-849).
+
+    Two independent, best-effort, non-blocking things happen here:
+
+    1. ``session_activity.record_tool_call`` — a cheap, synchronous,
+       in-memory update (no I/O) feeding the per-session activity tracker
+       that ``http_server.py::_publish_session_checkpoint`` reads from
+       (S-250 AC-1).
+    2. Scheduling ``EventStore.publish_ambient_trace`` onto the dedicated
+       ambient-trace background loop (S-250 AC-2) — fire-and-forget, the
+       response path never awaits it.
+
+    Never raises into ``_process_request`` — a failure in either half must
+    never turn a successful tool call into a failed response.
+    """
+    try:
+        _session_activity.record_tool_call(session_id, tool_name, arguments)
+    except Exception as exc:  # noqa: BLE001 — must never affect the tool response
+        logger.debug("session_activity.record_tool_call failed: %s", exc)
+
+    try:
+        agent_id = principal.principal_id if principal is not None else "mcp-server"
+        project_slug = _resolve_ambient_project_slug(arguments or {})
+        if not project_slug:
+            logger.debug(
+                "ambient_trace: no project context resolved for tool=%s — skipping", tool_name,
+            )
+            return
+        loop = _get_ambient_trace_loop()
+        asyncio.run_coroutine_threadsafe(
+            _publish_ambient_trace_safe(agent_id, project_slug, session_id), loop,
+        )
+    except Exception as exc:  # noqa: BLE001 — scheduling must never block/break dispatch
+        logger.debug("ambient_trace scheduling failed for tool=%s: %s", tool_name, exc)
+
 
 def _process_request(
     request: dict,
     config: Any,
     principal: Principal | None = None,
+    session_id: str | None = None,
 ) -> dict:
     """Process a single JSON-RPC request and return the response.
 
@@ -324,6 +468,14 @@ def _process_request(
         unauthenticated stdio sessions — tool calls will be rejected by the
         capability check unless the tool is accessible without a principal
         (currently none are).
+    session_id:
+        The MCP transport session id (``Mcp-Session-Id`` for streamable
+        HTTP, the legacy SSE ``sessionId`` query param), when known. Used
+        only for the S-250 ambient-trace / per-session activity tracker
+        side effect (T-849) — ``None`` for the stdio transport, which has
+        no per-connection session concept, and for the very first
+        streamable-HTTP call (``initialize``) before a session id has been
+        issued.
     """
     method = request.get("method", "")
     req_id = request.get("id")
@@ -341,6 +493,9 @@ def _process_request(
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
         result = _handle_tools_call(tool_name, arguments, config, principal)
+        # S-250 AC-1/AC-2 (T-849): non-blocking, best-effort side effect —
+        # never allowed to influence `result` or raise into this function.
+        _record_ambient_activity(tool_name, arguments, principal, session_id)
     elif method == "notifications/initialized":
         # Notification — no response needed
         return {}

@@ -6,6 +6,7 @@ Covers:
 - Report publishing: ContextItem tagged ['hygiene', project_slug] (AC-3)
 - build_scheduler() skip via env (AC-2, AC-1)
 - Lifespan integration: scheduler starts/stops without thread leak (AC-1)
+- Checkpoint TTL prune step wired into run_hygiene_for_project (S-250 AC-5)
 """
 from __future__ import annotations
 
@@ -223,6 +224,97 @@ class TestRunHygieneForProject:
         assert len(result["errors"]) >= 1
         phases_with_errors = {e["phase"] for e in result["errors"]}
         assert "decay" in phases_with_errors
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint TTL prune step — S-250 AC-5
+# ---------------------------------------------------------------------------
+
+class TestCheckpointPruneStep:
+    """S-250 AC-5: run_hygiene_for_project wires in prune_expired_checkpoints."""
+
+    def test_result_has_checkpoint_prune_keys(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DEPTHFUSION_CHECKPOINT_DIR", str(tmp_path / "checkpoints"))
+        mock_decay_summary = MagicMock()
+        mock_decay_summary.total = 0
+        mock_decay_summary.decayed = 0
+        mock_decay_summary.archived = 0
+        mock_decay_summary.skipped = 0
+
+        with (
+            patch("depthfusion.capture.hygiene.apply_decay", return_value=mock_decay_summary),
+            patch("depthfusion.capture.hygiene.identify_candidates", return_value=[]),
+        ):
+            from depthfusion.capture.hygiene import run_hygiene_for_project
+            disc_dir = tmp_path / "disc"
+            disc_dir.mkdir()
+            result = run_hygiene_for_project("ckpt-project", discoveries_dir=disc_dir)
+
+        assert "checkpoint_prune" in result
+        assert result["checkpoint_prune"] == {"expired_count": 0}
+        assert result["checkpoints_expired"] == 0
+
+    def test_expired_checkpoint_actually_pruned(self, tmp_path, monkeypatch):
+        """End-to-end: a real expired checkpoint file is deleted by the
+        hygiene run, not just a mocked count."""
+        import json as _json
+        from datetime import datetime, timedelta, timezone
+
+        from depthfusion.core.event_store import CheckpointRecord
+
+        monkeypatch.setenv("DEPTHFUSION_CHECKPOINT_DIR", str(tmp_path / "checkpoints"))
+        proj_dir = tmp_path / "checkpoints" / "ckpt-project2"
+        proj_dir.mkdir(parents=True)
+        old = CheckpointRecord(
+            checkpoint_id="old",
+            session_id="s1",
+            project_slug="ckpt-project2",
+            created_at=(datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
+            plan_state="stale",
+        )
+        (proj_dir / "old.json").write_text(_json.dumps(old.to_dict()))
+
+        mock_decay_summary = MagicMock()
+        mock_decay_summary.total = 0
+        mock_decay_summary.decayed = 0
+        mock_decay_summary.archived = 0
+        mock_decay_summary.skipped = 0
+
+        with (
+            patch("depthfusion.capture.hygiene.apply_decay", return_value=mock_decay_summary),
+            patch("depthfusion.capture.hygiene.identify_candidates", return_value=[]),
+        ):
+            from depthfusion.capture.hygiene import run_hygiene_for_project
+            disc_dir = tmp_path / "disc2"
+            disc_dir.mkdir()
+            result = run_hygiene_for_project("ckpt-project2", discoveries_dir=disc_dir)
+
+        assert result["checkpoints_expired"] == 1
+        assert not (proj_dir / "old.json").exists()
+
+    def test_checkpoint_prune_error_does_not_raise(self, tmp_path, monkeypatch):
+        mock_decay_summary = MagicMock()
+        mock_decay_summary.total = 0
+        mock_decay_summary.decayed = 0
+        mock_decay_summary.archived = 0
+        mock_decay_summary.skipped = 0
+
+        with (
+            patch("depthfusion.capture.hygiene.apply_decay", return_value=mock_decay_summary),
+            patch("depthfusion.capture.hygiene.identify_candidates", return_value=[]),
+            patch(
+                "depthfusion.core.event_store.prune_expired_checkpoints",
+                side_effect=RuntimeError("disk error"),
+            ),
+        ):
+            from depthfusion.capture.hygiene import run_hygiene_for_project
+            disc_dir = tmp_path / "disc3"
+            disc_dir.mkdir()
+            result = run_hygiene_for_project("ckpt-project3", discoveries_dir=disc_dir)
+
+        phases_with_errors = {e["phase"] for e in result["errors"]}
+        assert "checkpoint_prune" in phases_with_errors
+        assert result["checkpoints_expired"] == 0
 
 
 # ---------------------------------------------------------------------------

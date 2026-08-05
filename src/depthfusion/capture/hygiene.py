@@ -1,13 +1,20 @@
-"""Nightly hygiene orchestrator — S-248.
+"""Nightly hygiene orchestrator — S-248 (+ S-250 checkpoint TTL prune).
 
-Coordinates the three existing hygiene primitives in the canonical order:
+Coordinates the hygiene primitives in the canonical order:
 
-    decay → dedup → prune
+    decay → dedup → prune → checkpoint_prune
 
-Running all three in sequence ensures that:
+Running decay → dedup → prune in sequence ensures that:
 1. Salience scores are refreshed before dedup compares items.
 2. Dedup supersedes stale near-duplicates before prune assesses age.
 3. Prune then acts on a clean, current-scored corpus.
+
+``checkpoint_prune`` (S-250 AC-5) is independent of the other three — it
+deletes ``CheckpointRecord`` JSON files past their TTL
+(``DEPTHFUSION_CHECKPOINT_TTL_DAYS``, default 7 days) via
+``core.event_store.prune_expired_checkpoints``. It runs last purely by
+convention (append, don't reorder the existing three); order relative to
+decay/dedup/prune has no correctness implication for it.
 
 A ``hygiene_report`` :class:`~depthfusion.core.types.ContextItem` tagged
 ``['hygiene', project_slug]`` is published to the FileBus after each project
@@ -19,6 +26,8 @@ DEPTHFUSION_HYGIENE_SKIP
     Set to ``1`` to disable the scheduler entirely (for test environments).
     The scheduler is never started; ``run_hygiene_for_project`` can still be
     called directly in tests.
+DEPTHFUSION_CHECKPOINT_TTL_DAYS
+    Checkpoint retention window in days (S-250 AC-5). Default 7.
 """
 from __future__ import annotations
 
@@ -76,6 +85,7 @@ def run_hygiene_for_project(
         "decay": {},
         "dedup": {},
         "prune": {},
+        "checkpoint_prune": {},
         "errors": [],
     }
 
@@ -141,12 +151,33 @@ def run_hygiene_for_project(
         logger.warning("hygiene[%s] prune error: %s", project_slug, exc)
         result["errors"].append({"phase": "prune", "error": str(exc)})
 
-    # Flat headline counts (S-248 AC-2). The nested per-phase dicts above keep
-    # the full breakdown; these three are the contract consumers read.
-    # Default to 0 so a failed phase reports zero rather than a missing key.
+    # ── Step 4: checkpoint TTL prune (S-250 AC-5) ───────────────────────────
+    # Local import — mirrors the ProjectRegistry import pattern in
+    # _nightly_hygiene_job below; keeps event_store's (heavier) graph-backend
+    # import chain out of this module's top level, consistent with how the
+    # three primitives above are imported eagerly but this newer dependency
+    # is not.
+    try:
+        from depthfusion.core.event_store import prune_expired_checkpoints
+        expired_count = prune_expired_checkpoints(project_slug)
+        result["checkpoint_prune"] = {"expired_count": expired_count}
+        logger.info(
+            "hygiene[%s] checkpoint prune done: expired=%d",
+            project_slug,
+            expired_count,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("hygiene[%s] checkpoint prune error: %s", project_slug, exc)
+        result["errors"].append({"phase": "checkpoint_prune", "error": str(exc)})
+
+    # Flat headline counts (S-248 AC-2 / S-250 AC-5). The nested per-phase
+    # dicts above keep the full breakdown; these are the contract consumers
+    # read. Default to 0 so a failed phase reports zero rather than a
+    # missing key.
     result["items_decayed"] = result["decay"].get("decayed", 0)
     result["duplicates_merged"] = result["dedup"].get("superseded_count", 0)
     result["candidates_pruned"] = result["prune"].get("candidates_count", 0)
+    result["checkpoints_expired"] = result["checkpoint_prune"].get("expired_count", 0)
 
     return result
 

@@ -209,6 +209,17 @@ TOOLS: dict[str, str] = {
         "vector_search_enabled, embedding_backend, fusion_gates_enabled, router_enabled, "
         "decision_extractor_enabled}."
     ),
+    # E-73 S-250/S-254 T-850: manual checkpoint at plan boundaries
+    "depthfusion_session_checkpoint": (
+        "Publish a manual session checkpoint at a plan boundary, retrievable later via "
+        "depthfusion_session_seed(mode='resume') (S-250/E-73). "
+        "Args: session_id (str, required), project_slug (str, required), "
+        "plan_state (str, required) — free-form summary of the active plan/task; "
+        "files_modified (str[], required) — paths touched since the last checkpoint; "
+        "git_stash_ref (str, optional) — a `git stash` ref if uncommitted work was stashed; "
+        "context_pct_at_checkpoint (number, optional) — context-window utilisation (0-100). "
+        "Response: {checkpoint_id, created_at, session_id, project_slug} or {error: str}."
+    ),
 }
 
 # Map tools to the feature flags that gate them
@@ -253,6 +264,8 @@ _TOOL_FLAGS: dict[str, str | None] = {
     "depthfusion_recommend_model": None,
     # S-76: capability introspection (always enabled)
     "depthfusion_describe_capabilities": None,
+    # E-73 S-250/S-254 T-850: manual checkpoint (always enabled)
+    "depthfusion_session_checkpoint": None,
 }
 
 
@@ -311,6 +324,14 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 "description": (
                     "When true, include the most relevant scenario block summary "
                     "alongside L1 atoms in the response (E-68 S-230 AC-3)"
+                ),
+            },
+            "include_ambient_trace": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "When true, include blocks tagged `type: ambient_trace` "
+                    "(excluded from standard recall by default — S-250 AC-2)"
                 ),
             },
         },
@@ -574,9 +595,13 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             "mode": {
                 "type": "string",
-                "enum": ["recall", "fabric_seed"],
+                "enum": ["recall", "fabric_seed", "resume"],
                 "default": "recall",
-                "description": "'recall' (default) or 'fabric_seed' for Event Graph Fabric warm-up",
+                "description": (
+                    "'recall' (default), 'fabric_seed' for Event Graph Fabric "
+                    "warm-up, or 'resume' to hand back the most recent (or a "
+                    "named) checkpoint plus standard recall results (S-250 AC-3)"
+                ),
             },
             "projects": {
                 "type": "array",
@@ -589,7 +614,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             "project_slug": {
                 "type": "string",
-                "description": "Project slug used to include project backlog and context in seed",
+                "description": (
+                    "Project slug used to include project backlog and context in "
+                    "seed; required for resume mode"
+                ),
+            },
+            "checkpoint_id": {
+                "type": "string",
+                "description": (
+                    "Named checkpoint to resume from (resume mode only). "
+                    "Omit to resume from the most recent checkpoint."
+                ),
             },
         },
         "required": ["session_id"],
@@ -701,6 +736,41 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "depthfusion_describe_capabilities": {
         "properties": {},
         "required": [],
+    },
+    # E-73 S-250/S-254 T-850: manual checkpoint at plan boundaries
+    "depthfusion_session_checkpoint": {
+        "properties": {
+            "session_id": {
+                "type": "string",
+                "description": "Claude Code session ID",
+            },
+            "project_slug": {
+                "type": "string",
+                "description": "Registered project slug this checkpoint belongs to",
+            },
+            "plan_state": {
+                "type": "string",
+                "description": "Free-form summary of the active plan/task",
+            },
+            "files_modified": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Paths touched since the last checkpoint",
+            },
+            "git_stash_ref": {
+                "type": "string",
+                "description": (
+                    "A `git stash` ref if uncommitted work was stashed at checkpoint time"
+                ),
+            },
+            "context_pct_at_checkpoint": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 100.0,
+                "description": "Context-window utilisation (0-100) at checkpoint time",
+            },
+        },
+        "required": ["session_id", "project_slug", "plan_state", "files_modified"],
     },
 }
 

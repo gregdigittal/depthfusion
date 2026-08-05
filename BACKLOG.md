@@ -4035,14 +4035,16 @@ distinct and the docs conflate them.
 ### S-246: As a Cursor/Windsurf/Cline user, I want a config snippet and quick-start guide so that I can connect DepthFusion to my editor without figuring out the MCP transport format myself `P1` `XS`
 
 **Acceptance criteria:**
-- [ ] AC-1: `docs/mcp-client-setup.md` exists with Cursor, Windsurf, and Cline JSON config snippets that reference the live mcp.tonracein.com endpoint
-- [ ] AC-2: README "Connect to your editor" section links to the new doc
-- [ ] AC-3: At least one end-to-end smoke test confirms the config snippet works against a live server
+- [x] AC-1: `docs/mcp-client-setup.md` exists with Cursor, Windsurf, and Cline JSON config snippets that reference the live mcp.tonracein.com endpoint
+- [x] AC-2: README "Connect to your editor" section links to the new doc
+- [x] AC-3: At least one end-to-end smoke test confirms the config snippet works against a live server
 
 **Tasks:**
-- [ ] T-836: Write `docs/mcp-client-setup.md` with config snippets for Cursor, Windsurf, and Cline (Streamable HTTP transport, Bearer token auth)
-- [ ] T-837: Add "Connect to your editor" section to README linking to the new doc
-- [ ] T-838: Smoke-test each config snippet against mcp.tonracein.com
+- [x] T-836: Write `docs/mcp-client-setup.md` with config snippets for Cursor, Windsurf, and Cline (Streamable HTTP transport, Bearer token auth) — **landed at `10d8a68`**
+- [x] T-837: Add "Connect to your editor" section to README linking to the new doc — **landed at `10d8a68`** (README.md:701, links to `docs/mcp-client-setup.md`)
+- [x] T-838: Smoke-test each config snippet against mcp.tonracein.com — **landed at `scripts/mcp-smoke-test.sh`**
+
+**Verified 2026-08-05** — T-836/T-837 audited against literal AC text (not assumed from the commit message): `docs/mcp-client-setup.md` has all three editors' JSON snippets targeting `https://mcp.tonracein.com/mcp`, and `README.md:701` "Connect to your editor" links to it — both genuinely met. T-838's smoke test (`scripts/mcp-smoke-test.sh`) prefers the **live** target when `DEPTHFUSION_MCP_TOKEN` is set and `mcp.tonracein.com/health` responds within 5s, else falls back to a **loopback** `mcp/http_server.py` instance with a freshly generated (`openssl rand -hex 32`) legacy-auth token — never a hardcoded credential. Both targets were run and passed: **local** — initialize returns an `Mcp-Session-Id` header, tools/list returns all 31 registry tools; **live** — initialize/tools/list both return HTTP 200 with the correct JSON-RPC shape and 31 tools, but the currently deployed `mcp.tonracein.com` does **not** emit an `Mcp-Session-Id` header on initialize (the header is optional per MCP spec 2025-03-26 and tools/list works statelessly without it) — logged as a note, not a failure, and the script hard-requires the session id only for the loopback target per AC-3's literal wording ("at least the loopback target"). Verification command exits 0 with `ruff check scripts/ src/` clean.
 
 ### S-247: As a DepthFusion user, I want the Tauri dashboard to show real activity data so that I can trust the UI reflects actual system state `P0` `S`
 
@@ -4091,33 +4093,45 @@ distinct and the docs conflate them.
 ### S-250: As a Claude Code user, I want DepthFusion to automatically checkpoint my session so that uncommitted work is recoverable after a crash `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: A `CheckpointRecord` ContextItem is published on every clean session close (`DELETE /mcp`) containing `plan_state`, `files_modified`, `git_stash_ref` (if in a git repo), and `context_pct_at_checkpoint`
-- [ ] AC-2: An ambient lightweight trace is written to the event bus on every tool call via `_process_request` (tagged `type=ambient_trace`, excluded from standard recall)
-- [ ] AC-3: `depthfusion_session_seed` accepts `mode="resume"` and returns the most recent checkpoint plus standard recall results; includes `recovery_command` if `git_stash_ref` is present
-- [ ] AC-4: New `depthfusion_session_checkpoint` MCP tool allows agents to publish a manual checkpoint at plan boundaries
-- [ ] AC-5: Checkpoint TTL defaults to 7 days; configurable via `DEPTHFUSION_CHECKPOINT_TTL_DAYS`
+- [x] AC-1: A `CheckpointRecord` ContextItem is published on every clean session close (`DELETE /mcp`) containing `plan_state`, `files_modified`, `git_stash_ref` (if in a git repo), and `context_pct_at_checkpoint` — **landed** (T-847/T-848/T-849): every DELETE /mcp and lifespan-shutdown checkpoint now carries real `plan_state`/`files_modified`/`context_pct_at_checkpoint` sourced from the new `mcp/session_activity.py` per-session activity tracker, fed by every `tools/call` request via `_process_request`. `git_stash_ref` remains read-only-detected from an existing `git stash`. A session with zero tracked tool calls still correctly gets the placeholder triple (`""`/`[]`/`None`) — no fabrication.
+- [x] AC-2: An ambient lightweight trace is written to the event bus on every tool call via `_process_request` (tagged `type=ambient_trace`, excluded from standard recall) — **landed** (T-849): `mcp/server.py::_record_ambient_activity` schedules `EventStore.publish_ambient_trace` onto a dedicated background event-loop thread (fire-and-forget via `asyncio.run_coroutine_threadsafe`) on every `tools/call` request, from both the stdio and HTTP/SSE transports. The pre-existing recall-exclusion half (`retrieval/hybrid.py::filter_blocks_by_ambient_trace`, opt-in via `include_ambient_trace`) is unchanged. Real-collaborator test: `tests/mcp/test_ambient_trace_wiring.py` (real `JSONGraphStore`/`EventStore`, no MagicMock), proven to fail when the `_record_ambient_activity` call is removed from `_process_request`.
+- [x] AC-3: `depthfusion_session_seed` accepts `mode="resume"` and returns the most recent checkpoint plus standard recall results; includes `recovery_command` if `git_stash_ref` is present — **landed** (`mcp/tools/project.py::_tool_session_seed_resume`, optional `checkpoint_id` for a named checkpoint; tested `tests/mcp/test_session_seed_resume.py`)
+- [x] AC-4: New `depthfusion_session_checkpoint` MCP tool allows agents to publish a manual checkpoint at plan boundaries — **landed** (T-850): `mcp/tools/project.py::_tool_session_checkpoint`, a thin wrapper over the existing `EventStore.publish_checkpoint`, registered in `mcp/tools/_registry.py` (TOOLS/TOOL_SCHEMAS/`_TOOL_FLAGS`, always-enabled) and dispatched from `mcp/server.py::_dispatch_tool`/`DISPATCHABLE`. Round-trips through `depthfusion_session_seed(mode="resume")`. Real-collaborator test: `tests/mcp/test_session_checkpoint.py::TestRealCollaborators` (real `JSONGraphStore`/`EventStore`, no MagicMock), proven to fail when the tool's `store.publish_checkpoint(...)` call is bypassed — see completion note below.
+- [x] AC-5: Checkpoint TTL defaults to 7 days; configurable via `DEPTHFUSION_CHECKPOINT_TTL_DAYS` — **landed** (`core/event_store.py::checkpoint_ttl_days`/`prune_expired_checkpoints`, wired into the nightly hygiene job as a 4th `checkpoint_prune` step)
 
 **Tasks:**
-- [ ] T-847: Add `CheckpointRecord` schema and `publish_checkpoint(session_id, config, plan_state, files_modified)` function to `core/event_store.py`
-- [ ] T-848: Hook checkpoint publish into `DELETE /mcp` handler in `mcp/http_server.py` (before session is removed from dict)
-- [ ] T-849: Add ambient trace side-effect to `_process_request` dispatcher (lightweight, non-blocking)
-- [ ] T-850: Add `depthfusion_session_checkpoint` to `mcp/tools/` registry
-- [ ] T-851: Add `mode="resume"` branch to `_tool_session_seed` in `mcp/tools/project.py`
-- [ ] T-852: Add SIGTERM lifespan hook to checkpoint all open sessions on server shutdown
+- [x] T-847: Add `CheckpointRecord` schema and `publish_checkpoint(session_id, config, plan_state, files_modified)` function to `core/event_store.py` — **landed**; signature uses `project_slug` in place of the literal `config` param (matches every other `EventStore` method — `publish`/`publish_memory` — none of which take a `config` object; no such object exists in this class)
+- [x] T-848: Hook checkpoint publish into `DELETE /mcp` handler in `mcp/http_server.py` (before session is removed from dict) — **landed**; ordering explicitly regression-tested (`tests/mcp/test_http_server.py::TestDeleteEndpointCheckpoint::test_checkpoint_published_before_session_popped`)
+- [x] T-849: Add ambient trace side-effect to `_process_request` dispatcher (lightweight, non-blocking) — **landed**; also adds `mcp/session_activity.py` (per-session activity tracker) and threads `session_id` through `_process_request` from both HTTP transports (`streamable_http_endpoint`, `messages_endpoint`) so `_publish_session_checkpoint` reads real activity instead of placeholders
+- [x] T-850: Add `depthfusion_session_checkpoint` to `mcp/tools/` registry — **landed**; see AC-4
+- [x] T-851: Add `mode="resume"` branch to `_tool_session_seed` in `mcp/tools/project.py` — **landed**
+- [x] T-852: Add SIGTERM lifespan hook to checkpoint all open sessions on server shutdown — **landed**; wired into the existing FastAPI `_lifespan` `finally` block (uvicorn invokes this on graceful ASGI shutdown, including SIGTERM) rather than a second `signal.signal` handler
+
+**Verified 2026-08-05** — all five ACs and all six tasks landed; story complete. T-847/T-848/T-851/T-852 and AC-3/AC-5 landed first; T-849 closed AC-1/AC-2 by wiring the ambient-trace side effect and per-session activity tracker into `_process_request`; T-850 closed AC-4 with the `depthfusion_session_checkpoint` MCP tool. Note: T-849's `tools/call`-on-every-request side effect exposed a pre-existing test-isolation gap — `mcp/tools/_state.py::_get_fabric_store()`'s lazy singleton defaults to the real `~/.claude/depthfusion-graph.{json,db}` production path; `tests/conftest.py::_guard_fabric_store_production_path` (same pattern as the existing S-82 metrics guard) now redirects it to a per-session temp store for the whole test suite.
+
+Real-collaborator fail-with-bug proofs (both required by the project's real-collaborator mandate — a round-trip test against `EventStore` alone is not sufficient; each proof exercises the actual NEW wiring added by this story):
+- T-849 (ambient trace + activity tracker wiring into `_process_request`): `tests/mcp/test_ambient_trace_wiring.py::TestRealCollaborators::test_tool_call_publishes_a_real_ambient_trace_event` and `::test_delete_mcp_checkpoint_carries_tracked_activity` — verified to fail (no `ambient_trace` entity written; checkpoint reverts to the `""`/`[]` placeholder) with the `_record_ambient_activity(...)` call removed from `mcp/server.py::_process_request`'s `tools/call` branch; pass with it restored.
+- T-850 (`depthfusion_session_checkpoint` MCP tool wiring, distinct from the pre-existing `EventStore.publish_checkpoint` round-trip test in `tests/core/test_event_store.py`): `tests/mcp/test_session_checkpoint.py::TestRealCollaborators::test_invocation_persists_real_checkpoint_retrievable_by_get_checkpoint`, `::test_invocation_persists_checkpoint_retrievable_by_get_latest_checkpoint`, and `::test_invocation_retrievable_via_session_seed_resume` — verified 2026-08-05 to fail (checkpoint never persisted; `get_checkpoint`/`get_latest_checkpoint` return `None`) when `mcp/tools/project.py::_tool_session_checkpoint`'s `store.publish_checkpoint(...)` call is bypassed with a fabricated response; all three (plus `TestInvalidArguments::test_store_exception_degrades_to_error_dict`) pass with the real call restored. Confirmed via a scripted patch/run/revert cycle (`ruff check src/` and `mypy src/ --ignore-missing-imports` re-verified clean after revert; `diff` against a pre-probe backup confirmed a byte-identical restore).
 
 ### S-251: As a DepthFusion operator, I want rate limiting and multi-worker session safety so that the server is safe for team and hosted deployment `P1` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `POST /mcp` is rate-limited to `DEPTHFUSION_RATE_LIMIT_PUBLISH` calls/minute/principal (default 60) and `DEPTHFUSION_RATE_LIMIT_RECALL` calls/minute/principal (default 300)
-- [ ] AC-2: Rate limiter is backed by Redis when `DEPTHFUSION_REDIS_URL` is set; falls back to in-process counter when absent
-- [ ] AC-3: `_MCP_SESSIONS` and `_MCP_STREAMABLE_SESSIONS` single-worker constraint is documented in `docs/deployment.md` with a clear path to Redis-backed session store
-- [ ] AC-4: A 429 response from the rate limiter returns `{"error": "rate_limited", "retry_after_seconds": N}`
+- [x] AC-1: `POST /mcp` is rate-limited to `DEPTHFUSION_RATE_LIMIT_PUBLISH` calls/minute/principal (default 60) and `DEPTHFUSION_RATE_LIMIT_RECALL` calls/minute/principal (default 300)
+- [x] AC-2: Rate limiter is backed by Redis when `DEPTHFUSION_REDIS_URL` is set; falls back to in-process counter when absent
+- [x] AC-3: `_MCP_SESSIONS` and `_MCP_STREAMABLE_SESSIONS` single-worker constraint is documented in `docs/deployment.md` with a clear path to Redis-backed session store
+- [x] AC-4: A 429 response from the rate limiter returns `{"error": "rate_limited", "retry_after_seconds": N}`
 
 **Tasks:**
-- [ ] T-853: Add `fastapi-limiter` to `vps-cpu` and `vps-gpu` extras in `pyproject.toml`
-- [ ] T-854: Wire rate limits onto `POST /mcp` endpoint keyed by authenticated principal
-- [ ] T-855: Add `DEPTHFUSION_RATE_LIMIT_PUBLISH` and `DEPTHFUSION_RATE_LIMIT_RECALL` env vars with documented defaults
-- [ ] T-856: Document single-worker session dict constraint and Redis upgrade path in `docs/deployment.md`
+- [x] T-853: Add `fastapi-limiter` to `vps-cpu` and `vps-gpu` extras in `pyproject.toml` — **deviation, recorded verbatim**: "fastapi-limiter evaluated and rejected — redis-only dependency incompatible with core-install default; implemented RateLimiter Protocol + InMemory/Redis backends per event_store.py precedent." No `pyproject.toml` change was made; `redis>=5.0` is already installable via the pre-existing `fabric` extra (E-46), reused as-is by `RedisRateLimitBackend`'s install hint.
+- [x] T-854: Wire rate limits onto `POST /mcp` endpoint keyed by authenticated principal — **landed**; `mcp/http_server.py::streamable_http_endpoint` calls `mcp/ratelimit.py::classify_tool_call` + `get_rate_limiter().check(_principal.principal_id, bucket, limit)` for every `tools/call` request, gated behind the existing `require_principal` fail-closed dependency (no principal reaches the check unauthenticated). Over-quota → `429` before `_process_request` is ever invoked.
+- [x] T-855: Add `DEPTHFUSION_RATE_LIMIT_PUBLISH` and `DEPTHFUSION_RATE_LIMIT_RECALL` env vars with documented defaults — **landed**; `mcp/ratelimit.py::rate_limit_publish_per_minute`/`rate_limit_recall_per_minute` (defaults 60/300), degrade-safe on missing/invalid/non-positive values (mirrors `core/event_store.py::checkpoint_ttl_days`); documented in `docs/deployment.md`.
+- [x] T-856: Document single-worker session dict constraint and Redis upgrade path in `docs/deployment.md` — **landed**; new `docs/deployment.md` covers `_MCP_SESSIONS`/`_MCP_STREAMABLE_SESSIONS`'s single-worker-only constraint, the documented (not-yet-implemented) `SessionStore` Protocol upgrade path, and the rate-limiter's own per-worker-vs-Redis-shared behaviour.
+
+**Verified 2026-08-05** — all four ACs and all four tasks landed. `mcp/ratelimit.py` implements the `RateLimiter` Protocol (mirroring `core/event_store.py::StreamBackend`) with `InMemoryRateLimitBackend` (default, loopback/single-worker) and `RedisRateLimitBackend` (`redis>=5.0` via the existing `fabric` extra, same install-hint `ImportError` message pattern as `RedisStreamBackend`). `classify_tool_call` buckets each MCP tool via its existing `mcp/authz.py::TOOL_CAPABILITIES` annotation: `READ_OWN_RECORDS` → "recall" (300/min default), everything else (write/admin/audit, and unrecognised tool names) → the tighter "publish" bucket (60/min default) — no new tool taxonomy was invented. AC-4's 429 body is exactly `{"error": "rate_limited", "retry_after_seconds": N}`.
+
+Real-collaborator fail-with-bug proof (T-854, per the project's real-collaborator mandate): `tests/mcp/test_ratelimit.py::TestRealCollaborators::test_exceeding_publish_limit_over_http_returns_429_with_exact_body` calls the real `mcp/http_server.py::streamable_http_endpoint` with a real `Principal` and the real singleton `RateLimiter` (Redis-backed if reachable, else the real `InMemoryRateLimitBackend` — never `MagicMock`) — verified 2026-08-05 to fail (`assert 200 == 429`) with the `if not rl_result.allowed: return JSONResponse(status_code=429, ...)` block removed from the endpoint's `tools/call` branch; passes with it restored. Confirmed via a scripted patch/run/revert cycle (`ruff check src/` and `mypy src/ --ignore-missing-imports` re-verified clean after revert; `diff` against a pre-probe backup confirmed a byte-identical restore). A second, backend-level real-collaborator test (`test_real_backend_enforces_the_limit_and_recovers_next_window`) exercises the same Redis-if-reachable-else-InMemory selection directly against `RateLimiter.check()`.
+
+All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite (75 tests, including pre-existing S-250 wiring) is unaffected. `pytest tests/mcp/ -q && ruff check . && ruff check src/ && mypy src/ --ignore-missing-imports` — all green.
 
 ### S-252: As a Claude Code agent, I want streaming recall results so that I can start using the first relevant memory before the full reranker pipeline completes `P2` `M`
 

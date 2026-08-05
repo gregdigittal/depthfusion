@@ -30,6 +30,23 @@ Design principles
   itself remains unmodified; the guard lives here where it belongs.
 
 See tests/README.md for the full separation policy and escape hatches.
+
+Fabric store / EventStore production-path guard (T-849)
+=========================================================
+``mcp/tools/_state.py::_get_fabric_store()`` is a lazy singleton that,
+absent an explicit override, resolves to ``JSONGraphStore``/
+``SQLiteGraphStore``'s own default — ``~/.claude/depthfusion-graph.json`` or
+``~/.claude/depthfusion-graph.db`` under the *real* developer home
+directory (see ``graph/store.py``). T-849 wired an ambient-trace publish
+side effect into ``mcp/server.py::_process_request`` that fires on every
+``tools/call`` request; any test exercising ``_process_request`` /
+``_handle_tools_call`` / any of the several tools that call
+``_get_fabric_store()`` directly, *without itself* monkeypatching that
+lookup, would otherwise background-write test-fixture ``ambient_trace``
+(and other) events into that real, on-disk production knowledge graph —
+the exact S-82 class of pollution the metrics guard above exists to
+prevent, now via a second production path. The ``_guard_fabric_store_
+production_path`` fixture below applies the identical pattern to close it.
 """
 from __future__ import annotations
 
@@ -85,4 +102,60 @@ def _guard_metrics_production_path(tmp_path_factory: pytest.TempPathFactory) -> 
         original_init(self, metrics_dir=metrics_dir, **kwargs)
 
     with patch.object(MetricsCollector, "__init__", _safe_init):
+        yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _guard_fabric_store_production_path(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Redirect the lazy fabric-store singleton away from ~/.claude/ (T-849).
+
+    ``mcp/tools/_state.py::_get_fabric_store()`` lazily constructs an
+    ``EventStore`` over ``graph/store.py::get_store()``'s default backend,
+    which — absent an explicit path — resolves to
+    ``~/.claude/depthfusion-graph.json`` (local mode) or
+    ``~/.claude/depthfusion-graph.db`` (vps mode) under the *real* developer
+    home directory. T-849 wired an ambient-trace publish side effect into
+    ``mcp/server.py::_process_request`` that fires on every ``tools/call``
+    request, so any test that exercises ``_process_request`` /
+    ``_handle_tools_call`` without itself monkeypatching
+    ``_get_fabric_store`` would otherwise write test-fixture events into
+    that real, on-disk production knowledge graph — confirmed during T-849
+    implementation (``tests/test_mcp_authz.py``'s un-mocked dispatch tests
+    wrote six ``ambient_trace`` entities into the live
+    ``~/.claude/depthfusion-graph.db`` before this guard was added; they
+    were manually purged and this fixture closes the gap).
+
+    Same pattern as ``_guard_metrics_production_path`` above: intercepts
+    only when ``Path.home()`` still resolves to the real home directory, so
+    tests that already redirect home or explicitly monkeypatch
+    ``_get_fabric_store`` themselves are unaffected — a per-test
+    ``monkeypatch.setattr(...)`` always overrides this session-scoped
+    default for the duration of that test, then reverts back to it
+    afterwards (monkeypatch restores whatever value was in place
+    immediately before it patched, which is this fixture's replacement,
+    not the original production function).
+    """
+    import depthfusion.mcp.tools._state as _mcp_state
+    from depthfusion.core.event_store import EventStore, InMemoryStreamBackend
+    from depthfusion.graph.store import JSONGraphStore, get_store
+
+    # Per-session temp dir: shared across all tests but isolated from production.
+    session_graph_path = (
+        tmp_path_factory.mktemp("session_fabric_store", numbered=True)
+        / "depthfusion-graph.json"
+    )
+
+    def _session_fabric_store() -> EventStore:
+        if Path.home() == _REAL_HOME:
+            # No home redirect active — intercept and route to a session
+            # temp file instead of the real ~/.claude/ graph store.
+            return EventStore(
+                graph=JSONGraphStore(path=session_graph_path),
+                stream=InMemoryStreamBackend(),
+            )
+        # A test has redirected Path.home() — let production code's own
+        # resolution (against that redirected home) work as intended.
+        return EventStore(graph=get_store(), stream=None)
+
+    with patch.object(_mcp_state, "_get_fabric_store", _session_fabric_store):
         yield
