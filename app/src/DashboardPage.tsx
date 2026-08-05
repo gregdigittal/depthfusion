@@ -3,26 +3,120 @@ import { useDashboard } from './hooks/useDashboard'
 import { useStats } from './hooks/useStats'
 import type { StatsData } from './hooks/useStats'
 import { useCognitiveStatus } from './hooks/useCognitiveStatus'
+import { useRecentSessions } from './hooks/useRecentSessions'
+import type { SessionEvent } from './hooks/useRecentSessions'
+import { useStorageUsage } from './hooks/useStorageUsage'
 import { TileGrid } from './components/TileGrid'
 
+// ---------------------------------------------------------------------------
+// Shared skeleton and error primitives
+// ---------------------------------------------------------------------------
+
+function SkeletonRow() {
+  return (
+    <div
+      style={{
+        height: '1em',
+        borderRadius: 4,
+        background: 'var(--muted)',
+        opacity: 0.25,
+        marginBottom: 'var(--sp-2)',
+      }}
+    />
+  )
+}
+
+function TileError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+      <div style={{ color: 'var(--danger-soft)', fontSize: 'var(--fs-small)' }}>
+        {message}
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          style={{
+            alignSelf: 'flex-start',
+            fontSize: 'var(--fs-small)',
+            color: 'var(--accent)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// RecentActivity — S-247: fetches /query/sessions?limit=10
+// ---------------------------------------------------------------------------
+
+function formatRelativeTime(timestamp: string): string {
+  try {
+    const diff = Date.now() - new Date(timestamp).getTime()
+    const mins = Math.floor(diff / 60_000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins} min ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs} hr ago`
+    return `${Math.floor(hrs / 24)} d ago`
+  } catch {
+    return ''
+  }
+}
+
+function formatSessionLabel(ev: SessionEvent): string {
+  const mode = ev.mode ?? 'recall'
+  return `${mode.charAt(0).toUpperCase()}${mode.slice(1)} session`
+}
+
 function RecentActivity() {
-  const activities = [
-    { label: 'Searched "microservices patterns"', time: '2 min ago' },
-    { label: 'Opened "Architecture ADR-003"', time: '14 min ago' },
-    { label: 'Viewed graph: auth concepts', time: '1 hr ago' },
-    { label: 'Downloaded "Q1 Report.pdf"', time: '3 hr ago' },
-  ]
+  const { data, loading, error, retry } = useRecentSessions(10)
+
+  if (loading) {
+    return (
+      <div style={{ width: '100%' }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonRow key={i} />
+        ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return <TileError message={`Failed to load recent sessions: ${error}`} onRetry={retry} />
+  }
+
+  const items = data?.items ?? []
+
+  if (items.length === 0) {
+    return (
+      <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>
+        No recent sessions found.
+      </div>
+    )
+  }
+
   return (
     <ul className="df-activity">
-      {activities.map((a, i) => (
+      {items.map((ev, i) => (
         <li key={i} className="df-activity__row">
-          <span>{a.label}</span>
-          <span className="df-activity__time">{a.time}</span>
+          <span>{formatSessionLabel(ev)}</span>
+          <span className="df-activity__time">{formatRelativeTime(ev.timestamp)}</span>
         </li>
       ))}
     </ul>
   )
 }
+
+// ---------------------------------------------------------------------------
+// SearchStats (unchanged, driven by useStats)
+// ---------------------------------------------------------------------------
 
 function SearchStats({ stats, error }: { stats: StatsData | null; error: string | null }) {
   if (error) {
@@ -46,25 +140,56 @@ function SearchStats({ stats, error }: { stats: StatsData | null; error: string 
   )
 }
 
+// ---------------------------------------------------------------------------
+// StorageUsage — S-247: fetches /query/aggregate
+// ---------------------------------------------------------------------------
+
 function StorageUsage() {
-  const usedGb = 4.2
-  const totalGb = 20
-  const pct = Math.round((usedGb / totalGb) * 100)
+  const { data, loading, error, retry } = useStorageUsage()
+
+  if (loading) {
+    return (
+      <div style={{ width: '100%' }}>
+        <SkeletonRow />
+        <SkeletonRow />
+        <SkeletonRow />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <TileError message={`Failed to load usage stats: ${error}`} onRetry={retry} />
+  }
+
+  const totalEvents = data?.total_events ?? 0
+  const avgLatency = data?.avg_latency_ms ?? null
+  const modes = data?.modes ?? {}
+  const topMode = Object.entries(modes).sort((a, b) => b[1] - a[1])[0]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
       <div>
-        <div className="df-stat-big">{usedGb} GB</div>
-        <div className="df-stat-label">of {totalGb} GB used</div>
+        <div className="df-stat-big">{totalEvents.toLocaleString()}</div>
+        <div className="df-stat-label">Total recall events</div>
       </div>
-      <div>
-        <div className="df-progress">
-          <div className="df-progress__fill" style={{ width: `${pct}%` }} />
+      {avgLatency !== null && (
+        <div>
+          <div className="df-stat-med">{Math.round(avgLatency)} ms</div>
+          <div className="df-stat-label">Avg latency</div>
         </div>
-        <div className="df-stat-label" style={{ marginTop: 'var(--sp-1)' }}>{pct}% used</div>
-      </div>
+      )}
+      {topMode && (
+        <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-micro)' }}>
+          Top mode: {topMode[0]} ({topMode[1]})
+        </div>
+      )}
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// SyncStatus (unchanged, driven by useStats)
+// ---------------------------------------------------------------------------
 
 function SyncStatus({ stats, error }: { stats: StatsData | null; error: string | null }) {
   if (error) {
@@ -91,6 +216,10 @@ function SyncStatus({ stats, error }: { stats: StatsData | null; error: string |
   )
 }
 
+// ---------------------------------------------------------------------------
+// CognitiveSummary (unchanged, driven by useCognitiveStatus)
+// ---------------------------------------------------------------------------
+
 function CognitiveSummary() {
   const { data, loading, error } = useCognitiveStatus()
   if (loading) return <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-small)' }}>Loading…</div>
@@ -109,6 +238,10 @@ function CognitiveSummary() {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// DashboardPage
+// ---------------------------------------------------------------------------
 
 export function DashboardPage() {
   const { tiles } = useDashboard()

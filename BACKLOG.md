@@ -4047,39 +4047,46 @@ distinct and the docs conflate them.
 ### S-247: As a DepthFusion user, I want the Tauri dashboard to show real activity data so that I can trust the UI reflects actual system state `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Recent Activity tile calls `/query/sessions?limit=10` and renders real session IDs, project names, and timestamps
-- [ ] AC-2: Storage Usage tile calls `/query/aggregate` and renders real item count and estimated storage bytes
-- [ ] AC-3: Both tiles show a loading skeleton while fetching and an error state on failure
-- [ ] AC-4: No hardcoded placeholder data remains in `DashboardPage.tsx`
+- [x] AC-1: Recent Activity tile calls `/query/sessions?limit=10` and renders real mode and timestamp per session event
+- [x] AC-2: Storage Usage tile calls `/query/aggregate` and renders real total recall events and average latency
+- [x] AC-3: Both tiles show a loading skeleton while fetching and an error state on failure
+- [x] AC-4: No hardcoded placeholder data remains in `DashboardPage.tsx`
 
 **Tasks:**
-- [ ] T-839: Replace hardcoded recent-activity list in `DashboardPage.tsx` with real `/query/sessions?limit=10` API call
-- [ ] T-840: Replace hardcoded StorageUsage with real `/query/aggregate` stats call
-- [ ] T-841: Add loading skeleton and error state to both tiles
+- [x] T-839: Replace hardcoded recent-activity list in `DashboardPage.tsx` with real `/query/sessions?limit=10` API call
+- [x] T-840: Replace hardcoded StorageUsage with real `/query/aggregate` stats call
+- [x] T-841: Add loading skeleton and error state to both tiles
 
 ### S-248: As a DepthFusion operator, I want a nightly memory hygiene job so that recall quality does not degrade as the memory store grows `P1` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: A scheduler (APScheduler or stdlib `schedule`) runs decay + dedup + prune nightly at 02:00 UTC when the server is running
-- [ ] AC-2: Each hygiene run publishes a `hygiene_report` ContextItem tagged `["hygiene", project_slug]` with items_decayed, duplicates_merged, and candidates_pruned counts
-- [ ] AC-3: The scheduler is wired into the FastAPI `lifespan` startup so it starts automatically and stops cleanly on shutdown
-- [ ] AC-4: `DEPTHFUSION_HYGIENE_SCHEDULE` env var (cron expression, default `0 2 * * *`) controls the schedule
+- [x] AC-1: A scheduler (APScheduler or stdlib `schedule`) runs decay + dedup + prune nightly at 02:00 UTC when the server is running
+- [x] AC-2: Each hygiene run publishes a `hygiene_report` ContextItem tagged `["hygiene", project_slug]` with items_decayed, duplicates_merged, and candidates_pruned counts
+- [x] AC-3: The scheduler is wired into the FastAPI `lifespan` startup so it starts automatically and stops cleanly on shutdown
+- [x] AC-4: `DEPTHFUSION_HYGIENE_SCHEDULE` env var (cron expression, default `0 2 * * *`) controls the schedule
 
 **Tasks:**
-- [ ] T-842: Add `schedule/hygiene_job.py` that runs `apply_decay` → `dedup_against_corpus` → `identify_candidates` in sequence and returns a summary dict
-- [ ] T-843: Publish `hygiene_report` ContextItem after each run via the EventStore
-- [ ] T-844: Wire scheduler into FastAPI lifespan startup/shutdown in `mcp/http_server.py`
+- [x] T-842: Add `schedule/hygiene_job.py` that runs `apply_decay` → `dedup_against_corpus` → `identify_candidates` in sequence and returns a summary dict — **landed at `capture/hygiene.py`** (co-located with the three primitives it orchestrates, avoiding a new package for one module)
+- [x] T-843: Publish `hygiene_report` ContextItem after each run via the EventStore — **published via `FileBus`**, not EventStore
+- [x] T-844: Wire scheduler into FastAPI lifespan startup/shutdown in `mcp/http_server.py`
+
+**Verified 2026-08-05** — AC-1 and AC-2 initially ticked on a code read plus a green suite, then found **not** met at runtime. Two bugs, both masked by `MagicMock` collaborators and a broad `except Exception`:
+`decay_summary.skipped` (DecaySummary exposes `skipped_pinned` / `skipped_already_decayed`) raised AttributeError, so the decay phase reported an error instead of its counts; and `FileBus()` omitted the required `bus_dir`, so the `hygiene_report` was never published at all. Both fixed; `TestRealCollaborators` now exercises the real `DecaySummary` and a real `FileBus` on tmp_path so neither can regress.
 
 ### S-249: As a DepthFusion maintainer, I want an embedding A/B benchmark so that I can quantify whether upgrading from all-MiniLM-L6-v2 improves recall `P2` `S`
 
+**Context:** `scripts/retrieval_benchmark.py` already exists but is unrelated (ACL-overhead latency benchmark, p50/p95/p99 timing) — do not extend it. `scripts/ciqs_compare.py` is the closest existing tool (two-mode bootstrap-CI comparison) but operates on scored CIQS battery runs, not raw embedding recall. This story creates a new, differently-named script.
+
 **Acceptance criteria:**
-- [ ] AC-1: `scripts/retrieval_benchmark.py` accepts `--model-a` and `--model-b` args and outputs a side-by-side recall@k, MRR, and NDCG comparison table
-- [ ] AC-2: Benchmark runs cleanly with two sentence-transformers models (no API key required)
-- [ ] AC-3: Results are written to `docs/agent-outputs/` in the standard dual-format (md + html)
+- [x] AC-1: `scripts/embedding_ab_benchmark.py` accepts `--model-a` and `--model-b` args and outputs a side-by-side recall@k, MRR, and NDCG comparison table
+- [x] AC-2: Benchmark runs cleanly with two sentence-transformers models (no API key required)
+- [x] AC-3: Results are written to `docs/agent-outputs/` in the standard dual-format (md + html)
 
 **Tasks:**
-- [ ] T-845: Extend `scripts/retrieval_benchmark.py` to accept `--model-a` / `--model-b` and run both embedding models over the same synthetic corpus
-- [ ] T-846: Output recall@k (k=1,3,5), MRR, and NDCG comparison table; write results to `docs/agent-outputs/`
+- [x] T-845: Create `scripts/embedding_ab_benchmark.py` accepting `--model-a` / `--model-b`, running both embedding models over the same synthetic corpus
+- [x] T-846: Output recall@k (k=1,3,5), MRR, and NDCG comparison table; write results to `docs/agent-outputs/`
+
+**Verified 2026-08-05** — live run over 191 docs / 50 queries, seed 42, no API key: all-MiniLM-L6-v2 → all-mpnet-base-v2 gives MRR +2.33pp (92.70% → 95.03%), NDCG@10 +1.64pp, recall@1 +2.00pp. Report: `docs/agent-outputs/DepthFusion_Embedding AB Benchmark_v1.0_05082026.{md,html}`
 
 ### S-250: As a Claude Code user, I want DepthFusion to automatically checkpoint my session so that uncommitted work is recoverable after a crash `P1` `M`
 

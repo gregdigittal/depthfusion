@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embedding A/B Benchmark — DepthFusion</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 860px; margin: 40px auto;
+           padding: 0 24px; line-height: 1.7; color: #222; background: #fff; }
+    h1 { font-size: 1.6rem; border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { font-size: 1.2rem; margin-top: 2em; border-bottom: 1px solid #ccc; }
+    h3 { font-size: 1rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background: #f4f4f4; font-weight: bold; }
+    .doc-control { background: #f9f9f9; border: 1px solid #ddd;
+                   border-radius: 4px; padding: 12px; margin-bottom: 2em; }
+    .doc-control table { margin: 0; }
+    .doc-control th { width: 120px; }
+    code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px;
+           font-family: monospace; font-size: 0.9em; }
+    pre { background: #f0f0f0; padding: 16px; border-radius: 4px;
+          overflow-x: auto; font-size: 0.9em; }
+    hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a1a; color: #e0e0e0; }
+      th { background: #2a2a2a; } td, th { border-color: #444; }
+      .doc-control { background: #222; border-color: #444; }
+      code, pre { background: #2a2a2a; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>DepthFusion — Embedding A/B Benchmark</h1>
+
+<div class="doc-control">
+  <table>
+    <tr><th>Project</th><td>DepthFusion</td></tr>
+    <tr><th>Document</th><td>Embedding A/B Benchmark</td></tr>
+    <tr><th>Author</th><td>Greg Morris</td></tr>
+    <tr><th>Version</th><td>v1.0</td></tr>
+    <tr><th>Date</th><td>05-08-2026</td></tr>
+    <tr><th>Status</th><td>Draft</td></tr>
+  </table>
+</div>
+
+<h2>Overview</h2>
+<p>Standalone embedding model comparison using a deterministic synthetic corpus
+of agent-memory-style items (code snippets, decisions, error traces, config facts).
+Corpus: <strong>191 documents</strong>,
+Queries: <strong>50</strong>.
+No API key required — sentence-transformers local models only. (S-249)</p>
+
+<h2>Corpus &amp; Query Design</h2>
+<ul>
+  <li>~200 documents across 4 categories: code snippets, decisions, error traces, config facts</li>
+  <li>~50 queries with gold-relevance labels (category-level and item-specific)</li>
+  <li>Deterministic RNG seed: 42 — fully reproducible, no external data dependency</li>
+</ul>
+
+<h2>Results</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>Model A<br><code>all-MiniLM-L6-v2</code></th>
+      <th>Model B<br><code>all-mpnet-base-v2</code></th>
+      <th>Delta (B−A)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Recall@1</td><td>25.45%</td><td>27.45%</td><td style='color:#2d7a2d;font-weight:bold'>+2.00pp</td></tr>
+    <tr><td>Recall@3</td><td>55.51%</td><td>57.49%</td><td style='color:#2d7a2d;font-weight:bold'>+1.98pp</td></tr>
+    <tr><td>Recall@5</td><td>58.25%</td><td>58.41%</td><td style='color:#2d7a2d;font-weight:bold'>+0.16pp</td></tr>
+    <tr><td>MRR</td><td>92.70%</td><td>95.03%</td><td style='color:#2d7a2d;font-weight:bold'>+2.33pp</td></tr>
+    <tr><td>NDCG@10</td><td>73.49%</td><td>75.13%</td><td style='color:#2d7a2d;font-weight:bold'>+1.64pp</td></tr>
+    <tr>
+      <td>Embed time (corpus)</td>
+      <td>0.26s</td>
+      <td>0.31s</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Metric Definitions</h2>
+<ul>
+  <li><strong>Recall@k</strong>: fraction of relevant documents retrieved in top-k (higher is better)</li>
+  <li><strong>MRR</strong>: reciprocal rank of the first relevant hit (higher is better)</li>
+  <li><strong>NDCG@10</strong>: normalized discounted cumulative gain at depth 10 (higher is better)</li>
+  <li><strong>pp</strong> = percentage points absolute difference</li>
+</ul>
+
+<h2>Reproduction</h2>
+<pre>python scripts/embedding_ab_benchmark.py \
+    --model-a all-MiniLM-L6-v2 \
+    --model-b all-mpnet-base-v2</pre>
+
+<hr>
+<h2>Version History</h2>
+<table>
+  <thead><tr><th>Version</th><th>Date</th><th>Author</th><th>Changes</th></tr></thead>
+  <tbody>
+    <tr><td>v1.0</td><td>05-08-2026</td><td>Greg Morris</td><td>Initial release</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>
