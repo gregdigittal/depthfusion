@@ -329,10 +329,117 @@ async def get_checkpoints(
 
 @app.get("/query/aggregate")
 async def get_aggregate(
+    type_: Optional[str] = Query(
+        default=None,
+        alias="type",
+        description="Aggregate view selector. Omit for the recall-event aggregate; "
+                    "'file_diffs' for the cross-session diff history of one file (T-864).",
+    ),
     from_: Optional[str] = Query(default=None, alias="from"),
     to: Optional[str] = Query(default=None),
+    file: Optional[str] = Query(
+        default=None, description="Required when type=file_diffs — the path to trace."
+    ),
+    since: Optional[str] = Query(
+        default=None, description="type=file_diffs only: ISO-8601 lower bound on created_at."
+    ),
+    project: Optional[str] = Query(
+        default=None, description="type=file_diffs only: project slug; omit for all projects."
+    ),
+    limit: Optional[str] = Query(
+        default=None,
+        description="type=file_diffs only: max rows, 1-500 (default 50).",
+    ),
     principal: Principal = Depends(require_principal),
 ):
+    """Aggregate views over recall events (default) or checkpoint diffs (T-864).
+
+    ``type`` dispatches; with ``type`` absent or None the pre-existing
+    ``from``/``to`` recall-event aggregate is returned unchanged, so existing
+    callers are unaffected by the added parameters.
+
+    The parameter is spelled ``type_`` with ``alias="type"``, matching the
+    ``from_``/``alias="from"`` convention already used on this route: the wire
+    name is unchanged, but the handler body does not shadow the ``type`` builtin.
+
+    ``limit`` is deliberately declared ``Optional[str]`` with no ``ge=``/``le=``,
+    and is parsed *inside* the ``file_diffs`` branch. Both halves of that are the
+    same backward-compatibility rule, and the review gate caught the second half
+    being missed:
+
+    * ``ge=``/``le=`` would make FastAPI range-check on **every** request to this
+      route, so a no-``type`` caller sending an out-of-range ``limit`` (previously
+      an unknown, ignored param) would start getting 422s.
+    * ``Optional[int]`` had exactly the same defect one layer earlier: FastAPI
+      *coerces* before the handler body runs, so ``?limit=abc`` with no ``type``
+      returned 422 where it previously returned 200. Declaring the wire type as a
+      string moves both the coercion and the range check into the only branch in
+      which ``limit`` means anything, which is what makes the no-``type`` path
+      byte-identical to its pre-T-864 behaviour rather than merely similar.
+
+    The cost is an OpenAPI schema that types ``limit`` as a string. That is the
+    right trade: the schema is documentation, whereas a 422 on a previously-200
+    request is a break in a shipped contract.
+    """
+    if type_ == "file_diffs":
+        from depthfusion.api.query import query_file_diffs
+
+        if not file or not file.strip():
+            raise HTTPException(
+                status_code=422, detail="Query param 'file' is required when type=file_diffs"
+            )
+        if limit is None or not limit.strip():
+            limit_value = 50
+        else:
+            try:
+                limit_value = int(limit.strip())
+            except ValueError:
+                # Fixed message — the caller's value is not echoed back, matching
+                # the reflected-input posture of the other 422s on this route.
+                raise HTTPException(
+                    status_code=422,
+                    detail="Query param 'limit' must be an integer between 1 and 500",
+                ) from None
+            if not 1 <= limit_value <= 500:
+                raise HTTPException(
+                    status_code=422, detail="Query param 'limit' must be between 1 and 500"
+                )
+        try:
+            return query_file_diffs(
+                file_path=file,
+                since=since,
+                project_slug=project,
+                limit=limit_value,
+                principal=principal,
+            )
+        except ValueError as exc:
+            # Only the two documented sentinels are caller error. Any other
+            # ValueError is an internal fault and must surface as a 500 rather
+            # than be mislabelled as bad input the caller did not send.
+            # Neither detail echoes the caller's value back (S-254 Gate-4:
+            # no reflected input in error bodies).
+            sentinel = str(exc)
+            if sentinel == "invalid_since":
+                raise HTTPException(status_code=422, detail="Invalid since") from exc
+            if sentinel == "invalid_file":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Query param 'file' must name a file inside the "
+                           "project working tree, with no '..' segments",
+                ) from exc
+            raise
+
+    if type_:
+        # Fixed message listing the allowed values — the caller-supplied `type`
+        # is deliberately NOT interpolated. Echoing it back reflects attacker
+        # -controlled bytes into the response body (and into any log or UI that
+        # renders `detail`), which is the reflected-input finding this closes.
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported aggregate type. Allowed values: omit the param "
+                   "for the recall-event aggregate, or 'file_diffs'.",
+        )
+
     from depthfusion.api.query import query_aggregate
 
     from_dt = _parse_dt(from_, "from")

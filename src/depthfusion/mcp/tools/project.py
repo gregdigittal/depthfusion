@@ -379,6 +379,8 @@ def _tool_session_checkpoint(arguments: dict) -> str:
             })
 
     try:
+        from depthfusion.core.event_store import project_root_path
+
         store = _get_fabric_store()
         record = asyncio.run(
             store.publish_checkpoint(
@@ -388,6 +390,10 @@ def _tool_session_checkpoint(arguments: dict) -> str:
                 files_modified=[str(f) for f in files_modified],
                 git_stash_ref=git_stash_ref,
                 context_pct_at_checkpoint=context_pct_at_checkpoint,
+                # No working-tree path is in scope for a stdio tool call, so
+                # the git root comes from DEPTHFUSION_PROJECT_PATH (default
+                # os.getcwd()) — see project_root_path() (T-863).
+                project_path=project_root_path(),
             )
         )
         return json.dumps({

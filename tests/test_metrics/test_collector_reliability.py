@@ -16,8 +16,42 @@ import multiprocessing
 import time
 from pathlib import Path
 
+import pytest
+
 from depthfusion.metrics.aggregator import MetricsAggregator, _iter_jsonl_counted
 from depthfusion.metrics.collector import MetricsCollector
+
+# ---------------------------------------------------------------------------
+# Deterministic bounds for the cross-process concurrency test (S-254 Gate-3)
+# ---------------------------------------------------------------------------
+# test_concurrent_writers_do_not_interleave was observed to hang for >120s in a
+# full-suite run. The mechanism is pre-existing and has nothing to do with the
+# code under test: pytest makes the parent process multi-threaded, and the
+# default `multiprocessing` start method on Linux is `fork`, so each pool worker
+# is forked from a multi-threaded parent. CPython warns about exactly this at
+# multiprocessing/popen_fork.py:66 ("This process is multi-threaded, use of
+# fork() may lead to deadlocks in the child"), and a child that inherits a
+# held lock never returns, so `pool.map` blocks forever.
+#
+# Two independent bounds are applied, both constant-driven so the cost of the
+# test is visible in one place:
+#
+#   1. `_MP_CONTEXT` forces the `spawn` start method. A spawned child is a fresh
+#      interpreter that inherits none of the parent's threads or locks, which
+#      removes the deadlock class at its root rather than papering over it.
+#   2. `@pytest.mark.timeout(_CONCURRENCY_TIMEOUT_SECONDS)` is an explicit
+#      per-test bound. A marker beats pyproject's global `--timeout=30` and, more
+#      importantly, survives a caller that overrides `addopts` — so even if the
+#      spawn fix were ever reverted, this test can no longer hang a whole run.
+#
+# Worker/iteration counts are also constants: the assertion is about *whether*
+# concurrent flock-guarded writes interleave, which 4 writers demonstrate as
+# well as 40, so the numbers stay small enough that `spawn`'s higher per-worker
+# start-up cost is irrelevant.
+_CONCURRENT_WRITERS = 4
+_WRITES_PER_WORKER = 20
+_CONCURRENCY_TIMEOUT_SECONDS = 60
+_MP_CONTEXT = multiprocessing.get_context("spawn")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,17 +84,22 @@ class TestRecordFlockGuard:
         assert lines[0]["metric"] == "my.metric"
         assert lines[0]["value"] == 1.5
 
+    @pytest.mark.timeout(_CONCURRENCY_TIMEOUT_SECONDS)
     def test_concurrent_writers_do_not_interleave(self, tmp_path: Path) -> None:
         """Multiple processes writing via record() must produce valid JSONL.
 
         This test verifies no line corruption under concurrent writes.
         Interleaved writes would produce unparseable lines, caught by
         _iter_jsonl_counted returning skipped_lines > 0.
-        """
-        writes_per_worker = 20
-        num_workers = 4
 
-        with multiprocessing.Pool(processes=num_workers) as pool:
+        Bounded deliberately — see the ``_MP_CONTEXT`` /
+        ``_CONCURRENCY_TIMEOUT_SECONDS`` comment at the top of this module for
+        why a `spawn` context and an explicit per-test timeout are both used.
+        """
+        writes_per_worker = _WRITES_PER_WORKER
+        num_workers = _CONCURRENT_WRITERS
+
+        with _MP_CONTEXT.Pool(processes=num_workers) as pool:
             pool.map(
                 _write_records,
                 [(tmp_path, writes_per_worker)] * num_workers,

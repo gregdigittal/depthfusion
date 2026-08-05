@@ -9,16 +9,22 @@ v0.6 / E-46 / S-141
 from __future__ import annotations
 
 import asyncio
+import base64
+import fnmatch
+import gzip
 import hashlib
 import json
 import logging
 import os
+import re
+import subprocess
+import tempfile
 import time
 from asyncio import AbstractEventLoop
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncIterator, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Protocol, runtime_checkable
 
 from depthfusion.graph.store import GraphBackend
 from depthfusion.graph.types import Edge, Entity
@@ -252,6 +258,492 @@ def checkpoint_ttl_days() -> int:
     return value if value > 0 else _DEFAULT_CHECKPOINT_TTL_DAYS
 
 
+def project_root_path() -> str:
+    """Resolve the git working tree a checkpoint's diffs should be captured from.
+
+    Sourced from ``DEPTHFUSION_PROJECT_PATH``, defaulting to
+    ``os.getcwd()`` (T-863 / S-254). This is a *separate* source from
+    ``DEPTHFUSION_CHECKPOINT_DIR``, and deliberately so: the checkpoint store
+    layout is ``<checkpoint dir>/<project_slug>/<id>.json``, which is a plain
+    JSON directory and **not** a git working tree — a git root can never be
+    derived from it.
+
+    Resolution is degrade-safe in the same spirit as ``checkpoint_ttl_days``:
+    a missing, empty, or whitespace-only value falls back to the process cwd
+    rather than raising. No validation that the path exists or is a git repo
+    happens here — that is the diff collector's job, and it treats "not a git
+    tree" as "no diffs", never as an error.
+    """
+    raw = os.environ.get("DEPTHFUSION_PROJECT_PATH", "").strip()
+    return raw or os.getcwd()
+
+
+# Per-file `git diff` cap — bounds how many subprocesses the loop may spawn.
+# files_modified is caller-supplied and could in principle be thousands of
+# entries. This bounds the *count*; _MAX_DIFF_TOTAL_SECONDS below bounds the
+# aggregate wall-clock (the per-file timeout alone does not: 50 files each
+# taking the full _DIFF_TIMEOUT_SECONDS would be minutes, far too long to sit
+# in a publish).
+_MAX_DIFF_FILES = 50
+
+# Raw `git diff` bytes retained per file, applied BEFORE gzip+base64 so the
+# stored payload is a bounded prefix of the real diff rather than a bounded
+# prefix of its encoding.
+_MAX_DIFF_RAW_BYTES = 4096
+
+# Bound on any single `git diff` subprocess (seconds).
+_DIFF_TIMEOUT_SECONDS = 3
+
+# Bound on the whole collection loop (seconds). Once exceeded, remaining files
+# are skipped: diffs are a best-effort side channel, so returning fewer of them
+# is always preferable to delaying the authoritative checkpoint write.
+#
+# Why this is deliberately far BELOW the suite's per-test timeout (30s, see
+# pyproject addopts --timeout=30): the loop runs inside a thread executor
+# (publish_checkpoint hops off the event loop), and pytest-timeout's default
+# signal method fires SIGALRM in the MAIN thread only. A blocked worker thread
+# is therefore not interruptible by the per-test timeout, and a collection loop
+# allowed to run for the full 30s could outlive the timeout that is supposed to
+# bound it — the test errors, but the process cannot tear down until the child
+# git exits, which reads externally as a wedged suite. Keeping the aggregate
+# budget an order of magnitude under the test timeout makes that impossible on
+# any host, however slow its git. Production cost of the smaller budget is nil:
+# the loop still captures every file whose diff completes inside the budget and
+# simply skips the tail, which is exactly the documented degradation.
+_MAX_DIFF_TOTAL_SECONDS = 8
+
+
+# ---------------------------------------------------------------------------
+# Secret-bearing path denylist (S-254 Gate-4 security finding)
+# ---------------------------------------------------------------------------
+# A captured `git diff` is verbatim file content. For a credential file that
+# means the credential itself lands in checkpoint JSON on disk and is then
+# served back over /query/aggregate — a plaintext secret at rest plus a
+# read amplifier. The denylist below is applied on BOTH sides:
+#
+#   * WRITE (``_collect_git_diffs``) — the path is skipped before any
+#     subprocess is spawned, so the secret is never read in the first place.
+#   * READ (``api.query.query_file_diffs``) — the same predicate rejects the
+#     request, so checkpoints written BEFORE this denylist existed cannot be
+#     mined for secrets either.
+#
+# Matching is on the lower-cased final path segment (plus a small set of
+# denied directory names), never on the full string, so `src/app.env.py`
+# is not caught while `config/.env.production` is.
+_SECRET_BASENAME_GLOBS: tuple[str, ...] = (
+    ".env",
+    ".env.*",
+    "*.env",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "*.jks",
+    "*.keystore",
+    "*.keyfile",
+    "secrets",
+    "secrets.*",
+    "secret",
+    "secret.*",
+    "id_rsa*",
+    "id_dsa*",
+    "id_ecdsa*",
+    "id_ed25519*",
+    "credentials",
+    "credentials.*",
+    "*.credentials",
+    "*_rsa",
+    "htpasswd",
+    ".htpasswd",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    # S-254 review gate — closing false negatives in the list above. A false
+    # negative writes a credential to disk and serves it over HTTP, so this
+    # list errs long. Private-key and keystore formats the original list
+    # missed:
+    "*.p8",
+    "*.ppk",
+    "*.kdbx",
+    "*.asc",
+    "*.gpg",
+    # Credential *stores* that live in a repo or a home directory:
+    ".git-credentials",
+    ".dockercfg",
+    # Terraform variable files are the canonical place secrets are pasted:
+    "*.tfvars",
+    "*.tfvars.json",
+)
+
+# Any path containing one of these as a directory segment is denied outright —
+# everything under them is credential material by convention.
+# ``.docker`` added by the S-254 review gate: ``.docker/config.json`` holds
+# registry auth, and the basename ``config.json`` is far too common to deny.
+_SECRET_DIR_SEGMENTS: frozenset[str] = frozenset(
+    {".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", "secrets", ".secrets"}
+)
+
+
+def is_secret_bearing_path(path: str) -> bool:
+    """Return True when *path* looks like it holds credential material.
+
+    Used to keep secrets out of captured diffs (see the denylist comment
+    above). Deliberately conservative — a false positive costs one missing
+    diff for an observability side channel; a false negative writes a
+    credential to disk and serves it over HTTP.
+
+    Never raises: an unparseable value is treated as secret-bearing (fail
+    closed), because "I could not classify this" must not mean "capture it".
+    """
+    try:
+        normalised = str(path).strip().replace("\\", "/")
+        if not normalised:
+            return False
+        segments = [s for s in normalised.split("/") if s not in ("", ".")]
+        if not segments:
+            return False
+        if any(seg.lower() in _SECRET_DIR_SEGMENTS for seg in segments[:-1]):
+            return True
+        basename = segments[-1].lower()
+        return any(fnmatch.fnmatch(basename, glob) for glob in _SECRET_BASENAME_GLOBS)
+    except Exception:  # noqa: BLE001 — fail closed: unclassifiable means "do not capture"
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Canonical diff-map key (S-254 review gate)
+# ---------------------------------------------------------------------------
+# ``metadata["diffs"]`` is keyed by path, and the WRITE side (``_collect_git_diffs``)
+# and the READ side (``api.query.query_file_diffs``) must agree on the shape of
+# that key or the feature silently returns nothing.
+#
+# They did not. The writer stored whatever ``files_modified`` carried, and
+# ``files_modified`` is populated in ``mcp/session_activity.py`` from raw tool-call
+# arguments (``file_path`` / ``files`` / ``source_files``) — which in practice are
+# ABSOLUTE paths. The reader rejected absolute selectors outright, so every real
+# checkpoint stored keys the reader could never address: a 422 for the dashboard's
+# file pills and an empty history forever.
+#
+# One canonicaliser, used by both sides, fixes that by making the reader's
+# documented assumption ("checkpoint diff keys are repo-relative by construction")
+# actually true. It is pure string manipulation — no ``open``, no ``resolve()``, no
+# subprocess — because the read path must never touch the filesystem with a
+# caller-supplied value (pinned by
+# ``test_file_param_never_reaches_a_subprocess_or_open``).
+_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def normalise_diff_path(path: str, project_path: str | None = None) -> str | None:
+    """Canonical repo-relative diff-map key for *path*, or ``None`` if it cannot be one.
+
+    Rules, in order:
+
+    * separators are folded (``\\`` → ``/``) and redundant ``.``/empty segments
+      dropped, so ``./a//b`` and ``.\\a\\b`` both canonicalise to ``a/b``;
+    * any ``..`` segment is rejected rather than resolved, so no traversal string
+      can ever become a key or be used to address one;
+    * a Windows drive-absolute path (``C:\\x``) is rejected;
+    * a POSIX-absolute path is made relative to *project_path* when it lies
+      inside it, and rejected otherwise. ``/etc/shadow`` is therefore rejected on
+      both sides, while the absolute paths the MCP session tracker really records
+      resolve to the same key the collector stored.
+
+    Returns ``None`` rather than raising: the write side skips the file, and the
+    read side maps ``None`` to its own ``ValueError("invalid_file")`` sentinel so
+    the route can answer 422. Never raises for any input.
+    """
+    raw = str(path).strip()
+    if not raw or _WINDOWS_DRIVE_RE.match(raw):
+        return None
+
+    text = raw.replace("\\", "/")
+    segments = [seg for seg in text.split("/") if seg not in ("", ".")]
+    if not segments or any(seg == ".." for seg in segments):
+        return None
+
+    if not text.startswith("/"):
+        return "/".join(segments)
+
+    # Absolute: only admissible as the project-relative remainder of a path that
+    # is genuinely inside the working tree the diffs were captured from.
+    if not project_path:
+        return None
+    root = [
+        seg
+        for seg in str(project_path).strip().replace("\\", "/").split("/")
+        if seg not in ("", ".")
+    ]
+    if not root or segments[: len(root)] != root:
+        return None
+    remainder = segments[len(root):]
+    return "/".join(remainder) if remainder else None
+
+
+def _git_subprocess_env() -> dict[str, str]:
+    """Environment for the ``git diff`` child: inherited minus the code-exec hooks.
+
+    ``GIT_EXTERNAL_DIFF`` (and ``diff.external`` via ``GIT_CONFIG_*``) make git
+    execute an arbitrary program per diffed file, and ``GIT_PAGER`` /
+    ``GIT_SSH_COMMAND`` are similar footguns. They are stripped rather than
+    trusted so this collector cannot be turned into an execution primitive by
+    ambient environment state. ``GIT_TERMINAL_PROMPT=0`` additionally keeps the
+    child from ever blocking on an interactive credential prompt, which is a
+    boundedness property the timeout alone would only paper over.
+
+    S-254 review gate: the original list closed ``GIT_CONFIG_PARAMETERS`` /
+    ``GIT_CONFIG_COUNT`` but left three equivalent routes to the same
+    ``diff.external`` / ``textconv`` execution primitive open, plus a redirect:
+
+    * ``GIT_CONFIG_GLOBAL`` / ``GIT_CONFIG_SYSTEM`` point git at an arbitrary
+      config file, which can set ``diff.external`` — the very knob
+      ``GIT_EXTERNAL_DIFF`` was stripped to close.
+    * ``GIT_ATTR_SOURCE`` chooses the gitattributes source, and a ``diff=<drv>``
+      attribute plus a config driver reaches the same place.
+    * ``GIT_DIR`` / ``GIT_WORK_TREE`` / ``GIT_INDEX_FILE`` /
+      ``GIT_OBJECT_DIRECTORY`` / ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` would
+      silently retarget the diff at a *different* repository than the ``cwd``
+      this function was called for, so the captured diff would not be the
+      project's. Stripping them makes ``cwd=project_path`` authoritative, which
+      is what every docstring on this path already claims.
+    """
+    env = dict(os.environ)
+    for var in (
+        "GIT_EXTERNAL_DIFF",
+        "GIT_DIFF_OPTS",
+        "GIT_PAGER",
+        "GIT_SSH_COMMAND",
+        "GIT_SSH",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_ATTR_SOURCE",
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ):
+        env.pop(var, None)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return env
+
+
+def _collect_git_diffs(project_path: str, files_modified: list[str]) -> dict[str, str]:
+    """Best-effort ``git diff HEAD`` capture, gzip+base64 per file (T-863).
+
+    Runs ``git diff HEAD -- <path>`` once per entry in *files_modified* with
+    ``cwd=project_path``, truncates the RAW diff to ``_MAX_DIFF_RAW_BYTES``,
+    then gzips and base64-encodes it. Returns a ``{path: encoded}`` mapping
+    of the files that actually produced a diff.
+
+    Strictly best-effort — this feeds ``CheckpointRecord.metadata``, which is
+    supplementary observability, while the checkpoint file write is
+    authoritative. Every failure mode degrades to "fewer (or no) diffs":
+
+      * git missing / not executable  → ``OSError`` → empty mapping
+      * *project_path* is not a git tree, or HEAD does not exist yet (fresh
+        repo with no commit) → non-zero exit → that file is skipped
+      * subprocess timeout            → that file is skipped
+      * empty *files_modified*        → empty mapping, no subprocess spawned
+      * unreadable/binary/renamed path, or any other per-file exception
+                                      → that file is skipped
+      * ``_MAX_DIFF_TOTAL_SECONDS`` budget exhausted
+                                      → all remaining files are skipped
+
+    Secret hygiene: any path for which :func:`is_secret_bearing_path` is true
+    (``.env*``, ``*.pem``, ``*.key``, ``secrets.*``, ``id_rsa``,
+    ``credentials.json``, ``*.p12``, ``*.keystore``, anything under ``.ssh``/
+    ``.aws``/``secrets``, …) is dropped BEFORE any subprocess runs, so the
+    credential is never read, never encoded, and never written to checkpoint
+    JSON. Logging on every path here is deliberately limited to the path and a
+    byte count — a diff body is verbatim file content and must never reach a
+    log record at any level.
+
+    Resource bounds, all enforced rather than assumed: at most
+    ``_MAX_DIFF_FILES`` subprocesses; at most ``_DIFF_TIMEOUT_SECONDS`` each and
+    ``_MAX_DIFF_TOTAL_SECONDS`` across the whole loop; and peak memory of
+    ``_MAX_DIFF_RAW_BYTES`` per file regardless of how large the real diff is
+    (git writes to a temp file and only the capped prefix is read back).
+
+    Keys are canonical repo-relative paths, not the caller's raw strings — see
+    :func:`normalise_diff_path`, which is shared verbatim with the read side so
+    the two can never disagree about how a diff is addressed. A path that cannot
+    be expressed as such a key (absolute but outside *project_path*, or
+    containing ``..``) is skipped before any subprocess runs, because a key the
+    reader can never look up is not worth a ``git diff``.
+
+    Nothing here raises. Files whose diff is empty (unchanged, untracked, or
+    outside the tree) are omitted rather than stored as an empty payload.
+    """
+    diffs: dict[str, str] = {}
+    if not files_modified:
+        log.debug("_collect_git_diffs: no files_modified — skipping diff collection")
+        return diffs
+
+    # Secret denylist first, so a credential path never even costs a subprocess
+    # and never appears in the capture budget. Only the path is logged.
+    #
+    # Then canonicalise to the repo-relative key the READ side addresses records
+    # by (see normalise_diff_path). Storing the caller's raw path instead — which
+    # for the MCP session tracker is an absolute one — produced keys that
+    # query_file_diffs could never look up. The canonical key is used BOTH as the
+    # dict key and as the git pathspec; with cwd=project_path the two are the same
+    # file, so nothing about what git is asked to diff changes.
+    kept: list[str] = []
+    seen: set[str] = set()
+    for raw_candidate in files_modified:
+        candidate = str(raw_candidate)
+        if not candidate.strip():
+            continue
+        if is_secret_bearing_path(candidate):
+            log.debug(
+                "_collect_git_diffs: path_sha256=%s matches the secret-bearing "
+                "denylist — not capturing",
+                hashlib.sha256(candidate.encode()).hexdigest()[:12],
+            )
+            continue
+        key = normalise_diff_path(candidate, project_path)
+        if key is None:
+            log.debug(
+                "_collect_git_diffs: path_sha256=%s is not addressable as a repo-relative key "
+                "under the project root — not capturing",
+                hashlib.sha256(candidate.encode()).hexdigest()[:12],
+            )
+            continue
+        # Re-check the canonical form: relativisation strips leading segments, so
+        # a denied directory could in principle only be *removed*, never added —
+        # but the check is free and a missed credential is the expensive
+        # direction to be wrong in.
+        if is_secret_bearing_path(key):
+            log.debug(
+                "_collect_git_diffs: path_sha256=%s canonicalises to a "
+                "secret-bearing key — not capturing",
+                hashlib.sha256(candidate.encode()).hexdigest()[:12],
+            )
+            continue
+        if key in seen:
+            # Two supplied spellings of one file (`x` and `./x`) collapse to one
+            # key; capturing it twice would waste a subprocess and a budget slot.
+            continue
+        seen.add(key)
+        kept.append(key)
+    paths = kept
+    if not paths:
+        return diffs
+
+    if len(paths) > _MAX_DIFF_FILES:
+        log.debug(
+            "_collect_git_diffs: %d files exceeds cap %d — capturing the first %d",
+            len(paths), _MAX_DIFF_FILES, _MAX_DIFF_FILES,
+        )
+        paths = paths[:_MAX_DIFF_FILES]
+
+    deadline = time.monotonic() + _MAX_DIFF_TOTAL_SECONDS
+    # Built once for the whole loop — it is a snapshot of the same env for every
+    # file, and copying os.environ up to _MAX_DIFF_FILES times is pure waste.
+    git_env = _git_subprocess_env()
+
+    for path in paths:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            log.debug(
+                "_collect_git_diffs: %.1fs total budget exhausted — skipping remaining files",
+                _MAX_DIFF_TOTAL_SECONDS,
+            )
+            break
+
+        try:
+            # Injection safety, in order of importance:
+            #   1. argv LIST, never a string, and no shell interpolation (the
+            #      `shell` kwarg is never enabled anywhere in this module) — the
+            #      path is one argv element, so metacharacters in it are inert.
+            #   2. The path is always the element AFTER the literal `--`, which
+            #      terminates git's option parsing. A caller-supplied path such
+            #      as "--upload-pack=evil" or "--output=/etc/x" is therefore
+            #      parsed as a pathspec, never as a git option.
+            #   3. `--no-ext-diff --no-textconv` disables repository-controlled
+            #      diff drivers, while `env` strips ambient Git execution hooks.
+            # Bytes (not text=True) because the 4096-byte cap is defined on raw
+            # diff bytes.
+            #
+            # stdout goes to a temp FILE rather than a pipe: capture_output
+            # buffers git's *entire* output in memory before the cap below can
+            # apply, so a single huge diff would defeat _MAX_DIFF_RAW_BYTES and
+            # balloon RSS. Spooling to disk and reading only the capped prefix
+            # keeps peak memory at _MAX_DIFF_RAW_BYTES regardless of diff size,
+            # while still giving subprocess.run its normal timeout and a real
+            # returncode (both of which a bounded pipe read would forfeit).
+            # stderr is discarded — only returncode is consulted.
+            # TODO(S-254 review gate): replace the temporary-file spool with a
+            # byte-bounded process reader. Raised independently by the external
+            # reviewer, and deferred deliberately — the reasoning, so the next
+            # reader does not have to redo it:
+            #
+            #   * The spool bounds MEMORY (only the capped prefix is read back) but
+            #     not temporary-DISK use, which is the residual gap.
+            #   * That gap is bounded in practice rather than open-ended: the child
+            #     is killed at _DIFF_TIMEOUT_SECONDS (3s) and the loop stops at
+            #     _MAX_DIFF_TOTAL_SECONDS (8s), so worst-case spill is ~8s of git
+            #     write throughput into a TemporaryFile that is unlinked on close
+            #     and on process exit. It is not an unbounded-disk primitive.
+            #   * The obvious fix — Popen + a bounded stdout.read() — trades a
+            #     bounded-disk property for an UNBOUNDED-time one: a bare read()
+            #     blocks with no timeout if git is slow to produce bytes, which
+            #     would let a single file outlive the aggregate budget that the
+            #     whole design of this loop rests on. Doing it correctly means
+            #     reimplementing timeout, kill and reap semantics that
+            #     subprocess.run already gets right.
+            #
+            # Net: fixing this properly is a self-contained change with its own
+            # failure modes to test, not a line edit inside a review pass.
+            with tempfile.TemporaryFile() as out:
+                result = subprocess.run(
+                    ["git", "diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", path],
+                    cwd=project_path,
+                    stdout=out,
+                    stderr=subprocess.DEVNULL,
+                    env=git_env,
+                    timeout=min(_DIFF_TIMEOUT_SECONDS, remaining),
+                    check=False,
+                )
+                if result.returncode != 0:
+                    log.debug(
+                        "_collect_git_diffs: git diff exited %d for path_sha256=%s — skipping",
+                        result.returncode, hashlib.sha256(path.encode()).hexdigest()[:12],
+                    )
+                    continue
+                out.seek(0)
+                raw = out.read(_MAX_DIFF_RAW_BYTES)
+        except Exception as exc:  # noqa: BLE001 — degrade to no diff, never crash publish
+            # Exception TYPE only, not str(exc): a subprocess error message can
+            # carry captured child output, and diff bytes must never be logged.
+            log.debug(
+                "_collect_git_diffs: git diff failed for path_sha256=%s — %s",
+                hashlib.sha256(path.encode()).hexdigest()[:12], type(exc).__name__,
+            )
+            continue
+
+        try:
+            if not raw:
+                continue
+            diffs[path] = base64.b64encode(gzip.compress(raw)).decode("ascii")
+            # Path + byte count ONLY. The diff body is verbatim file content, so
+            # it must never be interpolated into a log record at any level.
+            log.debug(
+                "_collect_git_diffs: captured path_sha256=%s (%d raw bytes)",
+                hashlib.sha256(path.encode()).hexdigest()[:12], len(raw),
+            )
+        except Exception as exc:  # noqa: BLE001 — degrade to no diff, never crash publish
+            log.debug(
+                "_collect_git_diffs: encoding failed for path_sha256=%s — %s",
+                hashlib.sha256(path.encode()).hexdigest()[:12], type(exc).__name__,
+            )
+            continue
+
+    return diffs
+
+
 def _checkpoint_base_dir() -> Path:
     """Root directory for persisted checkpoint JSON files (no side effects).
 
@@ -302,6 +794,14 @@ class CheckpointRecord:
     and later looked up by id or by "most recent for this project" — they are
     not part of the AC-1 literal set but are necessary for the record to be
     retrievable at all.
+
+    ``metadata`` (T-863) is an open, best-effort side-channel for supplementary
+    capture that must never be load-bearing. Its one current producer is
+    ``EventStore.publish_checkpoint``'s git-diff collector, which populates
+    ``metadata["diffs"]`` with a ``{path: base64(gzip(raw git diff))}`` mapping.
+    Consumers must treat every key as optional: an older on-disk record has no
+    ``metadata`` at all (``from_dict`` defaults it), and a newer one may have
+    ``metadata`` but no ``"diffs"`` key when collection was skipped.
     """
 
     checkpoint_id: str
@@ -312,6 +812,7 @@ class CheckpointRecord:
     files_modified: list[str] = field(default_factory=list)
     git_stash_ref: str | None = None
     context_pct_at_checkpoint: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -323,10 +824,15 @@ class CheckpointRecord:
             "files_modified": list(self.files_modified),
             "git_stash_ref": self.git_stash_ref,
             "context_pct_at_checkpoint": self.context_pct_at_checkpoint,
+            "metadata": dict(self.metadata),
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "CheckpointRecord":
+        # Every optional key uses a defensive .get() default: this is the sole
+        # deserialiser on every read path, and checkpoint JSON written before a
+        # field existed must still load (a KeyError here would make
+        # list_checkpoints skip the record entirely).
         return cls(
             checkpoint_id=d["checkpoint_id"],
             session_id=d.get("session_id", ""),
@@ -336,6 +842,7 @@ class CheckpointRecord:
             files_modified=list(d.get("files_modified") or []),
             git_stash_ref=d.get("git_stash_ref"),
             context_pct_at_checkpoint=d.get("context_pct_at_checkpoint"),
+            metadata=dict(d.get("metadata") or {}),
         )
 
 
@@ -627,6 +1134,7 @@ class EventStore:
         git_stash_ref: str | None = None,
         context_pct_at_checkpoint: float | None = None,
         checkpoint_id: str | None = None,
+        project_path: str | None = None,
     ) -> CheckpointRecord:
         """Persist a ``CheckpointRecord`` and mirror it into the event fabric.
 
@@ -644,24 +1152,62 @@ class EventStore:
            a graph-write failure is logged and swallowed rather than losing
            the checkpoint file that was already written.
 
+        *project_path* (T-863) is the git working tree to capture diffs from —
+        resolve it from ``project_root_path()`` at the call site rather than
+        letting it default here. When it is ``None`` no subprocess is spawned
+        at all and ``metadata`` carries no ``"diffs"`` key, which keeps every
+        existing caller and test byte-identical to the pre-T-863 behaviour.
+        When it is set, ``metadata["diffs"]`` gains a
+        ``{path: base64(gzip(raw git diff HEAD -- path))}`` mapping. That
+        collection is best-effort in the same sense as the graph mirror: it is
+        wrapped so that a missing git binary, a non-repo path, or any per-file
+        failure can never prevent the authoritative file write.
+
         Returns the ``CheckpointRecord`` that was persisted.
         """
         timestamp_iso = datetime.now(timezone.utc).isoformat()
         record_id = checkpoint_id or _event_entity_id(
             agent_id, "checkpoint", timestamp_iso, [session_id]
         )
+        files = list(files_modified)
+
+        loop = asyncio.get_event_loop()
+
+        metadata: dict[str, Any] = {}
+        if project_path is not None:
+            try:
+                # Executor hop: _collect_git_diffs shells out to git, which is
+                # blocking — same reason the file write below is offloaded.
+                diffs = await loop.run_in_executor(
+                    None, _collect_git_diffs, project_path, files
+                )
+            except Exception as exc:  # noqa: BLE001 — diffs degrade, publish must not
+                # Exception TYPE only, never str(exc) — same rule as the per-file
+                # handler in _collect_git_diffs: anything raised on a diff path can
+                # carry captured child output, and diff bytes are verbatim file
+                # content that must not reach a log record at any level. This
+                # handler should be unreachable (_collect_git_diffs swallows its own
+                # per-file failures), which is exactly why it must not be the one
+                # place the rule is relaxed.
+                log.debug(
+                    "publish_checkpoint: diff collection failed for session=%s — %s",
+                    session_id, type(exc).__name__,
+                )
+                diffs = {}
+            if diffs:
+                metadata["diffs"] = diffs
+
         record = CheckpointRecord(
             checkpoint_id=record_id,
             session_id=session_id,
             project_slug=project_slug,
             created_at=timestamp_iso,
             plan_state=plan_state,
-            files_modified=list(files_modified),
+            files_modified=files,
             git_stash_ref=git_stash_ref,
             context_pct_at_checkpoint=context_pct_at_checkpoint,
+            metadata=metadata,
         )
-
-        loop = asyncio.get_event_loop()
 
         def _write_file() -> None:
             d = checkpoint_store_dir(project_slug)

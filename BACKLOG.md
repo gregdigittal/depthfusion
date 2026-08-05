@@ -4161,11 +4161,11 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 ### S-254: As a team lead, I want cross-session diff analysis so that I can see what all agents changed in a file this week `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: Checkpoint records store gzipped, base64-encoded git diffs per modified file (capped at 4KB/file)
-- [ ] AC-2: `/query/aggregate?type=file_diffs&file=<path>&since=<iso>` returns chronological diff history for a file across all checkpoint records
-- [ ] AC-3: Tauri dashboard has a `FileDiffHistory` panel accessible from the checkpoint timeline
+- [x] AC-1: Checkpoint records store gzipped, base64-encoded git diffs per modified file (capped at 4KB/file)
+- [x] AC-2: `/query/aggregate?type=file_diffs&file=<path>&since=<iso>` returns chronological diff history for a file across all checkpoint records
+- [x] AC-3: Tauri dashboard has a `FileDiffHistory` panel accessible from the checkpoint timeline
 
 **Tasks:**
-- [ ] T-863: Extend checkpoint publish to run `git diff HEAD -- <file>` for each modified file and store gzipped diff in `metadata.diffs` (4KB cap per file)
-- [ ] T-864: Add `?type=file_diffs&file=<path>&since=<iso>` query branch to `/query/aggregate` in `api/rest.py`
-- [ ] T-865: Build `FileDiffHistory` panel in Tauri dashboard, accessible from the checkpoint timeline tile
+- [x] T-863: Extend checkpoint publish to run `git diff HEAD -- <file>` for each modified file and store gzipped diff in `metadata.diffs` (4KB cap per file)
+- [x] T-864: Add `?type=file_diffs&file=<path>&since=<iso>` query branch to `/query/aggregate` in `api/rest.py`
+- [x] T-865: Build `FileDiffHistory` panel in Tauri dashboard, accessible from the checkpoint timeline tile
