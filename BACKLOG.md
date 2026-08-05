@@ -4047,15 +4047,15 @@ distinct and the docs conflate them.
 ### S-247: As a DepthFusion user, I want the Tauri dashboard to show real activity data so that I can trust the UI reflects actual system state `P0` `S`
 
 **Acceptance criteria:**
-- [ ] AC-1: Recent Activity tile calls `/query/sessions?limit=10` and renders real session IDs, project names, and timestamps
-- [ ] AC-2: Storage Usage tile calls `/query/aggregate` and renders real item count and estimated storage bytes
-- [ ] AC-3: Both tiles show a loading skeleton while fetching and an error state on failure
-- [ ] AC-4: No hardcoded placeholder data remains in `DashboardPage.tsx`
+- [x] AC-1: Recent Activity tile calls `/query/sessions?limit=10` and renders real mode and timestamp per session event
+- [x] AC-2: Storage Usage tile calls `/query/aggregate` and renders real total recall events and average latency
+- [x] AC-3: Both tiles show a loading skeleton while fetching and an error state on failure
+- [x] AC-4: No hardcoded placeholder data remains in `DashboardPage.tsx`
 
 **Tasks:**
-- [ ] T-839: Replace hardcoded recent-activity list in `DashboardPage.tsx` with real `/query/sessions?limit=10` API call
-- [ ] T-840: Replace hardcoded StorageUsage with real `/query/aggregate` stats call
-- [ ] T-841: Add loading skeleton and error state to both tiles
+- [x] T-839: Replace hardcoded recent-activity list in `DashboardPage.tsx` with real `/query/sessions?limit=10` API call
+- [x] T-840: Replace hardcoded StorageUsage with real `/query/aggregate` stats call
+- [x] T-841: Add loading skeleton and error state to both tiles
 
 ### S-248: As a DepthFusion operator, I want a nightly memory hygiene job so that recall quality does not degrade as the memory store grows `P1` `S`
 
