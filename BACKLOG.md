@@ -4028,7 +4028,7 @@ distinct and the docs conflate them.
 
 ---
 
-## E-73: Growth, Reliability & Observability [active]
+## E-73: Growth, Reliability & Observability [done]
 
 > Expand DepthFusion's reach (MCP clients beyond Claude Code), fix trust-eroding UI placeholders, add the hygiene scheduler that prevents recall quality decay, ship session crash recovery as a novel differentiator, harden the server for team use, and add observability tooling for power users.
 
@@ -4136,15 +4136,15 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 ### S-252: As a Claude Code agent, I want streaming recall results so that I can start using the first relevant memory before the full reranker pipeline completes `P2` `M`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion_recall_relevant` accepts `stream=true` parameter
-- [ ] AC-2: When streaming, results are pushed to the open SSE session stream as they clear the BM25 minimum score threshold (~20ms for first result)
-- [ ] AC-3: Reranker scores arrive as follow-up `score_update` events on the same stream
-- [ ] AC-4: Non-streaming behaviour is unchanged when `stream` is omitted or false
+- [x] AC-1: `depthfusion_recall_relevant` accepts `stream=true` parameter
+- [x] AC-2: When streaming, results are pushed to the open SSE session stream as they clear the BM25 minimum score threshold (~20ms for first result)
+- [x] AC-3: Reranker scores arrive as follow-up `score_update` events on the same stream
+- [x] AC-4: Non-streaming behaviour is unchanged when `stream` is omitted or false
 
 **Tasks:**
-- [ ] T-857: Convert `_tool_recall` to an async generator that yields results above BM25 threshold before waiting for full rerank
-- [ ] T-858: Add `stream` parameter to `depthfusion_recall_relevant` tool schema
-- [ ] T-859: Wire streamed recall results through the session asyncio Queue to the open SSE event stream
+- [x] T-857: Convert `_tool_recall` to an async generator that yields results above BM25 threshold before waiting for full rerank
+- [x] T-858: Add `stream` parameter to `depthfusion_recall_relevant` tool schema
+- [x] T-859: Wire streamed recall results through the session asyncio Queue to the open SSE event stream
 
 ### S-253: As a DepthFusion user, I want a checkpoint timeline in the Tauri dashboard so that I can see my session history and resume from a prior checkpoint `P2` `M`
 
