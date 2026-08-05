@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from depthfusion.identity.models import Principal
@@ -173,6 +174,7 @@ def _handle_tools_call(
     arguments: dict,
     config: Any,
     principal: Principal | None = None,
+    stream_push_cb: Callable[[str], None] | None = None,
 ) -> dict:
     """Dispatch a tool call and return MCP-formatted result.
 
@@ -212,7 +214,9 @@ def _handle_tools_call(
 
     # Dispatch to tool implementations
     try:
-        result_text = _dispatch_tool(tool_name, arguments, config, principal)
+        result_text = _dispatch_tool(
+            tool_name, arguments, config, principal, stream_push_cb=stream_push_cb
+        )
         return {
             "isError": False,
             "content": [{"type": "text", "text": result_text}],
@@ -228,6 +232,7 @@ def _dispatch_tool(
     arguments: dict,
     config: Any,
     principal: Principal | None = None,
+    stream_push_cb: Callable[[str], None] | None = None,
 ) -> str:
     """Route tool calls to their implementations.
 
@@ -248,7 +253,7 @@ def _dispatch_tool(
     if tool_name == "depthfusion_status":
         return _tool_status(config)
     elif tool_name == "depthfusion_recall_relevant":
-        return _tool_recall(arguments)
+        return _tool_recall(arguments, stream_push_cb=stream_push_cb)
     elif tool_name == "depthfusion_tag_session":
         return _tool_tag_session(arguments)
     elif tool_name == "depthfusion_publish_context":
@@ -454,6 +459,7 @@ def _process_request(
     config: Any,
     principal: Principal | None = None,
     session_id: str | None = None,
+    stream_push_cb: Callable[[str], None] | None = None,
 ) -> dict:
     """Process a single JSON-RPC request and return the response.
 
@@ -492,7 +498,9 @@ def _process_request(
     elif method == "tools/call":
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
-        result = _handle_tools_call(tool_name, arguments, config, principal)
+        result = _handle_tools_call(
+            tool_name, arguments, config, principal, stream_push_cb=stream_push_cb
+        )
         # S-250 AC-1/AC-2 (T-849): non-blocking, best-effort side effect —
         # never allowed to influence `result` or raise into this function.
         _record_ambient_activity(tool_name, arguments, principal, session_id)

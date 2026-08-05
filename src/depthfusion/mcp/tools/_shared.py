@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from depthfusion.retrieval.bm25 import BM25 as _BM25
@@ -187,7 +188,12 @@ def _detect_current_backends(
         pass
     return result
 
-def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
+def _tool_recall_impl(
+    arguments: dict,
+    *,
+    perf_ms: dict | None = None,
+    stream_push_cb: Callable[[str], None] | None = None,
+) -> str:
     """Core recall logic — extracted from `_tool_recall` for wrapping with
     metrics emission (S-60 / T-186). Preserves the full v0.5.1 behaviour.
 
@@ -232,6 +238,7 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     # S-250 AC-2: ambient traces (event_type="ambient_trace") are excluded
     # from standard recall by default. Explicit opt-in via this argument.
     include_ambient_trace = bool(arguments.get("include_ambient_trace", False))
+    _stream: bool = bool(arguments.get("stream", False)) and stream_push_cb is not None
 
     recall_id: str | None = None  # minted after raw_blocks assembled; None on empty-result paths
 
@@ -583,6 +590,13 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
         if explain and idx in _explain_data:
             entry["_explain"] = _explain_data[idx]
         reranker_input.append(entry)
+        if _stream:
+            stream_push_cb(json.dumps({  # type: ignore[misc]
+                "event_type": "interim_result",
+                "chunk_id": entry["chunk_id"],
+                "score": entry["score"],
+                "source": entry["source"],
+            }))
 
     # VPS Tier 1+2: apply pipeline (reranker / ChromaDB fusion)
     from depthfusion.retrieval.hybrid import _BLEND_MODE, RecallPipeline
@@ -649,6 +663,14 @@ def _tool_recall_impl(arguments: dict, *, perf_ms: dict | None = None) -> str:
     finally:
         if pipeline.mode.value != "local":
             perf_ms["reranker"] = round((time.monotonic() - _t_rerank) * 1000.0, 3)
+    if _stream:
+        stream_push_cb(json.dumps({  # type: ignore[misc]
+            "event_type": "ranking_complete",
+            "results": [
+                {"chunk_id": b["chunk_id"], "score": b.get("score"), "rank": i}
+                for i, b in enumerate(blocks_out)
+            ],
+        }))
     # Ensure output blocks have consistent fields; attach explain block when requested.
     for rank_idx, b in enumerate(blocks_out):
         if "snippet" not in b:
