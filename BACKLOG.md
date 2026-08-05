@@ -4070,6 +4070,9 @@ distinct and the docs conflate them.
 - [x] T-843: Publish `hygiene_report` ContextItem after each run via the EventStore — **published via `FileBus`**, not EventStore
 - [x] T-844: Wire scheduler into FastAPI lifespan startup/shutdown in `mcp/http_server.py`
 
+**Verified 2026-08-05** — AC-1 and AC-2 initially ticked on a code read plus a green suite, then found **not** met at runtime. Two bugs, both masked by `MagicMock` collaborators and a broad `except Exception`:
+`decay_summary.skipped` (DecaySummary exposes `skipped_pinned` / `skipped_already_decayed`) raised AttributeError, so the decay phase reported an error instead of its counts; and `FileBus()` omitted the required `bus_dir`, so the `hygiene_report` was never published at all. Both fixed; `TestRealCollaborators` now exercises the real `DecaySummary` and a real `FileBus` on tmp_path so neither can regress.
+
 ### S-249: As a DepthFusion maintainer, I want an embedding A/B benchmark so that I can quantify whether upgrading from all-MiniLM-L6-v2 improves recall `P2` `S`
 
 **Context:** `scripts/retrieval_benchmark.py` already exists but is unrelated (ACL-overhead latency benchmark, p50/p95/p99 timing) — do not extend it. `scripts/ciqs_compare.py` is the closest existing tool (two-mode bootstrap-CI comparison) but operates on scored CIQS battery runs, not raw embedding recall. This story creates a new, differently-named script.

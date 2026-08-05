@@ -21,12 +21,10 @@ from __future__ import annotations
 import argparse
 import datetime
 import math
-import os
 import random
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
@@ -538,7 +536,7 @@ def write_markdown(
         "## Reproduction",
         "",
         "```bash",
-        f"python scripts/embedding_ab_benchmark.py \\",
+        "python scripts/embedding_ab_benchmark.py \\",
         f"    --model-a {results_a.model_name} \\",
         f"    --model-b {results_b.model_name}",
         "```",

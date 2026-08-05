@@ -33,7 +33,7 @@ from typing import Optional
 # Module-level imports of hygiene primitives and bus — required so that
 # patch("depthfusion.capture.hygiene.apply_decay", ...) works in tests.
 # All three primitives are in the same package so there is no circular risk.
-from depthfusion.capture.decay import apply_decay, DecaySummary  # noqa: F401
+from depthfusion.capture.decay import DecaySummary, apply_decay  # noqa: F401
 from depthfusion.capture.dedup import dedup_against_corpus  # noqa: F401
 from depthfusion.capture.pruner import identify_candidates  # noqa: F401
 from depthfusion.core.types import ContextItem  # noqa: F401
@@ -82,11 +82,14 @@ def run_hygiene_for_project(
     # ── Step 1: decay ────────────────────────────────────────────────────────
     try:
         decay_summary: DecaySummary = apply_decay(discovery_dir=discoveries_dir)
+        # DecaySummary splits skips into two counters — there is no `.skipped`.
         result["decay"] = {
             "total": decay_summary.total,
             "decayed": decay_summary.decayed,
             "archived": decay_summary.archived,
-            "skipped": decay_summary.skipped,
+            "skipped": (
+                decay_summary.skipped_pinned + decay_summary.skipped_already_decayed
+            ),
         }
         logger.info(
             "hygiene[%s] decay done: total=%d decayed=%d archived=%d",
@@ -164,7 +167,11 @@ def _publish_hygiene_report(project_slug: str, run_result: dict) -> None:
             priority="low",
             metadata={"report_type": "hygiene_report", "project_slug": project_slug},
         )
-        bus = FileBus()
+        # FileBus requires bus_dir. Same default as mcp/tools/_state.py.
+        bus_dir = Path(
+            os.getenv("DEPTHFUSION_BUS_DIR", "~/.claude/context-bus")
+        ).expanduser()
+        bus = FileBus(bus_dir=bus_dir)
         bus.publish(item)
         logger.info("hygiene[%s] report published to bus", project_slug)
     except Exception as exc:  # noqa: BLE001

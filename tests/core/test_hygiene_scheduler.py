@@ -9,15 +9,11 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
 import json
-import os
-from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # _parse_cron_fields
@@ -97,7 +93,6 @@ class TestBuildScheduler:
                 pass  # The actual import happens inside build_scheduler
         # We just verify it doesn't return None due to skip
         monkeypatch.setenv("DEPTHFUSION_HYGIENE_SKIP", "0")
-        from depthfusion.capture.hygiene import build_scheduler as bs
         # Without mocking APScheduler imports we can't easily test this path
         # without apscheduler installed — just confirm skip=0 doesn't None-out
         # via the skip branch (it may None-out via ImportError which is fine)
@@ -178,7 +173,7 @@ class TestRunHygieneForProject:
             disc_dir.mkdir()
             (disc_dir / "2026-01-01-test.md").write_text("---\ncontent: hello\n---\nsome content")
 
-            result = run_hygiene_for_project("test-project", discoveries_dir=disc_dir)
+            run_hygiene_for_project("test-project", discoveries_dir=disc_dir)
 
         assert call_order[0] == "decay", f"Expected decay first, got: {call_order}"
         # dedup may appear multiple times (once per file), but must come before prune
@@ -329,3 +324,58 @@ class TestLifespanIntegration:
             from depthfusion.mcp.http_server import _lifespan, app
             async with _lifespan(app):
                 pass  # Must not raise
+
+
+# ---------------------------------------------------------------------------
+# Unmocked wiring  (S-248 AC-1, AC-2)
+# ---------------------------------------------------------------------------
+
+class TestRealCollaborators:
+    """Regression guard: exercise the real DecaySummary and FileBus.
+
+    Every other test in this file patches `apply_decay` and `FileBus` with
+    MagicMocks, which answer to any attribute and any constructor signature.
+    That hid two runtime bugs behind a green suite and a broad
+    `except Exception`:
+
+      * `decay_summary.skipped` — DecaySummary has skipped_pinned /
+        skipped_already_decayed, so this raised AttributeError and the decay
+        phase silently reported an error instead of its counts.
+      * `FileBus()` — bus_dir is a required argument, so every publish raised
+        TypeError and the hygiene_report was never actually written.
+
+    These tests construct the real objects so neither can regress.
+    """
+
+    def test_decay_summary_attributes_exist(self):
+        """The attributes hygiene.py reads must exist on the real DecaySummary."""
+        from depthfusion.capture.decay import DecaySummary
+        summary = DecaySummary()
+        # Reading these must not raise — this is the exact access hygiene.py makes.
+        _ = (
+            summary.total,
+            summary.decayed,
+            summary.archived,
+            summary.skipped_pinned,
+            summary.skipped_already_decayed,
+        )
+        assert not hasattr(summary, "skipped"), (
+            "DecaySummary grew a `.skipped` attribute — collapse the two "
+            "skip counters in hygiene.py back to it."
+        )
+
+    def test_report_actually_lands_on_a_real_bus(self, tmp_path, monkeypatch):
+        """_publish_hygiene_report must write a retrievable item to a real FileBus."""
+        monkeypatch.setenv("DEPTHFUSION_BUS_DIR", str(tmp_path))
+        from depthfusion.capture.hygiene import _publish_hygiene_report
+        from depthfusion.router.bus import FileBus
+
+        _publish_hygiene_report("demo-project", {"items_decayed": 3})
+
+        # Subscribe through a real bus pointed at the same dir.
+        items = FileBus(bus_dir=tmp_path).subscribe(tags=["hygiene"])
+        assert len(items) == 1, "hygiene_report was not published to the bus"
+        item = items[0]
+        assert "hygiene" in item.tags
+        assert "demo-project" in item.tags
+        assert json.loads(item.content)["items_decayed"] == 3
