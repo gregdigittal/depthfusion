@@ -334,6 +334,16 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     "(excluded from standard recall by default — S-250 AC-2)"
                 ),
             },
+            "stream": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "When true, push interim BM25 results to the open SSE event stream as "
+                    "they clear the relevance threshold, then emit a 'ranking_complete' event "
+                    "after reranking completes. No-op when no session stream is open, or when "
+                    "omitted/false — non-streaming call semantics are fully preserved (AC-4)."
+                ),
+            },
         },
         "required": ["query"],
     },

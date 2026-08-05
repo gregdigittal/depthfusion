@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 try:
@@ -21,7 +22,7 @@ from depthfusion.mcp.tools._state import _get_hnsw_store
 logger = logging.getLogger("depthfusion.mcp.server")
 
 
-def _tool_recall(arguments: dict) -> str:
+def _tool_recall(arguments: dict, *, stream_push_cb: Callable[[str], None] | None = None) -> str:
     """Retrieve relevant context blocks across three sources using BM25 + RRF.
 
     v0.5.2 S-60 / T-186: thin wrapper around `_tool_recall_impl` that
@@ -44,7 +45,7 @@ def _tool_recall(arguments: dict) -> str:
     response_json = ""
     perf_ms: dict[str, float] = {}
     try:
-        response_json = _tool_recall_impl(arguments, perf_ms=perf_ms)
+        response_json = _tool_recall_impl(arguments, perf_ms=perf_ms, stream_push_cb=stream_push_cb)
     except Exception as exc:
         event_subtype = "error"
         response_json = json.dumps(
