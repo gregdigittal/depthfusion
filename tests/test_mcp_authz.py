@@ -190,7 +190,7 @@ class TestRequiresCapabilityDecorator:
 class TestHandleToolsCallAuthz:
     """For every tool: allow with correct role, deny with wrong role, deny with None."""
 
-    def _stub_dispatch(self, tool_name: str, arguments: dict, config: Any, principal: Any) -> str:
+    def _stub_dispatch(self, tool_name: str, arguments: dict, config: Any, principal: Any, stream_push_cb: Any = None) -> str:
         """Stub that bypasses actual tool logic — returns a success marker."""
         return '{"ok": true}'
 
@@ -271,6 +271,7 @@ class TestProcessRequestPropagatesPrincipal:
             arguments: dict,
             cfg: Any,
             p: Principal | None = None,
+            stream_push_cb: Any = None,
         ) -> dict:
             captured.append(p)
             return {"isError": False, "content": [{"type": "text", "text": "ok"}]}
@@ -297,6 +298,7 @@ class TestProcessRequestPropagatesPrincipal:
             arguments: dict,
             cfg: Any,
             p: Principal | None = None,
+            stream_push_cb: Any = None,
         ) -> dict:
             captured.append(p)
             return {"isError": True, "content": [{"type": "text", "text": "Authorization denied: ..."}]}

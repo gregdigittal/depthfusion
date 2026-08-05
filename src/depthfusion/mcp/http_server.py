@@ -36,6 +36,7 @@ import logging
 import os
 import subprocess
 import uuid
+from collections.abc import Callable
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
@@ -348,14 +349,46 @@ async def streamable_http_endpoint(
 
     config = DepthFusionConfig.from_env()
     loop = asyncio.get_event_loop()
+    # S-252 AC-2/AC-4 (T-859): build stream_push_cb when the caller has an
+    # open session queue and requests streaming recall.  When no queue is
+    # open (session_id absent or not yet registered), stream_push_cb stays
+    # None and _tool_recall silently falls back to non-streaming (AC-4).
+    stream_push_cb: Callable[[str], None] | None = None
+    if body.get("method") == "tools/call":
+        _args = (body.get("params") or {}).get("arguments") or {}
+        if (
+            (body.get("params") or {}).get("name") == "depthfusion_recall_relevant"
+            and _args.get("stream")
+        ):
+            _sq = (
+                None if session_id is None else _MCP_STREAMABLE_SESSIONS.get(session_id)
+            )
+            if _sq is not None:
+                _q: asyncio.Queue = _sq
+                _lp = loop
+
+                def _push_streamable(s: str) -> None:
+                    _lp.call_soon_threadsafe(lambda: _q.put_nowait(s))
+
+                stream_push_cb = _push_streamable
     # S-250 AC-1/AC-2 (T-849): thread the session id through so
     # `_process_request` can feed the per-session activity tracker and the
     # ambient-trace side effect. `session_id` is `None` for the very first
     # call on a connection (`initialize`, before a session id is issued) —
     # `_process_request` treats that as "no session to track", which is
     # correct (nothing to checkpoint against yet).
+    # S-252 (T-859): also thread the validated principal so that
+    # `check_tool_access` inside `_handle_tools_call` can authorise the
+    # caller — without this the tool-level authz always fails with
+    # AuthorizationError (the HTTP-transport-level check done by
+    # `require_principal` above is a different gate).
     response = await loop.run_in_executor(
-        None, functools.partial(_process_request, body, config, session_id=session_id)
+        None, functools.partial(
+            _process_request, body, config,
+            principal=_principal,
+            session_id=session_id,
+            stream_push_cb=stream_push_cb,
+        )
     )
 
     # JSON-RPC notifications (no id) → 202 Accepted, empty body.
@@ -509,11 +542,37 @@ async def messages_endpoint(
     config = DepthFusionConfig.from_env()
 
     loop = asyncio.get_event_loop()
+    # S-252 AC-2/AC-4 (T-859): same stream_push_cb wiring as the streamable-HTTP
+    # transport, but keyed on the legacy SSE session registry and sessionId param.
+    stream_push_cb: Callable[[str], None] | None = None
+    if body.get("method") == "tools/call":
+        _args = (body.get("params") or {}).get("arguments") or {}
+        if (
+            (body.get("params") or {}).get("name") == "depthfusion_recall_relevant"
+            and _args.get("stream")
+        ):
+            _sq = _MCP_SESSIONS.get(sessionId)
+            if _sq is not None:
+                _q2: asyncio.Queue = _sq
+                _lp2 = loop
+
+                def _push_sse(s: str) -> None:
+                    _lp2.call_soon_threadsafe(lambda: _q2.put_nowait(s))
+
+                stream_push_cb = _push_sse
     # S-250 AC-1/AC-2 (T-849): legacy SSE sessions are tracked by the query
     # param `sessionId` — thread it through the same way the streamable-HTTP
     # transport does.
+    # S-252 (T-859): also thread the validated principal so that
+    # `check_tool_access` inside `_handle_tools_call` can authorise the
+    # caller (same fix as the streamable-HTTP transport above).
     response = await loop.run_in_executor(
-        None, functools.partial(_process_request, body, config, session_id=sessionId)
+        None, functools.partial(
+            _process_request, body, config,
+            principal=_principal,
+            session_id=sessionId,
+            stream_push_cb=stream_push_cb,
+        )
     )
 
     if response:
