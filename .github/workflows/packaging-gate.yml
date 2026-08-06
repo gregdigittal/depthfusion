@@ -1,0 +1,31 @@
+name: Packaging Gate
+
+on: [push, pull_request]
+
+jobs:
+  packaging-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core deps only
+        run: pip install -e . --quiet
+
+      - name: pip check (core)
+        run: pip check
+
+      - name: stdio import check
+        run: python -c "import depthfusion.mcp.server; print('stdio OK')"
+
+      - name: Install vps-cpu extras
+        run: pip install -e ".[vps-cpu]" --quiet
+
+      - name: http import check
+        run: python -c "from depthfusion.mcp.http_server import app; print('http OK')"
+
+      - name: pip check (full)
+        run: pip check

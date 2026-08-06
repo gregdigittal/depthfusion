@@ -21,9 +21,9 @@ Security:
     DEPTHFUSION_API_TOKEN for development; JWKS/OIDC in production).
     There is no pass-through mode.
   - Origin header validation (MCP 2025-03-26 §2.1): /mcp routes check the Origin
-    header only when DEPTHFUSION_MCP_ALLOWED_ORIGINS is set. When unset the check
-    is permissive (any Origin accepted). When set, only listed origins are accepted;
-    unlisted origins receive 403. Absent Origin is always accepted.
+    header against DEPTHFUSION_MCP_ALLOWED_ORIGINS (default: localhost only).
+    Set env var to empty string to allow all Origins (dev/testing escape hatch).
+    Absent Origin header is always accepted (CLI tools, non-browser clients).
   - /health is the only unauthenticated endpoint.
 """
 from __future__ import annotations
@@ -281,16 +281,16 @@ async def _check_origin(request: Request) -> None:
 
     Behavior:
     - Absent Origin header → always accepted (CLI tools, Claude Code).
-    - DEPTHFUSION_MCP_ALLOWED_ORIGINS not set → permissive, no restriction.
-    - DEPTHFUSION_MCP_ALLOWED_ORIGINS set → Origin must match the list; if
-      the Origin header is present and not listed → 403 {"error": "Origin not allowed"}.
+    - DEPTHFUSION_MCP_ALLOWED_ORIGINS unset → localhost-only (secure default).
+    - DEPTHFUSION_MCP_ALLOWED_ORIGINS="" → allow all Origins (dev escape hatch).
+    - Otherwise → Origin must match the comma-separated list; unlisted → 403.
     """
     origin = request.headers.get("origin")
     if origin is None:
         return
-    raw = os.getenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "")
-    if not raw:
-        # Env var not set → fully permissive
+    raw = os.getenv("DEPTHFUSION_MCP_ALLOWED_ORIGINS", "http://localhost,http://127.0.0.1")
+    if raw == "":
+        # Explicit empty string = allow all (dev/testing override)
         return
     allowed = frozenset(o.strip().rstrip("/") for o in raw.split(",") if o.strip())
     if origin.rstrip("/") not in allowed:
