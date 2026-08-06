@@ -88,6 +88,14 @@ async def _lifespan(app: FastAPI):  # type: ignore[type-arg]  # noqa: ARG001
     try:
         yield
     finally:
+        # ponytail: belt-and-braces alongside atexit; the HTTP process may not exit() cleanly
+        try:
+            from depthfusion.mcp.tools._state import _HNSW_STORE
+            if _HNSW_STORE is not None:
+                _HNSW_STORE.save()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("lifespan: hnsw flush failed: %s", exc)
+
         # S-250 T-852: checkpoint any still-open sessions before the
         # scheduler stops — uvicorn invokes this `finally` on graceful ASGI
         # shutdown (including SIGTERM). Best-effort: a failure here must
@@ -807,7 +815,7 @@ def main() -> None:
     logger.info(
         "DepthFusion MCP HTTP/SSE server starting on %s:%d", host, port
     )
-    uvicorn.run(app, host=host, port=port, log_level="info", timeout_graceful_shutdown=30)
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":

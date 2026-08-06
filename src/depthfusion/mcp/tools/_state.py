@@ -1,6 +1,7 @@
 """depthfusion MCP tool implementations — shared server state and infrastructure helpers."""
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 import threading
@@ -40,7 +41,6 @@ def _get_context_bus(config: Any = None) -> ContextBus:
 
 _HNSW_STORE: Any = None  # depthfusion.retrieval.hnsw_store.HNSWStore | None
 _HNSW_INIT_ATTEMPTED: bool = False
-_HNSW_SHUTDOWN_REGISTERED: bool = False
 _HNSW_LOCK = threading.Lock()
 
 def _hnsw_enabled() -> bool:
@@ -49,33 +49,6 @@ def _hnsw_enabled() -> bool:
         "1",
         "yes",
     )
-
-def _register_hnsw_shutdown() -> None:
-    """Install SIGTERM/SIGINT handlers that flush the index on graceful exit."""
-    global _HNSW_SHUTDOWN_REGISTERED
-    if _HNSW_SHUTDOWN_REGISTERED:
-        return
-    try:
-        import signal as _signal
-
-        def _hnsw_shutdown_handler(signum, frame):  # type: ignore[no-redef]
-            store = _HNSW_STORE
-            if store is not None:
-                try:
-                    store.save()
-                    logger.info("[hnsw] index persisted on shutdown")
-                except Exception as exc:  # noqa: BLE001 — best-effort flush
-                    logger.warning("[hnsw] failed to persist on shutdown: %s", exc)
-
-        # Only install handlers in the main thread (signal API restriction).
-        if threading.current_thread() is threading.main_thread():
-            _signal.signal(_signal.SIGTERM, _hnsw_shutdown_handler)
-            _signal.signal(_signal.SIGINT, _hnsw_shutdown_handler)
-            _HNSW_SHUTDOWN_REGISTERED = True
-    except (ValueError, OSError) as exc:
-        # signal() raises ValueError outside the main thread or when running
-        # under restricted environments — degrade silently.
-        logger.debug("[hnsw] shutdown handler not installed: %s", exc)
 
 def _get_hnsw_store() -> Any:
     """Return the process-wide HNSWStore (lazily constructed), or None.
@@ -115,7 +88,7 @@ def _get_hnsw_store() -> Any:
                 _HNSW_STORE = None
                 return None
             _HNSW_STORE = store
-            _register_hnsw_shutdown()
+            atexit.register(lambda: store.save())
             logger.info("[hnsw] store initialised (model=%s)", model_name)
             return _HNSW_STORE
         except Exception as exc:  # noqa: BLE001 — graceful degrade

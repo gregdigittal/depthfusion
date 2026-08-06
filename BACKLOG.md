@@ -4221,9 +4221,9 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [ ] AC-4: `kill <pid>` successfully terminates a stdio MCP process that has loaded the HNSW store
 
 **Tasks:**
-- [ ] T-875: Remove `_register_hnsw_shutdown()` and all `signal.signal()` calls from `_state.py:53-78`
-- [ ] T-876: Add `atexit.register(lambda: _HNSW_STORE.save() if _HNSW_STORE else None)` to `_state.py`
-- [ ] T-877: Add HNSW flush call to the lifespan `finally` block in `http_server.py` (~line 102)
+- [x] T-875: Remove `_register_hnsw_shutdown()` and all `signal.signal()` calls from `_state.py:53-78`
+- [x] T-876: Add `atexit.register(lambda: _HNSW_STORE.save() if _HNSW_STORE else None)` to `_state.py`
+- [x] T-877: Add HNSW flush call to the lifespan `finally` block in `http_server.py` (~line 102)
 - [ ] T-878: One-time cleanup: `pkill -9 -f 'depthfusion.mcp.server'` after T-875 ships (eliminate existing zombies)
 
 ### S-259: As a Claude Code user, I want MCP tool exceptions to return a JSON-RPC error instead of silently dropping the response so that failures are visible and don't force /mcp reconnect `P1` `M`
@@ -4235,9 +4235,9 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [ ] AC-4: Existing stdio tests pass; a new test confirms the error-response path
 
 **Tasks:**
-- [ ] T-879: Replace bare `except Exception` in `server.py:668-686` with error-response emit + `BrokenPipeError` exit
-- [ ] T-880: Add `isinstance(params, dict)` guard before `params.get()` at `server.py:499`; raise `McpError(-32602, ...)` on failure
-- [ ] T-881: Write test in `tests/mcp/` covering exception → error response and BrokenPipe → exit
+- [x] T-879: Replace bare `except Exception` in `server.py:668-686` with error-response emit + `BrokenPipeError` exit
+- [x] T-880: Add `isinstance(params, dict)` guard before `params.get()` at `server.py:499`; raise `McpError(-32602, ...)` on failure
+- [x] T-881: Write test in `tests/mcp/` covering exception → error response and BrokenPipe → exit
 
 ### S-260: As a DepthFusion operator, I want sd_notify + WatchdogSec so that a slow-but-alive event loop is detected and auto-recovered within 2 minutes `P1` `L`
 

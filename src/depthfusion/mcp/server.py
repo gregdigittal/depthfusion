@@ -496,6 +496,17 @@ def _process_request(
     elif method == "tools/list":
         result = _handle_tools_list(config)
     elif method == "tools/call":
+        if not isinstance(params, dict):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {
+                    "code": -32602,
+                    "message": (
+                        f"params must be an object, got {type(params).__name__}"
+                    ),
+                },
+            }
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
         result = _handle_tools_call(
@@ -669,8 +680,10 @@ def main() -> None:
         line = line.strip()
         if not line:
             continue
+        req_id = None  # captured before _process_request so we can reply on error
         try:
             request = json.loads(line)
+            req_id = request.get("id")
             response = _process_request(request, config)
             if response:
                 print(json.dumps(response), flush=True)
@@ -681,8 +694,27 @@ def main() -> None:
                 "error": {"code": -32700, "message": f"Parse error: {exc}"},
             }
             print(json.dumps(error_response), flush=True)
+        except BrokenPipeError:
+            sys.exit(0)
         except Exception as exc:
-            logger.error(f"Unhandled error: {exc}")
+            logger.error("unhandled error processing request: %s", exc, exc_info=True)
+            if req_id is not None:
+                try:
+                    print(
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": req_id,
+                                "error": {
+                                    "code": -32603,
+                                    "message": f"Internal error: {exc}",
+                                },
+                            }
+                        ),
+                        flush=True,
+                    )
+                except BrokenPipeError:
+                    sys.exit(0)
 
 
 if __name__ == "__main__":
