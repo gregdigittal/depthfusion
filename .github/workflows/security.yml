@@ -36,7 +36,11 @@ jobs:
         # Audit the installed environment. Exits non-zero on any CVE found.
         # PYSEC-2026-311: chromadb >=1.0 — no fix version published as of 2026-07-18;
         # suppressed until upstream releases a patch. Track: https://pypi.org/project/chromadb/
-        run: pip-audit --ignore-vuln PYSEC-2026-311
+        # GHSA-wj6h-64fc-37mp (CVE-2024-23342): Minerva timing attack in python-ecdsa — no fix
+        # version exists upstream. Mitigated: we use python-jose[cryptography] which delegates
+        # all crypto to the OpenSSL-backed `cryptography` lib; the ecdsa code path is never
+        # exercised. Suppress until python-jose drops the ecdsa dep or a fix ships.
+        run: pip-audit --ignore-vuln PYSEC-2026-311 --ignore-vuln GHSA-wj6h-64fc-37mp
 
   npm-audit:
     name: "Node.js dependency audit (npm audit)"
