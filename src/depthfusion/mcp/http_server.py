@@ -807,7 +807,7 @@ def main() -> None:
     logger.info(
         "DepthFusion MCP HTTP/SSE server starting on %s:%d", host, port
     )
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    uvicorn.run(app, host=host, port=port, log_level="info", timeout_graceful_shutdown=30)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 LOG="/home/gregmorris/projects/depthfusion/.pm/logs/mcp-health.log"
-SERVICE="depthfusion-mcp.service"
+SERVICE="depthfusion-mcp"
 LOCAL_HEALTH_URL="http://127.0.0.1:7301/health"
 PUBLIC_HEALTH_URL="https://mcp.tonracein.com/health"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -20,7 +20,7 @@ rotate_log() {
 rotate_log
 
 # Check 1: local HTTP health endpoint (fast, no TLS overhead)
-LOCAL_STATUS=$(curl -s -o /tmp/df_health_local.json -w "%{http_code}" --max-time 5 "$LOCAL_HEALTH_URL" 2>/dev/null || echo "000")
+LOCAL_STATUS=$(curl -s -o /tmp/df_health_local.json -w "%{http_code}" --max-time 5 "$LOCAL_HEALTH_URL" 2>/dev/null || true)
 
 if [ "$LOCAL_STATUS" = "200" ]; then
     BODY=$(cat /tmp/df_health_local.json 2>/dev/null || echo "")
@@ -29,7 +29,7 @@ if [ "$LOCAL_STATUS" = "200" ]; then
 fi
 
 # Local check failed — try public URL as secondary verification
-PUBLIC_STATUS=$(curl -s -o /tmp/df_health_public.json -w "%{http_code}" --max-time 10 "$PUBLIC_HEALTH_URL" 2>/dev/null || echo "000")
+PUBLIC_STATUS=$(curl -s -o /tmp/df_health_public.json -w "%{http_code}" --max-time 10 "$PUBLIC_HEALTH_URL" 2>/dev/null || true)
 
 if [ "$PUBLIC_STATUS" = "200" ]; then
     # Public OK but local failed — nginx is up but direct port may have changed
@@ -44,7 +44,7 @@ echo "$TIMESTAMP FAIL local=$LOCAL_STATUS public=$PUBLIC_STATUS service=$SERVICE
 # Attempt restart (requires sudo; will succeed if sudoers allows it)
 if sudo -n systemctl restart "$SERVICE" 2>/dev/null; then
     sleep 8
-    AFTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$LOCAL_HEALTH_URL" 2>/dev/null || echo "000")
+    AFTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$LOCAL_HEALTH_URL" 2>/dev/null || true)
     if [ "$AFTER_STATUS" = "200" ]; then
         echo "$TIMESTAMP RECOVERED restart=ok post_check=$AFTER_STATUS" >> "$LOG"
     else

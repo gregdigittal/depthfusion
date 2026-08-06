@@ -1,0 +1,8 @@
+[Unit]
+Description=DepthFusion MCP Health Check (one-shot)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/gregmorris/projects/depthfusion/scripts/mcp-health-check.sh
+User=root

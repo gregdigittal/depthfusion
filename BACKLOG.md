@@ -4169,3 +4169,113 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [x] T-863: Extend checkpoint publish to run `git diff HEAD -- <file>` for each modified file and store gzipped diff in `metadata.diffs` (4KB cap per file)
 - [x] T-864: Add `?type=file_diffs&file=<path>&since=<iso>` query branch to `/query/aggregate` in `api/rest.py`
 - [x] T-865: Build `FileDiffHistory` panel in Tauri dashboard, accessible from the checkpoint timeline tile
+
+## E-74: MCP Stability Hardening [active]
+
+> Eliminate the three stacked failure modes that caused the Aug 6 3h45m outage and make
+> the MCP server self-healing: cap graceful shutdown, fix the broken watchdog recovery path,
+> stop zombie stdio accumulation, and add deep health signalling. Adversarial diagnosis
+> source: `docs/agent-outputs/DepthFusion_MCP Stability Diagnosis_v1.0_06082026.md`.
+
+### S-255: As a DepthFusion operator, I want graceful HTTP shutdown to be time-bounded so that a hung SSE connection cannot cause a multi-hour outage `P0` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `uvicorn.run()` in `http_server.py` passes `timeout_graceful_shutdown=30`
+- [ ] AC-2: `systemctl restart depthfusion-mcp` completes within 60 seconds regardless of connected clients
+
+**Tasks:**
+- [x] T-866: Add `timeout_graceful_shutdown=30` to `uvicorn.run()` at `http_server.py:810`
+- [x] T-867: Add `TimeoutStopSec=60` to `infra/systemd/depthfusion-mcp.service`
+
+### S-256: As a DepthFusion operator, I want the health-check watchdog to actually recover a hung server so that outages self-heal without human intervention `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `scripts/mcp-health-check.sh` calls `systemctl restart depthfusion-mcp` (no `.service` suffix) matching the existing NOPASSWD sudoers rule exactly
+- [ ] AC-2: The `pkill SIGTERM` line is removed from the script
+- [ ] AC-3: A manual test confirms `sudo -n systemctl restart depthfusion-mcp` succeeds from the gregmorris account
+
+**Tasks:**
+- [x] T-868: Fix unit name in `mcp-health-check.sh`: `depthfusion-mcp.service` → `depthfusion-mcp`
+- [x] T-869: Remove the `pkill SIGTERM depthfusion-mcp` line from the health check script
+- [ ] T-870: Verify sudoers NOPASSWD rule matches the fixed call; document in `docs/deployment.md`
+
+### S-257: As a DepthFusion operator, I want the health check to run every 5 minutes so that any outage is detected and recovered within one interval `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: A systemd timer fires `scripts/mcp-health-check.sh` every 5 minutes as root
+- [ ] AC-2: The existing 2×/day cron job is removed
+- [ ] AC-3: The timer is enabled and persisted across reboots (`systemctl enable --now`)
+
+**Tasks:**
+- [x] T-871: Write `infra/systemd/depthfusion-health.timer` (OnCalendar=*:0/5, Persistent=true)
+- [x] T-872: Write `infra/systemd/depthfusion-health.service` (Type=oneshot, User=root)
+- [ ] T-873: Install and enable the timer; remove the crontab entry
+- [x] T-874: Fix the `000000` curl artifact in `mcp-health-check.sh` (remove `|| echo 000` after `-w "%{http_code}"`)
+
+### S-258: As a DepthFusion operator, I want HNSW shutdown to use atexit instead of signal handlers so that stdio MCP processes are killable and do not accumulate as zombies `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: All `signal.signal(SIGTERM/SIGINT, ...)` calls are removed from `src/depthfusion/mcp/tools/_state.py`
+- [ ] AC-2: HNSW store flush is registered via `atexit.register()` for the stdio path
+- [ ] AC-3: HNSW store flush is called in the lifespan `finally` block for the HTTP path
+- [ ] AC-4: `kill <pid>` successfully terminates a stdio MCP process that has loaded the HNSW store
+
+**Tasks:**
+- [ ] T-875: Remove `_register_hnsw_shutdown()` and all `signal.signal()` calls from `_state.py:53-78`
+- [ ] T-876: Add `atexit.register(lambda: _HNSW_STORE.save() if _HNSW_STORE else None)` to `_state.py`
+- [ ] T-877: Add HNSW flush call to the lifespan `finally` block in `http_server.py` (~line 102)
+- [ ] T-878: One-time cleanup: `pkill -9 -f 'depthfusion.mcp.server'` after T-875 ships (eliminate existing zombies)
+
+### S-259: As a Claude Code user, I want MCP tool exceptions to return a JSON-RPC error instead of silently dropping the response so that failures are visible and don't force /mcp reconnect `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: Any unhandled exception in the stdio loop emits a well-formed JSON-RPC error response with the original request id
+- [ ] AC-2: `BrokenPipeError` from stdout causes a clean `sys.exit(0)` rather than continued reading from stdin
+- [ ] AC-3: Non-dict `params` returns JSON-RPC -32602 (invalid params) instead of an `AttributeError`
+- [ ] AC-4: Existing stdio tests pass; a new test confirms the error-response path
+
+**Tasks:**
+- [ ] T-879: Replace bare `except Exception` in `server.py:668-686` with error-response emit + `BrokenPipeError` exit
+- [ ] T-880: Add `isinstance(params, dict)` guard before `params.get()` at `server.py:499`; raise `McpError(-32602, ...)` on failure
+- [ ] T-881: Write test in `tests/mcp/` covering exception → error response and BrokenPipe → exit
+
+### S-260: As a DepthFusion operator, I want sd_notify + WatchdogSec so that a slow-but-alive event loop is detected and auto-recovered within 2 minutes `P1` `L`
+
+**Acceptance criteria:**
+- [ ] AC-1: `depthfusion-mcp.service` has `Type=notify` and `WatchdogSec=90`
+- [ ] AC-2: An asyncio task pings `sdnotify` with `WATCHDOG=1` every 30 seconds from the running event loop
+- [ ] AC-3: Killing the asyncio watchdog task (but not the process) causes systemd to restart the service within 90s
+- [ ] AC-4: `READY=1` notification is sent after application startup completes
+
+**Tasks:**
+- [ ] T-882: Add `Type=notify`, `WatchdogSec=90` to `infra/systemd/depthfusion-mcp.service`
+- [ ] T-883: Install `sdnotify` in project dependencies (`pyproject.toml`)
+- [ ] T-884: Add asyncio watchdog task to `http_server.py` lifespan startup; send `READY=1` on startup, `WATCHDOG=1` every 30s
+- [ ] T-885: Write integration test confirming watchdog task runs and sends heartbeats
+
+### S-261: As a DepthFusion operator, I want SSE generators to cooperatively observe app shutdown so that streams end cleanly without relying only on the force-cancel timeout `P2` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: An `asyncio.Event` (`app.state.shutting_down`) is set in the lifespan `finally` block
+- [ ] AC-2: Both `/sse` and `/mcp` streaming generators check the event each iteration and exit when set
+- [ ] AC-3: On shutdown, open SSE streams close within 1 second of the event being set
+
+**Tasks:**
+- [ ] T-886: Add `app.state.shutting_down = asyncio.Event()` to lifespan startup
+- [ ] T-887: Set `app.state.shutting_down` in lifespan `finally` block
+- [ ] T-888: Update SSE generator loops at `http_server.py:451-462` and `510-525` to check the event
+
+### S-262: As a DepthFusion operator, I want systemd restart limits and app logging configured correctly so that crash loops are recoverable and investigation is possible `P2` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `StartLimitIntervalSec=300` (was 30) in `depthfusion-mcp.service`
+- [ ] AC-2: `RestartSec=10` (was 5) in `depthfusion-mcp.service`
+- [ ] AC-3: App INFO logs are visible in `journalctl -u depthfusion-mcp.service`
+- [ ] AC-4: Host swap alert fires at 80% (Prometheus rule or equivalent)
+- [ ] AC-5: LLM-agent docker containers have `mem_limit` set
+
+**Tasks:**
+- [ ] T-889: Set `StartLimitIntervalSec=300` and `RestartSec=10` in `depthfusion-mcp.service`
+- [ ] T-890: Add `logging.basicConfig(level=logging.INFO, stream=sys.stderr)` to `http_server.py` and `server.py`
+- [ ] T-891: Add `mem_limit` to the 9 LLM-agent docker container definitions
+- [ ] T-892: Add swap usage alert rule (Prometheus alertmanager or systemd-based equivalent)
