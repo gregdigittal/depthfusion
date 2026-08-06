@@ -4170,7 +4170,7 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [x] T-864: Add `?type=file_diffs&file=<path>&since=<iso>` query branch to `/query/aggregate` in `api/rest.py`
 - [x] T-865: Build `FileDiffHistory` panel in Tauri dashboard, accessible from the checkpoint timeline tile
 
-## E-74: MCP Stability Hardening [active]
+## E-74: MCP Stability Hardening [done]
 
 > Eliminate the three stacked failure modes that caused the Aug 6 3h45m outage and make
 > the MCP server self-healing: cap graceful shutdown, fix the broken watchdog recovery path,
@@ -4197,7 +4197,7 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 **Tasks:**
 - [x] T-868: Fix unit name in `mcp-health-check.sh`: `depthfusion-mcp.service` → `depthfusion-mcp`
 - [x] T-869: Remove the `pkill SIGTERM depthfusion-mcp` line from the health check script
-- [ ] T-870: Verify sudoers NOPASSWD rule matches the fixed call; document in `docs/deployment.md`
+- [x] T-870: Verify sudoers NOPASSWD rule matches the fixed call; document in `docs/deployment.md`
 
 ### S-257: As a DepthFusion operator, I want the health check to run every 5 minutes so that any outage is detected and recovered within one interval `P0` `S`
 
@@ -4209,7 +4209,7 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 **Tasks:**
 - [x] T-871: Write `infra/systemd/depthfusion-health.timer` (OnCalendar=*:0/5, Persistent=true)
 - [x] T-872: Write `infra/systemd/depthfusion-health.service` (Type=oneshot, User=root)
-- [ ] T-873: Install and enable the timer; remove the crontab entry
+- [x] T-873: Install and enable the timer; remove the crontab entry
 - [x] T-874: Fix the `000000` curl artifact in `mcp-health-check.sh` (remove `|| echo 000` after `-w "%{http_code}"`)
 
 ### S-258: As a DepthFusion operator, I want HNSW shutdown to use atexit instead of signal handlers so that stdio MCP processes are killable and do not accumulate as zombies `P1` `M`
@@ -4224,7 +4224,7 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [x] T-875: Remove `_register_hnsw_shutdown()` and all `signal.signal()` calls from `_state.py:53-78`
 - [x] T-876: Add `atexit.register(lambda: _HNSW_STORE.save() if _HNSW_STORE else None)` to `_state.py`
 - [x] T-877: Add HNSW flush call to the lifespan `finally` block in `http_server.py` (~line 102)
-- [ ] T-878: One-time cleanup: `pkill -9 -f 'depthfusion.mcp.server'` after T-875 ships (eliminate existing zombies)
+- [x] T-878: One-time cleanup: `pkill -9 -f 'depthfusion.mcp.server'` after T-875 ships (eliminate existing zombies)
 
 ### S-259: As a Claude Code user, I want MCP tool exceptions to return a JSON-RPC error instead of silently dropping the response so that failures are visible and don't force /mcp reconnect `P1` `M`
 
@@ -4279,3 +4279,90 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [x] T-890: Add `logging.basicConfig(level=logging.INFO, stream=sys.stderr)` to `http_server.py` and `server.py`
 - [x] T-891: Add `mem_limit` to the 9 LLM-agent docker container definitions
 - [x] T-892: Add swap usage alert rule (Prometheus alertmanager or systemd-based equivalent)
+
+---
+
+## E-75: Packaging, Transport & Developer Onboarding [active]
+
+> Close the P0/P1 gaps left open in E-72/E-73: import hygiene, missing dependency declarations,
+> Origin-header security, MCP negotiation coverage, and transport documentation so new integrations
+> (Cursor, Windsurf, Cline) can onboard without digging through source code.
+
+### S-263: As a DepthFusion user on Mac/VPS, I want the stdio MCP server to import cleanly without FastAPI or cryptography so that local stdio mode works without the HTTP stack `P0` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: `python -m depthfusion.mcp.server --help` succeeds in a venv with only stdio deps installed (no fastapi, no cryptography)
+- [ ] AC-2: HTTP-only imports are behind `TYPE_CHECKING` guards or lazy-imported inside HTTP-path functions
+
+**Tasks:**
+- [ ] T-893: Audit all imports in `server.py` and `tools/` for HTTP-stack dependencies; move to lazy imports
+- [ ] T-894: Add a CI job (or pytest mark) that installs only stdio deps and imports `depthfusion.mcp.server`
+
+### S-264: As a DepthFusion operator, I want all direct HTTP/OIDC dependencies declared in pyproject.toml so that `pip check` catches missing packages `P0` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: `pip check` exits 0 after a clean install of the package
+- [ ] AC-2: All imports used at HTTP-server startup have a corresponding `pyproject.toml` entry
+
+**Tasks:**
+- [ ] T-895: Run `pip check` in CI and fix any missing declarations
+- [ ] T-896: Add `pip check` as a required step in the packaging CI gate
+
+### S-265: As a DepthFusion installer, I want the install script to fail fast on a broken MCP import so that packaging errors surface immediately `P0` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `install.sh` runs `python -m depthfusion.mcp.server --check` (or equivalent) and exits non-zero on import error
+- [ ] AC-2: Error message names the missing package
+
+**Tasks:**
+- [ ] T-897: Add import smoke-test step to `install.sh` / `scripts/mcp-server.sh`
+
+### S-266: As a DepthFusion operator, I want the HTTP MCP endpoint to validate the Origin header so that the server meets MCP 2025-03-26 spec and is protected from cross-origin abuse `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Requests with a disallowed Origin are rejected with 403
+- [ ] AC-2: Allowed origins are configurable via env var (default: localhost only)
+- [ ] AC-3: Test coverage for allowed and rejected origins
+
+**Tasks:**
+- [ ] T-898: Implement Origin validation middleware in `http_server.py`
+- [ ] T-899: Add `DEPTHFUSION_ALLOWED_ORIGINS` env var; document in `.env.example`
+- [ ] T-900: Write tests for origin allow/deny
+
+### S-267: As a DepthFusion maintainer, I want complete MCP negotiation and protocol-version tests so that edge cases are caught before regressions ship `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: Tests cover: missing `initialize`, wrong protocol version, out-of-order messages
+- [ ] AC-2: Tests run in CI without a live server (use TestClient or subprocess)
+
+**Tasks:**
+- [ ] T-901: Write MCP negotiation edge-case tests in `tests/mcp/test_negotiation.py`
+
+### S-268: As a DepthFusion operator, I want HTTP MCP authentication to use a single consistent env var path so that deployment docs and curl examples are not misleading `P1` `M`
+
+**Acceptance criteria:**
+- [ ] AC-1: One env var controls auth token for HTTP MCP (currently split across multiple names)
+- [ ] AC-2: Old env var names emit a deprecation warning for one release cycle
+- [ ] AC-3: `docs/deployment.md` and `.env.example` reflect the canonical name
+
+**Tasks:**
+- [ ] T-902: Consolidate auth env var; add deprecation shim for old names
+- [ ] T-903: Update `docs/deployment.md` and `.env.example`
+
+### S-269: As a Cursor/Windsurf/Cline user, I want a config snippet and quick-start guide so that I can connect DepthFusion to my editor without figuring out the MCP transport format myself `P1` `XS`
+
+**Acceptance criteria:**
+- [ ] AC-1: `docs/editor-quickstart.md` exists with copy-paste configs for Cursor, Windsurf, and Cline
+- [ ] AC-2: README links to it
+
+**Tasks:**
+- [ ] T-904: Write `docs/editor-quickstart.md` with tested config snippets
+- [ ] T-905: Add link from README
+
+### S-270: As a DepthFusion maintainer, I want a clean-venv packaging CI gate so that missing dependency declarations are caught before release `P1` `S`
+
+**Acceptance criteria:**
+- [ ] AC-1: CI builds a clean venv from `pyproject.toml` (no dev extras), runs `pip check`, imports both `http_server` and `server`, exits 0
+
+**Tasks:**
+- [ ] T-906: Add `packaging-gate` CI job to `.github/workflows/`
