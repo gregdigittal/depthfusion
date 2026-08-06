@@ -18,6 +18,9 @@ dependencies = [
     # S-248: nightly hygiene scheduler — APScheduler drives the AsyncIOScheduler
     # cron job (decay→dedup→prune). T-848 introduced the dep; T-849 wired lifespan.
     "apscheduler>=3.10",
+    # S-260: sd_notify + WatchdogSec — signals systemd READY=1 and kicks watchdog.
+    # No-ops gracefully when not running under systemd (safe in tests/dev).
+    "sdnotify>=0.3.2",
 ]
 
 [project.optional-dependencies]

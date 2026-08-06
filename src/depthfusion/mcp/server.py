@@ -15,6 +15,14 @@ from depthfusion.identity.models import Principal
 from depthfusion.mcp import session_activity as _session_activity
 from depthfusion.mcp.authz import AuthorizationError, check_tool_access
 
+# Configure logging to stderr so systemd/journald captures output from the
+# stdio server process (StandardError=journal in the systemd unit file).
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stderr,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+
 logger = logging.getLogger(__name__)
 
 # Tool registry (TOOLS, _TOOL_FLAGS, TOOL_SCHEMAS, get_enabled_tools)
@@ -500,12 +508,7 @@ def _process_request(
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
-                "error": {
-                    "code": -32602,
-                    "message": (
-                        f"params must be an object, got {type(params).__name__}"
-                    ),
-                },
+                "error": {"code": -32602, "message": f"params must be an object, got {type(params).__name__}"},
             }
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
@@ -680,13 +683,15 @@ def main() -> None:
         line = line.strip()
         if not line:
             continue
-        req_id = None  # captured before _process_request so we can reply on error
+        req_id = None
         try:
             request = json.loads(line)
             req_id = request.get("id")
             response = _process_request(request, config)
             if response:
                 print(json.dumps(response), flush=True)
+        except BrokenPipeError:
+            sys.exit(0)
         except json.JSONDecodeError as exc:
             error_response = {
                 "jsonrpc": "2.0",
@@ -694,25 +699,15 @@ def main() -> None:
                 "error": {"code": -32700, "message": f"Parse error: {exc}"},
             }
             print(json.dumps(error_response), flush=True)
-        except BrokenPipeError:
-            sys.exit(0)
         except Exception as exc:
-            logger.error("unhandled error processing request: %s", exc, exc_info=True)
+            logger.error("Unhandled error processing request: %s", exc, exc_info=True)
             if req_id is not None:
                 try:
-                    print(
-                        json.dumps(
-                            {
-                                "jsonrpc": "2.0",
-                                "id": req_id,
-                                "error": {
-                                    "code": -32603,
-                                    "message": f"Internal error: {exc}",
-                                },
-                            }
-                        ),
-                        flush=True,
-                    )
+                    print(json.dumps({
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {"code": -32603, "message": f"Internal error: {exc}"},
+                    }), flush=True)
                 except BrokenPipeError:
                     sys.exit(0)
 

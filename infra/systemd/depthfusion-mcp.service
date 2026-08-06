@@ -10,8 +10,11 @@ WorkingDirectory=/home/gregmorris/projects/depthfusion
 EnvironmentFile=/home/gregmorris/.claude/depthfusion.env
 ExecStart=/home/gregmorris/projects/depthfusion/.venv/bin/python3 \
     -m depthfusion.mcp.http_server
+Type=notify
 Restart=always
 RestartSec=10
+TimeoutStopSec=60
+WatchdogSec=90
 StandardOutput=journal
 StandardError=journal
 

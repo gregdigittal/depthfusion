@@ -4248,9 +4248,9 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [ ] AC-4: `READY=1` notification is sent after application startup completes
 
 **Tasks:**
-- [ ] T-882: Add `Type=notify`, `WatchdogSec=90` to `infra/systemd/depthfusion-mcp.service`
-- [ ] T-883: Install `sdnotify` in project dependencies (`pyproject.toml`)
-- [ ] T-884: Add asyncio watchdog task to `http_server.py` lifespan startup; send `READY=1` on startup, `WATCHDOG=1` every 30s
+- [x] T-882: Add `Type=notify`, `WatchdogSec=90` to `infra/systemd/depthfusion-mcp.service`
+- [x] T-883: Install `sdnotify` in project dependencies (`pyproject.toml`)
+- [x] T-884: Add asyncio watchdog task to `http_server.py` lifespan startup; send `READY=1` on startup, `WATCHDOG=1` every 30s
 - [ ] T-885: Write integration test confirming watchdog task runs and sends heartbeats
 
 ### S-261: As a DepthFusion operator, I want SSE generators to cooperatively observe app shutdown so that streams end cleanly without relying only on the force-cancel timeout `P2` `M`
@@ -4261,9 +4261,9 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [ ] AC-3: On shutdown, open SSE streams close within 1 second of the event being set
 
 **Tasks:**
-- [ ] T-886: Add `app.state.shutting_down = asyncio.Event()` to lifespan startup
-- [ ] T-887: Set `app.state.shutting_down` in lifespan `finally` block
-- [ ] T-888: Update SSE generator loops at `http_server.py:451-462` and `510-525` to check the event
+- [x] T-886: Add `app.state.shutting_down = asyncio.Event()` to lifespan startup
+- [x] T-887: Set `app.state.shutting_down` in lifespan `finally` block
+- [x] T-888: Update SSE generator loops at `http_server.py:451-462` and `510-525` to check the event
 
 ### S-262: As a DepthFusion operator, I want systemd restart limits and app logging configured correctly so that crash loops are recoverable and investigation is possible `P2` `S`
 

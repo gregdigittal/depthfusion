@@ -85,9 +85,33 @@ async def _lifespan(app: FastAPI):  # type: ignore[type-arg]  # noqa: ARG001
             logger.warning("lifespan: failed to start hygiene scheduler: %s", exc)
             scheduler = None
 
+    # S-261: cooperative shutdown event — SSE generators poll this so they exit
+    # promptly when uvicorn begins its graceful-shutdown sequence rather than
+    # looping until timeout_graceful_shutdown forces them closed.
+    app.state.shutting_down = asyncio.Event()
+
+    # S-260: sd_notify + watchdog — tell systemd the process is ready and kick
+    # the watchdog every 30 s (WatchdogSec=90 → 3× safety margin).  The
+    # SystemdNotifier silently no-ops when NOTIFY_SOCKET is absent (dev/test).
+    import sdnotify as _sdnotify  # noqa: PLC0415 — deferred: optional on non-systemd hosts
+    _sd_notifier = _sdnotify.SystemdNotifier()
+
+    async def _watchdog_loop() -> None:
+        """Kick the systemd watchdog every 30 s (WatchdogSec=90 → 3× margin)."""
+        while True:
+            await asyncio.sleep(30)
+            _sd_notifier.notify("WATCHDOG=1")
+
+    asyncio.ensure_future(_watchdog_loop())
+    _sd_notifier.notify("READY=1")
+    logger.info("lifespan: sd_notify READY=1 sent")
+
     try:
         yield
     finally:
+        # S-261: signal all SSE generators to exit their cooperative loop.
+        app.state.shutting_down.set()
+
         # ponytail: belt-and-braces alongside atexit; the HTTP process may not exit() cleanly
         try:
             from depthfusion.mcp.tools._state import _HNSW_STORE
@@ -458,7 +482,9 @@ async def streamable_http_sse_endpoint(
 
     async def event_stream() -> AsyncGenerator[str, None]:
         try:
-            while True:
+            # S-261: cooperative loop — exits promptly when the lifespan sets the
+            # shutting_down event rather than spinning until uvicorn's hard timeout.
+            while not request.app.state.shutting_down.is_set():
                 if await request.is_disconnected():
                     break
                 try:
@@ -466,6 +492,7 @@ async def streamable_http_sse_endpoint(
                     yield f"event: message\ndata: {msg}\n\n"
                 except asyncio.TimeoutError:
                     yield ": ping\n\n"
+            yield "event: close\ndata: server shutdown\n\n"
         finally:
             logger.info("MCP streamable-http event stream closed: %s", session_id)
 
@@ -520,7 +547,9 @@ async def sse_endpoint(
             # MCP spec: server immediately sends endpoint URI
             yield f"event: endpoint\ndata: /messages?sessionId={session_id}\n\n"
 
-            while True:
+            # S-261: cooperative loop — exits promptly when the lifespan sets the
+            # shutting_down event rather than spinning until uvicorn's hard timeout.
+            while not request.app.state.shutting_down.is_set():
                 if await request.is_disconnected():
                     break
                 try:
@@ -528,6 +557,7 @@ async def sse_endpoint(
                     yield f"event: message\ndata: {msg}\n\n"
                 except asyncio.TimeoutError:
                     yield ": ping\n\n"
+            yield "event: close\ndata: server shutdown\n\n"
         finally:
             _MCP_SESSIONS.pop(session_id, None)
             logger.info("MCP SSE session closed: %s", session_id)
@@ -815,7 +845,7 @@ def main() -> None:
     logger.info(
         "DepthFusion MCP HTTP/SSE server starting on %s:%d", host, port
     )
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    uvicorn.run(app, host=host, port=port, log_level="info", timeout_graceful_shutdown=30)
 
 
 if __name__ == "__main__":
