@@ -6,11 +6,11 @@ Every agent session starts from zero — it doesn't know what previous sessions 
 
 Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank → vector fusion), structured capture, a cognitive infrastructure layer, and the Event Graph Fabric for multi-agent shared memory.
 
-> **v2.4.0 — now on main:** DepthFusion v2.4.0 closes E-69–E-72: Tauri cognitive panel, CI hygiene, transport hardening, and packaging integrity. **Mac users on v2.3.x:** this release fixes the Claude Desktop MCP outage caused by `cryptography` missing from the `mac-mlx` extras. Run `git pull && pip install -e '.[mac-mlx]'` and restart Claude Desktop. v2.3.0 (E-68) added layered memory augmentation (L3 PersonaEngine, L2 ScenarioEngine, ContextOffloader). v2.2.0 closed E-65+E-67. All backlog epics are `[done]`. For v2.3.x see the `v2.3.0` git tag.
+> **v2.5.0 — now on main:** DepthFusion v2.5.0 closes E-73: session crash recovery (`depthfusion_session_checkpoint`), team-safe rate limiting, streaming recall, checkpoint timeline in the Tauri dashboard, and cross-session diff analysis. v2.4.0 (E-69–E-72) added the Tauri cognitive panel, CI hygiene, transport hardening, and packaging integrity. v2.3.0 (E-68) added layered memory augmentation. All 74 backlog epics are `[done]`. For v2.4.x see the `v2.4.0` git tag.
 
 **[→ Animated demo](https://gregdigittal.github.io/depthfusion/depthfusion-animated-demo.html)**
 
-> **Status:** v2.4.0 (main). 3692+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). Named configuration profiles (E-67). **Layered memory augmentation (E-68):** configurable AI distillation backend (auto/local/haiku), L3 PersonaEngine, L2 ScenarioEngine, ContextOffloader + Mermaid canvas. **Streamable HTTP MCP transport** (MCP 2025-03-26): `/mcp` endpoint for Claude Code, `/sse`+`/messages` for legacy clients, opt-in Origin validation (`DEPTHFUSION_MCP_ALLOWED_ORIGINS`). **Packaging integrity (E-72):** `cryptography` declared in all extras, install-script smoke tests, lazy identity imports so stdio MCP works without the HTTP stack. **31 canonical MCP tools** (22 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
+> **Status:** v2.5.0 (main). 3822+ tests passing · 0 ruff · 0 mypy. OIDC+PKCE authentication, device enrollment, RBAC (viewer/contributor/operator/admin), ACL records, data classification levels (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED), Fernet cache encryption, OS keychain token vault, Tauri desktop app (macOS + Windows), offline mode (SqliteLeaseStore durable HWM), HTTP MCP server at `https://mcp.tonracein.com` (E-64), model recommendation engine (`recommend_model`, `record_model_telemetry`, `GET /api/budget-summary`), and **ChatGPT Desktop for macOS MCP integration** (E-66). Multi-Provider Context Bridge (E-48), Project Context Intelligence (E-47), Event Graph Fabric (E-46). Named configuration profiles (E-67). **Layered memory augmentation (E-68):** configurable AI distillation backend (auto/local/haiku), L3 PersonaEngine, L2 ScenarioEngine, ContextOffloader + Mermaid canvas. **Streamable HTTP MCP transport** (MCP 2025-03-26): `/mcp` endpoint for Claude Code, `/sse`+`/messages` for legacy clients, opt-in Origin validation (`DEPTHFUSION_MCP_ALLOWED_ORIGINS`). **Packaging integrity (E-72):** `cryptography` declared in all extras, install-script smoke tests, lazy identity imports so stdio MCP works without the HTTP stack. **E-73 Growth & Observability:** session crash recovery (`depthfusion_session_checkpoint`), in-process rate limiting (InMemory/Redis backends, 300/min recall · 60/min publish), streaming recall (`stream=true` SSE results before reranker completes), Tauri checkpoint timeline tile with resume-from-checkpoint, cross-session diff analysis (`/query/aggregate?type=file_diffs`). **32 canonical MCP tools** (23 always-on, 9 feature-flagged). SkillForge SF-2 + Mamba B/C/Δ + HNSW vector layer active.
 
 ## V2 Feature Summary
 
@@ -33,6 +33,11 @@ Built on Claude Code's MCP surface: tiered retrieval (BM25 → semantic rerank �
 | ContextOffloader + Mermaid canvas (E-68) | Offloads verbose tool logs to `refs/{session}/{node}.md`; `depthfusion_compress_session` produces a Mermaid task canvas; `depthfusion_bridge node_id=` retrieves raw text | — |
 | Streamable HTTP transport (E-71/E-72) | `/mcp` endpoint implements MCP 2025-03-26 Streamable HTTP; `POST /mcp` returns JSON or SSE based on `Accept`; `GET /mcp` opens server-push stream; `DELETE /mcp` tears down session. Opt-in Origin validation via `DEPTHFUSION_MCP_ALLOWED_ORIGINS` | [docs/mcp-http-server.md](docs/mcp-http-server.md) |
 | Packaging integrity (E-72) | `cryptography` declared in `mac-mlx`, `vps-cpu`, `vps-gpu` extras; install scripts fail fast on broken MCP import; lazy-import in `depthfusion.identity` so stdio MCP starts without FastAPI or cryptography | — |
+| Session crash recovery (E-73 S-250) | `depthfusion_session_checkpoint` tool snapshots plan state, modified files, git stash ref, and context % — restores via `depthfusion_session_seed(mode="resume", checkpoint_id=…)` | — |
+| Rate limiting (E-73 S-251) | In-process rate limiter with `InMemoryRateLimitBackend` (default) and `RedisRateLimitBackend`; 300 req/min for recall tools, 60 req/min for publish/admin; exact `429 {"error":"rate_limited","retry_after_seconds":N}` body | — |
+| Streaming recall (E-73 S-252) | `depthfusion_recall_relevant` accepts `stream=true`; BM25 results stream via SSE before the reranker finishes; reranker scores arrive as follow-up `score_update` events | — |
+| Checkpoint timeline (E-73 S-253) | Tauri dashboard tile showing session checkpoint history per project; resume-from-checkpoint button calls `POST /session/seed`; `GET /query/checkpoints` REST endpoint | — |
+| Cross-session diff analysis (E-73 S-254) | Each checkpoint record stores gzip-compressed git diffs (4 KB cap/file); `GET /query/aggregate?type=file_diffs&file=<path>&since=<iso>` returns chronological diff history; `FileDiffHistory` drill-down panel in the dashboard | — |
 
 ---
 
@@ -90,7 +95,7 @@ The **37–372 ms (n=4 real sessions)** row is the canonical **end-to-end recall
 
 The stronger "no regression" story is the **green test suite**, not the 1.0 precision figure above. As of v2.0.0:
 
-- **3692 tests collected**, full suite passing · 0 ruff · 0 mypy.
+- **3822 tests collected**, full suite passing · 0 ruff · 0 mypy.
 - **18/18 benchmark-suite tests pass (0.40 s)** spanning all four CIQS proxy categories:
   - **Cat A** — retrieval precision, no-regression sentinel
   - **Cat B** — BM25 score monotonicity + source-weight tier ordering
@@ -227,7 +232,7 @@ src/depthfusion/
 ├── router/      — bus (InMemory/File), publisher, subscriber, dispatcher
 ├── recursive/   — trajectory, sandbox, strategies, client (rlm)
 ├── analyzer/    — scanner, compatibility (C1-C11), recommender, installer, prune
-├── mcp/         — server (31 canonical tools: 22 always-on, 9 feature-flagged)
+├── mcp/         — server (32 canonical tools: 23 always-on, 9 feature-flagged)
 ├── retrieval/   — bm25, reranker (haiku/gemma), hybrid (RRF pipeline), embedding
 ├── capture/     — auto_learn, compressor, decision_extractor, negative_extractor,
 │                  confirm_discovery, dedup, event_hook (high-importance signal)
@@ -294,6 +299,8 @@ Requirements: Windows 10/11 x64 · winget ([install from Microsoft Store](https:
 For team members who need to connect to the shared VPS memory hub without a local install, open **[docs/install/ceo-quickstart.html](docs/install/ceo-quickstart.html)** in any browser. 4 steps: install Claude Desktop, install Tailscale, run one `claude mcp add` command, verify with `depthfusion_status`. Covers Mac and Windows, copy buttons throughout, no terminal knowledge required.
 
 For the full two-part guide that covers both server setup (admin) and client onboarding (team), see **[docs/install/team-vps-install.html](docs/install/team-vps-install.html)**.
+
+**Upgrading to v2.5.0?** `git pull && pip install -e ".[<your-mode>]"`. No schema changes, no migration needed. New env vars (all optional): none required — rate limiting and streaming recall are on by default; Redis rate-limit backend activates when `REDIS_URL` is set. The Tauri dashboard picks up the new checkpoint timeline tile automatically on next launch (localStorage key bumped to `depthfusion-dashboard-layout-v2`).
 
 **Upgrading to v2.4.0?** `git pull && pip install -e ".[<your-mode>]"`. No schema changes. **Mac users:** this release fixes the Claude Desktop MCP outage — `cryptography` is now declared in the `mac-mlx` extras so a clean venv install no longer fails at import. The HTTP MCP server now uses `/mcp` (Streamable HTTP, MCP 2025-03-26) as the primary transport; update your Claude Code `mcp.json` from `type: sse` + `/sse` to `type: http` + `/mcp` for better performance. See `docs/mcp-http-server.md` for the three transport scenarios.
 
@@ -570,16 +577,16 @@ A generated Go CLI (`depthfusion-pp-cli`) and MCP server (`depthfusion-pp-mcp`) 
 
 ---
 
-## MCP Tools (31 canonical)
+## MCP Tools (32 canonical)
 
-After E-48 (Multi-Provider Context Bridge), E-64 (HTTP MCP server + model recommendation engine), and E-67 (capability introspection), the MCP surface is 31 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; `depthfusion_describe_capabilities` was re-added in E-67. The canonical set:
+After E-48 (Multi-Provider Context Bridge), E-64 (HTTP MCP server + model recommendation engine), E-67 (capability introspection), and E-73 (session checkpoint + streaming recall), the MCP surface is 32 tools across Mac (mac-mlx) and VPS (vps-gpu / vps-cpu) installs. 11 low-value or unshipped tools were removed in the 2026-05-25 parity audit; `depthfusion_describe_capabilities` was re-added in E-67. The canonical set:
 
-### Core retrieval & capture (22 always-on)
+### Core retrieval & capture (23 always-on)
 
 | Tool | Description | Required flag |
 |---|---|---|
 | `depthfusion_status` | Feature-flag states + module health | always |
-| `depthfusion_recall_relevant` | Tier-aware session block retrieval | always |
+| `depthfusion_recall_relevant` | Tier-aware session block retrieval. Pass `stream=true` to receive BM25 results via SSE before the reranker completes; reranker scores arrive as follow-up `score_update` events. | always |
 | `depthfusion_tag_session` | Tag a session file → `.meta.yaml` sidecar | always |
 | `depthfusion_auto_learn` | Trigger extraction from recent `.tmp` session files | always |
 | `depthfusion_compress_session` | Compress a `.tmp` file into a discovery | always |
@@ -600,6 +607,7 @@ After E-48 (Multi-Provider Context Bridge), E-64 (HTTP MCP server + model recomm
 | `depthfusion_list_providers` | List configured bridge providers, their health status, and how many memories each has contributed. Returns immediately without a network call. | always |
 | `depthfusion_recommend_model` | Query DepthFusion for the best model given task category, vendor exclusion (Fable-5 isolation), and per-task budget. Returns ranked candidates with `quality_rate`, `avg_cost_usd`, `confidence`, and `budget_warning`. Companion tool `record_model_telemetry` closes the feedback loop. Requires HTTP MCP server at `https://mcp.tonracein.com`. | always |
 | `depthfusion_describe_capabilities` | Introspect the active feature-flag profile: returns tier, mode, flag states, and which processing layers are engaged per operation (recall / publish / auto_learn). Added in E-67. | always |
+| `depthfusion_session_checkpoint` | Snapshot the current session: plan state, files modified, git stash ref, and context %. Stored as a `CheckpointRecord`; resume via `depthfusion_session_seed(mode="resume", checkpoint_id=…)`. Added in E-73. | always |
 
 ### Feature-flagged (9 tools)
 
@@ -625,7 +633,7 @@ Full tool documentation with response shapes: see `docs/coordination/2026-05-05-
 
 For project sync and Stop-hook setup: see **[docs/project-sync.md](docs/project-sync.md)**.
 
-The generated CLI (`depthfusion-pp-cli`) exposes all 31 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
+The generated CLI (`depthfusion-pp-cli`) exposes all 32 tools as subcommands. See **[docs/cli.md](docs/cli.md)**.
 
 ---
 
@@ -668,7 +676,7 @@ Full documentation: **[docs/fabric/api-reference.md](docs/fabric/api-reference.m
 
 ## ChatGPT Desktop Integration (E-66, v2.1.1)
 
-Connect **ChatGPT Desktop for macOS** to the DepthFusion MCP server. The existing SSE transport at `https://mcp.tonracein.com` satisfies ChatGPT's MCP connector requirements — no server-side changes required. All 31 tools are available; 19 are immediately useful in a chat context, 12 are designed for Claude Code's agentic loop.
+Connect **ChatGPT Desktop for macOS** to the DepthFusion MCP server. The existing SSE transport at `https://mcp.tonracein.com` satisfies ChatGPT's MCP connector requirements — no server-side changes required. All 32 tools are available; 19 are immediately useful in a chat context, 13 are designed for Claude Code's agentic loop.
 
 ### One-step install
 
@@ -702,7 +710,7 @@ Full guide: **[docs/chatgpt-mcp-setup.md](docs/chatgpt-mcp-setup.md)**
 
 Cursor, Windsurf, and Cline can connect to DepthFusion via the **Streamable HTTP transport**
 (`POST https://mcp.tonracein.com/mcp`, MCP spec 2025-03-26) using a Bearer token.
-All 31 tools are available in each editor's AI assistant.
+All 32 tools are available in each editor's AI assistant.
 
 Full setup guide with ready-to-paste JSON config snippets for each editor:
 **[docs/mcp-client-setup.md](docs/mcp-client-setup.md)**
