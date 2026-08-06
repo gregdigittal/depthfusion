@@ -715,6 +715,9 @@ All 32 tools are available in each editor's AI assistant.
 Full setup guide with ready-to-paste JSON config snippets for each editor:
 **[docs/mcp-client-setup.md](docs/mcp-client-setup.md)**
 
+Quick-start (2-minute copy-paste configs for stdio and HTTP transport):
+**[docs/editor-quickstart.md](docs/editor-quickstart.md)**
+
 ---
 
 ## Project Context Intelligence (E-47, v1.2.0)

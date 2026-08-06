@@ -21,6 +21,8 @@ dependencies = [
     # S-260: sd_notify + WatchdogSec — signals systemd READY=1 and kicks watchdog.
     # No-ops gracefully when not running under systemd (safe in tests/dev).
     "sdnotify>=0.3.2",
+    # S-264: auth module uses python-jose for JWT decode; was missing from declared deps.
+    "python-jose[cryptography]>=3.3",
 ]
 
 [project.optional-dependencies]

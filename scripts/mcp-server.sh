@@ -18,4 +18,9 @@ if [[ ! -x "${VENV_PYTHON}" ]]; then
     exit 1
 fi
 
+"${VENV_PYTHON}" -c "import depthfusion.mcp.server" 2>&1 || {
+    echo "ERROR: depthfusion.mcp.server import failed — run: pip install -e '.[vps-cpu]'" >&2
+    exit 1
+}
+
 exec "${VENV_PYTHON}" -m depthfusion.mcp.server "$@"

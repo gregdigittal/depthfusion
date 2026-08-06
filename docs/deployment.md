@@ -120,3 +120,19 @@ If using Prometheus + node_exporter, add an alert rule:
   annotations:
     summary: "Host swap below 20% — check for zombie depthfusion stdio processes"
 ```
+
+## Auth Environment Variables (S-268)
+
+All five auth variables live under the `DEPTHFUSION_*` prefix and are set in
+`/home/gregmorris/.claude/depthfusion.env` on VPS deployments.
+
+| Variable | Required when | Description |
+|---|---|---|
+| `DEPTHFUSION_V2_LEGACY_AUTH` | Always | Set `1` to accept a shared Bearer token (legacy mode). Set `0` for OIDC-only. |
+| `DEPTHFUSION_API_TOKEN` | `V2_LEGACY_AUTH=1` | The shared Bearer secret for the REST API (`/api/*`). Generate: `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `DEPTHFUSION_MCP_TOKEN` | `MCP_PUBLIC=1` | Bearer secret for the MCP HTTP server. Same generation command. |
+| `DEPTHFUSION_JWKS_URI` | OIDC mode | JWKS endpoint of your IdP, e.g. `https://accounts.google.com/.well-known/openid-configuration` |
+| `DEPTHFUSION_OIDC_ISSUER` | OIDC mode | Expected `iss` claim, e.g. `https://accounts.google.com` |
+| `DEPTHFUSION_MCP_ALLOWED_ORIGINS` | `MCP_PUBLIC=1` | Comma-separated allowed CORS Origins. Default: `http://localhost,http://127.0.0.1`. Empty string = allow all (dev only). |
+
+See `.env.example` for the full list of configurable variables.
