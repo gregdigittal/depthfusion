@@ -1,0 +1,17 @@
+# Security floor pins for pip users (uv users: see [tool.uv].constraint-dependencies in pyproject.toml).
+# Install with: pip install -c constraints.txt -e ".[vps-cpu]"
+#
+# These are transitive dependencies with known CVEs where the fix version is available.
+# Direct dep floors are already declared in pyproject.toml.
+pyasn1>=0.6.4        # PYSEC-2026-3455/3456/3457: BER/CER/DER DoS
+aiohttp>=3.14.3      # PYSEC-2026-3545/3546/3547: HTTP response splitting / smuggling
+setuptools>=83.0.0   # PYSEC-2026-3447: path traversal in wheel extraction
+# chromadb — PYSEC-2026-311 — no upstream fix available; tracked in pyproject.toml.
+# ecdsa — PYSEC-2026-1325 — no upstream fix; mitigated by python-jose[cryptography] (ecdsa not called).
+#
+# The following CVEs appear in shared dev venvs that contain other projects (langchain, etc.)
+# and will NOT appear in a fresh depthfusion-only install:
+#   GHSA-f4xh-w4cj-qxq8  langsmith (not a depthfusion dep)
+#   PYSEC-2026-3483       mcp (not a depthfusion dep)
+#   PYSEC-2026-1835       pypdf2 (orphaned; not a depthfusion dep)
+#   PYSEC-2025-194        torch (not a depthfusion dep; from sentence-transformers in vps-gpu only)

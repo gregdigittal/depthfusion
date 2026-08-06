@@ -29,3 +29,14 @@ jobs:
 
       - name: pip check (full)
         run: pip check
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit --quiet
+          pip-audit \
+            --ignore-vuln PYSEC-2026-311 \
+            --ignore-vuln PYSEC-2026-1325 \
+            --ignore-vuln PYSEC-2026-2447
+          # PYSEC-2026-311:  chromadb — no upstream fix available (tracked in pyproject.toml [tool.uv])
+          # PYSEC-2026-1325: ecdsa — no fix; mitigated: python-jose[cryptography] never calls ecdsa
+          # PYSEC-2026-2447: diskcache — not a depthfusion dep (orphaned transitive in some envs)

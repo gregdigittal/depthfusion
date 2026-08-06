@@ -44,7 +44,7 @@ vps-cpu = [
     "Markdown>=3.8.1",
     "starlette>=1.3.1",   # CVE-2026-54282/54283: Host header + form DoS (Dependabot #35)
     "pydantic-settings>=2.14.2",  # Dependabot: transitive via chromadb (pinned 2.14.1)
-    "cryptography>=49.0.0",  # T-826: identity.TokenValidator RS256 primitives (S-239)
+    "cryptography>=50.0.0",  # T-826: identity.TokenValidator RS256 primitives (S-239); >=50 fixes PYSEC-2026-3552
 ]
 
 # `vps-gpu` mode: on-box Gemma (no Python dep — served via vLLM CLI)
@@ -64,7 +64,7 @@ vps-gpu = [
     "Markdown>=3.8.1",
     "starlette>=1.3.1",   # CVE-2026-54282/54283: Host header + form DoS (Dependabot #35)
     "pydantic-settings>=2.14.2",  # Dependabot: transitive via chromadb (pinned 2.14.1)
-    "cryptography>=49.0.0",  # T-826: identity.TokenValidator RS256 primitives (S-239)
+    "cryptography>=50.0.0",  # PYSEC-2026-3552: vulnerable OpenSSL in wheels
 ]
 
 # `mac-mlx` mode: Apple Silicon GPU inference via mlx_lm.server.
@@ -85,7 +85,7 @@ mac-mlx = [
     "Markdown>=3.8.1",
     "starlette>=1.3.1",   # CVE-2026-54282/54283: Host header + form DoS (Dependabot #35)
     "pydantic-settings>=2.14.2",  # Dependabot: transitive via chromadb (pinned 2.14.1)
-    "cryptography>=49.0.0",  # T-826: identity.TokenValidator RS256 primitives (S-239)
+    "cryptography>=50.0.0",  # PYSEC-2026-3552: vulnerable OpenSSL in wheels
 ]
 
 # E-45: standalone HNSW extra — install for the agent-ops bridge integration
@@ -103,7 +103,7 @@ rlm = ["rlms"]
 # Activate at runtime with: DEPTHFUSION_OCR_ENABLED=1
 ocr = [
     "pytesseract>=0.3",
-    "Pillow>=10.0",
+    "Pillow>=12.3.0",        # >=12.3.0 fixes PYSEC-2026-2253/2254/2255/2256/2257/3451/3452/3453/3454/3493/3494/3495/3496
     "rapidocr_onnxruntime>=1.3; python_version>='3.8'",
 ]
 
@@ -131,11 +131,11 @@ dev = [
     "starlette>=1.3.1",      # CVE-2026-54282/54283: Host header + form DoS (Dependabot #35)
     "chromadb>=1.0,<2.0",   # graph/vector store tests (T-534 CI 80% floor)
     "hnswlib>=0.7",          # HNSW index tests (T-534 CI 80% floor)
-    "pypdf>=3.0",            # optional PDF parser — imported by test_ingest_throughput.py
+    "pypdf>=6.14.2",         # optional PDF parser — >=6.14.2 fixes PYSEC-2026-361x CVEs
     "pdfplumber>=0.11",      # PdfParser primary backend — required by test_document_parsers.py
     "pdfminer.six>=20221105",  # PdfParser fallback backend — pdfplumber transitive dep but pinned for CI
     "reportlab>=4.0",        # test fixture _make_pdf() multi-page PDF generator — without it CI falls back to single-page MINIMAL_PDF and test_page_count_matches_records fails (assert 1 == 2)
-    "cryptography>=49.0.0",  # token_validator.py direct import; not installed transitively by pip
+    "cryptography>=50.0.0",  # token_validator.py direct import; not installed transitively by pip
     "python-docx>=0.8",     # ingest/parser.py + test_ingest.py direct import; not installed transitively by pip
     "msal>=1.0",            # sharepoint.py lazy import; test_sharepoint.py expects ConfigurationError not ImportError
 ]
@@ -195,10 +195,14 @@ select = ["E", "F", "W", "I"]
 constraint-dependencies = [
     "mako>=1.3.12",       # CVE: path traversal (backslash + double-slash URI)
     "pyjwt>=2.13.0",      # CVE: accepts unknown crit header extensions
-    "cryptography>=49.0.0",  # CVE: vulnerable OpenSSL in wheels (transitive via chromadb)
+    "cryptography>=50.0.0",  # CVE: vulnerable OpenSSL in wheels (transitive via chromadb)
     "starlette>=1.3.1",   # CVE-2026-54282/54283: Host header + form DoS
     "markdown>=3.8.1",    # CVE: uncaught exception
     "pygments>=2.20.0",   # CVE: ReDoS on GUID matching
     "pydantic-settings>=2.14.2",  # Dependabot: transitive via chromadb (pinned 2.14.1)
-    "pyasn1>=0.6.4",              # CVE: BER/CER/DER DoS + quadratic complexity (transitive via python-jose/rsa)
+    "pyasn1>=0.6.4",              # PYSEC-2026-3455/3456/3457: BER/CER/DER DoS (transitive via python-jose/rsa)
+    "aiohttp>=3.14.3",            # PYSEC-2026-3545/3546/3547: transitive via chromadb→kubernetes
+    "pillow>=12.3.0",             # PYSEC-2026-2253-2257/3451-3496: image parsing CVEs (ocr extra)
+    "pypdf>=6.14.2",              # PYSEC-2026-3610-3613/GHSA-jm82: PDF parsing CVEs (dev extra)
+    "setuptools>=83.0.0",         # PYSEC-2026-3447: path traversal in package extraction
 ]
