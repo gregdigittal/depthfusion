@@ -122,6 +122,13 @@ class TestDeleteEndpointCheckpoint:
 
 
 class TestLifespanShutdownCheckpoint:
+    @pytest.fixture(autouse=True)
+    def _stub_sdnotify(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        monkeypatch.setitem(sys.modules, "sdnotify", MagicMock())
+
     @pytest.mark.asyncio
     async def test_open_sessions_checkpointed_on_shutdown(self, monkeypatch):
         from depthfusion.mcp import http_server as hs
@@ -291,3 +298,61 @@ class TestPublishSessionCheckpoint:
 
         # Must not raise.
         await hs._publish_session_checkpoint("sess-broken-store")
+
+
+# ---------------------------------------------------------------------------
+# T-885: watchdog lifespan — READY=1 on startup, WATCHDOG=1 heartbeats
+# ---------------------------------------------------------------------------
+
+
+class TestWatchdogLifespan:
+    """S-260 AC-2/AC-4: lifespan sends READY=1 on startup and WATCHDOG=1 heartbeats."""
+
+    @pytest.mark.asyncio
+    async def test_ready_sent_on_startup(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        from depthfusion.mcp import http_server as hs
+
+        mock_notifier = MagicMock()
+        fake_sdnotify = MagicMock()
+        fake_sdnotify.SystemdNotifier.return_value = mock_notifier
+
+        monkeypatch.setattr(hs, "build_scheduler", lambda: None)
+        # sdnotify is optional and not installed in CI — inject a fake module
+        monkeypatch.setitem(sys.modules, "sdnotify", fake_sdnotify)
+
+        async with hs._lifespan(hs.app):
+            pass
+
+        mock_notifier.notify.assert_any_call("READY=1")
+
+    @pytest.mark.asyncio
+    async def test_watchdog_heartbeat_sent(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock, patch
+
+        from depthfusion.mcp import http_server as hs
+
+        mock_notifier = MagicMock()
+        fake_sdnotify = MagicMock()
+        fake_sdnotify.SystemdNotifier.return_value = mock_notifier
+
+        monkeypatch.setattr(hs, "build_scheduler", lambda: None)
+        monkeypatch.setitem(sys.modules, "sdnotify", fake_sdnotify)
+
+        # Capture the real sleep so we can use it inside the mock and the
+        # test body without recursing into the patched version.
+        _real_sleep = asyncio.sleep
+
+        async def fast_sleep(_seconds):
+            await _real_sleep(0)  # yield without waiting the full 30 s
+
+        with patch("asyncio.sleep", fast_sleep):
+            async with hs._lifespan(hs.app):
+                # Give the event loop a real 10 ms — enough for the
+                # watchdog loop to fire at least once with the patched sleep.
+                await _real_sleep(0.01)
+
+        mock_notifier.notify.assert_any_call("WATCHDOG=1")

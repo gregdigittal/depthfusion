@@ -4242,16 +4242,16 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 ### S-260: As a DepthFusion operator, I want sd_notify + WatchdogSec so that a slow-but-alive event loop is detected and auto-recovered within 2 minutes `P1` `L`
 
 **Acceptance criteria:**
-- [ ] AC-1: `depthfusion-mcp.service` has `Type=notify` and `WatchdogSec=90`
-- [ ] AC-2: An asyncio task pings `sdnotify` with `WATCHDOG=1` every 30 seconds from the running event loop
+- [x] AC-1: `depthfusion-mcp.service` has `Type=notify` and `WatchdogSec=90`
+- [x] AC-2: An asyncio task pings `sdnotify` with `WATCHDOG=1` every 30 seconds from the running event loop
 - [ ] AC-3: Killing the asyncio watchdog task (but not the process) causes systemd to restart the service within 90s
-- [ ] AC-4: `READY=1` notification is sent after application startup completes
+- [x] AC-4: `READY=1` notification is sent after application startup completes
 
 **Tasks:**
 - [x] T-882: Add `Type=notify`, `WatchdogSec=90` to `infra/systemd/depthfusion-mcp.service`
 - [x] T-883: Install `sdnotify` in project dependencies (`pyproject.toml`)
 - [x] T-884: Add asyncio watchdog task to `http_server.py` lifespan startup; send `READY=1` on startup, `WATCHDOG=1` every 30s
-- [ ] T-885: Write integration test confirming watchdog task runs and sends heartbeats
+- [x] T-885: Write integration test confirming watchdog task runs and sends heartbeats
 
 ### S-261: As a DepthFusion operator, I want SSE generators to cooperatively observe app shutdown so that streams end cleanly without relying only on the force-cancel timeout `P2` `M`
 
