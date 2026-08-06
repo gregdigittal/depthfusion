@@ -86,3 +86,37 @@ than one.
 |---|---|---|
 | MCP session tracking (`_MCP_SESSIONS`, `_MCP_STREAMABLE_SESSIONS`) | In-process dict (works today) | Not yet implemented — documented upgrade path above; single worker only until it lands |
 | Rate limiting (`mcp/ratelimit.py`) | `InMemoryRateLimitBackend` (per-worker) | `RedisRateLimitBackend` via `DEPTHFUSION_REDIS_URL` — implemented and safe for multi-worker today |
+
+## Swap Alert
+
+The Aug 6 2026 outage was caused by swap exhaustion from zombie stdio processes.
+Monitor swap usage and alert when swap free falls below 20% of total:
+
+```bash
+# Check current swap usage
+free -h
+
+# One-liner alert threshold check (use in cron or monitoring)
+python3 -c "
+import subprocess, sys
+out = subprocess.check_output(['free', '-b']).decode()
+for line in out.splitlines():
+    if line.startswith('Swap:'):
+        total, used, free = int(line.split()[1]), int(line.split()[2]), int(line.split()[3])
+        if total > 0 and free / total < 0.2:
+            print(f'ALERT: Swap free {free//1024//1024}MB ({100*free//total}%) < 20%')
+            sys.exit(1)
+"
+```
+
+If using Prometheus + node_exporter, add an alert rule:
+
+```yaml
+- alert: SwapLow
+  expr: node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes < 0.2
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Host swap below 20% — check for zombie depthfusion stdio processes"
+```

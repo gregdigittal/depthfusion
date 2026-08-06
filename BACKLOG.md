@@ -4275,7 +4275,7 @@ All 28 tests in `tests/mcp/test_ratelimit.py` pass; the full `tests/mcp/` suite 
 - [ ] AC-5: LLM-agent docker containers have `mem_limit` set
 
 **Tasks:**
-- [ ] T-889: Set `StartLimitIntervalSec=300` and `RestartSec=10` in `depthfusion-mcp.service`
-- [ ] T-890: Add `logging.basicConfig(level=logging.INFO, stream=sys.stderr)` to `http_server.py` and `server.py`
-- [ ] T-891: Add `mem_limit` to the 9 LLM-agent docker container definitions
-- [ ] T-892: Add swap usage alert rule (Prometheus alertmanager or systemd-based equivalent)
+- [x] T-889: Set `StartLimitIntervalSec=300` and `RestartSec=10` in `depthfusion-mcp.service`
+- [x] T-890: Add `logging.basicConfig(level=logging.INFO, stream=sys.stderr)` to `http_server.py` and `server.py`
+- [x] T-891: Add `mem_limit` to the 9 LLM-agent docker container definitions
+- [x] T-892: Add swap usage alert rule (Prometheus alertmanager or systemd-based equivalent)

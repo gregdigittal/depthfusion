@@ -2,7 +2,7 @@
 Description=DepthFusion MCP HTTP Server
 After=network.target
 StartLimitBurst=5
-StartLimitIntervalSec=30
+StartLimitIntervalSec=300
 
 [Service]
 User=gregmorris
@@ -11,8 +11,7 @@ EnvironmentFile=/home/gregmorris/.claude/depthfusion.env
 ExecStart=/home/gregmorris/projects/depthfusion/.venv/bin/python3 \
     -m depthfusion.mcp.http_server
 Restart=always
-RestartSec=5
-TimeoutStopSec=60
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
