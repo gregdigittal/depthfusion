@@ -684,3 +684,7 @@ def main() -> None:
         except Exception as exc:
             logger.error(f"Unhandled error: {exc}")
 
+
+if __name__ == "__main__":
+    main()
+
